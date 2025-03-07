@@ -1,0 +1,143 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
+import { getIsPremium, getFavorites } from '../utils/storage';
+import stretches from '../data/stretches';
+import { Stretch } from '../types';
+
+export default function FavoritesScreen() {
+  const [isPremium, setIsPremium] = useState(false);
+  const [favorites, setFavorites] = useState<Stretch[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const premium = await getIsPremium();
+      setIsPremium(premium);
+      
+      if (premium) {
+        const favoriteIds = await getFavorites();
+        const favoriteStretches = stretches.filter(stretch => 
+          favoriteIds.includes(stretch.id)
+        );
+        setFavorites(favoriteStretches);
+      }
+    };
+    
+    loadData();
+  }, []);
+
+  const renderFavoriteItem = ({ item }: { item: Stretch }) => (
+    <View style={styles.favoriteItem}>
+      <Image source={item.image} style={styles.stretchImage} />
+      <View style={styles.stretchInfo}>
+        <Text style={styles.stretchName}>{item.name}</Text>
+        <Text style={styles.stretchDescription}>{item.description}</Text>
+        <Text style={styles.stretchDuration}>{item.duration}s</Text>
+      </View>
+    </View>
+  );
+
+  if (!isPremium) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.text}>Favorites Screen</Text>
+        <Text style={styles.subtext}>Unlock favorites with Premium!</Text>
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Go Premium</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.header}>Favorites</Text>
+      
+      {favorites.length === 0 ? (
+        <Text style={styles.emptyText}>No favorites yet. Star stretches during your routine to save them here!</Text>
+      ) : (
+        <FlatList
+          data={favorites}
+          renderItem={renderFavoriteItem}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.favoritesList}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  text: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtext: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  button: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignSelf: 'center',
+  },
+  buttonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  favoritesList: {
+    flex: 1,
+  },
+  favoriteItem: {
+    flexDirection: 'row',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  stretchImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  stretchInfo: {
+    flex: 1,
+  },
+  stretchName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  stretchDescription: {
+    fontSize: 12,
+    color: '#666',
+  },
+  stretchDuration: {
+    fontSize: 12,
+    color: '#4CAF50',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 32,
+  },
+}); 
