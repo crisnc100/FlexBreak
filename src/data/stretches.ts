@@ -1,52 +1,83 @@
 import { Stretch } from '../types';
 
 const stretches: Stretch[] = [
-  {
-    id: 1,
-    name: "Cat-Cow Stretch",
-    description: "Great for spinal mobility and back pain relief",
-    duration: 60,
-    tags: ["back", "full body"],
-    level: "beginner",
-    image: { uri: 'https://via.placeholder.com/200/4CAF50/FFFFFF?text=Cat-Cow' }
-  },
-  {
-    id: 2,
-    name: "Seated Twist",
-    description: "Relieves tension in the spine and shoulders",
-    duration: 45,
-    tags: ["back", "shoulders", "full body"],
-    level: "beginner",
-    image: { uri: 'https://via.placeholder.com/200/2196F3/FFFFFF?text=Seated+Twist' }
-  },
-  {
-    id: 3,
-    name: "Neck Rolls",
-    description: "Releases tension in the neck and upper shoulders",
-    duration: 30,
-    tags: ["neck", "shoulders", "full body"],
-    level: "beginner",
-    image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Neck+Rolls' }
-  },
-  {
-    id: 4,
-    name: "Hip Flexor Stretch",
-    description: "Opens tight hip flexors from prolonged sitting",
-    duration: 60,
-    tags: ["hips", "full body"],
-    level: "intermediate",
-    image: { uri: 'https://via.placeholder.com/200/9C27B0/FFFFFF?text=Hip+Flexor' }
-  },
-  {
-    id: 5,
-    name: "Shoulder Rolls",
-    description: "Relieves tension in shoulders and upper back",
-    duration: 30,
-    tags: ["shoulders", "full body"],
-    level: "beginner",
-    image: { uri: 'https://via.placeholder.com/200/F44336/FFFFFF?text=Shoulder+Rolls' }
-  },
-  // Add more stretches as needed to reach 30
+  // Hips & Legs (11 total: 5 Beginner, 5 Intermediate, 3 Advanced)
+  { id: 1, name: "Kneeling Hip Flexor Stretch", description: "Kneel on one knee with the other foot in front. Push hips forward to stretch the hip flexors, counteracting tightness from sitting. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/4CAF50/FFFFFF?text=Kneeling+Hip+Flexor+Stretch' } },
+  { id: 2, name: "Standing Quad Stretch", description: "Stand on one leg, pull the other foot towards your buttocks to stretch the quadriceps, relieving front-thigh tension. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/2196F3/FFFFFF?text=Standing+Quad+Stretch' } },
+  { id: 3, name: "Seated Hamstring Stretch", description: "Sit with one leg extended and the other bent. Reach towards your toes to stretch the hamstrings, easing tightness from sitting. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Seated+Hamstring+Stretch' } },
+  { id: 4, name: "Figure-Four Stretch", description: "Lie on your back, cross one ankle over the opposite knee, and pull the thigh towards your chest to stretch the glutes. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/9C27B0/FFFFFF?text=Figure-Four+Stretch' } },
+  { id: 5, name: "Butterfly Stretch", description: "Sit with the soles of your feet together and gently press your knees towards the ground to stretch the inner thighs and groin. Hold for 30 seconds.", duration: 30, tags: ["Hips & Legs"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/F44336/FFFFFF?text=Butterfly+Stretch' } },
+  { id: 6, name: "Pigeon Pose", description: "From a plank, bring one knee forward and extend the other leg back to deeply stretch the hips and glutes. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/3F51B5/FFFFFF?text=Pigeon+Pose' } },
+  { id: 7, name: "Lizard Pose", description: "From a lunge, lower your forearms to the ground for a deep hip flexor and quad stretch. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/009688/FFFFFF?text=Lizard+Pose' } },
+  { id: 8, name: "Low Lunge", description: "From a kneeling position, step one foot forward and push hips forward to gently stretch the hip flexors. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/FFEB3B/FFFFFF?text=Low+Lunge' } },
+  { id: 9, name: "Standing Hamstring Stretch", description: "Stand with feet hip-width apart, bend forward, and reach towards your toes to stretch the hamstrings. Hold for 30 seconds.", duration: 30, tags: ["Hips & Legs"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/795548/FFFFFF?text=Standing+Hamstring+Stretch' } },
+  { id: 10, name: "Wall Calf Stretch", description: "Stand facing a wall with one foot back, heel down, and lean forward to stretch the calf, aiding leg flexibility. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/E91E63/FFFFFF?text=Wall+Calf+Stretch' } },
+  { id: 11, name: "Deep Lunge with Twist", description: "Step into a low lunge, place one hand on the ground, and twist your torso toward the bent knee for a deep hip stretch. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/673AB7/FFFFFF?text=Deep+Lunge+with+Twist' } },
+  { id: 12, name: "Supine Hamstring Stretch with Towel", description: "Lie on your back with legs straight. Wrap a towel around one foot, hold the ends, and gently lift the leg upward to stretch the hamstrings, keeping the other leg flat. Hold for 30 seconds per side.", duration: 30, tags: ["Hips & Legs"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/795548/FFFFFF?text=Supine+Hamstring+Stretch+with+Towel' } },
+  { id: 13, name: "Reclining Hero Pose", description: "Sit on your knees with both legs bent backward, feet beside your hips, toes pointing back. Slowly lean back, supporting yourself with your hands or elbows, to deeply stretch the quadriceps and hip flexors. Hold for 30 seconds.", duration: 30, tags: ["Hips & Legs"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/E91E63/FFFFFF?text=Reclining+Hero+Pose' } },
+
+  // Lower Back (10 total: 5 Beginner, 3 Intermediate, 2 Advanced)
+  { id: 14, name: "Child's Pose", description: "Kneel, sit back on heels, extend arms forward, and lower chest to the ground to stretch the lower back. Hold for 30 seconds.", duration: 30, tags: ["Lower Back"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/673AB7/FFFFFF?text=Child\'s+Pose' } },
+  { id: 15, name: "Cat-Cow Stretch", description: "On all fours, alternate between arching (cow) and rounding (cat) your back to mobilize the spine and relieve lower back tension. Perform for 60 seconds.", duration: 60, tags: ["Lower Back", "Upper Back & Chest"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/03A9F4/FFFFFF?text=Cat-Cow+Stretch' } },
+  { id: 16, name: "Seated Forward Bend", description: "Sit with legs extended, reach towards your toes to stretch the lower back and hamstrings, improving posture. Hold for 30 seconds.", duration: 30, tags: ["Lower Back", "Hips & Legs"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/8BC34A/FFFFFF?text=Seated+Forward+Bend' } },
+  { id: 17, name: "Knees to Chest", description: "Lie on your back and pull both knees towards your chest to stretch the lower back. Hold for 30 seconds.", duration: 30, tags: ["Lower Back"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/FF5722/FFFFFF?text=Knees+to+Chest' } },
+  { id: 18, name: "Supine Twist", description: "Lie on your back, bring one knee across your body, and extend the arm to stretch the lower back and glutes. Hold for 30 seconds per side.", duration: 30, tags: ["Lower Back", "Hips & Legs"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/607D8B/FFFFFF?text=Supine+Twist' } },
+  { id: 19, name: "Bridge Pose", description: "Lie on your back with feet flat, lift hips to stretch and strengthen the lower back and glutes. Hold for 30 seconds.", duration: 30, tags: ["Lower Back", "Hips & Legs"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/4CAF50/FFFFFF?text=Bridge+Pose' } },
+  { id: 20, name: "Cobra Pose", description: "Lie on your stomach, hands under shoulders, lift your chest to stretch the lower back, aiding posture correction. Hold for 15 seconds.", duration: 15, tags: ["Lower Back"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/2196F3/FFFFFF?text=Cobra+Pose' } },
+  { id: 21, name: "Pelvic Tilt Stretch", description: "Lie on your back, press your lower back into the floor, engaging the core to stretch the lower spine. Hold for 30 seconds.", duration: 30, tags: ["Lower Back"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Pelvic+Tilt+Stretch' } },
+  { id: 22, name: "Extended Child’s Pose", description: "From Child’s Pose, reach arms far forward and press hips back for a deeper lower back stretch. Hold for 30 seconds.", duration: 30, tags: ["Lower Back"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/9C27B0/FFFFFF?text=Extended+Child’s+Pose' } },
+  { id: 23, name: "Threaded Supine Twist", description: "Lie on your back, drop both knees to one side, thread one arm under to deepen the lower back stretch. Hold for 30 seconds per side.", duration: 30, tags: ["Lower Back"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/F44336/FFFFFF?text=Threaded+Supine+Twist' } },
+
+  // Upper Back & Chest (11 total: 5 Beginner, 3 Intermediate, 3 Advanced)
+  { id: 24, name: "Thoracic Extension", description: "Sit or stand, hands behind head, gently arch your upper back to stretch the rhomboids and relieve hunching. Hold for 15 seconds.", duration: 15, tags: ["Upper Back & Chest"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Thoracic+Extension' } },
+  { id: 25, name: "Doorway Chest Stretch", description: "Stand in a doorway, arms on the frame, step forward to open the chest and shoulders, counteracting slouching. Hold for 30 seconds.", duration: 30, tags: ["Upper Back & Chest", "Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/9C27B0/FFFFFF?text=Doorway+Chest+Stretch' } },
+  { id: 26, name: "Arm Across Chest Stretch", description: "Bring one arm across your body, pull with the other arm to stretch the upper back and shoulders. Hold for 30 seconds per side.", duration: 30, tags: ["Upper Back & Chest", "Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/F44336/FFFFFF?text=Arm+Across+Chest+Stretch' } },
+  { id: 27, name: "Thread the Needle", description: "On all fours, slide one arm under, lower shoulder to the ground to stretch the upper back. Hold for 30 seconds per side.", duration: 30, tags: ["Upper Back & Chest", "Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/009688/FFFFFF?text=Thread+the+Needle' } },
+  { id: 28, name: "Chest Opener", description: "Stand tall, pull shoulders back and down, clasp hands behind to open the chest. Hold for 15 seconds.", duration: 15, tags: ["Upper Back & Chest"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/3F51B5/FFFFFF?text=Chest+Opener' } },
+  { id: 29, name: "Eagle Arms", description: "Cross arms, wrap forearms, lift elbows to stretch the upper back and shoulders, relieving upper trap tension. Hold for 30 seconds per side.", duration: 30, tags: ["Upper Back & Chest", "Shoulders & Arms"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/3F51B5/FFFFFF?text=Eagle+Arms' } },
+  { id: 30, name: "Wall Angels", description: "Stand against a wall, arms at 90 degrees, slide up and down to stretch the upper back and shoulders. Perform for 30 seconds.", duration: 30, tags: ["Upper Back & Chest", "Shoulders & Arms"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/FFEB3B/FFFFFF?text=Wall+Angels' } },
+  { id: 31, name: "Seated Upper Back Stretch", description: "Sit, clasp hands forward, round your upper back to stretch the rhomboids. Hold for 30 seconds.", duration: 30, tags: ["Upper Back & Chest"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/795548/FFFFFF?text=Seated+Upper+Back+Stretch' } },
+  { id: 32, name: "Foam Roller Thoracic Extension", description: "Lie on a foam roller across your upper back, arch gently to stretch the thoracic spine. Hold for 30 seconds.", duration: 30, tags: ["Upper Back & Chest"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/795548/FFFFFF?text=Foam+Roller+Thoracic+Extension' } },
+  { id: 33, name: "Thread the Needle with Hold", description: "Thread one arm under, press chest down, hold to deepen the upper back stretch. Hold for 30 seconds per side.", duration: 30, tags: ["Upper Back & Chest"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/E91E63/FFFFFF?text=Thread+the+Needle+with+Hold' } },
+  { id: 34, name: "Reverse Prayer", description: "Bring hands behind your back, palms together, lift slightly to stretch the chest and shoulders. Hold for 30 seconds.", duration: 30, tags: ["Upper Back & Chest", "Shoulders & Arms"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/673AB7/FFFFFF?text=Reverse+Prayer' } },
+
+  // Shoulders & Arms (11 total: 5 Beginner, 3 Intermediate, 3 Advanced)
+  { id: 35, name: "Shoulder Rolls", description: "Roll shoulders forward and backward to release tension in the delts and upper traps from typing. Perform for 30 seconds.", duration: 30, tags: ["Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/E91E63/FFFFFF?text=Shoulder+Rolls' } },
+  { id: 36, name: "Overhead Tricep Stretch", description: "Raise one arm overhead, bend elbow, pull with the other hand to stretch the triceps, easing arm tension. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/673AB7/FFFFFF?text=Overhead+Tricep+Stretch' } },
+  { id: 37, name: "Bicep Wall Stretch", description: "Face a wall, place hand with thumb up, turn body away to stretch the biceps from desk work. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/03A9F4/FFFFFF?text=Bicep+Wall+Stretch' } },
+  { id: 38, name: "Wrist Flexor Stretch", description: "Extend arm, palm up, pull fingers back with the other hand to stretch the forearms, relieving typing strain. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/8BC34A/FFFFFF?text=Wrist+Flexor+Stretch' } },
+  { id: 39, name: "Wrist Extensor Stretch", description: "Extend arm, palm down, pull fingers back with the other hand to stretch the forearms. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/FF5722/FFFFFF?text=Wrist+Extensor+Stretch' } },
+  { id: 40, name: "Cross-Body Shoulder Stretch", description: "Bring one arm across your body, hug it closer with the other arm to stretch the shoulders. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/607D8B/FFFFFF?text=Cross-Body+Shoulder+Stretch' } },
+  { id: 41, name: "Cow Face Arms", description: "Reach one arm up and bend, reach the other down and bend, clasp hands behind back to stretch shoulders and triceps. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/4CAF50/FFFFFF?text=Cow+Face+Arms' } },
+  { id: 42, name: "Double Arm Stretch", description: "Clasp hands behind your back, lift slightly to stretch both shoulders and chest. Hold for 30 seconds.", duration: 30, tags: ["Shoulders & Arms"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/2196F3/FFFFFF?text=Double+Arm+Stretch' } },
+  { id: 43, name: "Behind-the-Back Shoulder Stretch", description: "Clasp hands behind your back, lift high to deepen the shoulder and chest stretch. Hold for 30 seconds.", duration: 30, tags: ["Shoulders & Arms"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Behind-the-Back+Shoulder+Stretch' } },
+  { id: 44, name: "Advanced Tricep Stretch", description: "Raise one arm overhead, bend elbow, push down with the other hand while leaning back slightly for a deep tricep stretch. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/9C27B0/FFFFFF?text=Advanced+Tricep+Stretch' } },
+  { id: 45, name: "Wrist Flexor Hold", description: "Extend arm palm up, pull fingers back with slight weight or resistance for a deep forearm stretch. Hold for 30 seconds per side.", duration: 30, tags: ["Shoulders & Arms"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/F44336/FFFFFF?text=Wrist+Flexor+Hold' } },
+
+  // Neck (10 total: 5 Beginner, 3 Intermediate, 2 Advanced)
+  { id: 46, name: "Neck Rolls", description: "Gently roll your neck in circles to release tension in the cervical muscles from screen staring. Perform for 30 seconds.", duration: 30, tags: ["Neck"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/2196F3/FFFFFF?text=Neck+Rolls' } },
+  { id: 47, name: "Lateral Neck Stretch", description: "Tilt your head to one side, gently pull with your hand to stretch the neck, easing stiffness. Hold for 30 seconds per side.", duration: 30, tags: ["Neck"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Lateral+Neck+Stretch' } },
+  { id: 48, name: "Chin Tucks", description: "Sit tall, tuck your chin to your chest to stretch the back of the neck and correct forward head posture. Hold for 15 seconds.", duration: 15, tags: ["Neck"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/9C27B0/FFFFFF?text=Chin+Tucks' } },
+  { id: 49, name: "Levator Scapulae Stretch", description: "Turn your head to one side, tilt down, pull gently with your hand to stretch the neck and shoulders. Hold for 30 seconds per side.", duration: 30, tags: ["Neck", "Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/F44336/FFFFFF?text=Levator+Scapulae+Stretch' } },
+  { id: 50, name: "Upper Trapezius Stretch", description: "Sit on one hand, tilt head away, pull gently with the other hand to stretch the neck and upper traps. Hold for 30 seconds per side.", duration: 30, tags: ["Neck", "Shoulders & Arms"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/3F51B5/FFFFFF?text=Upper+Trapezius+Stretch' } },
+  { id: 51, name: "Scalene Stretch", description: "Tilt head back slightly, turn to one side, tilt down to stretch the neck’s scalene muscles. Hold for 30 seconds per side.", duration: 30, tags: ["Neck"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/009688/FFFFFF?text=Scalene+Stretch' } },
+  { id: 52, name: "Neck Side Tilt with Hold", description: "Tilt head to one side, press opposite hand down to stretch the neck deeper. Hold for 30 seconds per side.", duration: 30, tags: ["Neck"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/FFEB3B/FFFFFF?text=Neck+Side+Tilt+with+Hold' } },
+  { id: 53, name: "Chin Tuck with Resistance", description: "Tuck chin against your hand’s gentle resistance to stretch the neck muscles. Hold for 15 seconds.", duration: 15, tags: ["Neck"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/795548/FFFFFF?text=Chin+Tuck+with+Resistance' } },
+  { id: 54, name: "Advanced Scalene Stretch", description: "Tilt head back, turn to one side, pull down gently for a deep scalene stretch. Hold for 30 seconds per side.", duration: 30, tags: ["Neck"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/E91E63/FFFFFF?text=Advanced+Scalene+Stretch' } },
+  { id: 55, name: "Deep Neck Flexor Stretch", description: "Tilt head forward, pull gently with both hands to stretch the back of the neck deeply. Hold for 30 seconds.", duration: 30, tags: ["Neck"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/673AB7/FFFFFF?text=Deep+Neck+Flexor+Stretch' } },
+
+  // Full Body (11 total: 5 Beginner, 3 Intermediate, 3 Advanced)
+  { id: 56, name: "Downward Dog", description: "From plank, lift hips up and back into an inverted V to stretch hamstrings, shoulders, and back. Hold for 30 seconds.", duration: 30, tags: ["Full Body"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/FFEB3B/FFFFFF?text=Downward+Dog' } },
+  { id: 57, name: "Standing Side Bend", description: "Stand tall, reach one arm overhead, bend to the side to stretch the obliques and lateral body. Hold for 30 seconds per side.", duration: 30, tags: ["Full Body"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/795548/FFFFFF?text=Standing+Side+Bend' } },
+  { id: 58, name: "Standing Forward Fold with Shoulder Opener", description: "Clasp hands behind back, bend forward, let arms fall overhead to stretch hamstrings and shoulders. Hold for 30 seconds.", duration: 30, tags: ["Full Body"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/03A9F4/FFFFFF?text=Standing+Forward+Fold+with+Shoulder+Opener' } },
+  { id: 59, name: "Seated Wide-Legged Forward Fold", description: "Sit with legs wide, reach forward to stretch hamstrings and inner thighs, aiding full-body flexibility. Hold for 30 seconds.", duration: 30, tags: ["Full Body"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/8BC34A/FFFFFF?text=Seated+Wide-Legged+Forward+Fold' } },
+  { id: 60, name: "Reclining Bound Angle Pose", description: "Lie on your back, soles of feet together, knees out to stretch hips and reset the body. Hold for 60 seconds.", duration: 60, tags: ["Full Body"], level: "beginner", image: { uri: 'https://via.placeholder.com/200/FF5722/FFFFFF?text=Reclining+Bound+Angle+Pose' } },
+  { id: 61, name: "Sun Salutation", description: "Perform a series of poses (mountain, forward fold, plank, cobra, downward dog) for a full-body stretch. Perform one cycle, about 60 seconds.", duration: 60, tags: ["Full Body"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/E91E63/FFFFFF?text=Sun+Salutation' } },
+  { id: 62, name: "World's Greatest Stretch", description: "From a lunge, place one hand down, twist and reach the other arm up to stretch hips and upper back. Hold for 30 seconds per side.", duration: 30, tags: ["Full Body"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/673AB7/FFFFFF?text=World\'s+Greatest+Stretch' } },
+  { id: 63, name: "Seated Twist", description: "Sit with legs extended, bend one knee over the other, twist torso towards the bent knee to stretch the back and obliques. Hold for 30 seconds per side.", duration: 30, tags: ["Full Body"], level: "intermediate", image: { uri: 'https://via.placeholder.com/200/607D8B/FFFFFF?text=Seated+Twist' } },
+  { id: 64, name: "Bound Angle with Forward Fold", description: "Sit with soles together, hold your feet, fold forward to stretch hips and inner thighs deeply. Hold for 30 seconds.", duration: 30, tags: ["Full Body"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/4CAF50/FFFFFF?text=Bound+Angle+with+Forward+Fold' } },
+  { id: 65, name: "Deep Downward Dog", description: "From Downward Dog, press heels down and chest toward thighs for a deeper full-body stretch. Hold for 30 seconds.", duration: 30, tags: ["Full Body"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/2196F3/FFFFFF?text=Deep+Downward+Dog' } },
+  { id: 66, name: "Twisted Lunge", description: "Step into a lunge, twist torso toward the front leg, deepening the stretch across hips and back. Hold for 30 seconds per side.", duration: 30, tags: ["Full Body"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Twisted+Lunge' } },
 ];
 
-export default stretches; 
+export default stretches;

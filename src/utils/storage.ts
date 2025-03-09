@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ProgressEntry } from '../types';
+import { ProgressEntry, RoutineParams } from '../types';
 
 // Premium status
 export const saveIsPremium = async (isPremium: boolean) => {
@@ -119,5 +119,101 @@ export const getReminderTime = async () => {
   } catch (error) {
     console.error('Error getting reminder time:', error);
     return null;
+  }
+};
+
+/**
+ * Get recent routines from storage
+ */
+export const getRecentRoutines = async (): Promise<ProgressEntry[]> => {
+  try {
+    const jsonValue = await AsyncStorage.getItem('@progress');
+    if (jsonValue !== null) {
+      return JSON.parse(jsonValue);
+    }
+    return []; // Return empty array if no data
+  } catch (e) {
+    console.error('Error getting recent routines:', e);
+    return []; // Return empty array on error
+  }
+};
+
+/**
+ * Save a routine to favorites
+ */
+export const saveFavoriteRoutine = async (routine: RoutineParams): Promise<boolean> => {
+  try {
+    // Get existing favorites
+    const jsonValue = await AsyncStorage.getItem('@favoriteRoutines');
+    let favorites = jsonValue !== null ? JSON.parse(jsonValue) : [];
+    
+    // Add new favorite with timestamp
+    favorites.push({
+      ...routine,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Save back to storage
+    await AsyncStorage.setItem('@favoriteRoutines', JSON.stringify(favorites));
+    return true;
+  } catch (e) {
+    console.error('Error saving favorite routine:', e);
+    return false;
+  }
+};
+
+/**
+ * Save a completed routine to progress history
+ */
+export const saveCompletedRoutine = async (routine: RoutineParams): Promise<boolean> => {
+  try {
+    // Create progress entry
+    const entry: ProgressEntry = {
+      area: routine.area,
+      duration: routine.duration,
+      date: new Date().toISOString(),
+      stretchCount: 0, // This would normally be filled with actual count
+    };
+    
+    // Save to progress
+    await saveProgress(entry);
+    
+    // Also save to recent routines for the routine tab
+    const recentRoutines = await getRecentRoutines();
+    recentRoutines.unshift(entry); // Add to beginning of array
+    
+    // Save back to storage
+    await AsyncStorage.setItem('@progress', JSON.stringify(recentRoutines));
+    
+    return true;
+  } catch (e) {
+    console.error('Error saving completed routine:', e);
+    return false;
+  }
+};
+
+/**
+ * Clear all app data (for testing purposes)
+ */
+export const clearAllData = async (): Promise<boolean> => {
+  try {
+    // List of all keys used in the app
+    const keys = [
+      'isPremium',
+      'favorites',
+      'progress',
+      'reminderEnabled',
+      'reminderTime',
+      '@progress',
+      '@favoriteRoutines'
+    ];
+    
+    // Clear all keys
+    await AsyncStorage.multiRemove(keys);
+    console.log('All app data cleared successfully');
+    return true;
+  } catch (e) {
+    console.error('Error clearing app data:', e);
+    return false;
   }
 }; 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -8,9 +8,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
-  Modal,
   Animated,
-  Dimensions
+  Dimensions,
+  Pressable,
+  StyleSheet
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,15 +19,15 @@ import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getIsPremium, getReminderEnabled, getReminderTime, saveReminderTime } from '../utils/storage';
+import { getIsPremium, getReminderEnabled, getReminderTime, saveReminderTime, clearAllData } from '../utils/storage';
 import { requestNotificationsPermissions, scheduleDailyReminder, cancelReminders } from '../utils/notifications';
 import { tw } from '../utils/tw';
 
-const { height } = Dimensions.get('window');
+const { height, width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const navigation = useNavigation<AppNavigationProp>();
-  const [area, setArea] = useState<BodyArea>('hips');
+  const [area, setArea] = useState<BodyArea>('Hips & Legs');
   const [duration, setDuration] = useState<Duration>('5');
   const [level, setLevel] = useState<StretchLevel>('beginner');
   const [isPremium, setIsPremium] = useState(false);
@@ -36,11 +37,16 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
   
-  // Animation value for the modal
-  const slideAnimation = useRef(new Animated.Value(height)).current;
+  // Optimized animation values
+  const slideAnim = useRef(new Animated.Value(height)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
   
   // State for dropdown
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  
+  // Scroll position for preventing background scroll
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -67,25 +73,60 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  // Animation functions
-  const openDropdown = (dropdownName: string) => {
+  // Memoized animation functions for better performance
+  const openDropdown = useCallback((dropdownName: string) => {
+    // Save scroll position to restore later
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: scrollPosition, animated: false });
+    }
+    
     setActiveDropdown(dropdownName);
-    Animated.timing(slideAnimation, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
+    
+    // Run animations in parallel for smoother effect
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [scrollPosition, slideAnim, backdropOpacity]);
 
-  const closeDropdown = () => {
-    Animated.timing(slideAnimation, {
-      toValue: height,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
+  const closeDropdown = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: height,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
       setActiveDropdown(null);
     });
-  };
+  }, [slideAnim, backdropOpacity]);
+
+  // Handle option selection with optimized animation
+  const handleOptionSelect = useCallback((setValue: (value: any) => void, value: any) => {
+    setValue(value);
+    
+    // Quick fade out before closing dropdown
+    Animated.timing(backdropOpacity, {
+      toValue: 0,
+      duration: 100,
+      useNativeDriver: true,
+    }).start(() => {
+      closeDropdown();
+    });
+  }, [closeDropdown]);
 
   // Start stretching routine
   const handleStartStretching = () => {
@@ -96,36 +137,6 @@ export default function HomeScreen() {
     };
     
     navigation.navigate('Routine', routineParams);
-  };
-
-  // Helper functions for dropdown selection
-  const getAreaLabel = (value: BodyArea) => {
-    switch(value) {
-      case 'hips': return 'Hips';
-      case 'back': return 'Back';
-      case 'shoulders': return 'Shoulders';
-      case 'neck': return 'Neck';
-      case 'full body': return 'Full Body';
-      default: return 'Hips';
-    }
-  };
-
-  const getDurationLabel = (value: Duration) => {
-    switch(value) {
-      case '5': return '5 minutes';
-      case '10': return '10 minutes';
-      case '15': return '15 minutes';
-      default: return '5 minutes';
-    }
-  };
-
-  const getLevelLabel = (value: StretchLevel) => {
-    switch(value) {
-      case 'beginner': return 'Beginner';
-      case 'intermediate': return 'Intermediate';
-      case 'advanced': return 'Advanced';
-      default: return 'Beginner';
-    }
   };
 
   // Toggle reminder
@@ -221,41 +232,71 @@ export default function HomeScreen() {
     return `${hour12}:${minutes} ${ampm}`;
   };
 
-  // Render a custom dropdown field
-  const renderCustomDropdown = (label: string, value: string, onPress: () => void) => {
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        style={tw('flex-row items-center justify-between p-4 bg-white border border-gray-200 rounded-lg mb-3')}
-        activeOpacity={0.7}
-      >
-        <Text style={tw('text-base text-text')}>{value}</Text>
-        <Ionicons name="chevron-down" size={20} color="#666" />
-      </TouchableOpacity>
-    );
+  // Helper label functions
+  const getAreaLabel = (value: BodyArea): string => {
+    return value;
   };
 
-  // Define area options
+  const getDurationLabel = (value: Duration) => {
+    switch(value) {
+      case '5': return '5 minutes';
+      case '10': return '10 minutes';
+      case '15': return '15 minutes';
+      default: return '5 minutes';
+    }
+  };
+
+  const getLevelLabel = (value: StretchLevel) => {
+    switch(value) {
+      case 'beginner': return 'Beginner';
+      case 'intermediate': return 'Intermediate';
+      case 'advanced': return 'Advanced';
+      default: return 'Beginner';
+    }
+  };
+
+  // Add this function to get a descriptive message for each body area
+  const getAreaDescription = (area: string): string => {
+    switch(area) {
+      case 'Hips & Legs':
+        return 'For sitting-related stiffness';
+      case 'Lower Back':
+        return 'For desk posture relief';
+      case 'Upper Back & Chest':
+        return 'For hunching & slouching';
+      case 'Shoulders & Arms':
+        return 'For desk-typing tension';
+      case 'Neck':
+        return 'For screen-staring strain';
+      case 'Full Body':
+        return 'For complete rejuvenation';
+      default:
+        return '';
+    }
+  };
+
+  // Update the area options array
   const areaOptions = [
-    { label: 'Hips', value: 'hips' },
-    { label: 'Back', value: 'back' },
-    { label: 'Shoulders', value: 'shoulders' },
-    { label: 'Neck', value: 'neck' },
-    { label: 'Full Body', value: 'full body' }
+    { label: 'Hips & Legs', value: 'Hips & Legs', description: 'For sitting-related stiffness' },
+    { label: 'Lower Back', value: 'Lower Back', description: 'For desk posture relief' },
+    { label: 'Upper Back & Chest', value: 'Upper Back & Chest', description: 'For hunching & slouching' },
+    { label: 'Shoulders & Arms', value: 'Shoulders & Arms', description: 'For desk-typing tension' },
+    { label: 'Neck', value: 'Neck', description: 'For screen-staring strain' },
+    { label: 'Full Body', value: 'Full Body', description: 'For complete rejuvenation' }
   ];
 
   // Define duration options
   const durationOptions = [
-    { label: '5 minutes', value: '5' },
-    { label: '10 minutes', value: '10' },
-    { label: '15 minutes', value: '15' }
+    { label: '5 minutes', value: '5', description: 'Quick refresh' },
+    { label: '10 minutes', value: '10', description: 'Standard session' },
+    { label: '15 minutes', value: '15', description: 'Deep relief' }
   ];
 
   // Define level options
   const levelOptions = [
-    { label: 'Beginner', value: 'beginner' },
-    { label: 'Intermediate', value: 'intermediate' },
-    { label: 'Advanced', value: 'advanced' }
+    { label: 'Beginner', value: 'beginner', description: 'Easy gentle stretches' },
+    { label: 'Intermediate', value: 'intermediate', description: 'Moderate intensity' },
+    { label: 'Advanced', value: 'advanced', description: 'Deep stretching' }
   ];
 
   // Get active options based on dropdown
@@ -292,6 +333,21 @@ export default function HomeScreen() {
     }
   };
 
+  // Render a custom dropdown field with optimized styling
+  const renderCustomDropdown = (label: string, value: string, onPress: () => void) => {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        style={styles.dropdownButton}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.dropdownButtonText}>{value}</Text>
+        <Ionicons name="chevron-down" size={20} color="#666" />
+      </TouchableOpacity>
+    );
+  };
+
+  // Loading state
   if (isLoading) {
     return (
       <SafeAreaView style={tw('flex-1 bg-white justify-center items-center')}>
@@ -305,7 +361,13 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={tw('flex-1 bg-bg')}>
-      <ScrollView style={tw('flex-1 p-4')}>
+      <ScrollView 
+        ref={scrollViewRef}
+        style={tw('flex-1 p-4')}
+        scrollEnabled={!activeDropdown}
+        onScroll={(e) => setScrollPosition(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
+      >
         {/* Header */}
         <View style={tw('items-center mb-5')}>
           <Text style={tw('text-2xl font-bold text-text text-center')}>DeskStretch</Text>
@@ -401,57 +463,200 @@ export default function HomeScreen() {
         />
       </ScrollView>
 
-      {/* Animated Dropdown */}
+      {/* Optimized Dropdown Modal */}
       {activeDropdown && (
-        <View style={tw('absolute inset-0 bg-black bg-opacity-30')}>
-          <TouchableOpacity 
-            style={tw('flex-1')}
-            activeOpacity={1}
-            onPress={closeDropdown}
-          />
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <Animated.View 
             style={[
-              tw('bg-white rounded-t-lg'),
+              StyleSheet.absoluteFill,
               {
-                transform: [{ translateY: slideAnimation }],
-                maxHeight: height * 0.6,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                opacity: backdropOpacity,
+              },
+            ]}
+          >
+            <Pressable 
+              style={StyleSheet.absoluteFill}
+              onPress={closeDropdown}
+            />
+          </Animated.View>
+          
+          <Animated.View 
+            style={[
+              styles.dropdownContainer,
+              {
+                transform: [{ translateY: slideAnim }],
               }
             ]}
           >
-            <View style={tw('flex-row justify-between items-center p-4 border-b border-gray-200')}>
-              <Text style={tw('text-lg font-semibold text-text')}>{activeOptions.title}</Text>
-              <TouchableOpacity onPress={closeDropdown} style={tw('p-2')}>
+            <View style={styles.dropdownHeader}>
+              <Text style={styles.dropdownTitle}>{activeOptions.title}</Text>
+              <TouchableOpacity onPress={closeDropdown} style={styles.closeButton}>
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={tw('max-h-96')}>
+            <ScrollView 
+              style={styles.optionsContainer}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              contentContainerStyle={styles.optionsContent}
+            >
               {activeOptions.options.map((item) => (
-                <TouchableOpacity 
-                  key={item.value} 
-                  style={[
-                    tw('p-4 border-b border-gray-100'),
-                    activeOptions.value === item.value && tw('bg-primary bg-opacity-10')
+                <Pressable 
+                  key={item.value}
+                  style={({pressed}) => [
+                    styles.optionItem,
+                    activeOptions.value === item.value && styles.selectedOptionItem,
+                    pressed && styles.pressedOptionItem
                   ]}
-                  onPress={() => {
-                    activeOptions.onChange(item.value);
-                    closeDropdown();
-                  }}
+                  onPress={() => handleOptionSelect(activeOptions.onChange, item.value)}
+                  android_ripple={{color: 'rgba(0,0,0,0.1)'}}
                 >
-                  <Text 
-                    style={[
-                      tw('text-base text-text'),
-                      activeOptions.value === item.value && tw('font-bold text-primary')
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
+                  <View>
+                    <Text style={[
+                      styles.optionText,
+                      activeOptions.value === item.value && styles.selectedOptionText
+                    ]}>
+                      {item.label}
+                    </Text>
+                    {item.description && (
+                      <Text style={styles.optionDescription}>
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
+                  {activeOptions.value === item.value && (
+                    <Ionicons name="checkmark" size={22} color="#4CAF50" style={styles.checkIcon} />
+                  )}
+                </Pressable>
               ))}
             </ScrollView>
           </Animated.View>
         </View>
       )}
+
+      {__DEV__ && (
+        <TouchableOpacity 
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            right: 20,
+            backgroundColor: 'red',
+            padding: 10,
+            borderRadius: 5,
+            zIndex: 999
+          }}
+          onPress={async () => {
+            const success = await clearAllData();
+            if (success) {
+              Alert.alert('Success', 'All app data has been reset');
+              // Reset local state
+              setIsPremium(false);
+              setReminderEnabled(false);
+              setReminderTime('09:00');
+            } else {
+              Alert.alert('Error', 'Failed to reset app data');
+            }
+          }}
+        >
+          <Text style={{ color: 'white', fontWeight: 'bold' }}>Reset Data</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
+
+// Optimized styles with memoized StyleSheet for better performance
+const styles = StyleSheet.create({
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 15,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: height * 0.7,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  optionsContainer: {
+    maxHeight: height * 0.6,
+  },
+  optionsContent: {
+    paddingBottom: Platform.OS === 'ios' ? 40 : 16,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  selectedOptionItem: {
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+  },
+  pressedOptionItem: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  optionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedOptionText: {
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  optionDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  checkIcon: {
+    marginLeft: 8,
+  }
+});

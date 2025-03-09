@@ -1,7 +1,13 @@
 import { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 export type StretchLevel = "beginner" | "intermediate" | "advanced";
-export type BodyArea = "hips" | "back" | "shoulders" | "neck" | "full body";
+export type BodyArea = 
+  | 'Hips & Legs'
+  | 'Lower Back'
+  | 'Upper Back & Chest'
+  | 'Shoulders & Arms'
+  | 'Neck'
+  | 'Full Body';
 export type Duration = "5" | "10" | "15";
 
 export interface Stretch {
@@ -31,4 +37,12 @@ export interface ProgressEntry {
   duration: Duration;
 }
 
-export type AppNavigationProp = NavigationProp<ParamListBase>; 
+export type RootStackParamList = {
+  Home: { openSubscription?: boolean } | undefined;
+  Routine: RoutineParams;
+  Favorites: undefined;
+  Progress: undefined;
+  Settings: undefined;
+};
+
+export type AppNavigationProp = NavigationProp<RootStackParamList>; 

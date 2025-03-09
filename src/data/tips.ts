@@ -3,24 +3,44 @@ import { Tip } from '../types';
 const tips: Tip[] = [
   {
     id: 1,
-    text: "Tight hips from sitting all day? Try stretching every hour for 2-3 minutes."
+    text: "Tight hips from sitting all day? Try stretching every hour for 2-3 minutes. The hip flexor stretch—kneeling with one leg forward and pushing your hips gently forward—can unlock that stiffness fast."
   },
   {
     id: 2,
-    text: "Neck pain? Keep your monitor at eye level to maintain proper posture."
+    text: "Neck pain? Keep your monitor at eye level to maintain proper posture. Bonus: Add a 30-second chin tuck (pull your chin back like you’re making a double chin) to reset your neck alignment."
   },
   {
     id: 3,
-    text: "Wrist discomfort? Try wrist circles and stretches between typing sessions."
+    text: "Wrist discomfort? Try wrist circles and stretches between typing sessions. For a deeper fix, press your palms together at chest height and lower them slowly to stretch your forearms."
   },
   {
     id: 4,
-    text: "Lower back pain? Strengthen your core with simple exercises like planks."
+    text: "Lower back pain? Strengthen your core with simple exercises like planks—hold for 20-30 seconds to start. A strong core acts like a natural brace for your spine."
   },
   {
     id: 5,
-    text: "Remember the 20-20-20 rule: Every 20 minutes, look at something 20 feet away for 20 seconds."
+    text: "Eye strain driving you nuts? Follow the 20-20-20 rule: Every 20 minutes, look at something 20 feet away for 20 seconds. It’s a game-changer for screen fatigue."
+  },
+  {
+    id: 6,
+    text: "Shoulders tight from hunching? Roll them back 10 times, then try a doorway stretch—arms at 90 degrees, lean forward. It’s like hitting the reset button on your upper body."
+  },
+  {
+    id: 7,
+    text: "Feeling like a rusty robot? Dynamic stretches like leg swings (10 per leg) or arm circles (20 seconds) boost mobility and get your blood flowing."
+  },
+  {
+    id: 8,
+    text: "Slouching all day? Stand against a wall, arms raised, and slide them up and down like a snow angel. This ‘wall angel’ move strengthens your posture muscles."
+  },
+  {
+    id: 9,
+    text: "Stiff from head to toe? Set a timer to move every 45 minutes—walk, stretch, or even dance for 2 minutes. Small bursts of movement beat stiffness every time."
+  },
+  {
+    id: 10,
+    text: "Want a pro-level tip? Use a lacrosse ball to roll out tight spots (like your glutes or upper back) against a wall. It’s self-massage that digs deep into pain points."
   }
 ];
 
-export default tips; 
+export default tips;
