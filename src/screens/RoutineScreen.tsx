@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { RoutineParams, Stretch, ProgressEntry, AppNavigationProp } from '../types';
 import { generateRoutine } from '../utils/routineGenerator';
 import { saveProgress, getIsPremium, getRecentRoutines, saveFavoriteRoutine } from '../utils/storage';
@@ -422,6 +423,81 @@ export default function RoutineScreen() {
     }
   };
   
+  // Add this helper function to organize routines by week
+  const organizeRoutinesByWeek = (routines: ProgressEntry[]) => {
+    const weeks: { [key: string]: ProgressEntry[] } = {};
+    
+    routines.forEach(routine => {
+      const date = new Date(routine.date);
+      const today = new Date();
+      const diffTime = Math.abs(today.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      let weekLabel = '';
+      if (diffDays <= 7) {
+        weekLabel = 'This Week';
+      } else if (diffDays <= 14) {
+        weekLabel = 'Last Week';
+      } else if (diffDays <= 21) {
+        weekLabel = '2 Weeks Ago';
+      } else {
+        weekLabel = '3 Weeks Ago';
+      }
+      
+      if (!weeks[weekLabel]) {
+        weeks[weekLabel] = [];
+      }
+      weeks[weekLabel].push(routine);
+    });
+    
+    return weeks;
+  };
+  
+  // Add delete routine function
+  const deleteRoutine = async (routineDate: string) => {
+    try {
+      const existingRoutines = await getRecentRoutines();
+      const updatedRoutines = existingRoutines.filter(
+        routine => routine.date !== routineDate
+      );
+      await AsyncStorage.setItem('@progress', JSON.stringify(updatedRoutines));
+      setRecentRoutines(updatedRoutines);
+    } catch (error) {
+      console.error('Error deleting routine:', error);
+    }
+  };
+  
+  // Add RoutineItem component with swipe
+  const RoutineItem = ({ item, onDelete }) => {
+    const renderRightActions = () => (
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => onDelete(item.date)}
+      >
+        <Ionicons name="trash-outline" size={24} color="#FFF" />
+      </TouchableOpacity>
+    );
+
+    return (
+      <Swipeable renderRightActions={renderRightActions}>
+        <TouchableOpacity 
+          style={styles.routineCard}
+          onPress={() => startRecentRoutine(item)}
+        >
+          <View style={styles.routineCardContent}>
+            <View>
+              <Text style={styles.routineCardTitle}>{item.area}</Text>
+              <Text style={styles.routineCardSubtitle}>
+                {item.duration} min • {new Date(item.date).toLocaleDateString()}
+              </Text>
+            </View>
+            <Ionicons name="play-circle" size={32} color="#4CAF50" />
+          </View>
+        </TouchableOpacity>
+      </Swipeable>
+    );
+  };
+  
   // Render the empty state with recent routines
   const renderEmptyState = () => {
     if (isLoading) {
@@ -458,94 +534,90 @@ export default function RoutineScreen() {
       ? recentRoutines 
       : recentRoutines.slice(0, 3);
     
+    // Recent routines list
+    const weeks = organizeRoutinesByWeek(displayRoutines);
+    
     return (
-      <ScrollView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.sectionTitle}>Your Recent Routines</Text>
-          {!isPremium && recentRoutines.length > 3 && (
-            <Text style={styles.premiumNote}>
-              <Ionicons name="lock-closed" size={14} color="#FF9800" /> 
-              Upgrade to premium to access all your history
-            </Text>
-          )}
-        </View>
-        
-        {/* Recent routines list */}
-        <FlatList
-          data={displayRoutines}
-          keyExtractor={(item, index) => `routine-${index}-${item.date}`}
-          scrollEnabled={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.routineCard}
-              onPress={() => startRecentRoutine(item)}
-            >
-              <View style={styles.routineCardContent}>
-                <View>
-                  <Text style={styles.routineCardTitle}>{item.area}</Text>
-                  <Text style={styles.routineCardSubtitle}>
-                    {item.duration} min • {new Date(item.date).toLocaleDateString()}
-                  </Text>
-                </View>
-                <Ionicons name="play-circle" size={32} color="#4CAF50" />
-              </View>
-            </TouchableOpacity>
-          )}
-          ListFooterComponent={() => (
-            <View style={styles.suggestionsContainer}>
-              <Text style={styles.sectionTitle}>
-                {isPremium ? 'Smart Suggestions' : 'Try Something New'}
+      <GestureHandlerRootView style={styles.container}>
+        <ScrollView>
+          <View style={styles.headerContainer}>
+            <Text style={styles.sectionTitle}>Your Recent Routines</Text>
+            {!isPremium && recentRoutines.length > 3 && (
+              <Text style={styles.premiumNote}>
+                <Ionicons name="lock-closed" size={14} color="#FF9800" /> 
+                Upgrade to premium to access all your history
               </Text>
+            )}
+          </View>
+          
+          {/* Recent routines list */}
+          {Object.entries(weeks).map(([weekLabel, weekRoutines]) => (
+            <View key={weekLabel}>
+              <Text style={styles.weekLabel}>{weekLabel}</Text>
+              {weekRoutines.map((item, index) => (
+                <RoutineItem 
+                  key={`${item.date}-${index}`}
+                  item={item}
+                  onDelete={deleteRoutine}
+                />
+              ))}
+            </View>
+          ))}
+          
+          {/* Suggestions section */}
+          <View style={styles.suggestionsContainer}>
+            <Text style={styles.sectionTitle}>
+              {isPremium ? 'Smart Suggestions' : 'Try Something New'}
+            </Text>
+            
+            <View style={styles.suggestionCards}>
+              {/* Random suggestion - available to all users */}
+              <TouchableOpacity 
+                style={styles.suggestionCard}
+                onPress={() => {
+                  const suggestion = getRandomSuggestion();
+                  navigation.navigate('Routine', suggestion);
+                }}
+              >
+                <Ionicons name="shuffle" size={32} color="#FF9800" />
+                <Text style={styles.suggestionTitle}>Random</Text>
+                <Text style={styles.suggestionSubtitle}>
+                  Try a random routine
+                </Text>
+              </TouchableOpacity>
               
-              <View style={styles.suggestionCards}>
-                {/* Random suggestion - available to all users */}
+              {/* Smart suggestion - premium only */}
+              {isPremium && (
                 <TouchableOpacity 
                   style={styles.suggestionCard}
                   onPress={() => {
-                    const suggestion = getRandomSuggestion();
+                    const suggestion = getSmartSuggestion();
                     navigation.navigate('Routine', suggestion);
                   }}
                 >
-                  <Ionicons name="shuffle" size={32} color="#FF9800" />
-                  <Text style={styles.suggestionTitle}>Random</Text>
+                  <Ionicons name="bulb" size={32} color="#4CAF50" />
+                  <Text style={styles.suggestionTitle}>Smart Pick</Text>
                   <Text style={styles.suggestionSubtitle}>
-                    Try a random routine
+                    Based on your progress
                   </Text>
                 </TouchableOpacity>
-                
-                {/* Smart suggestion - premium only */}
-                {isPremium && (
-                  <TouchableOpacity 
-                    style={styles.suggestionCard}
-                    onPress={() => {
-                      const suggestion = getSmartSuggestion();
-                      navigation.navigate('Routine', suggestion);
-                    }}
-                  >
-                    <Ionicons name="bulb" size={32} color="#4CAF50" />
-                    <Text style={styles.suggestionTitle}>Smart Pick</Text>
-                    <Text style={styles.suggestionSubtitle}>
-                      Based on your progress
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                
-                {/* Custom routine - available to all */}
-                <TouchableOpacity 
-                  style={styles.suggestionCard}
-                  onPress={navigateToHome}
-                >
-                  <Ionicons name="create" size={32} color="#2196F3" />
-                  <Text style={styles.suggestionTitle}>Custom</Text>
-                  <Text style={styles.suggestionSubtitle}>
-                    Create your own
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              )}
+              
+              {/* Custom routine - available to all */}
+              <TouchableOpacity 
+                style={styles.suggestionCard}
+                onPress={navigateToHome}
+              >
+                <Ionicons name="create" size={32} color="#2196F3" />
+                <Text style={styles.suggestionTitle}>Custom</Text>
+                <Text style={styles.suggestionSubtitle}>
+                  Create your own
+                </Text>
+              </TouchableOpacity>
             </View>
-          )}
-        />
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </GestureHandlerRootView>
     );
   };
   
@@ -1069,5 +1141,18 @@ const styles = StyleSheet.create({
   },
   premiumButton: {
     backgroundColor: '#FF9800',
+  },
+  weekLabel: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    width: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

@@ -80,4 +80,4 @@ const stretches: Stretch[] = [
   { id: 66, name: "Twisted Lunge", description: "Step into a lunge, twist torso toward the front leg, deepening the stretch across hips and back. Hold for 30 seconds per side.", duration: 30, tags: ["Full Body"], level: "advanced", image: { uri: 'https://via.placeholder.com/200/FF9800/FFFFFF?text=Twisted+Lunge' } },
 ];
 
-export default stretches;
+export default stretches; 
