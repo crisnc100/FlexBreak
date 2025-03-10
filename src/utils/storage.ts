@@ -14,8 +14,12 @@ export const saveIsPremium = async (isPremium: boolean) => {
 
 export const getIsPremium = async () => {
   try {
+    console.log('Getting premium status from AsyncStorage');
     const value = await AsyncStorage.getItem('isPremium');
-    return value ? JSON.parse(value) : false;
+    console.log('Raw premium value from storage:', value);
+    const parsedValue = value ? JSON.parse(value) : false;
+    console.log('Parsed premium value:', parsedValue);
+    return parsedValue;
   } catch (error) {
     console.error('Error getting premium status:', error);
     return false;

@@ -3,27 +3,36 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react
 import { getIsPremium, getFavorites } from '../utils/storage';
 import stretches from '../data/stretches';
 import { Stretch } from '../types';
+import SubscriptionModal from '../components/SubscriptionModal';
+import { usePremium } from '../context/PremiumContext';
 
 export default function FavoritesScreen() {
-  const [isPremium, setIsPremium] = useState(false);
+  const { isPremium } = usePremium();
+  
   const [favorites, setFavorites] = useState<Stretch[]>([]);
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
-      const premium = await getIsPremium();
-      setIsPremium(premium);
-      
-      if (premium) {
-        const favoriteIds = await getFavorites();
-        const favoriteStretches = stretches.filter(stretch => 
-          favoriteIds.includes(stretch.id)
-        );
-        setFavorites(favoriteStretches);
+      try {
+        if (isPremium) {
+          await loadFavorites();
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
       }
     };
     
     loadData();
-  }, []);
+  }, [isPremium]);
+
+  const loadFavorites = async () => {
+    const favoriteIds = await getFavorites();
+    const favoriteStretches = stretches.filter(stretch => 
+      favoriteIds.includes(stretch.id)
+    );
+    setFavorites(favoriteStretches);
+  };
 
   const renderFavoriteItem = ({ item }: { item: Stretch }) => (
     <View style={styles.favoriteItem}>
@@ -41,9 +50,17 @@ export default function FavoritesScreen() {
       <View style={styles.container}>
         <Text style={styles.text}>Favorites Screen</Text>
         <Text style={styles.subtext}>Unlock favorites with Premium!</Text>
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => setSubscriptionModalVisible(true)}
+        >
           <Text style={styles.buttonText}>Go Premium</Text>
         </TouchableOpacity>
+
+        <SubscriptionModal 
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
       </View>
     );
   }

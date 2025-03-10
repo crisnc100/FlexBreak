@@ -22,6 +22,9 @@ import { RoutineParams, Stretch, ProgressEntry, AppNavigationProp } from '../typ
 import { generateRoutine } from '../utils/routineGenerator';
 import { saveProgress, getIsPremium, getRecentRoutines, saveFavoriteRoutine } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SubscriptionModal from '../components/SubscriptionModal';
+import SmartPickModal from '../components/SmartPickModal';
+import { usePremium } from '../context/PremiumContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,7 +38,6 @@ export default function RoutineScreen() {
   const [isRoutineComplete, setIsRoutineComplete] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [hasParams, setHasParams] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
   const [recentRoutines, setRecentRoutines] = useState<ProgressEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -47,16 +49,25 @@ export default function RoutineScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   
+  // Subscription modal state
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+  const [smartPickModalVisible, setSmartPickModalVisible] = useState(false);
+  
   // Get the current stretch
   const currentStretch = routine[currentIndex];
   
-  // Load premium status and recent routines
+  // Replace the local isPremium state with the global one
+  const { isPremium } = usePremium();
+  
+  // Load recent routines
   useEffect(() => {
     const loadData = async () => {
       try {
-        const premium = await getIsPremium();
-        setIsPremium(premium);
+        // Remove the premium loading code since it's handled by the context
+        // const premium = await getIsPremium();
+        // setIsPremium(premium);
         
+        // Keep the rest of the loading code
         const routines = await getRecentRoutines();
         setRecentRoutines(routines || []); // Ensure we always have an array
       } catch (error) {
@@ -64,7 +75,6 @@ export default function RoutineScreen() {
         // Set empty array on error to prevent loading state from getting stuck
         setRecentRoutines([]);
       } finally {
-        // Always set loading to false, even if there's an error
         setIsLoading(false);
       }
     };
@@ -586,22 +596,24 @@ export default function RoutineScreen() {
                 </Text>
               </TouchableOpacity>
               
-              {/* Smart suggestion - premium only */}
-              {isPremium && (
-                <TouchableOpacity 
-                  style={styles.suggestionCard}
-                  onPress={() => {
-                    const suggestion = getSmartSuggestion();
-                    navigation.navigate('Routine', suggestion);
-                  }}
-                >
+              {/* Smart suggestion - show to all but locked for free users */}
+              <TouchableOpacity 
+                style={styles.suggestionCard}
+                onPress={handleSmartPickTap}
+              >
+                <View style={styles.smartPickContainer}>
                   <Ionicons name="bulb" size={32} color="#4CAF50" />
-                  <Text style={styles.suggestionTitle}>Smart Pick</Text>
-                  <Text style={styles.suggestionSubtitle}>
-                    Based on your progress
-                  </Text>
-                </TouchableOpacity>
-              )}
+                  {!isPremium && (
+                    <View style={styles.premiumBadge}>
+                      <Ionicons name="lock-closed" size={12} color="#FFF" />
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.suggestionTitle}>Smart Pick</Text>
+                <Text style={styles.suggestionSubtitle}>
+                  {isPremium ? "Based on your progress" : "Personalized for you"}
+                </Text>
+              </TouchableOpacity>
               
               {/* Custom routine - available to all */}
               <TouchableOpacity 
@@ -692,11 +704,44 @@ export default function RoutineScreen() {
     );
   };
   
+  // Add this function to handle the Smart Pick tap for free users
+  const handleSmartPickTap = () => {
+    console.log('Smart Pick tapped, isPremium:', isPremium);
+    if (isPremium) {
+      const suggestion = getSmartSuggestion();
+      navigation.navigate('Routine', suggestion);
+    } else {
+      // Show the custom SmartPickModal instead of an alert
+      console.log('Setting smartPickModalVisible to true');
+      setSmartPickModalVisible(true);
+      console.log('smartPickModalVisible after setting:', smartPickModalVisible);
+    }
+  };
+  
+  // Add a useEffect to monitor the smartPickModalVisible state
+  useEffect(() => {
+    console.log('smartPickModalVisible changed:', smartPickModalVisible);
+  }, [smartPickModalVisible]);
+  
   // Main render function
   if (!hasParams) {
     return (
       <SafeAreaView style={styles.container}>
         {renderEmptyState()}
+        
+        <SubscriptionModal 
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
+        
+        <SmartPickModal
+          visible={smartPickModalVisible}
+          onClose={() => setSmartPickModalVisible(false)}
+          onUpgrade={() => {
+            setSmartPickModalVisible(false);
+            setSubscriptionModalVisible(true);
+          }}
+        />
       </SafeAreaView>
     );
   }
@@ -708,6 +753,20 @@ export default function RoutineScreen() {
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.loadingText}>Creating your routine...</Text>
         </View>
+        
+        <SubscriptionModal 
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
+        
+        <SmartPickModal
+          visible={smartPickModalVisible}
+          onClose={() => setSmartPickModalVisible(false)}
+          onUpgrade={() => {
+            setSmartPickModalVisible(false);
+            setSubscriptionModalVisible(true);
+          }}
+        />
       </SafeAreaView>
     );
   }
@@ -716,6 +775,20 @@ export default function RoutineScreen() {
     return (
       <SafeAreaView style={styles.container}>
         {renderCompletedState()}
+        
+        <SubscriptionModal 
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
+        
+        <SmartPickModal
+          visible={smartPickModalVisible}
+          onClose={() => setSmartPickModalVisible(false)}
+          onUpgrade={() => {
+            setSmartPickModalVisible(false);
+            setSubscriptionModalVisible(true);
+          }}
+        />
       </SafeAreaView>
     );
   }
@@ -826,6 +899,21 @@ export default function RoutineScreen() {
           />
         </View>
       </View>
+      
+      {/* Subscription Modal */}
+      <SubscriptionModal 
+        visible={subscriptionModalVisible}
+        onClose={() => setSubscriptionModalVisible(false)}
+      />
+      
+      <SmartPickModal
+        visible={smartPickModalVisible}
+        onClose={() => setSmartPickModalVisible(false)}
+        onUpgrade={() => {
+          setSmartPickModalVisible(false);
+          setSubscriptionModalVisible(true);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1136,7 +1224,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   suggestionSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   premiumButton: {
@@ -1154,5 +1242,15 @@ const styles = StyleSheet.create({
     width: 80,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  smartPickContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  premiumBadge: {
+    backgroundColor: '#FF9800',
+    borderRadius: 12,
+    padding: 2,
+    marginLeft: 4,
   },
 }); 

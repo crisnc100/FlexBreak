@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { getIsPremium, getProgress } from '../utils/storage';
 import { ProgressEntry, BodyArea } from '../types';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
+import SubscriptionModal from '../components/SubscriptionModal';
+import { usePremium } from '../context/PremiumContext';
 
 // Add these achievement definitions at the top
 const ACHIEVEMENTS = [
@@ -63,8 +65,8 @@ const AchievementCard = ({ achievement, isUnlocked }) => (
 );
 
 export default function ProgressScreen({ navigation }) {
-  const [isPremium, setIsPremium] = useState(false);
-  const [progress, setProgress] = useState([]);
+  const { isPremium } = usePremium();
+  const [progressData, setProgressData] = useState<ProgressEntry[]>([]);
   const [stats, setStats] = useState({
     totalRoutines: 0,
     totalMinutes: 0,
@@ -74,24 +76,27 @@ export default function ProgressScreen({ navigation }) {
     dayOfWeekBreakdown: [0, 0, 0, 0, 0, 0, 0],
     activeRoutineDays: 0
   });
+  const [streak, setStreak] = useState({ current: 0, best: 0 });
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
 
   // Day names for labels
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   useEffect(() => {
     const loadData = async () => {
-      const premium = await getIsPremium();
-      setIsPremium(premium);
-      
-      if (premium) {
-        const progressData = await getProgress();
-        setProgress(progressData);
-        calculateStats(progressData);
+      try {
+        if (isPremium) {
+          const progressData = await getProgress();
+          setProgressData(progressData);
+          calculateStats(progressData);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
       }
     };
     
     loadData();
-  }, []);
+  }, [isPremium]);
 
   const calculateStats = (data) => {
     if (!data || data.length === 0) return;
@@ -322,16 +327,21 @@ export default function ProgressScreen({ navigation }) {
         </View>
         <TouchableOpacity 
           style={styles.premiumButton}
-          onPress={() => navigation.navigate('Home', { openSubscription: true })}
+          onPress={() => setSubscriptionModalVisible(true)}
         >
-          <Text style={styles.premiumButtonText}>Go Premium</Text>
+          <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
         </TouchableOpacity>
+        
+        <SubscriptionModal 
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
       </View>
     );
   }
 
   // Empty state
-  if (progress.length === 0) {
+  if (progressData.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="fitness-outline" size={80} color="#CCCCCC" />

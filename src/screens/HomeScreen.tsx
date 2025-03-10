@@ -22,6 +22,7 @@ import SubscriptionModal from '../components/SubscriptionModal';
 import { getIsPremium, getReminderEnabled, getReminderTime, saveReminderTime, clearAllData } from '../utils/storage';
 import { requestNotificationsPermissions, scheduleDailyReminder, cancelReminders } from '../utils/notifications';
 import { tw } from '../utils/tw';
+import { usePremium } from '../context/PremiumContext';
 
 const { height, width } = Dimensions.get('window');
 
@@ -30,7 +31,7 @@ export default function HomeScreen() {
   const [area, setArea] = useState<BodyArea>('Hips & Legs');
   const [duration, setDuration] = useState<Duration>('5');
   const [level, setLevel] = useState<StretchLevel>('beginner');
-  const [isPremium, setIsPremium] = useState(false);
+  const { isPremium } = usePremium();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('09:00');
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
@@ -49,28 +50,45 @@ export default function HomeScreen() {
   const [scrollPosition, setScrollPosition] = useState(0);
 
   useEffect(() => {
+    console.log('HomeScreen: Starting data loading');
+    
     const loadData = async () => {
-      // Get premium status
-      const premium = await getIsPremium();
-      setIsPremium(premium);
-      
-      // Get reminder settings
-      const reminderStatus = await getReminderEnabled();
-      setReminderEnabled(reminderStatus);
-      
-      const savedTime = await getReminderTime();
-      if (savedTime) {
-        setReminderTime(savedTime);
+      try {
+        console.log('HomeScreen: Loading reminder settings');
+        
+        // Load reminder settings
+        const reminderEnabled = await getReminderEnabled();
+        setReminderEnabled(reminderEnabled);
+        
+        const reminderTime = await getReminderTime();
+        setReminderTime(reminderTime || '08:00');
+        
+        // Get a random tip
+        const randomTip = tips[Math.floor(Math.random() * tips.length)];
+        setDailyTip(randomTip);
+        
+        console.log('HomeScreen: Data loading completed successfully');
+      } catch (error) {
+        console.error('HomeScreen: Error loading data:', error);
+      } finally {
+        console.log('HomeScreen: Setting isLoading to false');
+        setIsLoading(false);
       }
-      
-      // Get a random tip
-      const randomTip = tips[Math.floor(Math.random() * tips.length)];
-      setDailyTip(randomTip);
-      
-      setIsLoading(false);
     };
     
+    // Set a timeout to ensure loading state is updated even if loadData fails
+    const timeoutId = setTimeout(() => {
+      console.log('HomeScreen: Timeout reached, forcing isLoading to false');
+      setIsLoading(false);
+    }, 3000); // 3 second timeout as a fallback
+    
+    // Start loading data
     loadData();
+    
+    // Clean up the timeout if component unmounts
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   // Memoized animation functions for better performance
@@ -347,6 +365,22 @@ export default function HomeScreen() {
     );
   };
 
+  // Add console logs to track component lifecycle
+  useEffect(() => {
+    console.log('HomeScreen mounted');
+    return () => {
+      console.log('HomeScreen unmounted');
+    };
+  }, []);
+  
+  useEffect(() => {
+    console.log('isPremium changed:', isPremium);
+  }, [isPremium]);
+  
+  useEffect(() => {
+    console.log('isLoading changed:', isLoading);
+  }, [isLoading]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -552,7 +586,6 @@ export default function HomeScreen() {
             if (success) {
               Alert.alert('Success', 'All app data has been reset');
               // Reset local state
-              setIsPremium(false);
               setReminderEnabled(false);
               setReminderTime('09:00');
             } else {

@@ -2,17 +2,30 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { saveIsPremium } from '../utils/storage';
+import { usePremium } from '../context/PremiumContext';
 
 interface SubscriptionModalProps {
   visible: boolean;
   onClose: () => void;
+  onSubscribe?: () => void;
 }
 
-export default function SubscriptionModal({ visible, onClose }: SubscriptionModalProps) {
+export default function SubscriptionModal({ visible, onClose, onSubscribe }: SubscriptionModalProps) {
+  // Use the global premium context
+  const { setPremiumStatus } = usePremium();
+
   const handleSubscribe = async () => {
     // In a real app, this would integrate with expo-in-app-purchases
     // For now, we'll just simulate a successful purchase
-    await saveIsPremium(true);
+    
+    // Update the global premium status
+    await setPremiumStatus(true);
+    
+    // Call the onSubscribe callback if provided (for backward compatibility)
+    if (onSubscribe) {
+      onSubscribe();
+    }
+    
     onClose();
     alert('Subscription successful! You now have premium access.');
   };
