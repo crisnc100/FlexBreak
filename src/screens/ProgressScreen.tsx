@@ -141,12 +141,12 @@ export default function ProgressScreen({ navigation }) {
   const calculateStreak = (data) => {
     if (data.length === 0) return 0;
     
-    // Sort dates newest to oldest
+    // Get all dates and sort them in descending order (newest first)
     const sortedDates = data
       .map(entry => new Date(entry.date).setHours(0, 0, 0, 0))
-      .sort((a, b) => b - a); // Sort descending
-
-    // Remove duplicates (multiple routines on same day)
+      .sort((a, b) => b - a);
+    
+    // Get unique dates
     const uniqueDates = [...new Set(sortedDates)];
     
     const today = new Date().setHours(0, 0, 0, 0);
@@ -158,17 +158,18 @@ export default function ProgressScreen({ navigation }) {
     if (streak === 0) return 0; // No streak if didn't work out today
 
     // Count consecutive days
-    let prevDate = uniqueDates[0];
+    let prevDate: number = uniqueDates[0] as number;
     for (let i = 1; i < uniqueDates.length; i++) {
-      const diff = (prevDate - uniqueDates[i]) / (1000 * 60 * 60 * 24);
+      // Both prevDate and uniqueDates[i] are already numbers (milliseconds since epoch)
+      const diff = (prevDate - (uniqueDates[i] as number)) / (1000 * 60 * 60 * 24);
       if (diff === 1) {
         streak++;
-        prevDate = uniqueDates[i];
+        prevDate = uniqueDates[i] as number;
       } else {
         break;
       }
     }
-
+    
     return streak;
   };
 
@@ -204,15 +205,16 @@ export default function ProgressScreen({ navigation }) {
     if (data.length === 0) return 0;
     
     const today = new Date().setHours(0, 0, 0, 0);
-    const thirtyDaysAgo = new Date(today);
+    const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29); // 30 days including today
+    const thirtyDaysAgoTimestamp = thirtyDaysAgo.setHours(0, 0, 0, 0);
     
     // Get unique dates in the last 30 days
     const uniqueDates = new Set();
     
     data.forEach(entry => {
       const entryDate = new Date(entry.date).setHours(0, 0, 0, 0);
-      if (entryDate >= thirtyDaysAgo && entryDate <= today) {
+      if (entryDate >= thirtyDaysAgoTimestamp && entryDate <= today) {
         uniqueDates.add(entryDate);
       }
     });
@@ -232,11 +234,11 @@ export default function ProgressScreen({ navigation }) {
     ];
     
     return Object.entries(stats.areaBreakdown)
-      .sort((a, b) => b[1] - a[1]) // Sort by frequency descending
+      .sort((a, b) => (b[1] as number) - (a[1] as number)) // Sort by frequency descending
       .map(([area, count], index) => {
         return {
           name: area,
-          count: count,
+          count: count as number,
           color: colors[index % colors.length],
           legendFontColor: '#7F7F7F',
           legendFontSize: 12
@@ -434,13 +436,13 @@ export default function ProgressScreen({ navigation }) {
             />
             <View style={styles.areaBreakdownList}>
               {Object.entries(stats.areaBreakdown)
-                .sort((a, b) => b[1] - a[1])
+                .sort((a, b) => (b[1] as number) - (a[1] as number))
                 .map(([area, count], index) => (
                   <View key={area} style={styles.areaBreakdownItem}>
                     <Text style={styles.areaBreakdownName}>{area}</Text>
                     <Text style={styles.areaBreakdownCount}>
-                      {count} {count === 1 ? 'activity' : 'activities'} 
-                      {' '}({Math.round((count / stats.totalRoutines) * 100)}%)
+                      {String(count)} {(count as number) === 1 ? 'activity' : 'activities'} 
+                      {' '}({Math.round(((count as number) / stats.totalRoutines) * 100)}%)
                     </Text>
                   </View>
                 ))
