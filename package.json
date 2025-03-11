@@ -17,6 +17,7 @@
     "expo": "^52.0.16",
     "expo-constants": "~17.0.2",
     "expo-in-app-purchases": "^14.5.0",
+    "expo-linear-gradient": "^14.0.2",
     "expo-linking": "~7.0.2",
     "expo-notifications": "^0.29.13",
     "expo-router": "~4.0.2",

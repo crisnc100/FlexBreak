@@ -5,9 +5,12 @@ import stretches from '../data/stretches';
 import { Stretch } from '../types';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { usePremium } from '../context/PremiumContext';
+import { useRefresh } from '../context/RefreshContext';
+import { RefreshableFlatList } from '../components/common';
 
 export default function FavoritesScreen() {
   const { isPremium } = usePremium();
+  const { isRefreshing, refreshFavorites } = useRefresh();
   
   const [favorites, setFavorites] = useState<Stretch[]>([]);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
@@ -32,6 +35,12 @@ export default function FavoritesScreen() {
       favoriteIds.includes(stretch.id)
     );
     setFavorites(favoriteStretches);
+  };
+
+  const handleRefresh = async () => {
+    console.log('Refreshing favorites...');
+    await loadFavorites();
+    await refreshFavorites();
   };
 
   const renderFavoriteItem = ({ item }: { item: Stretch }) => (
@@ -72,11 +81,14 @@ export default function FavoritesScreen() {
       {favorites.length === 0 ? (
         <Text style={styles.emptyText}>No favorites yet. Star stretches during your routine to save them here!</Text>
       ) : (
-        <FlatList
+        <RefreshableFlatList
           data={favorites}
           renderItem={renderFavoriteItem}
           keyExtractor={(item) => item.id.toString()}
           style={styles.favoritesList}
+          onRefresh={handleRefresh}
+          refreshing={isRefreshing}
+          showRefreshingFeedback={true}
         />
       )}
     </View>

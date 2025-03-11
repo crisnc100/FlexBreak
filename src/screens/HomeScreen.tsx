@@ -23,6 +23,8 @@ import { getIsPremium, getReminderEnabled, getReminderTime, saveReminderTime, cl
 import { requestNotificationsPermissions, scheduleDailyReminder, cancelReminders } from '../utils/notifications';
 import { tw } from '../utils/tw';
 import { usePremium } from '../context/PremiumContext';
+import { useRefresh } from '../context/RefreshContext';
+import { RefreshableScrollView } from '../components/common';
 
 const { height, width } = Dimensions.get('window');
 
@@ -32,6 +34,7 @@ export default function HomeScreen() {
   const [duration, setDuration] = useState<Duration>('5');
   const [level, setLevel] = useState<StretchLevel>('beginner');
   const { isPremium } = usePremium();
+  const { isRefreshing, refreshHome } = useRefresh();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('09:00');
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
@@ -45,9 +48,21 @@ export default function HomeScreen() {
   // State for dropdown
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   
-  // Scroll position for preventing background scroll
-  const scrollViewRef = useRef<ScrollView>(null);
+  // Scroll position tracking
   const [scrollPosition, setScrollPosition] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    console.log('Refreshing home screen...');
+    
+    // Get a new random tip
+    const randomTip = tips[Math.floor(Math.random() * tips.length)];
+    setDailyTip(randomTip);
+    
+    // Refresh other home data
+    await refreshHome();
+  };
 
   useEffect(() => {
     console.log('HomeScreen: Starting data loading');
@@ -113,7 +128,7 @@ export default function HomeScreen() {
         useNativeDriver: true,
       })
     ]).start();
-  }, [scrollPosition, slideAnim, backdropOpacity]);
+  }, [slideAnim, backdropOpacity, scrollPosition]);
 
   const closeDropdown = useCallback(() => {
     Animated.parallel([
@@ -395,12 +410,15 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={tw('flex-1 bg-bg')}>
-      <ScrollView 
+      <RefreshableScrollView 
         ref={scrollViewRef}
         style={tw('flex-1 p-4')}
         scrollEnabled={!activeDropdown}
         onScroll={(e) => setScrollPosition(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
+        onRefresh={handleRefresh}
+        refreshing={isRefreshing}
+        showRefreshingFeedback={true}
       >
         {/* Header */}
         <View style={tw('items-center mb-5')}>
@@ -495,7 +513,7 @@ export default function HomeScreen() {
           visible={subscriptionModalVisible}
           onClose={() => setSubscriptionModalVisible(false)}
         />
-      </ScrollView>
+      </RefreshableScrollView>
 
       {/* Optimized Dropdown Modal */}
       {activeDropdown && (

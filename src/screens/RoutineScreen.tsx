@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import SubscriptionModal from '../components/SubscriptionModal';
 import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
+import { useRefresh } from '../context/RefreshContext';
 import { BodyArea, Duration, ProgressEntry } from '../types';
 
 // Import our components
@@ -33,13 +34,16 @@ export default function RoutineScreen() {
   // Get premium status from context
   const { isPremium } = usePremium();
   
+  // Get refresh functionality from context
+  const { isRefreshing, refreshRoutine } = useRefresh();
+  
   // Single screen state to track what we're showing
   const [screenState, setScreenState] = useState<RoutineScreenState>('LOADING');
   
   // Modal visibility state
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [smartPickModalVisible, setSmartPickModalVisible] = useState(false);
-
+  
   // Effect for initial load and param changes
   useEffect(() => {
     // If we have params, we should show the active routine
@@ -128,7 +132,7 @@ export default function RoutineScreen() {
       console.log('Navigating to routine with params:', routine.area, routine.duration);
       // Navigate to routine with the parameters from the selected routine
       navigateToRoutine({
-        area: routine.area,
+      area: routine.area,
         duration: routine.duration
       });
     }, 100);
@@ -183,6 +187,12 @@ export default function RoutineScreen() {
     }
   };
   
+  // Handle refresh
+  const handleRefresh = async () => {
+    console.log('Refreshing routine screen...');
+    await refreshRoutine(); // Use refreshRoutine to refresh recent routines
+  };
+  
   // ============= RENDERING LOGIC =============
   
   // Render loading state
@@ -194,17 +204,19 @@ export default function RoutineScreen() {
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
-    );
-  }
-  
+      );
+    }
+    
   // Render dashboard
   if (screenState === 'DASHBOARD') {
-    return (
+      return (
       <SafeAreaView style={styles.container}>
         <RoutineDashboard 
           recentRoutines={recentRoutines}
           isPremium={isPremium}
           isLoading={isSuggestionsLoading}
+          isRefreshing={isRefreshing}
+          onRefresh={handleRefresh}
           onStartRecent={handleStartRecentRoutine}
           onRandomSuggestion={handleRandomSuggestion}
           onSmartPick={handleSmartPickTap}

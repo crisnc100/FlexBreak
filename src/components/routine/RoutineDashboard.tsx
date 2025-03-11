@@ -4,11 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ProgressEntry } from '../../types';
 import RoutineItem from './RoutineItem';
+import { RefreshableScrollView } from '../common';
 
 interface RoutineDashboardProps {
   recentRoutines: ProgressEntry[];
   isPremium: boolean;
   isLoading?: boolean;
+  isRefreshing?: boolean;
+  onRefresh: () => Promise<void>;
   onStartRecent: (routine: ProgressEntry) => void;
   onRandomSuggestion: () => void;
   onSmartPick: () => void;
@@ -24,6 +27,8 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   recentRoutines,
   isPremium,
   isLoading = false,
+  isRefreshing = false,
+  onRefresh,
   onStartRecent,
   onRandomSuggestion,
   onSmartPick,
@@ -100,7 +105,11 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   
   return (
     <GestureHandlerRootView style={styles.container}>
-      <ScrollView>
+      <RefreshableScrollView
+        onRefresh={onRefresh}
+        refreshing={isRefreshing}
+        showRefreshingFeedback={true}
+      >
         <View style={styles.headerContainer}>
           <Text style={styles.sectionTitle}>Your Recent Routines</Text>
           {!isPremium && recentRoutines.length > 3 && (
@@ -177,7 +186,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
     </GestureHandlerRootView>
   );
 };
