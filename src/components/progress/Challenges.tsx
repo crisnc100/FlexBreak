@@ -1,32 +1,132 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ProgressBarAndroid, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ProgressBarAndroid, Platform, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Challenge } from '../../hooks/useProgressSystem';
 
-interface ChallengesProps {
-  activeChallenges: Challenge[];
-  completedChallenges: Challenge[];
-  onCompleteChallenge: (challengeId: string) => Promise<void>;
-  isPremium: boolean;
-  onUpgradeToPremium: () => void;
+// Define challenge types
+type ChallengeType = 'daily' | 'weekly' | 'monthly' | 'special';
+
+// Define challenge interface
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  type: ChallengeType;
+  icon: string;
+  xpReward: number;
+  progress: number;
+  target: number;
+  isPremiumOnly: boolean;
+  expiresIn?: string; // For time-limited challenges
+  isCompleted: boolean;
 }
 
+// Sample challenges
+const SAMPLE_CHALLENGES: Challenge[] = [
+  // Daily challenges
+  {
+    id: 'daily_stretch',
+    title: 'Daily Stretch',
+    description: 'Complete at least one stretching routine today',
+    type: 'daily',
+    icon: 'today-outline',
+    xpReward: 50,
+    progress: 0,
+    target: 1,
+    isPremiumOnly: false,
+    expiresIn: '23h 45m',
+    isCompleted: false
+  },
+  {
+    id: 'morning_routine',
+    title: 'Morning Boost',
+    description: 'Complete a routine before 10 AM',
+    type: 'daily',
+    icon: 'sunny-outline',
+    xpReward: 75,
+    progress: 0,
+    target: 1,
+    isPremiumOnly: false,
+    expiresIn: '23h 45m',
+    isCompleted: false
+  },
+  
+  // Weekly challenges
+  {
+    id: 'variety_week',
+    title: 'Variety Week',
+    description: 'Complete routines for 3 different body areas this week',
+    type: 'weekly',
+    icon: 'apps-outline',
+    xpReward: 150,
+    progress: 1,
+    target: 3,
+    isPremiumOnly: false,
+    expiresIn: '5d 12h',
+    isCompleted: false
+  },
+  {
+    id: 'streak_week',
+    title: 'Streak Week',
+    description: 'Maintain a 5-day streak this week',
+    type: 'weekly',
+    icon: 'flame-outline',
+    xpReward: 200,
+    progress: 2,
+    target: 5,
+    isPremiumOnly: false,
+    expiresIn: '5d 12h',
+    isCompleted: false
+  },
+  
+  // Monthly challenges
+  {
+    id: 'consistency_master',
+    title: 'Consistency Master',
+    description: 'Complete 20 routines this month',
+    type: 'monthly',
+    icon: 'calendar-outline',
+    xpReward: 500,
+    progress: 8,
+    target: 20,
+    isPremiumOnly: true,
+    expiresIn: '22d 8h',
+    isCompleted: false
+  },
+  {
+    id: 'full_body_month',
+    title: 'Full Body Focus',
+    description: 'Complete routines for all body areas this month',
+    type: 'monthly',
+    icon: 'body-outline',
+    xpReward: 750,
+    progress: 4,
+    target: 6,
+    isPremiumOnly: true,
+    expiresIn: '22d 8h',
+    isCompleted: false
+  },
+  
+  // Special challenges
+  {
+    id: 'weekend_warrior',
+    title: 'Weekend Warrior',
+    description: 'Complete 3 routines this weekend',
+    type: 'special',
+    icon: 'trophy-outline',
+    xpReward: 300,
+    progress: 1,
+    target: 3,
+    isPremiumOnly: true,
+    expiresIn: '2d 5h',
+    isCompleted: false
+  }
+];
+
 // Challenge card component
-const ChallengeCard = ({ 
-  challenge, 
-  isPremium, 
-  onPress, 
-  onClaim, 
-  isCompleted 
-}: { 
-  challenge: Challenge; 
-  isPremium: boolean; 
-  onPress: (challenge: Challenge) => void; 
-  onClaim: (challenge: Challenge) => void;
-  isCompleted: boolean;
-}) => {
+const ChallengeCard = ({ challenge, isPremium, onPress, onClaim }) => {
   const isLocked = challenge.isPremiumOnly && !isPremium;
-  const progressPercentage = Math.min((challenge.progress / challenge.requirement) * 100, 100);
+  const isCompleted = challenge.progress >= challenge.target;
+  const progressPercentage = Math.min((challenge.progress / challenge.target) * 100, 100);
   
   return (
     <View style={[styles.challengeCard, isLocked && styles.lockedCard]}>
@@ -37,7 +137,7 @@ const ChallengeCard = ({
           isLocked && styles.lockedIconContainer
         ]}>
           <Ionicons 
-            name={challenge.icon as any} 
+            name={challenge.icon} 
             size={24} 
             color={isLocked ? '#999' : (isCompleted ? '#FFFFFF' : '#4CAF50')} 
           />
@@ -81,18 +181,16 @@ const ChallengeCard = ({
             )}
           </View>
           <Text style={styles.progressText}>
-            {challenge.progress}/{challenge.requirement}
+            {challenge.progress}/{challenge.target}
           </Text>
         </View>
       )}
       
       <View style={styles.challengeFooter}>
-        {challenge.endDate && (
+        {challenge.expiresIn && (
           <View style={styles.expiryContainer}>
             <Ionicons name="time-outline" size={14} color="#FF9800" />
-            <Text style={styles.expiryText}>
-              {new Date(challenge.endDate).toLocaleDateString()}
-            </Text>
+            <Text style={styles.expiryText}>{challenge.expiresIn}</Text>
           </View>
         )}
         
@@ -129,21 +227,21 @@ const ChallengeCard = ({
   );
 };
 
+interface ChallengesProps {
+  isPremium: boolean;
+  onUpgradeToPremium: () => void;
+  onCompleteChallenge: (challengeId: string) => Promise<void>;
+}
+
 const Challenges: React.FC<ChallengesProps> = ({
-  activeChallenges,
-  completedChallenges,
-  onCompleteChallenge,
   isPremium,
-  onUpgradeToPremium
+  onUpgradeToPremium,
+  onCompleteChallenge
 }) => {
-  const [activeTab, setActiveTab] = useState<string>('daily');
+  const [activeTab, setActiveTab] = useState<ChallengeType>('daily');
   
   // Filter challenges by type
-  const filteredActiveChallenges = activeChallenges.filter(
-    challenge => challenge.type === activeTab
-  );
-  
-  const filteredCompletedChallenges = completedChallenges.filter(
+  const filteredChallenges = SAMPLE_CHALLENGES.filter(
     challenge => challenge.type === activeTab
   );
   
@@ -160,9 +258,18 @@ const Challenges: React.FC<ChallengesProps> = ({
   // Handle claim reward
   const handleClaimReward = (challenge: Challenge) => {
     console.log('Claiming reward for:', challenge.title);
-    onCompleteChallenge(challenge.id);
+    // Logic to claim the reward and update user XP
   };
-  
+
+  // Handle challenge completion
+  const handleCompleteChallenge = async (challengeId) => {
+    try {
+      await onCompleteChallenge(challengeId);
+    } catch (error) {
+      console.error('Error completing challenge:', error);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -211,41 +318,17 @@ const Challenges: React.FC<ChallengesProps> = ({
       </View>
       
       <View style={styles.challengesContainer}>
-        {/* Active Challenges */}
-        {filteredActiveChallenges.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Active</Text>
-            {filteredActiveChallenges.map(challenge => (
-              <ChallengeCard
-                key={challenge.id}
-                challenge={challenge}
-                isPremium={isPremium}
-                onPress={handleChallengePress}
-                onClaim={handleClaimReward}
-                isCompleted={false}
-              />
-            ))}
-          </View>
-        )}
-        
-        {/* Completed Challenges */}
-        {filteredCompletedChallenges.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Completed</Text>
-            {filteredCompletedChallenges.map(challenge => (
-              <ChallengeCard
-                key={challenge.id}
-                challenge={challenge}
-                isPremium={isPremium}
-                onPress={handleChallengePress}
-                onClaim={handleClaimReward}
-                isCompleted={true}
-              />
-            ))}
-          </View>
-        )}
-        
-        {filteredActiveChallenges.length === 0 && filteredCompletedChallenges.length === 0 && (
+        {filteredChallenges.length > 0 ? (
+          filteredChallenges.map(challenge => (
+            <ChallengeCard
+              key={challenge.id}
+              challenge={challenge}
+              isPremium={isPremium}
+              onPress={handleChallengePress}
+              onClaim={handleClaimReward}
+            />
+          ))
+        ) : (
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={48} color="#CCCCCC" />
             <Text style={styles.emptyText}>
@@ -278,16 +361,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 4,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-    paddingHorizontal: 4,
   },
   tabContainer: {
     flexDirection: 'row',

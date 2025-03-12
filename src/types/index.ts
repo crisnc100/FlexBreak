@@ -18,6 +18,7 @@ export interface Stretch {
   tags: BodyArea[];
   level: StretchLevel;
   image: any; // image require
+  bilateral?: boolean; // Whether the stretch needs to be performed on both sides
 }
 
 export interface Tip {
@@ -35,6 +36,7 @@ export interface ProgressEntry {
   date: string;
   area: BodyArea;
   duration: Duration;
+  stretchCount?: number; // Number of stretches in the routine
   hidden?: boolean; // Optional property to mark if a routine is hidden from view but still counted in stats
 }
 

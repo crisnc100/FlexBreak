@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 // Enhanced achievement definitions with categories, XP rewards, and levels
 const ACHIEVEMENTS = [
-  // Beginner achievements
+  // Beginner achievements (0-500 XP)
   {
     id: 'first_stretch',
     title: 'First Stretch!',
@@ -33,14 +33,32 @@ const ACHIEVEMENTS = [
     xp: 200,
     category: 'beginner'
   },
+  {
+    id: 'five_routines',
+    title: 'Getting Started',
+    description: 'Completed 5 stretching routines',
+    icon: 'checkmark-done-outline',
+    requirement: 5,
+    xp: 100,
+    category: 'beginner'
+  },
+  {
+    id: 'time_investment',
+    title: 'Time Investment',
+    description: 'Spent 60+ minutes stretching',
+    icon: 'time-outline',
+    requirement: 60,
+    xp: 100,
+    category: 'beginner'
+  },
   
-  // Intermediate achievements
+  // Intermediate achievements (600-2000 XP)
   {
     id: 'variety_master',
     title: 'Variety Master',
-    description: 'Tried all body areas',
+    description: 'Tried all 6 body areas',
     icon: 'body-outline',
-    requirement: 6, // number of different areas
+    requirement: 6,
     xp: 150,
     category: 'intermediate'
   },
@@ -62,8 +80,35 @@ const ACHIEVEMENTS = [
     xp: 250,
     category: 'intermediate'
   },
+  {
+    id: 'dedicated_stretcher',
+    title: 'Dedicated Stretcher',
+    description: 'Spent 300+ minutes stretching',
+    icon: 'hourglass-outline',
+    requirement: 300,
+    xp: 250,
+    category: 'intermediate'
+  },
+  {
+    id: 'two_week_streak',
+    title: 'Fortnight Flexer',
+    description: '14-day streak achieved',
+    icon: 'flame-outline',
+    requirement: 14,
+    xp: 300,
+    category: 'intermediate'
+  },
+  {
+    id: 'twenty_routines',
+    title: 'Regular Stretcher',
+    description: 'Completed 20 routines',
+    icon: 'ribbon-outline',
+    requirement: 20,
+    xp: 250,
+    category: 'intermediate'
+  },
   
-  // Advanced achievements
+  // Advanced achievements (2000-5000 XP)
   {
     id: 'stretch_master',
     title: 'Stretch Master',
@@ -91,8 +136,35 @@ const ACHIEVEMENTS = [
     xp: 350,
     category: 'advanced'
   },
+  {
+    id: 'advanced_stretcher',
+    title: 'Advanced Stretcher',
+    description: 'Completed 10 advanced routines',
+    icon: 'trending-up-outline',
+    requirement: 10,
+    xp: 400,
+    category: 'advanced'
+  },
+  {
+    id: 'thousand_minutes',
+    title: 'Time Dedication',
+    description: 'Spent 1000+ minutes stretching',
+    icon: 'timer-outline',
+    requirement: 1000,
+    xp: 500,
+    category: 'advanced'
+  },
+  {
+    id: 'fifty_routines',
+    title: 'Flexibility Devotee',
+    description: 'Completed 50 routines',
+    icon: 'medal-outline',
+    requirement: 50,
+    xp: 450,
+    category: 'advanced'
+  },
   
-  // Elite achievements
+  // Elite achievements (5000+ XP)
   {
     id: 'stretch_guru',
     title: 'Stretch Guru',
@@ -110,22 +182,87 @@ const ACHIEVEMENTS = [
     requirement: 60,
     xp: 1500,
     category: 'elite'
+  },
+  {
+    id: 'yearly_flexibility',
+    title: 'Year of Flexibility',
+    description: '365-day streak achieved',
+    icon: 'calendar-outline',
+    requirement: 365,
+    xp: 2000,
+    category: 'elite'
+  },
+  {
+    id: 'master_of_all_areas',
+    title: 'Master of All Areas',
+    description: 'Complete 30 routines in each body area',
+    icon: 'grid-outline',
+    requirement: 30,
+    xp: 1200,
+    category: 'elite'
+  },
+  {
+    id: 'flexibility_legend',
+    title: 'Flexibility Legend',
+    description: 'Complete 200 routines',
+    icon: 'star-outline',
+    requirement: 200,
+    xp: 1800,
+    category: 'elite'
   }
 ];
 
-// Level definitions
+// Expanded level definitions (20 levels)
 const LEVELS = [
   { level: 1, xpRequired: 0, title: 'Stretching Novice' },
-  { level: 2, xpRequired: 200, title: 'Flexibility Enthusiast' },
-  { level: 3, xpRequired: 500, title: 'Stretching Regular' },
-  { level: 4, xpRequired: 1000, title: 'Flexibility Pro' },
-  { level: 5, xpRequired: 2000, title: 'Stretching Expert' },
-  { level: 6, xpRequired: 3500, title: 'Flexibility Master' },
-  { level: 7, xpRequired: 5000, title: 'Stretching Guru' },
-  { level: 8, xpRequired: 7500, title: 'Flexibility Champion' },
-  { level: 9, xpRequired: 10000, title: 'Stretching Legend' },
-  { level: 10, xpRequired: 15000, title: 'Ultimate Flexibility Master' }
+  { level: 2, xpRequired: 100, title: 'Flexibility Beginner' },
+  { level: 3, xpRequired: 250, title: 'Stretching Enthusiast' },
+  { level: 4, xpRequired: 400, title: 'Flexibility Starter' },
+  { level: 5, xpRequired: 500, title: 'Stretching Rookie' },
+  { level: 6, xpRequired: 750, title: 'Flexibility Student' },
+  { level: 7, xpRequired: 1000, title: 'Stretching Regular' },
+  { level: 8, xpRequired: 1250, title: 'Flexibility Adept' },
+  { level: 9, xpRequired: 1500, title: 'Stretching Practitioner' },
+  { level: 10, xpRequired: 2000, title: 'Flexibility Pro' },
+  { level: 11, xpRequired: 2500, title: 'Stretching Specialist' },
+  { level: 12, xpRequired: 3000, title: 'Flexibility Expert' },
+  { level: 13, xpRequired: 3500, title: 'Stretching Veteran' },
+  { level: 14, xpRequired: 4000, title: 'Flexibility Virtuoso' },
+  { level: 15, xpRequired: 5000, title: 'Stretching Master' },
+  { level: 16, xpRequired: 7000, title: 'Flexibility Champion' },
+  { level: 17, xpRequired: 9000, title: 'Stretching Elite' },
+  { level: 18, xpRequired: 11000, title: 'Flexibility Guru' },
+  { level: 19, xpRequired: 13000, title: 'Stretching Grandmaster' },
+  { level: 20, xpRequired: 15000, title: 'Ultimate Flexibility Legend' }
 ];
+
+// Calculate XP for a completed routine
+export const calculateRoutineXP = (
+  stretchCount: number, 
+  hasAdvancedStretch: boolean, 
+  extendsStreak: boolean,
+  streakLength: number
+): number => {
+  // Base XP: 10 XP per stretch
+  let totalXP = stretchCount * 10;
+  
+  // Advanced stretch bonus (Premium perk)
+  if (hasAdvancedStretch) {
+    totalXP += 20;
+  }
+  
+  // Streak bonus: +10 XP per day in streak if extending
+  if (extendsStreak && streakLength > 1) {
+    totalXP += 10;
+  }
+  
+  return totalXP;
+};
+
+// Calculate total XP from achievements
+export const calculateTotalXP = (achievements: Array<{id: string; xp: number}>): number => {
+  return achievements.reduce((total, achievement) => total + achievement.xp, 0);
+};
 
 // Achievement card component
 const AchievementCard = ({ achievement, isUnlocked, onPress }) => (
@@ -154,41 +291,95 @@ const AchievementCard = ({ achievement, isUnlocked, onPress }) => (
   </TouchableOpacity>
 );
 
+// Define the props interface
 interface AchievementsProps {
-  achievements: any[];
-  completedAchievements: any[];
-  upcomingAchievements: any[];
+  totalRoutines: number;
+  currentStreak: number;
+  areaBreakdown: Record<string, number>;
+  totalXP?: number;
+  level?: number;
+  completedAchievements?: Array<{id: string; title: string; xp: number; dateCompleted: string}>;
 }
 
 const Achievements: React.FC<AchievementsProps> = ({
-  achievements,
-  completedAchievements,
-  upcomingAchievements
+  totalRoutines,
+  currentStreak,
+  areaBreakdown,
+  totalXP = 0,
+  level = 1,
+  completedAchievements = []
 }) => {
+  // Log the stats for debugging
+  console.log(`Achievements received: ${totalRoutines} routines, streak: ${currentStreak}, areas: ${Object.keys(areaBreakdown).length}`);
+  
+  // Check if an achievement is already completed
+  const isAchievementCompleted = (achievementId) => {
+    return completedAchievements.some(a => a.id === achievementId);
+  };
+  
   // Calculate which achievements are unlocked
   const unlockedAchievements = ACHIEVEMENTS.map(achievement => {
-    // Check if this achievement is in the completed list
-    const isUnlocked = completedAchievements.some(a => a.id === achievement.id);
+    // First check if it's in the completed list
+    if (isAchievementCompleted(achievement.id)) {
+      return { ...achievement, isUnlocked: true };
+    }
+    
+    // Otherwise check if it should be unlocked based on the stats
+    let isUnlocked = false;
+    
+    switch (achievement.id) {
+      case 'first_stretch':
+        isUnlocked = totalRoutines >= achievement.requirement;
+        break;
+      case 'three_day_streak':
+      case 'week_streak':
+      case 'consistency_champion':
+      case 'month_streak':
+      case 'iron_flexibility':
+        // All streak-based achievements
+        isUnlocked = currentStreak >= achievement.requirement;
+        break;
+      case 'variety_master':
+        // Area variety achievements
+        isUnlocked = Object.keys(areaBreakdown).length >= achievement.requirement;
+        break;
+      case 'dedication':
+      case 'stretch_master':
+      case 'stretch_guru':
+        // Routine count achievements
+        isUnlocked = totalRoutines >= achievement.requirement;
+        break;
+      case 'area_expert':
+        // Check if any area has at least the required number of routines
+        isUnlocked = Object.values(areaBreakdown).some(count => count >= achievement.requirement);
+        break;
+      default:
+        break;
+    }
     
     return { ...achievement, isUnlocked };
   });
   
-  // Calculate total XP
-  const totalXP = completedAchievements
-    .reduce((sum, a) => sum + (a.xpReward || 0), 0);
+  // Calculate total XP from unlocked achievements if not provided
+  const calculatedTotalXP = totalXP || unlockedAchievements
+    .filter(a => a.isUnlocked)
+    .reduce((sum, a) => sum + (a.xp || 0), 0);
   
-  // Determine current level
-  const currentLevel = LEVELS.reduce((highest, level) => {
-    if (totalXP >= level.xpRequired && level.level > highest.level) {
-      return level;
-    }
-    return highest;
-  }, LEVELS[0]);
+  // Determine current level if not provided
+  const currentLevel = level ? 
+    LEVELS.find(l => l.level === level) || LEVELS[0] :
+    LEVELS.reduce((highest, level) => {
+      if (calculatedTotalXP >= level.xpRequired && level.level > highest.level) {
+        return level;
+      }
+      return highest;
+    }, LEVELS[0]);
   
   // Calculate XP for next level
   const nextLevel = LEVELS.find(l => l.level === currentLevel.level + 1);
   const xpForNextLevel = nextLevel ? nextLevel.xpRequired : currentLevel.xpRequired;
-  const xpProgress = nextLevel ? (totalXP - currentLevel.xpRequired) / (nextLevel.xpRequired - currentLevel.xpRequired) : 1;
+  const xpProgress = nextLevel ? 
+    (calculatedTotalXP - currentLevel.xpRequired) / (nextLevel.xpRequired - currentLevel.xpRequired) : 1;
   
   // Handle achievement press
   const handleAchievementPress = (achievement) => {
@@ -207,7 +398,7 @@ const Achievements: React.FC<AchievementsProps> = ({
           </View>
           <View style={styles.xpContainer}>
             <Ionicons name="flash" size={16} color="#FFD700" />
-            <Text style={styles.xpTotal}>{totalXP} XP</Text>
+            <Text style={styles.xpTotal}>{calculatedTotalXP} XP</Text>
           </View>
         </View>
         
@@ -222,7 +413,7 @@ const Achievements: React.FC<AchievementsProps> = ({
         
         {nextLevel && (
           <Text style={styles.nextLevelText}>
-            {xpForNextLevel - totalXP} XP to Level {nextLevel.level}: {nextLevel.title}
+            {xpForNextLevel - calculatedTotalXP} XP to Level {nextLevel.level}: {nextLevel.title}
           </Text>
         )}
       </View>

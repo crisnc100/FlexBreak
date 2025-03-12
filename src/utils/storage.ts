@@ -169,14 +169,14 @@ export const saveFavoriteRoutine = async (routine: RoutineParams): Promise<boole
 /**
  * Save a completed routine to progress history
  */
-export const saveCompletedRoutine = async (routine: RoutineParams): Promise<boolean> => {
+export const saveCompletedRoutine = async (routine: RoutineParams, stretchCount: number = 0): Promise<boolean> => {
   try {
     // Create progress entry
     const entry: ProgressEntry = {
       area: routine.area,
       duration: routine.duration,
       date: new Date().toISOString(),
-      stretchCount: 0, // This would normally be filled with actual count
+      stretchCount: stretchCount // Use the provided stretch count
     };
     
     // Save to progress

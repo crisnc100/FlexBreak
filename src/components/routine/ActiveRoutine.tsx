@@ -21,7 +21,7 @@ const { width, height } = Dimensions.get('window');
 export interface ActiveRoutineProps {
   area: BodyArea;
   duration: Duration;
-  onComplete: (routineArea: BodyArea, routineDuration: Duration) => Promise<void>;
+  onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean) => Promise<void>;
   onNavigateHome: () => void;
 }
 
@@ -152,7 +152,11 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Handle save and exit
   const handleSaveAndExit = () => {
     // Save progress
-    onComplete(area, duration);
+    const stretchCount = routine.length;
+    // Check if any stretch is an advanced stretch
+    const hasAdvancedStretch = routine.some(stretch => stretch.level === 'advanced');
+    
+    onComplete(area, duration, stretchCount, hasAdvancedStretch);
     Alert.alert('Progress Saved', 'Your routine has been saved to your progress');
     onNavigateHome();
   };
@@ -160,7 +164,11 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Handle routine completion
   const handleComplete = () => {
     // Call the onComplete callback
-    onComplete(area, duration);
+    const stretchCount = routine.length;
+    // Check if any stretch is an advanced stretch
+    const hasAdvancedStretch = routine.some(stretch => stretch.level === 'advanced');
+    
+    onComplete(area, duration, stretchCount, hasAdvancedStretch);
   };
   
   // If routine is not loaded yet, show loading
@@ -218,6 +226,13 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       >
         <Text style={styles.stretchName}>{currentStretch.name}</Text>
         
+        {currentStretch.bilateral && (
+          <View style={styles.bilateralBadge}>
+            <Ionicons name="swap-horizontal" size={16} color="#FFF" />
+            <Text style={styles.bilateralText}>Both Sides</Text>
+          </View>
+        )}
+        
         <View style={styles.imageContainer}>
           {currentStretch.image && (
             <Image 
@@ -232,6 +247,15 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           <Text style={styles.descriptionText}>
             {currentStretch.description}
           </Text>
+          
+          {currentStretch.bilateral && (
+            <View style={styles.bilateralInstructions}>
+              <Ionicons name="information-circle-outline" size={20} color="#4CAF50" />
+              <Text style={styles.bilateralInstructionsText}>
+                This stretch should be performed on both sides. The timer will count down for the total time.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       </Animated.View>
       
@@ -396,6 +420,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: '#333',
+  },
+  bilateralBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  bilateralText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    marginLeft: 6,
+    fontSize: 14,
+  },
+  bilateralInstructions: {
+    flexDirection: 'row',
+    backgroundColor: '#E8F5E9',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    alignItems: 'flex-start',
+  },
+  bilateralInstructionsText: {
+    fontSize: 14,
+    color: '#2E7D32',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
   },
   // Updated control styles
   controlsContainer: {

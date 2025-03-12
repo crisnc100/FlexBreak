@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Share
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +17,7 @@ export interface CompletedRoutineProps {
   area: BodyArea;
   duration: Duration;
   isPremium: boolean;
+  xpEarned?: number;
   onShowDashboard: () => void;
   onNavigateHome: () => void;
   onOpenSubscription: () => void;
@@ -27,6 +27,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   area,
   duration,
   isPremium,
+  xpEarned = 0,
   onShowDashboard,
   onNavigateHome,
   onOpenSubscription
@@ -39,7 +40,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   // Handle share
   const handleShare = async () => {
     try {
-      const message = `I just completed a ${duration}-minute beginner ${area} stretching routine with DeskStretch! 💪`;
+      const message = `I just completed a ${duration}-minute beginner ${area} stretching routine with DeskStretch! 💪 Earned ${xpEarned} XP!`;
       
       await Share.share({
         message,
@@ -57,17 +58,8 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   // Save routine to favorites
   const saveToFavorites = async () => {
     if (!isPremium) {
-      Alert.alert(
-        'Premium Feature',
-        'Saving routines to favorites is a premium feature. Upgrade to unlock unlimited favorites!',
-        [
-          { text: 'Maybe Later', style: 'cancel' },
-          { 
-            text: 'Upgrade', 
-            onPress: onOpenSubscription
-          }
-        ]
-      );
+      // Show subscription modal instead of alert
+      onOpenSubscription();
       return;
     }
     
@@ -80,14 +72,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
       };
       
       await saveFavoriteRoutine(routineParams);
-      Alert.alert('Success', 'Routine saved to your favorites!');
       
-      // Show dashboard first, then navigate home
+      // Show dashboard first, then navigate home (no alert)
       onShowDashboard();
       onNavigateHome();
     } catch (error) {
       console.error('Error saving to favorites:', error);
-      Alert.alert('Error', 'Failed to save routine to favorites');
     }
   };
   
@@ -139,6 +129,14 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
       <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
       <Text style={styles.completedTitle}>Routine Complete!</Text>
       <Text style={styles.completedSubtitle}>Great job on your stretching routine</Text>
+      
+      {/* XP Earned display right after subtitle */}
+      <View style={styles.xpContainer}>
+        <Ionicons name="star" size={24} color="#FF9800" />
+        <Text style={styles.xpText}>
+          <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
+        </Text>
+      </View>
       
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
@@ -247,7 +245,27 @@ const styles = StyleSheet.create({
   completedSubtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 32,
+    marginBottom: 16,
+  },
+  // New XP container styling
+  xpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginBottom: 24,
+  },
+  xpText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 8,
+  },
+  xpValue: {
+    fontWeight: 'bold',
+    color: '#FF9800',
+    fontSize: 18,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -320,7 +338,7 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 8,
-  },
+  }
 });
 
 export default CompletedRoutine;

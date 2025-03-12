@@ -16,6 +16,8 @@ import RoutineDashboard from '../components/routine/RoutineDashboard';
 import { useRoutineParams } from '../hooks/useRoutineParams';
 import { useRoutineStorage } from '../hooks/useRoutineStorage';
 import { useRoutineSuggestions } from '../hooks/useRoutineSuggestions';
+import { useProgressSystem } from '../hooks/useProgressSystem';
+import { calculateRoutineXP } from '../components/progress/Achievements';
 
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
@@ -27,9 +29,11 @@ export default function RoutineScreen() {
     recentRoutines, 
     isLoading: isStorageLoading, 
     saveRoutineProgress, 
-    hideRoutine 
+    hideRoutine,
+    getAllRoutines 
   } = useRoutineStorage();
   const { suggestions, isLoading: isSuggestionsLoading } = useRoutineSuggestions();
+  const { updateProgressWithRoutines } = useProgressSystem();
   
   // Get premium status from context
   const { isPremium } = usePremium();
@@ -43,6 +47,9 @@ export default function RoutineScreen() {
   // Modal visibility state
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [smartPickModalVisible, setSmartPickModalVisible] = useState(false);
+  
+  // Add state for XP earned
+  const [routineXpEarned, setRoutineXpEarned] = useState(0);
   
   // Effect for initial load and param changes
   useEffect(() => {
@@ -76,8 +83,8 @@ export default function RoutineScreen() {
     }, [screenState, hasParams])
   );
   
-  // Handle completing a routine
-  const handleRoutineComplete = async (routineArea: BodyArea, routineDuration: Duration) => {
+  // Handle routine completion
+  const handleRoutineComplete = async (routineArea: BodyArea, routineDuration: Duration, stretchCount: number = 5, hasAdvancedStretch: boolean = false) => {
     console.log('Routine completed');
     
     try {
@@ -85,11 +92,67 @@ export default function RoutineScreen() {
       const entry = {
         area: routineArea,
         duration: routineDuration,
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        stretchCount: stretchCount
       };
       
       await saveRoutineProgress(entry);
       console.log('Routine saved successfully');
+      
+      // Update progress system with all routines
+      try {
+        // Get all routines for progress calculation
+        const allRoutines = await getAllRoutines();
+        
+        // Determine if this routine extends a streak
+        const currentStreak = allRoutines.length > 1 ? 1 : 0; // Simple check - in real app would check dates
+        const extendsStreak = currentStreak > 0;
+        
+        // Calculate XP for this routine
+        const routineXP = calculateRoutineXP(
+          stretchCount,
+          hasAdvancedStretch,
+          extendsStreak,
+          currentStreak
+        );
+        
+        // Store XP earned
+        setRoutineXpEarned(routineXP);
+        
+        try {
+          // Update progress with all routines
+          const progressResult = await updateProgressWithRoutines(allRoutines);
+          
+          // Log the results
+          if (progressResult) {
+            console.log('Progress updated:', progressResult);
+            
+            // Calculate total XP (routine XP + achievement XP)
+            const totalXP = routineXP + (progressResult.xpEarned || 0);
+            
+            // Log total XP earned instead of showing an alert
+            console.log(`Total XP earned: ${totalXP}`);
+            console.log(`Routine XP: ${routineXP}, Achievement XP: ${progressResult.xpEarned || 0}`);
+            
+            // Log level up and achievements
+            if (progressResult.leveledUp) {
+              console.log('Level up!');
+            }
+            
+            if (progressResult.achievementsCompleted.length > 0) {
+              console.log(`Unlocked ${progressResult.achievementsCompleted.length} achievements!`);
+            }
+          }
+        } catch (progressError) {
+          console.error('Error updating progress system:', progressError);
+          // Just log the error instead of showing an alert
+          console.log(`XP earned for this routine: ${routineXP}`);
+        }
+      } catch (routineError) {
+        console.error('Error processing routine data:', routineError);
+        // Set a default XP amount in case of error
+        setRoutineXpEarned(50); // Default fallback XP value
+      }
       
       // Update state to show completed screen
       setScreenState('COMPLETED');
@@ -97,6 +160,8 @@ export default function RoutineScreen() {
       console.error('Error saving routine:', error);
       // Even on error, still show the completed screen
       setScreenState('COMPLETED');
+      // Set a default XP in case of error
+      setRoutineXpEarned(50); // Default fallback XP value
     }
   };
   
@@ -182,7 +247,7 @@ export default function RoutineScreen() {
     try {
       await hideRoutine(routineDate);
       console.log('Routine hidden successfully');
-    } catch (error) {
+      } catch (error) {
       console.error('Error hiding routine:', error);
     }
   };
@@ -266,6 +331,7 @@ export default function RoutineScreen() {
           area={area as BodyArea}
           duration={duration as Duration}
           isPremium={isPremium}
+          xpEarned={routineXpEarned}
           onShowDashboard={showDashboard}
           onNavigateHome={handleCreateNewRoutine}
           onOpenSubscription={() => setSubscriptionModalVisible(true)}
@@ -331,4 +397,4 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 20,
   },
-}); 
+});

@@ -1,8 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Define rewards that users can unlock at different levels
+// Define the props interface
+interface RewardsProps {
+  userLevel: number;
+  isPremium: boolean;
+  onUpgradeToPremium: () => void;
+}
+
+// Sample rewards data
 const REWARDS = [
   {
     id: 'dark_theme',
@@ -120,12 +127,6 @@ const RewardCard = ({ reward, userLevel, onPress }) => {
   );
 };
 
-interface RewardsProps {
-  userLevel: number;
-  isPremium: boolean;
-  onUpgradeToPremium: () => void;
-}
-
 const Rewards: React.FC<RewardsProps> = ({
   userLevel,
   isPremium,
@@ -155,11 +156,19 @@ const Rewards: React.FC<RewardsProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.headerContainer}>
         <Text style={styles.title}>Rewards</Text>
-        <Text style={styles.subtitle}>
-          Unlock special features as you level up
-        </Text>
+        
+        {/* Improved level display */}
+        <View style={styles.levelBadgeContainer}>
+          <View style={styles.levelBadgeInner}>
+            <Ionicons name="trophy" size={22} color="#4CAF50" />
+            <View style={styles.levelTextContainer}>
+              <Text style={styles.levelValue}>{userLevel}</Text>
+              <Text style={styles.levelLabel}>LEVEL</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       {!isPremium && (
@@ -202,6 +211,13 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: 8,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
   header: {
     paddingHorizontal: 16,
     marginBottom: 16,
@@ -215,6 +231,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 4,
+  },
+  // New styles for improved level badge
+  levelBadgeContainer: {
+    backgroundColor: '#F2F8F2',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    overflow: 'hidden',
+    padding: 6,
+  },
+  levelBadgeInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  levelTextContainer: {
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  levelValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  levelLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    letterSpacing: 1,
   },
   premiumBanner: {
     backgroundColor: '#FFF9C4',
@@ -351,4 +396,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Rewards; 
+export default Rewards;
