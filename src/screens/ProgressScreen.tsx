@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   Dimensions,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getIsPremium } from '../utils/storage';
+import { useRoutineStorage } from '../hooks/useRoutineStorage';
 import { ProgressEntry, BodyArea } from '../types';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { usePremium } from '../context/PremiumContext';
-import { useRoutineStorage } from '../hooks/useRoutineStorage';
 import { useRefresh } from '../context/RefreshContext';
+import { useProgressSystem } from '../hooks/useProgressSystem';
 import {
   calculateStreak,
   calculateWeeklyActivity,
@@ -35,10 +35,15 @@ import {
   Achievements,
   PremiumLock,
   EmptyState,
-  Rewards,
-  Challenges
+  Rewards
 } from '../components/progress';
 import { RefreshableScrollView } from '../components/common';
+import { debounce } from '../utils/debounce';
+import { measureAsyncOperation, logPerformanceStats } from '../utils/performance';
+import ChallengesComponent from '../components/progress/Challenges';
+import { useNavigation } from '@react-navigation/native';
+import { usePremium } from '../context/PremiumContext';
+import { AppNavigationProp } from '../types';
 
 // Day names for labels
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -46,11 +51,35 @@ const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 // Tab types
 type TabType = 'stats' | 'achievements' | 'challenges' | 'rewards';
 
-export default function ProgressScreen({ navigation }) {
+export default function ProgressScreen() {
+  const navigation = useNavigation<AppNavigationProp>();
   const { isPremium } = usePremium();
-  const { recentRoutines, isLoading, hasSynchronized, synchronizeProgressData } = useRoutineStorage();
-  const { isRefreshing, refreshProgress } = useRefresh();
+  const { 
+    recentRoutines, 
+    getAllRoutines,
+    isLoading, 
+    hasSynchronized, 
+    synchronizeProgressData 
+  } = useRoutineStorage();
+  const { isRefreshing, refreshProgress, debouncedRefreshProgress } = useRefresh();
+  const {
+    userProgress,
+    isLoading: isProgressLoading,
+    refreshUserProgress,
+    updateProgressWithRoutines,
+    updateCurrentStreak,
+    getUnlockedRewards,
+    getPendingAchievements,
+    getCurrentChallenges,
+    achievements,
+    rewards,
+    challenges,
+    completedChallenges,
+    completeChallenge,
+    updateUserProgress
+  } = useProgressSystem();
   const [progressData, setProgressData] = useState<ProgressEntry[]>([]);
+  const [allProgressData, setAllProgressData] = useState<ProgressEntry[]>([]);
   const [stats, setStats] = useState({
     totalRoutines: 0,
     totalMinutes: 0,
@@ -63,7 +92,14 @@ export default function ProgressScreen({ navigation }) {
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('stats');
-
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const debouncedRefreshRef = useRef(null);
+  
+  // Add these refs at the component level, not inside useEffect
+  const loadAllRoutinesRef = useRef(false);
+  const lastProgressDataKeyRef = useRef('');
+  const lastStreakKeyRef = useRef('');
+  
   // Calculate user level based on achievements and challenges
   const userLevel = useMemo(() => {
     // This is a simplified calculation - in a real app, this would be based on XP
@@ -84,6 +120,18 @@ export default function ProgressScreen({ navigation }) {
     [stats.dayOfWeekBreakdown]
   );
   
+  // Initialize debounced refresh function
+  useEffect(() => {
+    debouncedRefreshRef.current = debounce(async () => {
+      await handleRefresh();
+    }, 500); // 500ms debounce time
+    
+    return () => {
+      // Clean up
+      debouncedRefreshRef.current = null;
+    };
+  }, []);
+  
   // Synchronize data when component mounts
   useEffect(() => {
     const loadData = async () => {
@@ -100,12 +148,59 @@ export default function ProgressScreen({ navigation }) {
     loadData();
   }, [isPremium, hasSynchronized, synchronizeProgressData]);
   
-  // Update stats when recentRoutines changes
+  // Log performance stats when component unmounts
+  useEffect(() => {
+    return () => {
+      // Log performance stats when component unmounts
+      logPerformanceStats();
+    };
+  }, []);
+  
+  // Load all routines for statistics with performance monitoring
+  useEffect(() => {
+    const loadAllRoutines = async () => {
+      if (isPremium && !isLoadingStats && !loadAllRoutinesRef.current) {
+        try {
+          loadAllRoutinesRef.current = true;
+          setIsLoadingStats(true);
+          
+          // Use performance monitoring
+          const allRoutines = await measureAsyncOperation(
+            'getAllRoutines',
+            async () => await getAllRoutines()
+          );
+          
+          console.log('Loaded all routines for statistics:', allRoutines.length);
+          setAllProgressData(allRoutines);
+          
+          // Also measure stats calculation
+          await measureAsyncOperation(
+            'calculateStats',
+            async () => {
+              calculateStats(allRoutines);
+              return Promise.resolve();
+            }
+          );
+        } catch (error) {
+          console.error('Error loading all routines:', error);
+        } finally {
+          setIsLoadingStats(false);
+        }
+      }
+    };
+    
+    loadAllRoutines();
+    
+    return () => {
+      loadAllRoutinesRef.current = false;
+    };
+  }, [isPremium]);
+  
+  // Update visible routines
   useEffect(() => {
     if (isPremium && recentRoutines.length > 0) {
-      console.log('Updating stats with', recentRoutines.length, 'routines');
+      console.log('Updating visible routines:', recentRoutines.length);
       setProgressData(recentRoutines);
-      calculateStats(recentRoutines);
     }
   }, [isPremium, recentRoutines]);
   
@@ -155,10 +250,114 @@ export default function ProgressScreen({ navigation }) {
     setSubscriptionModalVisible(true);
   };
 
-  // Handle refresh
+  // Calculate next level XP threshold
+  const getNextLevelXP = useCallback(() => {
+    const currentLevel = userProgress.level;
+    if (currentLevel >= 10) return userProgress.totalXP; // Max level
+    
+    // This matches the thresholds defined in useProgressSystem.ts
+    const LEVEL_THRESHOLDS = [
+      0,      // Level 1
+      100,    // Level 2
+      250,    // Level 3
+      500,    // Level 4
+      1000,   // Level 5
+      2000,   // Level 6
+      3500,   // Level 7
+      5500,   // Level 8
+      8000,   // Level 9
+      12000   // Level 10
+    ];
+    
+    return LEVEL_THRESHOLDS[currentLevel];
+  }, [userProgress.level, userProgress.totalXP]);
+
+  // Update user progress when all routines are loaded
+  useEffect(() => {
+    if (allProgressData.length > 0 && isPremium && !isLoadingStats) {
+      // Add a flag to prevent multiple calls
+      const progressDataKey = `${allProgressData.length}_${new Date().toDateString()}`;
+      
+      if (lastProgressDataKeyRef.current !== progressDataKey) {
+        lastProgressDataKeyRef.current = progressDataKey;
+        console.log('Processing new progress data:', progressDataKey);
+        
+        // Update progress system with the full routine data
+        updateProgressWithRoutines(allProgressData);
+      }
+    }
+  }, [allProgressData, isPremium, updateProgressWithRoutines, isLoadingStats]);
+  
+  // Update streak in progress system when stats change
+  useEffect(() => {
+    if (stats.currentStreak > 0 && isPremium && !isLoadingStats) {
+      // Only update if the streak actually changed
+      const streakKey = `streak_${stats.currentStreak}`;
+      
+      if (lastStreakKeyRef.current !== streakKey) {
+        lastStreakKeyRef.current = streakKey;
+        console.log('Updating streak:', stats.currentStreak);
+        updateCurrentStreak(stats.currentStreak);
+      }
+    }
+  }, [stats.currentStreak, isPremium, updateCurrentStreak, isLoadingStats]);
+  
+  // Modify handleRefresh to include progress system
   const handleRefresh = async () => {
+    if (isRefreshing || isLoadingStats) {
+      console.log('Refresh already in progress, skipping...');
+      return;
+    }
+    
     console.log('Refreshing progress screen...');
-    await refreshProgress();
+    
+    // Measure refresh performance
+    await measureAsyncOperation(
+      'refreshProgress',
+      async () => await refreshProgress()
+    );
+    
+    // Also reload all routines for statistics
+    if (isPremium) {
+      try {
+        setIsLoadingStats(true);
+        
+        // Measure getAllRoutines performance
+        const allRoutines = await measureAsyncOperation(
+          'getAllRoutines',
+          async () => await getAllRoutines()
+        );
+        
+        setAllProgressData(allRoutines);
+        
+        // Measure stats calculation performance
+        await measureAsyncOperation(
+          'calculateStats',
+          async () => {
+            calculateStats(allRoutines);
+            return Promise.resolve();
+          }
+        );
+      } catch (error) {
+        console.error('Error refreshing all routines:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    }
+    
+    // Also refresh user progress
+    await refreshUserProgress();
+  };
+  
+  // Use the debounced refresh function from context
+  const handleDebouncedRefresh = async () => {
+    if (isRefreshing || isLoadingStats) {
+      console.log('Refresh already in progress, skipping...');
+      return Promise.resolve();
+    }
+    
+    console.log('Using debounced refresh from context...');
+    return debouncedRefreshProgress();
   };
 
   // Premium locked screen
@@ -182,6 +381,19 @@ export default function ProgressScreen({ navigation }) {
     );
   }
 
+  // Render challenges tab
+  const renderChallengesTab = () => {
+    return (
+      <ChallengesComponent 
+        activeChallenges={challenges}
+        completedChallenges={completedChallenges}
+        onCompleteChallenge={completeChallenge}
+        isPremium={isPremium}
+        onUpgradeToPremium={handleUpgradeToPremium}
+      />
+    );
+  };
+  
   // Render tab content
   const renderTabContent = () => {
     switch (activeTab) {
@@ -224,24 +436,22 @@ export default function ProgressScreen({ navigation }) {
       case 'achievements':
         return (
           <Achievements
-            totalRoutines={stats.totalRoutines}
-            currentStreak={stats.currentStreak}
-            areaBreakdown={stats.areaBreakdown}
+            achievements={Object.values(userProgress.achievements)}
+            completedAchievements={Object.values(userProgress.achievements).filter(a => a.completed)}
+            upcomingAchievements={getPendingAchievements().slice(0, 5)}
           />
         );
         
       case 'challenges':
-        return (
-          <Challenges
-            isPremium={isPremium}
-            onUpgradeToPremium={handleUpgradeToPremium}
-          />
-        );
+        return renderChallengesTab();
         
       case 'rewards':
         return (
           <Rewards
-            userLevel={userLevel}
+            rewards={Object.values(userProgress.rewards)}
+            level={userProgress.level}
+            totalXP={userProgress.totalXP}
+            nextLevelXP={getNextLevelXP()}
             isPremium={isPremium}
             onUpgradeToPremium={handleUpgradeToPremium}
           />
@@ -250,6 +460,19 @@ export default function ProgressScreen({ navigation }) {
       default:
         return null;
     }
+  };
+
+  // Render loading overlay if needed
+  const renderLoadingOverlay = () => {
+    if (isLoadingStats && !isRefreshing) {
+      return (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Loading statistics...</Text>
+        </View>
+      );
+    }
+    return null;
   };
 
   return (
@@ -316,7 +539,7 @@ export default function ProgressScreen({ navigation }) {
       {/* Tab content */}
       <RefreshableScrollView 
         style={styles.content}
-        onRefresh={handleRefresh}
+        onRefresh={handleDebouncedRefresh}
         refreshing={isRefreshing}
         showRefreshingFeedback={true}
       >
@@ -328,6 +551,9 @@ export default function ProgressScreen({ navigation }) {
           </Text>
         </View>
       </RefreshableScrollView>
+      
+      {/* Loading overlay */}
+      {renderLoadingOverlay()}
     </View>
   );
 }
@@ -372,5 +598,21 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: '#666',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#333',
   },
 });

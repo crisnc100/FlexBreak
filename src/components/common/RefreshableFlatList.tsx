@@ -50,19 +50,33 @@ const RefreshableFlatList = forwardRef(<T,>(
       setInternalRefreshing(true);
       setRefreshFailed(false);
       
+      console.log('Starting aggressive refresh...');
+      
       // Create a promise that resolves after the timeout
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Refresh timeout')), refreshTimeout);
       });
       
       // Race between the actual refresh and the timeout
-      await Promise.race([onRefresh(), timeoutPromise]);
+      await Promise.race([
+        onRefresh().catch(error => {
+          console.error('Refresh operation failed:', error);
+          throw error;
+        }), 
+        timeoutPromise
+      ]);
       
+      console.log('Refresh completed successfully');
       setInternalRefreshing(false);
     } catch (error) {
       console.error('Refresh failed:', error);
       setRefreshFailed(true);
       setInternalRefreshing(false);
+      
+      // After a delay, clear the error state
+      setTimeout(() => {
+        setRefreshFailed(false);
+      }, 3000);
     }
   };
   

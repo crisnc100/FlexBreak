@@ -96,7 +96,6 @@ const ACHIEVEMENTS = [
   {
     id: 'stretch_guru',
     title: 'Stretch Guru',
-    title: 'Stretch Guru',
     description: 'Completed 100 routines',
     icon: 'medal-outline',
     requirement: 100,
@@ -156,65 +155,27 @@ const AchievementCard = ({ achievement, isUnlocked, onPress }) => (
 );
 
 interface AchievementsProps {
-  totalRoutines: number;
-  currentStreak: number;
-  areaBreakdown: Record<string, number>;
+  achievements: any[];
+  completedAchievements: any[];
+  upcomingAchievements: any[];
 }
 
 const Achievements: React.FC<AchievementsProps> = ({
-  totalRoutines,
-  currentStreak,
-  areaBreakdown
+  achievements,
+  completedAchievements,
+  upcomingAchievements
 }) => {
   // Calculate which achievements are unlocked
   const unlockedAchievements = ACHIEVEMENTS.map(achievement => {
-    let isUnlocked = false;
-    
-    switch(achievement.id) {
-      case 'first_stretch':
-        isUnlocked = totalRoutines >= 1;
-        break;
-      case 'three_day_streak':
-        isUnlocked = currentStreak >= 3;
-        break;
-      case 'week_streak':
-        isUnlocked = currentStreak >= 7;
-        break;
-      case 'variety_master':
-        isUnlocked = Object.keys(areaBreakdown).length >= 6;
-        break;
-      case 'dedication':
-        isUnlocked = totalRoutines >= 10;
-        break;
-      case 'consistency_champion':
-        isUnlocked = currentStreak >= 5;
-        break;
-      case 'stretch_master':
-        isUnlocked = totalRoutines >= 30;
-        break;
-      case 'month_streak':
-        isUnlocked = currentStreak >= 30;
-        break;
-      case 'area_expert':
-        isUnlocked = Object.values(areaBreakdown).some(count => count >= 15);
-        break;
-      case 'stretch_guru':
-        isUnlocked = totalRoutines >= 100;
-        break;
-      case 'iron_flexibility':
-        isUnlocked = currentStreak >= 60;
-        break;
-      default:
-        break;
-    }
+    // Check if this achievement is in the completed list
+    const isUnlocked = completedAchievements.some(a => a.id === achievement.id);
     
     return { ...achievement, isUnlocked };
   });
   
   // Calculate total XP
-  const totalXP = unlockedAchievements
-    .filter(a => a.isUnlocked)
-    .reduce((sum, a) => sum + a.xp, 0);
+  const totalXP = completedAchievements
+    .reduce((sum, a) => sum + (a.xpReward || 0), 0);
   
   // Determine current level
   const currentLevel = LEVELS.reduce((highest, level) => {

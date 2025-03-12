@@ -35,6 +35,7 @@ export interface ProgressEntry {
   date: string;
   area: BodyArea;
   duration: Duration;
+  hidden?: boolean; // Optional property to mark if a routine is hidden from view but still counted in stats
 }
 
 export type RootStackParamList = {

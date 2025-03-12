@@ -209,12 +209,39 @@ export const clearAllData = async (): Promise<boolean> => {
       'reminderEnabled',
       'reminderTime',
       '@progress',
-      '@favoriteRoutines'
+      '@favoriteRoutines',
+      '@hiddenRoutines',
+      '@userProgress',
+      '@allRoutines',
+      '@recentRoutines',
+      '@completedChallenges',
+      '@achievements',
+      '@rewards',
+      '@syncTimestamp',
+      '@lastRefreshTime',
+      '@userSettings',
+      '@customRoutines',
+      '@routineHistory'
     ];
     
-    // Clear all keys
-    await AsyncStorage.multiRemove(keys);
-    console.log('All app data cleared successfully');
+    // For extra safety, get all keys and clear them
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      console.log('All AsyncStorage keys found:', allKeys);
+      
+      // Merge with our known keys list
+      const uniqueKeys = [...new Set([...keys, ...allKeys])];
+      
+      // Clear all keys
+      await AsyncStorage.multiRemove(uniqueKeys);
+      console.log('All app data cleared successfully. Cleared keys:', uniqueKeys);
+    } catch (innerError) {
+      // If getAllKeys fails, fall back to our predefined list
+      console.warn('Error getting all keys, falling back to predefined list:', innerError);
+      await AsyncStorage.multiRemove(keys);
+      console.log('Cleared predefined keys:', keys);
+    }
+    
     return true;
   } catch (e) {
     console.error('Error clearing app data:', e);

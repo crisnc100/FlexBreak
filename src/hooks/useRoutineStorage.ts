@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ProgressEntry, BodyArea, Duration } from '../types';
 
@@ -8,6 +8,8 @@ interface UseRoutineStorageReturn {
   hasSynchronized: boolean;
   saveRoutineProgress: (entry: { area: BodyArea; duration: Duration; date: string }) => Promise<void>;
   getRecentRoutines: () => Promise<ProgressEntry[]>;
+  getAllRoutines: () => Promise<ProgressEntry[]>;
+  hideRoutine: (routineDate: string) => Promise<void>;
   deleteRoutine: (routineDate: string) => Promise<void>;
   saveFavoriteRoutine: (routine: { name: string; area: BodyArea; duration: Duration }) => Promise<void>;
   setDashboardFlag: (value: boolean) => Promise<void>;
@@ -45,33 +47,26 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   }, [hasSynchronized]);
 
   // Synchronize data between @progress and progress
-  const synchronizeProgressData = async () => {
+  const synchronizeProgressData = useCallback(async () => {
     try {
-      // Get data from both storage locations
+      // Get data from all storage locations
       const recentRoutinesJson = await AsyncStorage.getItem('@progress');
       const progressJson = await AsyncStorage.getItem('progress');
+      const hiddenRoutinesJson = await AsyncStorage.getItem('@hiddenRoutines');
       
       const recentRoutinesData = recentRoutinesJson ? JSON.parse(recentRoutinesJson) : [];
       const progressData = progressJson ? JSON.parse(progressJson) : [];
+      const hiddenRoutinesData = hiddenRoutinesJson ? JSON.parse(hiddenRoutinesJson) : [];
       
-      // Check if synchronization is needed
-      if (recentRoutinesData.length === 0 && progressData.length === 0) {
-        console.log('No data to synchronize');
-        return;
-      }
-      
-      // If both arrays are empty or identical, no need to synchronize
-      if (JSON.stringify(recentRoutinesData) === JSON.stringify(progressData)) {
-        console.log('Data already synchronized');
-        return;
-      }
-      
-      console.log('Synchronizing progress data between storage locations');
+      console.log('Synchronizing data from multiple sources:');
+      console.log('- Visible routines:', recentRoutinesData.length);
+      console.log('- Progress data:', progressData.length);
+      console.log('- Hidden routines:', hiddenRoutinesData.length);
       
       // Create a merged set of unique entries based on date
       const mergedEntries: { [key: string]: ProgressEntry } = {};
       
-      // Add entries from @progress
+      // Add entries from @progress (visible routines)
       recentRoutinesData.forEach((entry: ProgressEntry) => {
         if (entry.date) {
           mergedEntries[entry.date] = entry;
@@ -85,6 +80,22 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
         }
       });
       
+      // Add entries from hidden routines
+      hiddenRoutinesData.forEach((entry: ProgressEntry) => {
+        if (entry.date) {
+          // Preserve the hidden flag
+          if (!mergedEntries[entry.date]) {
+            mergedEntries[entry.date] = entry;
+          } else {
+            // If entry exists but isn't marked as hidden, update it
+            mergedEntries[entry.date] = {
+              ...mergedEntries[entry.date],
+              hidden: entry.hidden || false
+            };
+          }
+        }
+      });
+      
       // Convert back to arrays
       const mergedRecentRoutines = Object.values(mergedEntries);
       
@@ -93,21 +104,31 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
       
-      // Save synchronized data back to both storage locations
-      await AsyncStorage.setItem('@progress', JSON.stringify(mergedRecentRoutines));
+      // Split into visible and hidden routines
+      const visibleRoutines = mergedRecentRoutines.filter(routine => !routine.hidden);
+      const hiddenRoutines = mergedRecentRoutines.filter(routine => routine.hidden);
+      
+      // Save synchronized data back to storage
+      await AsyncStorage.setItem('@progress', JSON.stringify(visibleRoutines));
+      await AsyncStorage.setItem('@hiddenRoutines', JSON.stringify(hiddenRoutines));
+      
+      // Save ALL routines (both visible and hidden) to progress for statistics
       await AsyncStorage.setItem('progress', JSON.stringify(mergedRecentRoutines));
       
-      console.log('Progress data synchronized successfully, total entries:', mergedRecentRoutines.length);
+      console.log('Progress data synchronized successfully:');
+      console.log('- Total entries:', mergedRecentRoutines.length);
+      console.log('- Visible entries:', visibleRoutines.length);
+      console.log('- Hidden entries:', hiddenRoutines.length);
       
-      // Update state
-      setRecentRoutines(mergedRecentRoutines);
+      // Update state with visible routines only
+      setRecentRoutines(visibleRoutines);
     } catch (error) {
       console.error('Error synchronizing progress data:', error);
     }
-  };
+  }, []);
 
   // Save routine progress
-  const saveRoutineProgress = async (entry: { area: BodyArea; duration: Duration; date: string }) => {
+  const saveRoutineProgress = useCallback(async (entry: { area: BodyArea; duration: Duration; date: string }) => {
     try {
       console.log('Saving routine progress:', entry);
       
@@ -150,16 +171,18 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
       console.error('Error saving routine progress:', error);
       throw error;
     }
-  };
+  }, []);
 
-  // Get recent routines
-  const getRecentRoutines = async (): Promise<ProgressEntry[]> => {
+  // Get recent routines (only visible ones)
+  const getRecentRoutines = useCallback(async (): Promise<ProgressEntry[]> => {
     try {
       const routinesJson = await AsyncStorage.getItem('@progress');
       if (routinesJson) {
         const routines = JSON.parse(routinesJson) as ProgressEntry[];
-        console.log('Retrieved routines from storage:', routines.length);
-        return routines;
+        // Filter out any routines that might have a hidden flag
+        const visibleRoutines = routines.filter(routine => !routine.hidden);
+        console.log('Retrieved visible routines from storage:', visibleRoutines.length);
+        return visibleRoutines;
       }
       console.log('No routines found in storage');
       return [];
@@ -167,47 +190,63 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
       console.error('Error getting recent routines:', error);
       return [];
     }
-  };
+  }, []);
 
-  // Delete a routine
-  const deleteRoutine = async (routineDate: string) => {
+  // Hide a routine (instead of deleting it)
+  const hideRoutine = useCallback(async (routineDate: string) => {
     try {
-      console.log('Deleting routine with date:', routineDate);
+      console.log('Hiding routine with date:', routineDate);
       
-      // Delete from @progress (recent routines)
+      // Get existing routines
       const existingRoutines = await getRecentRoutines();
+      
+      // Find the routine to hide
+      const routineToHide = existingRoutines.find(routine => routine.date === routineDate);
+      
+      if (!routineToHide) {
+        console.log('Routine not found, nothing to hide');
+        return;
+      }
+      
+      // Remove from visible routines
       const updatedRoutines = existingRoutines.filter(
         routine => routine.date !== routineDate
       );
       
+      // Save updated visible routines
       await AsyncStorage.setItem('@progress', JSON.stringify(updatedRoutines));
-      console.log('Deleted routine from @progress, remaining routines:', updatedRoutines.length);
+      console.log('Removed routine from visible list, remaining routines:', updatedRoutines.length);
       
-      // ALSO delete from 'progress' key for the ProgressScreen
-      try {
-        const progressJson = await AsyncStorage.getItem('progress');
-        if (progressJson) {
-          const progressData = JSON.parse(progressJson);
-          const updatedProgressData = progressData.filter(
-            (routine: ProgressEntry) => routine.date !== routineDate
-          );
-          
-          await AsyncStorage.setItem('progress', JSON.stringify(updatedProgressData));
-          console.log('Also deleted routine from progress key for ProgressScreen');
-        }
-      } catch (progressError) {
-        console.error('Error deleting from progress key:', progressError);
-      }
+      // Add to hidden routines
+      const hiddenRoutinesJson = await AsyncStorage.getItem('@hiddenRoutines');
+      const hiddenRoutines = hiddenRoutinesJson ? JSON.parse(hiddenRoutinesJson) : [];
       
+      // Mark the routine as hidden
+      const hiddenRoutine = {
+        ...routineToHide,
+        hidden: true
+      };
+      
+      hiddenRoutines.push(hiddenRoutine);
+      await AsyncStorage.setItem('@hiddenRoutines', JSON.stringify(hiddenRoutines));
+      console.log('Added routine to hidden list, total hidden routines:', hiddenRoutines.length);
+      
+      // Update state
       setRecentRoutines(updatedRoutines);
     } catch (error) {
-      console.error('Error deleting routine:', error);
+      console.error('Error hiding routine:', error);
       throw error;
     }
-  };
+  }, []);
+  
+  // For backward compatibility - now just calls hideRoutine
+  const deleteRoutine = useCallback(async (routineDate: string) => {
+    console.log('deleteRoutine is deprecated, using hideRoutine instead');
+    return hideRoutine(routineDate);
+  }, [hideRoutine]);
 
   // Save a favorite routine
-  const saveFavoriteRoutine = async (routine: { name: string; area: BodyArea; duration: Duration }) => {
+  const saveFavoriteRoutine = useCallback(async (routine: { name: string; area: BodyArea; duration: Duration }) => {
     try {
       console.log('Saving favorite routine:', routine);
       
@@ -232,10 +271,10 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
       console.error('Error saving favorite routine:', error);
       throw error;
     }
-  };
+  }, []);
 
   // Set dashboard flag
-  const setDashboardFlag = async (value: boolean) => {
+  const setDashboardFlag = useCallback(async (value: boolean) => {
     try {
       console.log('Setting dashboard flag to:', value);
       await AsyncStorage.setItem('@shouldShowDashboard', value ? 'true' : 'false');
@@ -244,10 +283,10 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
       console.error('Error setting dashboard flag:', error);
       throw error;
     }
-  };
+  }, []);
 
   // Get dashboard flag
-  const getDashboardFlag = async (): Promise<boolean> => {
+  const getDashboardFlag = useCallback(async (): Promise<boolean> => {
     try {
       const flag = await AsyncStorage.getItem('@shouldShowDashboard');
       const shouldShow = flag === 'true';
@@ -257,10 +296,10 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
       console.error('Error getting dashboard flag:', error);
       return false;
     }
-  };
+  }, []);
 
   // Clear all flags (for debugging)
-  const clearAllFlags = async () => {
+  const clearAllFlags = useCallback(async () => {
     try {
       console.log('Clearing all flags');
       await AsyncStorage.removeItem('@shouldShowDashboard');
@@ -269,7 +308,24 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
       console.error('Error clearing flags:', error);
       throw error;
     }
-  };
+  }, []);
+
+  // Get all routines (both visible and hidden) for statistics
+  const getAllRoutines = useCallback(async (): Promise<ProgressEntry[]> => {
+    try {
+      const progressJson = await AsyncStorage.getItem('progress');
+      if (progressJson) {
+        const allRoutines = JSON.parse(progressJson) as ProgressEntry[];
+        console.log('Retrieved all routines for statistics:', allRoutines.length);
+        return allRoutines;
+      }
+      console.log('No progress data found in storage');
+      return [];
+    } catch (error) {
+      console.error('Error getting all routines:', error);
+      return [];
+    }
+  }, []);
 
   return {
     recentRoutines,
@@ -277,6 +333,8 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
     hasSynchronized,
     saveRoutineProgress,
     getRecentRoutines,
+    getAllRoutines,
+    hideRoutine,
     deleteRoutine,
     saveFavoriteRoutine,
     setDashboardFlag,

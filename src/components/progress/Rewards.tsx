@@ -5,110 +5,103 @@ import { Ionicons } from '@expo/vector-icons';
 // Define rewards that users can unlock at different levels
 const REWARDS = [
   {
-    id: 'custom_routines',
-    title: 'Custom Routines',
-    description: 'Create and save your own personalized stretching routines',
-    icon: 'create-outline',
-    levelRequired: 2,
-    isPremiumOnly: true
-  },
-  {
-    id: 'advanced_analytics',
-    title: 'Advanced Analytics',
-    description: 'Gain deeper insights into your stretching patterns and progress',
-    icon: 'analytics-outline',
-    levelRequired: 3,
-    isPremiumOnly: true
-  },
-  {
-    id: 'exclusive_stretches',
-    title: 'Exclusive Stretches',
-    description: 'Access to 15+ premium stretching exercises',
-    icon: 'fitness-outline',
-    levelRequired: 4,
-    isPremiumOnly: true
-  },
-  {
-    id: 'routine_sharing',
-    title: 'Routine Sharing',
-    description: 'Share your favorite routines with friends and colleagues',
-    icon: 'share-social-outline',
-    levelRequired: 5,
-    isPremiumOnly: true
-  },
-  {
     id: 'dark_theme',
     title: 'Dark Theme',
     description: 'Enable a sleek dark mode for comfortable evening stretching',
     icon: 'moon-outline',
-    levelRequired: 6,
+    levelRequired: 2,
     isPremiumOnly: true
   },
-  {
+   {
     id: 'custom_reminders',
     title: 'Custom Reminders',
     description: 'Set personalized reminders with custom messages',
     icon: 'notifications-outline',
-    levelRequired: 7,
+    levelRequired: 3,
     isPremiumOnly: true
   },
   {
-    id: 'expert_guidance',
-    title: 'Expert Guidance',
-    description: 'Access to video tutorials from professional trainers',
-    icon: 'videocam-outline',
+    id: 'xp_boost',
+    title: 'XP Boost',
+    description: 'Get a 2x boost in XP for your daily streak',
+    icon: 'sparkles-outline',
+    levelRequired: 4,
+    isPremiumOnly: true
+  },
+  {
+    id: 'custom_routines',
+    title: 'Custom Routines',
+    description: 'Create and save your own personalized stretching routines',
+    icon: 'create-outline',
+    levelRequired: 5,
+    isPremiumOnly: true
+  },
+  {
+    id: 'streak_freezes',
+    title: 'Streak Freezes',
+    description: 'Miss a day, keep your streak—perfect for busy schedules.',
+    icon: 'pause-outline',
+    levelRequired: 6,
+    isPremiumOnly: true
+  },
+  {
+    id: 'premium_stretches',
+    title: 'Premium Stretches',
+    description: 'Access to 15+ premium stretching exercises',
+    icon: 'fitness-outline',
+    levelRequired: 7,
+    isPremiumOnly: true
+  },
+
+  {
+    id: 'desk_break',
+    title: 'Desk Break Boost',
+    description: 'Stretch in quick 15-sec bursts—3 fast routines!',
+    icon: 'desktop-outline',
     levelRequired: 8,
     isPremiumOnly: true
   },
   {
-    id: 'priority_support',
-    title: 'Priority Support',
-    description: 'Get priority customer support and feature requests',
-    icon: 'headset-outline',
+    id: 'focus_mastery',
+    title: 'Focus Area Mastery',
+    description: 'Get ultimate focus badges for your favorite areas',
+    icon: 'star-outline',
     levelRequired: 9,
     isPremiumOnly: true
   },
-  {
-    id: 'beta_features',
-    title: 'Beta Features',
-    description: 'Early access to upcoming features and improvements',
-    icon: 'flask-outline',
-    levelRequired: 10,
-    isPremiumOnly: true
-  }
 ];
 
 // Reward card component
 const RewardCard = ({ reward, userLevel, onPress }) => {
   const isUnlocked = userLevel >= reward.levelRequired;
-  
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.rewardCard, !isUnlocked && styles.rewardLocked]}
       onPress={() => onPress(reward, isUnlocked)}
     >
       <View style={styles.rewardHeader}>
         <View style={[styles.rewardIconContainer, isUnlocked && styles.rewardIconContainerUnlocked]}>
-          <Ionicons 
-            name={reward.icon} 
-            size={24} 
-            color={isUnlocked ? '#FFFFFF' : '#999'} 
+          <Ionicons
+            name={reward.icon}
+            size={24}
+            color={isUnlocked ? '#FFFFFF' : '#999'}
           />
         </View>
-        
+
         <View style={styles.levelBadge}>
           <Text style={styles.levelText}>Level {reward.levelRequired}</Text>
         </View>
       </View>
-      
+
       <Text style={[styles.rewardTitle, !isUnlocked && styles.rewardLockedText]}>
         {reward.title}
       </Text>
-      
+
       <Text style={styles.rewardDescription}>
         {reward.description}
       </Text>
-      
+
       {!isUnlocked && (
         <View style={styles.lockContainer}>
           <Ionicons name="lock-closed" size={16} color="#999" />
@@ -117,7 +110,7 @@ const RewardCard = ({ reward, userLevel, onPress }) => {
           </Text>
         </View>
       )}
-      
+
       {isUnlocked && (
         <TouchableOpacity style={styles.useButton}>
           <Text style={styles.useButtonText}>Use</Text>
@@ -145,7 +138,7 @@ const Rewards: React.FC<RewardsProps> = ({
       onUpgradeToPremium();
       return;
     }
-    
+
     if (isUnlocked) {
       // Navigate to the feature or show a modal with details
       console.log('Using reward:', reward.title);
@@ -154,12 +147,12 @@ const Rewards: React.FC<RewardsProps> = ({
       console.log('Need to reach level', reward.levelRequired, 'to unlock', reward.title);
     }
   };
-  
+
   // Filter rewards to show
-  const availableRewards = REWARDS.filter(reward => 
+  const availableRewards = REWARDS.filter(reward =>
     isPremium || !reward.isPremiumOnly || reward.levelRequired <= userLevel
   );
-  
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -168,14 +161,14 @@ const Rewards: React.FC<RewardsProps> = ({
           Unlock special features as you level up
         </Text>
       </View>
-      
+
       {!isPremium && (
         <View style={styles.premiumBanner}>
           <Ionicons name="star" size={24} color="#FFD700" />
           <Text style={styles.premiumText}>
             Upgrade to Premium to unlock all rewards
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.upgradeButton}
             onPress={onUpgradeToPremium}
           >
@@ -183,7 +176,7 @@ const Rewards: React.FC<RewardsProps> = ({
           </TouchableOpacity>
         </View>
       )}
-      
+
       <View style={styles.rewardsContainer}>
         {availableRewards.map(reward => (
           <RewardCard
@@ -194,7 +187,7 @@ const Rewards: React.FC<RewardsProps> = ({
           />
         ))}
       </View>
-      
+
       <View style={styles.comingSoonContainer}>
         <Text style={styles.comingSoonTitle}>Coming Soon</Text>
         <Text style={styles.comingSoonText}>

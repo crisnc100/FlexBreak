@@ -8,16 +8,27 @@ interface RoutineItemProps {
   item: ProgressEntry;
   onPress: () => void;
   onDelete: () => void;
+  hideLabel?: string; // Optional prop to customize the action label
 }
 
-const RoutineItem: React.FC<RoutineItemProps> = ({ item, onPress, onDelete }) => {
-  // Render the right swipe actions (delete)
+const RoutineItem: React.FC<RoutineItemProps> = ({ 
+  item, 
+  onPress, 
+  onDelete, 
+  hideLabel = 'Delete' // Default to "Delete" for backward compatibility
+}) => {
+  // Render the right swipe actions (hide/delete)
   const renderRightActions = () => (
     <TouchableOpacity 
-      style={styles.deleteAction}
+      style={styles.actionButton}
       onPress={onDelete}
     >
-      <Ionicons name="trash-outline" size={24} color="#FFF" />
+      <Ionicons 
+        name={hideLabel === 'Hide' ? 'eye-off-outline' : 'trash-outline'} 
+        size={24} 
+        color="#FFF" 
+      />
+      <Text style={styles.actionText}>{hideLabel}</Text>
     </TouchableOpacity>
   );
 
@@ -62,12 +73,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  deleteAction: {
+  actionButton: {
     backgroundColor: '#F44336',
     justifyContent: 'center',
     alignItems: 'center',
     width: 80,
+    flexDirection: 'column',
   },
+  actionText: {
+    color: '#FFF',
+    fontSize: 12,
+    marginTop: 4,
+  }
 });
 
 export default RoutineItem;

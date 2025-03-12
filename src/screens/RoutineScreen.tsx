@@ -27,7 +27,7 @@ export default function RoutineScreen() {
     recentRoutines, 
     isLoading: isStorageLoading, 
     saveRoutineProgress, 
-    deleteRoutine 
+    hideRoutine 
   } = useRoutineStorage();
   const { suggestions, isLoading: isSuggestionsLoading } = useRoutineSuggestions();
   
@@ -177,20 +177,37 @@ export default function RoutineScreen() {
     navigateToHome();
   };
 
-  // Handle deleting a routine
-  const handleDeleteRoutine = async (routineDate: string) => {
+  // Handle hiding a routine from view (but keep it for stats)
+  const handleHideRoutine = async (routineDate: string) => {
     try {
-      await deleteRoutine(routineDate);
-      console.log('Routine deleted successfully');
+      await hideRoutine(routineDate);
+      console.log('Routine hidden successfully');
     } catch (error) {
-      console.error('Error deleting routine:', error);
+      console.error('Error hiding routine:', error);
     }
   };
   
   // Handle refresh
   const handleRefresh = async () => {
-    console.log('Refreshing routine screen...');
-    await refreshRoutine(); // Use refreshRoutine to refresh recent routines
+    console.log('Performing comprehensive routine screen refresh...');
+    
+    try {
+      // First refresh the routine data
+      await refreshRoutine();
+      console.log('Routine data refreshed');
+      
+      // Then reload suggestions if needed
+      if (suggestions.length === 0) {
+        console.log('No suggestions found, attempting to reload...');
+        // You might need to add a method to reload suggestions in the useRoutineSuggestions hook
+      }
+      
+      // Add any other data refresh logic here
+      
+      console.log('Comprehensive routine screen refresh complete');
+    } catch (error) {
+      console.error('Error during routine screen refresh:', error);
+    }
   };
   
   // ============= RENDERING LOGIC =============
@@ -221,7 +238,7 @@ export default function RoutineScreen() {
           onRandomSuggestion={handleRandomSuggestion}
           onSmartPick={handleSmartPickTap}
           onCreateNew={handleCreateNewRoutine}
-          onDeleteRoutine={handleDeleteRoutine}
+          onDeleteRoutine={handleHideRoutine}
         />
         
         <SubscriptionModal 

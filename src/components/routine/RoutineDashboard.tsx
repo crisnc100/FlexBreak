@@ -68,29 +68,41 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   // Loading state
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading your routines...</Text>
-      </View>
+      <RefreshableScrollView
+        onRefresh={onRefresh}
+        refreshing={isRefreshing}
+        showRefreshingFeedback={true}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Loading your routines...</Text>
+        </View>
+      </RefreshableScrollView>
     );
   }
 
   // No routines yet - show first-time user experience
   if (recentRoutines.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="fitness-outline" size={80} color="#CCCCCC" />
-        <Text style={styles.emptyTitle}>No Routines Yet</Text>
-        <Text style={styles.emptySubtitle}>
-          Create your first personalized stretching routine
-        </Text>
-        <TouchableOpacity 
-          style={styles.createButton}
-          onPress={onCreateNew}
-        >
-          <Text style={styles.createButtonText}>Create Routine</Text>
-        </TouchableOpacity>
-      </View>
+      <RefreshableScrollView
+        onRefresh={onRefresh}
+        refreshing={isRefreshing}
+        showRefreshingFeedback={true}
+      >
+        <View style={styles.emptyContainer}>
+          <Ionicons name="fitness-outline" size={80} color="#CCCCCC" />
+          <Text style={styles.emptyTitle}>No Routines Yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Create your first personalized stretching routine
+          </Text>
+          <TouchableOpacity 
+            style={styles.createButton}
+            onPress={onCreateNew}
+          >
+            <Text style={styles.createButtonText}>Create Routine</Text>
+          </TouchableOpacity>
+        </View>
+      </RefreshableScrollView>
     );
   }
 
@@ -130,6 +142,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 item={item}
                 onPress={() => onStartRecent(item)}
                 onDelete={() => onDeleteRoutine(item.date)}
+                hideLabel="Hide"
               />
             ))}
           </View>
