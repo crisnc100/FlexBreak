@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BodyArea, Duration, RootStackParamList } from '../types';
+import { BodyArea, Duration, RootStackParamList, StretchLevel } from '../types';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 
 type RoutineScreenRouteProp = RouteProp<RootStackParamList, 'Routine'>;
@@ -7,11 +7,12 @@ type RoutineScreenRouteProp = RouteProp<RootStackParamList, 'Routine'>;
 interface UseRoutineParamsReturn {
   area: BodyArea | null;
   duration: Duration | null;
+  level: StretchLevel | null;
   hasParams: boolean;
-  setRoutineParams: (area: BodyArea, duration: Duration) => void;
+  setRoutineParams: (area: BodyArea, duration: Duration, level: StretchLevel) => void;
   resetParams: () => void;
   navigateToHome: () => void;
-  navigateToRoutine: (params: { area: BodyArea; duration: Duration }) => void;
+  navigateToRoutine: (params: { area: BodyArea; duration: Duration; level: StretchLevel }) => void;
 }
 
 export function useRoutineParams(): UseRoutineParamsReturn {
@@ -20,14 +21,16 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   
   const [area, setArea] = useState<BodyArea | null>(null);
   const [duration, setDuration] = useState<Duration | null>(null);
+  const [level, setLevel] = useState<StretchLevel | null>(null);
   const [hasParams, setHasParams] = useState(false);
 
   // Initialize from route params
   useEffect(() => {
     if (route.params?.area && route.params?.duration) {
-      console.log('Setting params from route:', route.params.area, route.params.duration);
+      console.log('Setting params from route:', route.params.area, route.params.duration, route.params.level || 'beginner');
       setArea(route.params.area);
       setDuration(route.params.duration);
+      setLevel(route.params.level || 'beginner');
       setHasParams(true);
     } else {
       console.log('No params in route, resetting hasParams');
@@ -36,10 +39,11 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   }, [route.params]);
 
   // Set routine parameters
-  const setRoutineParams = (newArea: BodyArea, newDuration: Duration) => {
-    console.log('Setting routine params:', newArea, newDuration);
+  const setRoutineParams = (newArea: BodyArea, newDuration: Duration, newLevel: StretchLevel = 'beginner') => {
+    console.log('Setting routine params:', newArea, newDuration, newLevel);
     setArea(newArea);
     setDuration(newDuration);
+    setLevel(newLevel);
     setHasParams(true);
     
     // Update navigation params to match state
@@ -47,7 +51,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
       navigation.setParams({
         area: newArea,
         duration: newDuration,
-        level: 'beginner'
+        level: newLevel
       });
     } catch (error) {
       console.error('Error setting navigation params:', error);
@@ -59,6 +63,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     console.log('Resetting routine params');
     setArea(null);
     setDuration(null);
+    setLevel(null);
     setHasParams(false);
     
     // Clear route params
@@ -83,14 +88,14 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   };
   
   // Navigate to routine screen with params
-  const navigateToRoutine = (params: { area: BodyArea; duration: Duration }) => {
+  const navigateToRoutine = (params: { area: BodyArea; duration: Duration; level?: StretchLevel }) => {
     console.log('Navigating to routine screen with params:', params);
     
     // Navigate to the routine screen
     try {
       navigation.navigate('Routine', {
         ...params,
-        level: 'beginner'
+        level: params.level || 'beginner'
       });
     } catch (error) {
       console.error('Error navigating to routine:', error);
@@ -100,6 +105,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   return {
     area,
     duration,
+    level,
     hasParams,
     setRoutineParams,
     resetParams,

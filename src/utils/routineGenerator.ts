@@ -19,28 +19,125 @@ export const generateRoutine = (
     (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))
   );
 
-  // Filter by level
-  filteredStretches = filteredStretches.filter(stretch => {
-    if (level === 'beginner') return stretch.level === 'beginner';
-    if (level === 'intermediate') return stretch.level === 'beginner' || stretch.level === 'intermediate';
-    if (level === 'advanced') return true; // All levels
-  });
+  // Debug logging
+  console.log(`[DEBUG] Generating routine for area: ${area}, level: ${level}, duration: ${duration}`);
+  console.log(`[DEBUG] Total stretches: ${stretches.length}`);
+  console.log(`[DEBUG] Filtered by area: ${filteredStretches.length}`);
+  
+  const advancedCount = filteredStretches.filter(s => s.level === 'advanced').length;
+  const intermediateCount = filteredStretches.filter(s => s.level === 'intermediate').length;
+  const beginnerCount = filteredStretches.filter(s => s.level === 'beginner').length;
+  
+  console.log(`[DEBUG] Available stretches by level - Advanced: ${advancedCount}, Intermediate: ${intermediateCount}, Beginner: ${beginnerCount}`);
 
-  // Shuffle for randomness
-  const shuffledStretches = shuffleArray(filteredStretches);
+  // Filter and mix stretches by level
+  let selectedStretches: Stretch[] = [];
+  
+  if (level === 'beginner') {
+    // Beginners only get beginner stretches
+    selectedStretches = filteredStretches.filter(stretch => stretch.level === 'beginner');
+    console.log(`[DEBUG] Selected ${selectedStretches.length} beginner stretches`);
+  } 
+  else if (level === 'intermediate') {
+    // Intermediates get mostly intermediate stretches with some beginner ones
+    const intermediateStretches = filteredStretches.filter(stretch => stretch.level === 'intermediate');
+    const beginnerStretches = filteredStretches.filter(stretch => stretch.level === 'beginner');
+    
+    // Aim for 70% intermediate, 30% beginner
+    const targetIntermediateCount = Math.ceil(maxStretches * 0.7);
+    const targetBeginnerCount = Math.floor(maxStretches * 0.3);
+    
+    console.log(`[DEBUG] Intermediate - Target: ${targetIntermediateCount}, Available: ${intermediateStretches.length}`);
+    console.log(`[DEBUG] Beginner - Target: ${targetBeginnerCount}, Available: ${beginnerStretches.length}`);
+    
+    // Shuffle and take the appropriate number from each level
+    selectedStretches = [
+      ...shuffleArray(intermediateStretches).slice(0, targetIntermediateCount),
+      ...shuffleArray(beginnerStretches).slice(0, targetBeginnerCount)
+    ];
+    
+    console.log(`[DEBUG] Selected ${selectedStretches.length} stretches for intermediate level`);
+  } 
+  else if (level === 'advanced') {
+    // Advanced users get a mix of all levels, with emphasis on advanced
+    const advancedStretches = filteredStretches.filter(stretch => stretch.level === 'advanced');
+    const intermediateStretches = filteredStretches.filter(stretch => stretch.level === 'intermediate');
+    const beginnerStretches = filteredStretches.filter(stretch => stretch.level === 'beginner');
+    
+    // FIXED: Prioritize advanced stretches - include ALL available advanced stretches first
+    // Then fill the remaining slots with intermediate and beginner
+    const availableAdvancedCount = advancedStretches.length;
+    
+    // Calculate how many more stretches we need after including all advanced
+    const remainingSlots = Math.max(0, maxStretches - availableAdvancedCount);
+    
+    // Distribute remaining slots: 70% intermediate, 30% beginner
+    const targetIntermediateCount = Math.ceil(remainingSlots * 0.7);
+    const targetBeginnerCount = Math.floor(remainingSlots * 0.3);
+    
+    console.log(`[DEBUG] Advanced - Available: ${availableAdvancedCount} (using all)`);
+    console.log(`[DEBUG] Remaining slots: ${remainingSlots}`);
+    console.log(`[DEBUG] Intermediate - Target: ${targetIntermediateCount}, Available: ${intermediateStretches.length}`);
+    console.log(`[DEBUG] Beginner - Target: ${targetBeginnerCount}, Available: ${beginnerStretches.length}`);
+    
+    // Include ALL advanced stretches first
+    const selectedAdvanced = shuffleArray(advancedStretches);
+    const selectedIntermediate = shuffleArray(intermediateStretches).slice(0, targetIntermediateCount);
+    const selectedBeginner = shuffleArray(beginnerStretches).slice(0, targetBeginnerCount);
+    
+    console.log(`[DEBUG] Selected - Advanced: ${selectedAdvanced.length}, Intermediate: ${selectedIntermediate.length}, Beginner: ${selectedBeginner.length}`);
+    
+    selectedStretches = [
+      ...selectedAdvanced,
+      ...selectedIntermediate,
+      ...selectedBeginner
+    ];
+    
+    console.log(`[DEBUG] Selected ${selectedStretches.length} stretches for advanced level`);
+  }
+
+  // Shuffle the selected stretches, but ensure advanced stretches are prioritized if level is advanced
+  if (level === 'advanced') {
+    // For advanced level, keep advanced stretches at the beginning to ensure they're included
+    const advancedStretches = selectedStretches.filter(s => s.level === 'advanced');
+    const otherStretches = selectedStretches.filter(s => s.level !== 'advanced');
+    
+    selectedStretches = [
+      ...shuffleArray(advancedStretches),
+      ...shuffleArray(otherStretches)
+    ];
+  } else {
+    selectedStretches = shuffleArray(selectedStretches);
+  }
+  
+  // Limit to max stretches
+  selectedStretches = selectedStretches.slice(0, maxStretches);
+  
+  console.log(`[DEBUG] After shuffle and limit: ${selectedStretches.length} stretches`);
+  console.log(`[DEBUG] Final stretch levels: ${selectedStretches.map(s => s.level).join(', ')}`);
 
   // Build routine dynamically
   let routine = [];
   let totalDuration = 0;
-  for (const stretch of shuffledStretches) {
-    if (routine.length >= maxStretches) break;
-
+  
+  // FIXED: Prioritize advanced stretches in the routine
+  // Sort selectedStretches to put advanced ones first if level is advanced
+  if (level === 'advanced') {
+    selectedStretches.sort((a, b) => {
+      if (a.level === 'advanced' && b.level !== 'advanced') return -1;
+      if (a.level !== 'advanced' && b.level === 'advanced') return 1;
+      return 0;
+    });
+  }
+  
+  // First pass: add stretches until we reach the time limit
+  for (const stretch of selectedStretches) {
     // Calculate stretch time (double for bilateral)
     const stretchTime = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
-
+    
     // Skip if adding this stretch exceeds total time
     if (totalDuration + stretchTime > totalSeconds) continue;
-
+    
     // Create the stretch entry
     const stretchEntry = {
       ...stretch,
@@ -49,10 +146,41 @@ export const generateRoutine = (
         ? `${stretch.description.split('Hold')[0].trim()} Hold for ${stretch.duration} seconds per side.` 
         : stretch.description // Keep original description for non-bilateral
     };
-
+    
     routine.push(stretchEntry);
     totalDuration += stretchTime;
   }
+  
+  // If we couldn't add any stretches, add at least one
+  if (routine.length === 0 && selectedStretches.length > 0) {
+    // For advanced level, prioritize adding an advanced stretch if available
+    let stretchToAdd = selectedStretches[0];
+    
+    if (level === 'advanced') {
+      const advancedStretch = selectedStretches.find(s => s.level === 'advanced');
+      if (advancedStretch) {
+        stretchToAdd = advancedStretch;
+      }
+    }
+    
+    const stretchTime = Math.min(
+      stretchToAdd.bilateral ? stretchToAdd.duration * 2 : stretchToAdd.duration,
+      totalSeconds
+    );
+    
+    const stretchEntry = {
+      ...stretchToAdd,
+      duration: stretchTime,
+      description: stretchToAdd.bilateral 
+        ? `${stretchToAdd.description.split('Hold')[0].trim()} Hold for ${Math.floor(stretchTime/2)} seconds per side.` 
+        : stretchToAdd.description
+    };
+    
+    routine.push(stretchEntry);
+  }
+  
+  console.log(`[DEBUG] Final routine: ${routine.length} stretches, total duration: ${totalDuration}s`);
+  console.log(`[DEBUG] Routine levels: ${routine.map(s => s.level).join(', ')}`);
 
   return routine;
 };

@@ -99,6 +99,7 @@ const INITIAL_PROGRESS_STATE = {
   level: 1,
   completedAchievements: [],
   completedChallenges: [],
+  completedRoutineIds: [],
   lastUpdated: new Date().toISOString()
 };
 
@@ -170,6 +171,7 @@ export default function ProgressScreen({ navigation }) {
   useEffect(() => {
     const loadData = async () => {
       try {
+        // For premium users, synchronize and load all data
         if (isPremium && !hasSynchronized) {
           console.log('Loading progress data...');
           await synchronizeProgressData();
@@ -184,6 +186,18 @@ export default function ProgressScreen({ navigation }) {
           
           // Update achievements based on stats
           updateAchievements(allRoutines);
+        } 
+        // For free users, still load routines to calculate XP
+        else if (!isPremium) {
+          console.log('Loading routines for free user to calculate XP...');
+          const allRoutines = await getAllRoutines();
+          if (allRoutines && allRoutines.length > 0) {
+            console.log('Loaded routines for free user:', allRoutines.length);
+            setAllProgressData(allRoutines);
+            
+            // Update achievements to calculate XP for free users
+            updateAchievements(allRoutines);
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -221,6 +235,27 @@ export default function ProgressScreen({ navigation }) {
     
     refreshAllRoutines();
   }, [isPremium, hasSynchronized, getAllRoutines]);
+  
+  // Check for new routines when the app starts, even for free users
+  useEffect(() => {
+    const checkForNewRoutines = async () => {
+      try {
+        // Get all routines for both premium and free users
+        const allRoutines = await getAllRoutines();
+        if (allRoutines && allRoutines.length > 0) {
+          console.log('Checking for new routines on app start:', allRoutines.length);
+          setAllProgressData(allRoutines);
+          
+          // Update achievements and XP for all users
+          updateAchievements(allRoutines);
+        }
+      } catch (error) {
+        console.error('Error checking for new routines:', error);
+      }
+    };
+    
+    checkForNewRoutines();
+  }, [getAllRoutines]);
   
   // Calculate all stats from progress data
   const calculateStats = (data) => {
@@ -281,30 +316,16 @@ export default function ProgressScreen({ navigation }) {
     
     try {
       setIsProgressLoading(true);
+      console.log('Updating achievements with', data.length, 'routines');
       
       // Get current stats
       const totalRoutines = data.length;
-      const totalMinutes = data.reduce((sum, entry) => {
-        const duration = typeof entry.duration === 'string' 
-          ? parseInt(entry.duration, 10) 
-          : (typeof entry.duration === 'number' ? entry.duration : 0);
-        return sum + (isNaN(duration) ? 0 : duration);
-      }, 0);
-      const currentStreak = calculateStreak(data);
-      const uniqueAreas = Array.from(new Set(data.map(r => r.area)));
-      
-      // Get area with most routines
-      const areaBreakdown = data.reduce((acc, entry) => {
-        acc[entry.area] = (acc[entry.area] || 0) + 1;
-        return acc;
-      }, {});
-      const maxAreaCount = Math.max(...Object.values(areaBreakdown).map(Number), 0);
       
       // Check achievements from Achievements.tsx
       const newCompletedAchievements = [];
       let totalXP = userProgress.totalXP;
       
-      // First stretch
+      // First stretch - award XP to all users, even free users
       if (totalRoutines >= 1 && !isAchievementCompleted('first_stretch')) {
         newCompletedAchievements.push({
           id: 'first_stretch',
@@ -313,158 +334,45 @@ export default function ProgressScreen({ navigation }) {
           dateCompleted: new Date().toISOString()
         });
         totalXP += 50;
+        console.log('Awarded First Stretch achievement: +50 XP');
       }
       
-      // Three day streak
-      if (currentStreak >= 3 && !isAchievementCompleted('three_day_streak')) {
-        newCompletedAchievements.push({
-          id: 'three_day_streak',
-          title: 'Getting Into It',
-          xp: 100,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 100;
-      }
+      // Add XP for each completed routine (even for free users)
+      // This ensures free users see their XP growing with each routine
+      const completedRoutineIds = userProgress.completedRoutineIds || [];
+      console.log('Previously completed routines:', completedRoutineIds.length);
       
-      // Weekly warrior
-      if (currentStreak >= 7 && !isAchievementCompleted('week_streak')) {
-        newCompletedAchievements.push({
-          id: 'week_streak',
-          title: 'Weekly Warrior',
-          xp: 200,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 200;
-      }
+      const newRoutines = data.filter(routine => 
+        !completedRoutineIds.includes(routine.id)
+      );
       
-      // Variety master
-      if (uniqueAreas.length >= 6 && !isAchievementCompleted('variety_master')) {
-        newCompletedAchievements.push({
-          id: 'variety_master',
-          title: 'Variety Master',
-          xp: 150,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 150;
-      }
-      
-      // Dedication
-      if (totalRoutines >= 10 && !isAchievementCompleted('dedication')) {
-        newCompletedAchievements.push({
-          id: 'dedication',
-          title: 'Dedication',
-          xp: 200,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 200;
-      }
-      
-      // Consistency champion
-      if (currentStreak >= 5 && !isAchievementCompleted('consistency_champion')) {
-        newCompletedAchievements.push({
-          id: 'consistency_champion',
-          title: 'Consistency Champion',
-          xp: 250,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 250;
-      }
-      
-      // Stretch master
-      if (totalRoutines >= 30 && !isAchievementCompleted('stretch_master')) {
-        newCompletedAchievements.push({
-          id: 'stretch_master',
-          title: 'Stretch Master',
-          xp: 300,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 300;
-      }
-      
-      // Monthly milestone
-      if (currentStreak >= 30 && !isAchievementCompleted('month_streak')) {
-        newCompletedAchievements.push({
-          id: 'month_streak',
-          title: 'Monthly Milestone',
-          xp: 500,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 500;
-      }
-      
-      // Area expert
-      if (maxAreaCount >= 15 && !isAchievementCompleted('area_expert')) {
-        newCompletedAchievements.push({
-          id: 'area_expert',
-          title: 'Area Expert',
-          xp: 350,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 350;
-      }
-      
-      // Stretch guru
-      if (totalRoutines >= 100 && !isAchievementCompleted('stretch_guru')) {
-        newCompletedAchievements.push({
-          id: 'stretch_guru',
-          title: 'Stretch Guru',
-          xp: 1000,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 1000;
-      }
-      
-      // Iron flexibility
-      if (currentStreak >= 60 && !isAchievementCompleted('iron_flexibility')) {
-        newCompletedAchievements.push({
-          id: 'iron_flexibility',
-          title: 'Iron Flexibility',
-          xp: 1500,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 1500;
-      }
-      
-      // Time investment
-      if (totalMinutes >= 60 && !isAchievementCompleted('time_investment')) {
-        newCompletedAchievements.push({
-          id: 'time_investment',
-          title: 'Time Investment',
-          xp: 100,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 100;
-      }
-      
-      // Dedicated stretcher
-      if (totalMinutes >= 300 && !isAchievementCompleted('dedicated_stretcher')) {
-        newCompletedAchievements.push({
-          id: 'dedicated_stretcher',
-          title: 'Dedicated Stretcher',
-          xp: 250,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 250;
+      if (newRoutines.length > 0) {
+        console.log(`Found ${newRoutines.length} new routines to award XP for`);
+        // Award 10 XP per new routine
+        const routineXP = newRoutines.length * 10;
+        totalXP += routineXP;
+        console.log(`Awarded ${routineXP} XP for ${newRoutines.length} new routines`);
       }
       
       // Calculate level based on XP
       const level = calculateLevel(totalXP);
+      console.log(`New XP total: ${totalXP}, level: ${level}`);
       
-      // If any new achievements, update state and storage
-      if (newCompletedAchievements.length > 0) {
-        const updatedProgress = {
-          ...userProgress,
-          totalXP,
-          level,
-          completedAchievements: [...userProgress.completedAchievements, ...newCompletedAchievements],
-          lastUpdated: new Date().toISOString()
-        };
-        
-        setUserProgress(updatedProgress);
-        await AsyncStorage.setItem('@userProgress', JSON.stringify(updatedProgress));
-        
-        console.log(`Updated achievements: ${newCompletedAchievements.length} new, total XP: ${totalXP}, level: ${level}`);
-      }
+      // Update user progress with new XP, level, and achievements
+      const updatedProgress = {
+        ...userProgress,
+        totalXP,
+        level,
+        completedAchievements: [...userProgress.completedAchievements, ...newCompletedAchievements],
+        completedRoutineIds: [...(userProgress.completedRoutineIds || []), ...newRoutines.map(r => r.id)],
+        lastUpdated: new Date().toISOString()
+      };
+      
+      // Always update XP and level, even for free users
+      setUserProgress(updatedProgress);
+      await AsyncStorage.setItem('@userProgress', JSON.stringify(updatedProgress));
+      
+      console.log(`Updated user progress: XP: ${totalXP}, level: ${level}, new achievements: ${newCompletedAchievements.length}`);
     } catch (error) {
       console.error('Error updating achievements:', error);
     } finally {
@@ -531,19 +439,21 @@ export default function ProgressScreen({ navigation }) {
     console.log('Refreshing progress screen...');
     await refreshProgress();
     
-    // Also refresh all routines to update stats
-    if (isPremium) {
-      try {
-        const allRoutines = await getAllRoutines();
-        console.log('Refreshed all routines for statistics:', allRoutines.length);
-        setAllProgressData(allRoutines);
+    try {
+      // Get all routines for both premium and free users
+      const allRoutines = await getAllRoutines();
+      console.log('Refreshed all routines:', allRoutines.length);
+      setAllProgressData(allRoutines);
+      
+      // For premium users, calculate full stats
+      if (isPremium) {
         calculateStats(allRoutines);
-        
-        // Update achievements based on stats
-        updateAchievements(allRoutines);
-      } catch (error) {
-        console.error('Error refreshing all routines:', error);
       }
+      
+      // For all users, update achievements and XP
+      updateAchievements(allRoutines);
+    } catch (error) {
+      console.error('Error refreshing all routines:', error);
     }
   };
 
@@ -591,11 +501,14 @@ export default function ProgressScreen({ navigation }) {
 
   // Premium locked screen
   if (!isPremium) {
+    console.log('Showing PremiumLock with XP:', userProgress.totalXP, 'and level:', userProgress.level);
     return (
       <PremiumLock
         onOpenSubscription={handleUpgradeToPremium}
         subscriptionModalVisible={subscriptionModalVisible}
         onCloseSubscription={() => setSubscriptionModalVisible(false)}
+        totalXP={userProgress.totalXP}
+        level={userProgress.level}
       />
     );
   }
@@ -655,9 +568,6 @@ export default function ProgressScreen({ navigation }) {
             totalRoutines={stats.totalRoutines}
             currentStreak={stats.currentStreak}
             areaBreakdown={stats.areaBreakdown}
-            totalXP={userProgress.totalXP}
-            level={userProgress.level}
-            completedAchievements={userProgress.completedAchievements}
           />
         );
         

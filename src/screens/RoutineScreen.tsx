@@ -5,7 +5,7 @@ import SubscriptionModal from '../components/SubscriptionModal';
 import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
-import { BodyArea, Duration, ProgressEntry } from '../types';
+import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../types';
 
 // Import our components
 import ActiveRoutine from '../components/routine/ActiveRoutine';
@@ -24,7 +24,7 @@ type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
 
 export default function RoutineScreen() {
   // Use our custom hooks
-  const { area, duration, hasParams, navigateToHome, resetParams, navigateToRoutine } = useRoutineParams();
+  const { area, duration, level, hasParams, navigateToHome, resetParams, navigateToRoutine } = useRoutineParams();
   const { 
     recentRoutines, 
     isLoading: isStorageLoading, 
@@ -55,7 +55,7 @@ export default function RoutineScreen() {
   useEffect(() => {
     // If we have params, we should show the active routine
     if (hasParams && screenState !== 'COMPLETED') {
-      console.log('We have params, showing active routine:', area, duration);
+      console.log('We have params, showing active routine:', area, duration, level);
       setScreenState('ACTIVE');
     } 
     // If we don't have params and we're not on the completion screen, show dashboard
@@ -63,7 +63,7 @@ export default function RoutineScreen() {
       console.log('No params, showing dashboard');
       setScreenState('DASHBOARD');
     }
-  }, [hasParams, area, duration]);
+  }, [hasParams, area, duration, level]);
   
   // Handle focus changes from tab navigation
   useFocusEffect(
@@ -197,8 +197,9 @@ export default function RoutineScreen() {
       console.log('Navigating to routine with params:', routine.area, routine.duration);
       // Navigate to routine with the parameters from the selected routine
       navigateToRoutine({
-      area: routine.area,
-        duration: routine.duration
+        area: routine.area,
+        duration: routine.duration,
+        level: 'beginner' // Default to beginner for recent routines
       });
     }, 100);
   };
@@ -222,7 +223,8 @@ export default function RoutineScreen() {
         // Navigate to routine with the suggestion parameters
         navigateToRoutine({
           area: suggestion.area,
-          duration: suggestion.duration
+          duration: suggestion.duration,
+          level: 'beginner' // Default to beginner for suggestions
         });
       }, 100);
     }
@@ -360,6 +362,7 @@ export default function RoutineScreen() {
       <ActiveRoutine 
         area={area as BodyArea}
         duration={duration as Duration}
+        level={level as StretchLevel}
         onComplete={handleRoutineComplete}
         onNavigateHome={handleCreateNewRoutine}
       />

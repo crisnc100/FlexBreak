@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SubscriptionModal from '../SubscriptionModal';
 
@@ -7,20 +7,36 @@ interface PremiumLockProps {
   onOpenSubscription: () => void;
   subscriptionModalVisible: boolean;
   onCloseSubscription: () => void;
+  totalXP?: number;
+  level?: number;
 }
 
 const PremiumLock: React.FC<PremiumLockProps> = ({
   onOpenSubscription,
   subscriptionModalVisible,
-  onCloseSubscription
+  onCloseSubscription,
+  totalXP = 0,
+  level = 1
 }) => {
   return (
     <View style={styles.premiumContainer}>
-      <Ionicons name="stats-chart" size={80} color="#CCCCCC" />
-      <Text style={styles.premiumTitle}>Track Your Progress</Text>
+      {/* XP Badge */}
+      <View style={styles.xpContainer}>
+        <View style={styles.xpBadge}>
+          <Text style={styles.xpValue}>{totalXP}</Text>
+          <Text style={styles.xpLabel}>XP</Text>
+        </View>
+        <View style={styles.levelBadge}>
+          <Text style={styles.levelValue}>Level {level}</Text>
+        </View>
+      </View>
+      
+      <Ionicons name="trophy" size={80} color="#FFD700" style={styles.trophyIcon} />
+      <Text style={styles.premiumTitle}>Unlock Your Full Potential!</Text>
       <Text style={styles.premiumSubtitle}>
-        Unlock detailed stats, streaks, and insights with Premium
+        You've earned {totalXP} XP so far. Upgrade to Premium to track your progress and unlock exclusive features!
       </Text>
+      
       <View style={styles.premiumFeatures}>
         <View style={styles.premiumFeatureItem}>
           <Ionicons name="calendar" size={24} color="#FF9800" />
@@ -34,7 +50,12 @@ const PremiumLock: React.FC<PremiumLockProps> = ({
           <Ionicons name="trending-up" size={24} color="#FF9800" />
           <Text style={styles.premiumFeatureText}>Monitor your consistency</Text>
         </View>
+        <View style={styles.premiumFeatureItem}>
+          <Ionicons name="ribbon" size={24} color="#FF9800" />
+          <Text style={styles.premiumFeatureText}>Earn achievements and rewards</Text>
+        </View>
       </View>
+      
       <TouchableOpacity 
         style={styles.premiumButton}
         onPress={onOpenSubscription}
@@ -58,6 +79,59 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  xpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  xpBadge: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 50,
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  xpValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  xpLabel: {
+    fontSize: 14,
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  levelBadge: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginLeft: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  levelValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  trophyIcon: {
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   premiumTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -71,10 +145,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 32,
+    lineHeight: 22,
   },
   premiumFeatures: {
     width: '100%',
     marginBottom: 32,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   premiumFeatureItem: {
     flexDirection: 'row',
@@ -91,6 +174,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
   premiumButtonText: {
     color: '#FFF',

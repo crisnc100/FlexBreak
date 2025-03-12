@@ -12,7 +12,7 @@ import {
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BodyArea, Duration, Stretch } from '../../types';
+import { BodyArea, Duration, Stretch, StretchLevel } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
 import { useRoutineTimer } from '../../hooks/useRoutineTimer';
 
@@ -21,6 +21,7 @@ const { width, height } = Dimensions.get('window');
 export interface ActiveRoutineProps {
   area: BodyArea;
   duration: Duration;
+  level: StretchLevel;
   onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean) => Promise<void>;
   onNavigateHome: () => void;
 }
@@ -28,6 +29,7 @@ export interface ActiveRoutineProps {
 const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   area,
   duration,
+  level,
   onComplete,
   onNavigateHome
 }) => {
@@ -65,7 +67,8 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Generate the routine when the component mounts
   useEffect(() => {
     if (area && duration) {
-      const generatedRoutine = generateRoutine(area, duration, 'beginner');
+      console.log(`Generating routine with level: ${level}`);
+      const generatedRoutine = generateRoutine(area, duration, level);
       setRoutine(generatedRoutine);
       
       if (generatedRoutine.length > 0) {
@@ -73,7 +76,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         startTimer(generatedRoutine[0].duration);
       }
     }
-  }, [area, duration]);
+  }, [area, duration, level]);
   
   // Handle skip to next stretch
   const handleNext = () => {
