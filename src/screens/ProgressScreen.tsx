@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,16 @@ import {
   ScrollView,
   Dimensions,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ProgressEntry, BodyArea } from '../types';
 import { usePremium } from '../context/PremiumContext';
 import { useRoutineStorage } from '../hooks/useRoutineStorage';
 import { useRefresh } from '../context/RefreshContext';
+import useProgressSystem from '../hooks/useProgressSystem';
 import {
   calculateStreak,
   calculateWeeklyActivity,
@@ -22,6 +25,8 @@ import {
   getOrderedDayNames,
   getMostActiveDay
 } from '../utils/progressUtils';
+import * as storageService from '../services/storageService';
+import * as challengeManager from '../utils/progress/challengeManager';
 import {
   StatsOverview,
   ConsistencyInsights,
@@ -35,60 +40,13 @@ import {
   Rewards,
   Challenges
 } from '../components/progress';
+import { ChallengeList } from '../components/progress/ChallengeList';
+import { PremiumLockSimple } from '../components/progress/PremiumLockSimple';
 import { RefreshableScrollView } from '../components/common';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import XpNotificationManager from '../components/XpNotificationManager';
 
 // Day names for labels
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-// Sample challenges for the app
-const SAMPLE_CHALLENGES = [
-  {
-    id: 'daily_stretch_1',
-    title: 'Daily Stretch',
-    description: 'Complete a stretching routine today',
-    xpReward: 50,
-    icon: 'today-outline',
-    type: 'daily',
-    requirement: 1
-  },
-  {
-    id: 'streak_3',
-    title: 'Mini Streak',
-    description: 'Complete 3 days in a row',
-    xpReward: 100,
-    icon: 'flame-outline',
-    type: 'streak',
-    requirement: 3
-  },
-  {
-    id: 'variety_challenge',
-    title: 'Variety Challenge',
-    description: 'Try 3 different body areas this week',
-    xpReward: 150,
-    icon: 'apps-outline',
-    type: 'weekly',
-    requirement: 3
-  },
-  {
-    id: 'morning_routine',
-    title: 'Morning Routine',
-    description: 'Complete a routine before 10 AM',
-    xpReward: 75,
-    icon: 'sunny-outline',
-    type: 'daily',
-    requirement: 1
-  },
-  {
-    id: 'evening_wind_down',
-    title: 'Evening Wind Down',
-    description: 'Complete a routine after 8 PM',
-    xpReward: 75,
-    icon: 'moon-outline',
-    type: 'daily',
-    requirement: 1
-  }
-];
 
 // Tab types
 type TabType = 'stats' | 'achievements' | 'challenges' | 'rewards';
@@ -126,13 +84,27 @@ export default function ProgressScreen({ navigation }) {
     activeRoutineDays: 0
   });
   
-  // State for achievements and XP system
+  // Use the progress system hook for XP tracking
+  const { 
+    userProgress: progressSystemData, 
+    isLoading: isProgressSystemLoading,
+    processRoutine,
+    updateUserAchievements,
+    refreshUserProgress,
+    updateChallengesWithRoutines,
+    claimChallengeReward
+  } = useProgressSystem();
+  
+  // Legacy state for backward compatibility
   const [userProgress, setUserProgress] = useState(INITIAL_PROGRESS_STATE);
   const [isProgressLoading, setIsProgressLoading] = useState(true);
   
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('stats');
 
+  // Create a ref to track if we've already updated challenges - moved outside useEffect
+  const hasUpdatedChallenges = useRef(false);
+  
   // Get ordered day names once
   const orderedDayNames = useMemo(() => getOrderedDayNames(DAY_NAMES), []);
   
@@ -142,61 +114,39 @@ export default function ProgressScreen({ navigation }) {
     [stats.dayOfWeekBreakdown]
   );
   
-  // Load user progress from storage
-  useEffect(() => {
-    const loadUserProgress = async () => {
-      try {
-        setIsProgressLoading(true);
-        const progressJson = await AsyncStorage.getItem('@userProgress');
-        
-        if (progressJson) {
-          const savedProgress = JSON.parse(progressJson);
-          console.log('Loaded user progress:', savedProgress);
-          setUserProgress(savedProgress);
-        } else {
-          console.log('No existing user progress found, initializing defaults');
-          await AsyncStorage.setItem('@userProgress', JSON.stringify(INITIAL_PROGRESS_STATE));
-        }
-      } catch (error) {
-        console.error('Error loading user progress:', error);
-      } finally {
-        setIsProgressLoading(false);
-      }
-    };
-    
-    loadUserProgress();
-  }, []);
-  
   // Synchronize data and load all routines when component mounts
   useEffect(() => {
     const loadData = async () => {
       try {
-        // For premium users, synchronize and load all data
-        if (isPremium && !hasSynchronized) {
-          console.log('Loading progress data...');
-          await synchronizeProgressData();
-          
-          // After synchronization, get ALL routines (visible and hidden)
-          const allRoutines = await getAllRoutines();
-          console.log('Loaded all routines for statistics:', allRoutines.length);
+        // For both free and premium users, load routines to calculate XP
+        const allRoutines = await getAllRoutines();
+        
+        if (allRoutines && allRoutines.length > 0) {
+          console.log('Loaded routines for XP calculation:', allRoutines.length);
           setAllProgressData(allRoutines);
           
-          // Calculate stats using ALL routines
+          // Calculate stats first to ensure streak is calculated
           calculateStats(allRoutines);
           
-          // Update achievements based on stats
-          updateAchievements(allRoutines);
-        } 
-        // For free users, still load routines to calculate XP
-        else if (!isPremium) {
-          console.log('Loading routines for free user to calculate XP...');
-          const allRoutines = await getAllRoutines();
-          if (allRoutines && allRoutines.length > 0) {
-            console.log('Loaded routines for free user:', allRoutines.length);
-            setAllProgressData(allRoutines);
-            
-            // Update achievements to calculate XP for free users
-            updateAchievements(allRoutines);
+          // Force refresh user progress to ensure XP is up to date
+          await refreshUserProgress();
+          
+          // Update progress with routines for both free and premium users
+          // Only do this once per component mount to avoid infinite loops
+          if (progressSystemData && !hasUpdatedChallenges.current) {
+            console.log('Updating challenges with routines (first time only)');
+            await updateChallengesWithRoutines(allRoutines);
+            hasUpdatedChallenges.current = true;
+          } else if (!progressSystemData) {
+            console.log('Skipping updateChallengesWithRoutines because progressSystemData is null');
+          } else {
+            console.log('Skipping updateChallengesWithRoutines because it was already done');
+          }
+          
+          // For premium users, also synchronize
+          if (isPremium && !hasSynchronized) {
+            console.log('Loading progress data for premium user...');
+            await synchronizeProgressData();
           }
         }
       } catch (error) {
@@ -205,7 +155,8 @@ export default function ProgressScreen({ navigation }) {
     };
     
     loadData();
-  }, [isPremium, hasSynchronized, synchronizeProgressData, getAllRoutines]);
+    // Remove progressSystemData from dependency array to prevent loops
+  }, [isPremium, hasSynchronized, synchronizeProgressData, getAllRoutines, updateChallengesWithRoutines, refreshUserProgress]);
   
   // Update visible routines for display
   useEffect(() => {
@@ -215,48 +166,37 @@ export default function ProgressScreen({ navigation }) {
     }
   }, [isPremium, recentRoutines]);
   
-  // Refresh all routines when needed
-  useEffect(() => {
-    const refreshAllRoutines = async () => {
-      if (isPremium && hasSynchronized) {
-        try {
-          const allRoutines = await getAllRoutines();
-          console.log('Refreshed all routines for statistics:', allRoutines.length);
-          setAllProgressData(allRoutines);
-          calculateStats(allRoutines);
-          
-          // Update achievements based on stats
-          updateAchievements(allRoutines);
-        } catch (error) {
-          console.error('Error refreshing all routines:', error);
-        }
-      }
-    };
+  // Handle refresh
+  const handleRefresh = async () => {
+    console.log('Refreshing progress screen...');
+    await refreshProgress();
     
-    refreshAllRoutines();
-  }, [isPremium, hasSynchronized, getAllRoutines]);
-  
-  // Check for new routines when the app starts, even for free users
-  useEffect(() => {
-    const checkForNewRoutines = async () => {
-      try {
-        // Get all routines for both premium and free users
-        const allRoutines = await getAllRoutines();
-        if (allRoutines && allRoutines.length > 0) {
-          console.log('Checking for new routines on app start:', allRoutines.length);
-          setAllProgressData(allRoutines);
-          
-          // Update achievements and XP for all users
-          updateAchievements(allRoutines);
-        }
-      } catch (error) {
-        console.error('Error checking for new routines:', error);
+    try {
+      // Get all routines for both premium and free users
+      const allRoutines = await getAllRoutines();
+      console.log('Refreshed all routines:', allRoutines.length);
+      setAllProgressData(allRoutines);
+      
+      // Calculate stats first
+      calculateStats(allRoutines);
+      
+      // Force refresh user progress
+      await refreshUserProgress();
+      
+      // Update progress with routines for both free and premium users
+      // This also handles updating challenges appropriately
+      await updateChallengesWithRoutines(allRoutines);
+      
+      // If on the challenges tab, specifically refresh challenge data
+      if (activeTab === 'challenges') {
+        // The ChallengeList component will handle its own refresh
+        console.log('Refreshing challenges tab');
       }
-    };
-    
-    checkForNewRoutines();
-  }, [getAllRoutines]);
-  
+    } catch (error) {
+      console.error('Error refreshing all routines:', error);
+    }
+  };
+
   // Calculate all stats from progress data
   const calculateStats = (data) => {
     if (!data || data.length === 0) {
@@ -308,125 +248,38 @@ export default function ProgressScreen({ navigation }) {
       dayOfWeekBreakdown,
       activeRoutineDays
     });
-  };
-  
-  // Update achievements based on stats
-  const updateAchievements = async (data) => {
-    if (!data || data.length === 0) return;
     
+    // Update achievements based on the calculated stats
+    // Note: We're not using updateUserAchievements here as it has a different signature
+    // Instead, we'll just log the stats for now
+    console.log('Stats updated for achievements:', {
+      totalRoutines,
+      streak,
+      areaCount: Object.keys(areaBreakdown).length,
+      totalMinutes,
+      areaBreakdown
+    });
+  };
+
+  // Handle completing a challenge
+  const handleCompleteChallenge = async (challengeId) => {
     try {
-      setIsProgressLoading(true);
-      console.log('Updating achievements with', data.length, 'routines');
+      console.log(`Completing challenge: ${challengeId}`);
       
-      // Get current stats
-      const totalRoutines = data.length;
+      // Claim the challenge reward
+      const result = await claimChallengeReward(challengeId);
       
-      // Check achievements from Achievements.tsx
-      const newCompletedAchievements = [];
-      let totalXP = userProgress.totalXP;
-      
-      // First stretch - award XP to all users, even free users
-      if (totalRoutines >= 1 && !isAchievementCompleted('first_stretch')) {
-        newCompletedAchievements.push({
-          id: 'first_stretch',
-          title: 'First Stretch!',
-          xp: 50,
-          dateCompleted: new Date().toISOString()
-        });
-        totalXP += 50;
-        console.log('Awarded First Stretch achievement: +50 XP');
+      if (result.success) {
+        console.log(`Challenge completed, earned ${result.xpEarned} XP`);
+        
+        // Refresh progress data after claiming challenge
+        refreshProgress();
+      } else {
+        console.log(`Failed to complete challenge: ${result.message}`);
       }
-      
-      // Add XP for each completed routine (even for free users)
-      // This ensures free users see their XP growing with each routine
-      const completedRoutineIds = userProgress.completedRoutineIds || [];
-      console.log('Previously completed routines:', completedRoutineIds.length);
-      
-      const newRoutines = data.filter(routine => 
-        !completedRoutineIds.includes(routine.id)
-      );
-      
-      if (newRoutines.length > 0) {
-        console.log(`Found ${newRoutines.length} new routines to award XP for`);
-        // Award 10 XP per new routine
-        const routineXP = newRoutines.length * 10;
-        totalXP += routineXP;
-        console.log(`Awarded ${routineXP} XP for ${newRoutines.length} new routines`);
-      }
-      
-      // Calculate level based on XP
-      const level = calculateLevel(totalXP);
-      console.log(`New XP total: ${totalXP}, level: ${level}`);
-      
-      // Update user progress with new XP, level, and achievements
-      const updatedProgress = {
-        ...userProgress,
-        totalXP,
-        level,
-        completedAchievements: [...userProgress.completedAchievements, ...newCompletedAchievements],
-        completedRoutineIds: [...(userProgress.completedRoutineIds || []), ...newRoutines.map(r => r.id)],
-        lastUpdated: new Date().toISOString()
-      };
-      
-      // Always update XP and level, even for free users
-      setUserProgress(updatedProgress);
-      await AsyncStorage.setItem('@userProgress', JSON.stringify(updatedProgress));
-      
-      console.log(`Updated user progress: XP: ${totalXP}, level: ${level}, new achievements: ${newCompletedAchievements.length}`);
     } catch (error) {
-      console.error('Error updating achievements:', error);
-    } finally {
-      setIsProgressLoading(false);
+      console.error('Error completing challenge:', error);
     }
-  };
-  
-  // Helper to check if achievement is already completed
-  const isAchievementCompleted = (achievementId) => {
-    return userProgress.completedAchievements.some(a => a.id === achievementId);
-  };
-  
-  // Calculate level based on XP
-  const calculateLevel = (xp) => {
-    const LEVEL_THRESHOLDS = [
-      0,      // Level 1
-      200,    // Level 2
-      500,    // Level 3
-      1000,   // Level 4
-      2000,   // Level 5
-      3500,   // Level 6
-      5000,   // Level 7
-      7500,   // Level 8
-      10000,  // Level 9
-      15000   // Level 10
-    ];
-    
-    for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
-      if (xp >= LEVEL_THRESHOLDS[i]) {
-        return i + 1;
-      }
-    }
-    return 1; // Default to level 1
-  };
-  
-  // Get XP required for next level
-  const getNextLevelXP = () => {
-    const LEVEL_THRESHOLDS = [
-      0,      // Level 1
-      200,    // Level 2
-      500,    // Level 3
-      1000,   // Level 4
-      2000,   // Level 5
-      3500,   // Level 6
-      5000,   // Level 7
-      7500,   // Level 8
-      10000,  // Level 9
-      15000   // Level 10
-    ];
-    
-    const currentLevel = userProgress.level;
-    if (currentLevel >= 10) return userProgress.totalXP; // Max level
-    
-    return LEVEL_THRESHOLDS[currentLevel];
   };
 
   // Handle upgrade to premium
@@ -434,81 +287,102 @@ export default function ProgressScreen({ navigation }) {
     setSubscriptionModalVisible(true);
   };
 
-  // Handle refresh
-  const handleRefresh = async () => {
-    console.log('Refreshing progress screen...');
-    await refreshProgress();
-    
-    try {
-      // Get all routines for both premium and free users
-      const allRoutines = await getAllRoutines();
-      console.log('Refreshed all routines:', allRoutines.length);
-      setAllProgressData(allRoutines);
-      
-      // For premium users, calculate full stats
-      if (isPremium) {
-        calculateStats(allRoutines);
-      }
-      
-      // For all users, update achievements and XP
-      updateAchievements(allRoutines);
-    } catch (error) {
-      console.error('Error refreshing all routines:', error);
+  // Reset user progress (DEV only)
+  const handleResetProgress = async () => {
+    if (__DEV__) {
+      Alert.alert(
+        'Reset Progress',
+        'Are you sure you want to reset all progress data? This cannot be undone.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Reset',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await storageService.resetUserProgress();
+                Alert.alert('Success', 'Progress data has been reset. Please restart the app.');
+              } catch (error) {
+                console.error('Error resetting progress:', error);
+                Alert.alert('Error', 'Failed to reset progress data.');
+              }
+            }
+          }
+        ]
+      );
     }
   };
 
-  // Handle completing a challenge
-  const handleCompleteChallenge = async (challengeId) => {
-    try {
-      // Find the challenge in the sample challenges
-      const challenge = SAMPLE_CHALLENGES.find(c => c.id === challengeId);
-      if (!challenge) return;
-      
-      // Add to completed challenges
-      const updatedProgress = {
-        ...userProgress,
-        totalXP: userProgress.totalXP + challenge.xpReward,
-        completedChallenges: [
-          ...userProgress.completedChallenges,
-          {
-            id: challengeId,
-            title: challenge.title,
-            xp: challenge.xpReward,
-            dateCompleted: new Date().toISOString()
+  // Add an effect to refresh challenges when the Challenges tab is selected
+  useEffect(() => {
+    if (activeTab === 'challenges' && !isProgressSystemLoading) {
+      console.log('Challenges tab selected, refreshing challenge data');
+      const refreshChallengeData = async () => {
+        try {
+          console.log('Force-refreshing challenge data');
+          
+          // Get all routines to ensure challenges are updated based on latest data
+          const allRoutines = await getAllRoutines();
+          console.log(`Retrieved all routines: ${allRoutines.length}`);
+          
+          // Force refresh user progress first
+          await refreshUserProgress();
+          
+          // CRITICAL FIX: Force update daily challenges based on completed routines
+          // This ensures daily challenges are properly marked as completed if routines exist
+          // Import the function from challengeManager
+          await challengeManager.forceUpdateDailyChallengesWithRoutines();
+          
+          // Force update challenges with latest routine data
+          // This is important to make sure challenges reflect the latest completed routines
+          const result = await updateChallengesWithRoutines(allRoutines);
+          
+          // Log the updated challenges
+          if (result && 'updatedChallenges' in result && result.updatedChallenges) {
+            console.log(`Successfully updated ${result.updatedChallenges.length} challenges`);
+            
+            // Extra debugging: Log any challenges that are daily routine_count
+            const dailyRoutineChallenges = result.updatedChallenges.filter(
+              c => c.type === 'routine_count' && c.requirement === 1 && c.category === 'daily'
+            );
+            
+            if (dailyRoutineChallenges.length > 0) {
+              console.log('Daily routine challenges found:');
+              dailyRoutineChallenges.forEach(c => {
+                console.log(`- ${c.title}: progress=${c.progress}/${c.requirement}, completed=${c.completed}, claimed=${c.claimed}`);
+              });
+            }
           }
-        ],
-        lastUpdated: new Date().toISOString()
+        } catch (error) {
+          console.error('Error refreshing challenge data:', error);
+        }
       };
       
-      // Calculate new level
-      updatedProgress.level = calculateLevel(updatedProgress.totalXP);
-      
-      // Update state and storage
-      setUserProgress(updatedProgress);
-      await AsyncStorage.setItem('@userProgress', JSON.stringify(updatedProgress));
-      
-      console.log(`Challenge completed: ${challenge.title}, earned ${challenge.xpReward} XP`);
-      
-      // Check if leveled up
-      if (updatedProgress.level > userProgress.level) {
-        console.log(`Leveled up to level ${updatedProgress.level}!`);
-        // Show level up notification
-      }
-    } catch (error) {
-      console.error('Error completing challenge:', error);
+      refreshChallengeData();
     }
+  }, [activeTab, isProgressSystemLoading, getAllRoutines, updateChallengesWithRoutines, refreshUserProgress]);
+  
+  // Change tab handler
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    
+    // Track tab change in analytics if needed
+    console.log(`Tab changed to: ${tab}`);
   };
 
   // Premium locked screen
   if (!isPremium) {
-    console.log('Showing PremiumLock with XP:', userProgress.totalXP, 'and level:', userProgress.level);
+    console.log('Showing PremiumLock with XP:', progressSystemData?.totalXP || 0, 'and level:', progressSystemData?.level || 1);
     return (
       <PremiumLock
         onOpenSubscription={handleUpgradeToPremium}
         subscriptionModalVisible={subscriptionModalVisible}
         onCloseSubscription={() => setSubscriptionModalVisible(false)}
-        totalXP={userProgress.totalXP}
-        level={userProgress.level}
+        totalXP={progressSystemData?.totalXP || 0}
+        level={progressSystemData?.level || 1}
       />
     );
   }
@@ -525,6 +399,36 @@ export default function ProgressScreen({ navigation }) {
 
   // Render tab content
   const renderTabContent = () => {
+    // Add a loading state if progressSystemData is not available yet
+    if (!progressSystemData && !isProgressSystemLoading) {
+      console.log('Warning: progressSystemData is null but not loading');
+      return (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
+            Loading progress data...
+          </Text>
+          <TouchableOpacity 
+            style={{ marginTop: 20, padding: 10, backgroundColor: '#4CAF50', borderRadius: 5 }}
+            onPress={refreshProgress}
+          >
+            <Text style={{ color: 'white' }}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // If still loading, show a loading indicator
+    if (isProgressSystemLoading) {
+      return (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={{ marginTop: 10, fontSize: 16, color: '#666' }}>
+            Loading progress data...
+          </Text>
+        </View>
+      );
+    }
+
     switch (activeTab) {
       case 'stats':
         return (
@@ -540,14 +444,14 @@ export default function ProgressScreen({ navigation }) {
               mostActiveDay={mostActiveDay}
             />
             
-            <FocusAreas
-              areaBreakdown={stats.areaBreakdown}
-              totalRoutines={stats.totalRoutines}
-            />
-            
             <WeeklyActivity
               weeklyActivity={stats.weeklyActivity}
               orderedDayNames={orderedDayNames}
+            />
+            
+            <FocusAreas
+              areaBreakdown={stats.areaBreakdown}
+              totalRoutines={stats.totalRoutines}
             />
             
             <StretchingPatterns
@@ -568,22 +472,37 @@ export default function ProgressScreen({ navigation }) {
             totalRoutines={stats.totalRoutines}
             currentStreak={stats.currentStreak}
             areaBreakdown={stats.areaBreakdown}
+            totalXP={progressSystemData?.totalXP || 0}
+            level={progressSystemData?.level || 1}
+            totalMinutes={stats.totalMinutes}
+            completedAchievements={progressSystemData?.achievements ? 
+              Object.values(progressSystemData.achievements || {})
+                .filter(a => a.completed)
+                .map(a => ({
+                  id: a.id,
+                  title: a.title,
+                  xp: a.xp,
+                  dateCompleted: a.dateCompleted || new Date().toISOString()
+                })) : 
+              []}
           />
         );
         
       case 'challenges':
-        return (
-          <Challenges
-            isPremium={isPremium}
-            onUpgradeToPremium={handleUpgradeToPremium}
-            onCompleteChallenge={handleCompleteChallenge}
+        return isPremium ? (
+          <ChallengeList />
+        ) : (
+          <PremiumLockSimple
+            feature="Challenges"
+            description="Complete daily, weekly, and monthly challenges to earn XP and track your progress."
+            onUpgrade={handleUpgradeToPremium}
           />
         );
         
       case 'rewards':
         return (
           <Rewards
-            userLevel={userProgress.level}
+            userLevel={progressSystemData?.level || 1}
             isPremium={isPremium}
             onUpgradeToPremium={handleUpgradeToPremium}
           />
@@ -596,11 +515,12 @@ export default function ProgressScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <XpNotificationManager />
       {/* Tab navigation */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
-          onPress={() => setActiveTab('stats')}
+          onPress={() => handleTabChange('stats')}
         >
           <Ionicons
             name="stats-chart"
@@ -614,7 +534,7 @@ export default function ProgressScreen({ navigation }) {
         
         <TouchableOpacity
           style={[styles.tab, activeTab === 'achievements' && styles.activeTab]}
-          onPress={() => setActiveTab('achievements')}
+          onPress={() => handleTabChange('achievements')}
         >
           <Ionicons
             name="trophy"
@@ -628,7 +548,7 @@ export default function ProgressScreen({ navigation }) {
         
         <TouchableOpacity
           style={[styles.tab, activeTab === 'challenges' && styles.activeTab]}
-          onPress={() => setActiveTab('challenges')}
+          onPress={() => handleTabChange('challenges')}
         >
           <Ionicons
             name="flag"
@@ -642,7 +562,7 @@ export default function ProgressScreen({ navigation }) {
         
         <TouchableOpacity
           style={[styles.tab, activeTab === 'rewards' && styles.activeTab]}
-          onPress={() => setActiveTab('rewards')}
+          onPress={() => handleTabChange('rewards')}
         >
           <Ionicons
             name="gift"
@@ -659,15 +579,38 @@ export default function ProgressScreen({ navigation }) {
       <RefreshableScrollView 
         style={styles.content}
         onRefresh={handleRefresh}
-        refreshing={isRefreshing || isProgressLoading}
+        refreshing={isRefreshing || isProgressSystemLoading}
         showRefreshingFeedback={true}
       >
         {renderTabContent()}
         
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            DeskStretch Premium
+            DeskStretch Premium • Level {progressSystemData?.level || 1} • {progressSystemData?.totalXP || 0} XP
           </Text>
+          
+          {/* Add testing buttons in development mode */}
+          {__DEV__ && (
+            <View style={styles.devTools}>
+              <TouchableOpacity
+                style={styles.testingButton}
+                onPress={() => Alert.alert('Progress Testing', 'Select the Testing tab to access the testing tools.')}
+              >
+                <Text style={styles.testingButtonText}>
+                  Progress Testing Available
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.testingButton, { backgroundColor: '#F44336', marginTop: 8 }]}
+                onPress={handleResetProgress}
+              >
+                <Text style={styles.testingButtonText}>
+                  Reset Progress Data
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </RefreshableScrollView>
     </View>
@@ -714,5 +657,169 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 12,
+  },
+  testingButton: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  testingButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  devTools: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  xpHistoryCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  xpHistoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  viewAllText: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  xpHistorySection: {
+    marginBottom: 12,
+  },
+  xpHistoryDate: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 8,
+    backgroundColor: '#f0f0f0',
+    padding: 4,
+    borderRadius: 4,
+  },
+  xpHistoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  xpHistoryIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  xpHistoryDetails: {
+    flex: 1,
+  },
+  xpHistoryTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  xpHistoryTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  xpHistoryAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  showMoreButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  showMoreText: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#999',
+    padding: 16,
+  },
+  xpSummaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  xpSummaryIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  xpSummaryDetails: {
+    flex: 1,
+  },
+  xpSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  xpSummaryBarContainer: {
+    height: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  xpSummaryBar: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+  },
+  xpSummaryStats: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  xpSummaryAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  xpSummaryPercentage: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 12,
+  },
+  tabContent: {
+    padding: 24,
   },
 });

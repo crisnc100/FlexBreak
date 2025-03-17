@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { saveIsPremium } from '../utils/storage';
+import { saveIsPremium } from '../services/storageService';
 import { usePremium } from '../context/PremiumContext';
 
 interface SubscriptionModalProps {

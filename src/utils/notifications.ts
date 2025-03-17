@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { saveReminderEnabled, saveReminderTime } from './storage';
+import { saveReminderEnabled, saveReminderTime } from '../services/storageService';
 
 // Configure notifications
 Notifications.setNotificationHandler({

@@ -1,0 +1,294 @@
+import { ProgressEntry } from '../../types';
+import { UserProgress, XpAddResult, XpHistoryEntry, Level } from './types';
+import * as storageService from '../../services/storageService';
+
+/**
+ * XP levels configuration
+ * Defines XP thresholds for each level
+ */
+export const LEVELS: Level[] = [
+  { level: 1, xpRequired: 0, title: 'Beginner' },
+  { level: 2, xpRequired: 250, title: 'Rookie' },
+  { level: 3, xpRequired: 500, title: 'Amateur' },
+  { level: 4, xpRequired: 750, title: 'Enthusiast' },
+  { level: 5, xpRequired: 1200, title: 'Committed' },
+  { level: 6, xpRequired: 1800, title: 'Dedicated' },
+  { level: 7, xpRequired: 2500, title: 'Pro' },
+  { level: 8, xpRequired: 3200, title: 'Expert' },
+  { level: 9, xpRequired: 4000, title: 'Master' },
+  { level: 10, xpRequired: 5000, title: 'Guru' }
+];
+
+/**
+ * Checks if a routine is the first one completed on its day
+ * @param routine The routine to check
+ * @param allRoutines All completed routines
+ * @returns Boolean indicating if this is first routine of its day
+ */
+export const isFirstRoutineOfDay = (
+  routine: ProgressEntry,
+  allRoutines: ProgressEntry[]
+): boolean => {
+  // Extract date from routine (without time)
+  const routineDate = new Date(routine.date);
+  const routineDateString = routineDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  // Find other routines on the same day
+  const routinesOnSameDay = allRoutines.filter(r => {
+    const date = new Date(r.date);
+    return date.toISOString().split('T')[0] === routineDateString;
+  });
+  
+  // Sort routines by time
+  routinesOnSameDay.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateA.getTime() - dateB.getTime();
+  });
+  
+  // If this routine is the first one of the day
+  return routinesOnSameDay.length > 0 && 
+         routinesOnSameDay[0].date === routine.date;
+};
+
+/**
+ * Calculates XP for a routine based on duration
+ * Only first routine of the day earns XP
+ * @param routine The routine to calculate XP for
+ * @param isFirstEver Whether this is the very first routine ever
+ * @returns XP amount and breakdown
+ */
+export const calculateRoutineXP = (
+  routine: ProgressEntry,
+  isFirstEver: boolean = false
+): { xp: number; breakdown: { source: string; amount: number; description: string }[] } => {
+  // Parse duration to number
+  const duration = typeof routine.duration === 'string'
+    ? parseInt(routine.duration, 10)
+    : (typeof routine.duration === 'number' ? routine.duration : 0);
+  
+  let xp = 0;
+  const breakdown: { source: string; amount: number; description: string }[] = [];
+  
+  // Base XP based on duration (5/10/15 min brackets)
+  let baseXP = 0;
+  if (duration <= 300) { // 5 min (300 seconds)
+    baseXP = 30;
+  } else if (duration <= 600) { // 10 min (600 seconds)
+    baseXP = 60;
+  } else { // 15+ min
+    baseXP = 90;
+  }
+  
+  xp += baseXP;
+  breakdown.push({
+    source: 'routine',
+    amount: baseXP,
+    description: `${Math.round(duration / 60)}-Minute Routine`
+  });
+  
+  // Welcome bonus for first ever routine
+  if (isFirstEver) {
+    const welcomeBonus = 50;
+    xp += welcomeBonus;
+    breakdown.push({
+      source: 'first_ever',
+      amount: welcomeBonus,
+      description: 'First Ever Routine Completed'
+    });
+  }
+  
+  return { xp, breakdown };
+};
+
+/**
+ * Adds XP to user progress with detailed tracking
+ * @param amount XP amount to add
+ * @param source Source of XP (routine, challenge, achievement)
+ * @param details Additional details for tracking
+ * @param userProgress Current user progress
+ * @returns Updated progress and XP info
+ */
+export const addXP = async (
+  amount: number,
+  source: string,
+  details: string,
+  userProgress: UserProgress
+): Promise<XpAddResult> => {
+  // Validate amount
+  const validAmount = Math.max(0, Math.round(amount));
+  
+  // Get current XP values
+  const previousTotal = userProgress.totalXP || 0;
+  const previousLevel = userProgress.level || 1;
+  
+  // Calculate new totals
+  const newTotal = previousTotal + validAmount;
+  
+  // Determine level based on XP thresholds
+  let newLevel = 1;
+  let xpThreshold = 0;
+  
+  const calculateLevel = (xp: number): number => {
+    if (xp < 100) return 1;
+    if (xp < 250) return 2;
+    if (xp < 450) return 3;
+    if (xp < 700) return 4;
+    if (xp < 1000) return 5;
+    if (xp < 1350) return 6;
+    if (xp < 1700) return 7;
+    if (xp < 2050) return 8;
+    if (xp < 2400) return 9;
+    return 10;
+  };
+  
+  newLevel = calculateLevel(newTotal);
+  const levelUp = newLevel > previousLevel;
+  
+  // Create XP history entry
+  const xpHistoryEntry: XpHistoryEntry = {
+    id: `xp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+    amount: validAmount,
+    source,
+    timestamp: new Date().toISOString(),
+    details,
+    claimed: source !== 'challenge' // Only challenges need claiming
+  };
+  
+  // Add to XP history
+  const xpHistory = userProgress.xpHistory || [];
+  xpHistory.push(xpHistoryEntry);
+  
+  // Update rewards if leveled up
+  let updatedRewards = { ...userProgress.rewards };
+  if (levelUp) {
+    // Check for rewards that should be unlocked at this level
+    Object.keys(updatedRewards).forEach(rewardId => {
+      const reward = updatedRewards[rewardId];
+      if (!reward.unlocked && reward.levelRequired <= newLevel) {
+        updatedRewards[rewardId] = {
+          ...reward,
+          unlocked: true
+        };
+        
+        console.log(`Reward unlocked: ${reward.title} (Level ${reward.levelRequired})`);
+      }
+    });
+  }
+  
+  // Create updated progress object
+  const updatedProgress = {
+    ...userProgress,
+    totalXP: newTotal,
+    level: newLevel,
+    xpHistory,
+    rewards: updatedRewards,
+    lastUpdated: new Date().toISOString()
+  };
+  
+  // Save updated progress
+  await storageService.saveUserProgress(updatedProgress);
+  
+  if (levelUp) {
+    console.log(`🎉 Level Up! ${previousLevel} → ${newLevel}`);
+  }
+  
+  console.log(`Added ${validAmount} XP from ${source}. Total: ${previousTotal} → ${newTotal}`);
+  
+  return {
+    previousTotal,
+    newTotal,
+    previousLevel,
+    newLevel,
+    levelUp,
+    amount: validAmount,
+    progress: updatedProgress
+  };
+};
+
+/**
+ * Process a completed routine to award XP (if eligible)
+ * @param routine The routine to process
+ * @returns XP earned and resulting progress
+ */
+export const processRoutineForXP = async (
+  routine: ProgressEntry
+): Promise<{ xpEarned: number; updatedProgress: UserProgress }> => {
+  try {
+    // Get current progress and all routines
+    const userProgress = await storageService.getUserProgress();
+    const allRoutines = await storageService.getAllRoutines();
+    
+    // Check if this is the first ever routine
+    const isFirstEver = allRoutines.length === 1 && allRoutines[0].date === routine.date;
+    
+    // Check if this is the first routine of its day
+    const isFirstOfDay = isFirstRoutineOfDay(routine, allRoutines);
+    
+    // Only award XP if this is the first routine of the day
+    let xpEarned = 0;
+    let updatedProgress = userProgress;
+    
+    if (isFirstOfDay) {
+      // Calculate XP for the routine
+      const { xp, breakdown } = calculateRoutineXP(routine, isFirstEver);
+      
+      console.log(`Routine qualifies for XP (first of day). Awarding ${xp} XP.`);
+      
+      // Award XP with detailed tracking
+      for (const item of breakdown) {
+        const result = await addXP(
+          item.amount,
+          item.source,
+          item.description,
+          updatedProgress
+        );
+        updatedProgress = result.progress;
+        xpEarned += item.amount;
+      }
+    } else {
+      console.log(`Routine does not qualify for XP (not first of day).`);
+    }
+    
+    return { xpEarned, updatedProgress };
+  } catch (error) {
+    console.error('Error processing routine for XP:', error);
+    return { xpEarned: 0, updatedProgress: await storageService.getUserProgress() };
+  }
+};
+
+/**
+ * Calculate user level based on XP
+ * @param xp Total XP
+ * @returns Object with level and progress info
+ */
+export const calculateLevel = (
+  xp: number
+): { level: number; xpForCurrentLevel: number; xpForNextLevel: number; progress: number } => {
+  // Find the highest level where XP is greater than or equal to the threshold
+  let level = 1;
+  
+  for (let i = 0; i < LEVELS.length; i++) {
+    if (xp >= LEVELS[i].xpRequired) {
+      level = i + 1; // Level is 1-indexed
+    } else {
+      break;
+    }
+  }
+  
+  // Calculate XP for current level
+  const xpForCurrentLevel = level > 1 ? LEVELS[level - 1].xpRequired : 0;
+  
+  // Calculate XP for next level
+  const xpForNextLevel = level < LEVELS.length ? LEVELS[level].xpRequired : Infinity;
+  
+  // Calculate progress to next level (0-1)
+  const progress = (xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel);
+  
+  return {
+    level,
+    xpForCurrentLevel,
+    xpForNextLevel,
+    progress
+  };
+}; 

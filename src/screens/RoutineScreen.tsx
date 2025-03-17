@@ -6,6 +6,7 @@ import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
 import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../types';
+import { UserProgress } from '../utils/progress/types';
 
 // Import our components
 import ActiveRoutine from '../components/routine/ActiveRoutine';
@@ -16,8 +17,7 @@ import RoutineDashboard from '../components/routine/RoutineDashboard';
 import { useRoutineParams } from '../hooks/useRoutineParams';
 import { useRoutineStorage } from '../hooks/useRoutineStorage';
 import { useRoutineSuggestions } from '../hooks/useRoutineSuggestions';
-import { useProgressSystem } from '../hooks/useProgressSystem';
-import { calculateRoutineXP } from '../components/progress/Achievements';
+import { useGamification } from '../hooks/useGamification';
 
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
@@ -33,7 +33,15 @@ export default function RoutineScreen() {
     getAllRoutines 
   } = useRoutineStorage();
   const { suggestions, isLoading: isSuggestionsLoading } = useRoutineSuggestions();
-  const { updateProgressWithRoutines } = useProgressSystem();
+  
+  // Replace progressSystem with useGamification
+  const { 
+    processRoutine, 
+    isLoading: isGamificationLoading,
+    recentlyUnlockedAchievements,
+    recentlyCompletedChallenges,
+    recentlyUnlockedRewards
+  } = useGamification();
   
   // Get premium status from context
   const { isPremium } = usePremium();
@@ -99,57 +107,44 @@ export default function RoutineScreen() {
       await saveRoutineProgress(entry);
       console.log('Routine saved successfully');
       
-      // Update progress system with all routines
+      // Use the new gamification system to process the routine
       try {
-        // Get all routines for progress calculation
-        const allRoutines = await getAllRoutines();
+        // Process the routine through the gamification system
+        const result = await processRoutine(entry);
         
-        // Determine if this routine extends a streak
-        const currentStreak = allRoutines.length > 1 ? 1 : 0; // Simple check - in real app would check dates
-        const extendsStreak = currentStreak > 0;
-        
-        // Calculate XP for this routine
-        const routineXP = calculateRoutineXP(
-          stretchCount,
-          hasAdvancedStretch,
-          extendsStreak,
-          currentStreak
-        );
-        
-        // Store XP earned
-        setRoutineXpEarned(routineXP);
-        
-        try {
-          // Update progress with all routines
-          const progressResult = await updateProgressWithRoutines(allRoutines);
+        if (result && result.success) {
+          // Set XP earned
+          setRoutineXpEarned(result.xpEarned);
           
-          // Log the results
-          if (progressResult) {
-            console.log('Progress updated:', progressResult);
-            
-            // Calculate total XP (routine XP + achievement XP)
-            const totalXP = routineXP + (progressResult.xpEarned || 0);
-            
-            // Log total XP earned instead of showing an alert
-            console.log(`Total XP earned: ${totalXP}`);
-            console.log(`Routine XP: ${routineXP}, Achievement XP: ${progressResult.xpEarned || 0}`);
-            
-            // Log level up and achievements
-            if (progressResult.leveledUp) {
-              console.log('Level up!');
-            }
-            
-            if (progressResult.achievementsCompleted.length > 0) {
-              console.log(`Unlocked ${progressResult.achievementsCompleted.length} achievements!`);
-            }
+          // Log results
+          console.log(`Total XP earned: ${result.xpEarned}`);
+          
+          // Check for level up
+          if (result.levelUp) {
+            console.log(`Level up! New level: ${result.newLevel}`);
           }
-        } catch (progressError) {
-          console.error('Error updating progress system:', progressError);
-          // Just log the error instead of showing an alert
-          console.log(`XP earned for this routine: ${routineXP}`);
+          
+          // Check for completed challenges
+          if (result.completedChallenges.length > 0) {
+            console.log(`Completed ${result.completedChallenges.length} challenges!`);
+          }
+          
+          // Check for unlocked achievements
+          if (result.unlockedAchievements.length > 0) {
+            console.log(`Unlocked ${result.unlockedAchievements.length} achievements!`);
+          }
+          
+          // Check for unlocked rewards
+          if (result.unlockedRewards.length > 0) {
+            console.log(`Unlocked ${result.unlockedRewards.length} rewards!`);
+          }
+        } else {
+          // If processing failed, set a default XP
+          console.error('Error processing routine in gamification system');
+          setRoutineXpEarned(50); // Default fallback XP value
         }
-      } catch (routineError) {
-        console.error('Error processing routine data:', routineError);
+      } catch (error) {
+        console.error('Error processing routine:', error);
         // Set a default XP amount in case of error
         setRoutineXpEarned(50); // Default fallback XP value
       }

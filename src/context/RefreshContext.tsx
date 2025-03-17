@@ -154,12 +154,15 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
       setIsRefreshing(true);
       
       return await measureAsyncOperation('refreshProgress', async () => {
-        // First, force a synchronization
+        // First, force a synchronization of storage data only, without reprocessing
         await synchronizeProgressData();
         
-        // Then get the latest data
+        // Then get the latest data without triggering gamification processing
         const routines = await getRecentRoutines();
         console.log('Progress refresh complete with', routines.length, 'routines');
+        
+        // Note: We're purposely not updating challenges/achievements here
+        // to avoid duplicate XP awards during refresh
         
         return routines;
       });
@@ -239,12 +242,15 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
       console.log('Refreshing routine data...');
       setIsRefreshing(true);
       
-      // First synchronize to ensure data consistency
+      // First synchronize to ensure data consistency without reprocessing routines
       await synchronizeProgressData();
       
       // Then get the latest routines
       const routines = await getRecentRoutines();
       console.log('Routine refresh complete with', routines.length, 'routines');
+      
+      // Note: We're purposely not updating the gamification system here
+      // to avoid duplicate XP awards during refresh
       
       return routines;
     } catch (error) {

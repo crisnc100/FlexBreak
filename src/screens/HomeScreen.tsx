@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getIsPremium, getReminderEnabled, getReminderTime, saveReminderTime, clearAllData } from '../utils/storage';
+import { getIsPremium, getReminderEnabled, getReminderTime, saveReminderTime, clearAllData } from '../services/storageService';
 import { requestNotificationsPermissions, scheduleDailyReminder, cancelReminders } from '../utils/notifications';
 import { tw } from '../utils/tw';
 import { usePremium } from '../context/PremiumContext';

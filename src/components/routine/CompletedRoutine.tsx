@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp } from '../../types';
 import { BodyArea, Duration, RoutineParams } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
-import { saveFavoriteRoutine } from '../../utils/storage';
+import { saveFavoriteRoutine } from '../../services/storageService';
 
 export interface CompletedRoutineProps {
   area: BodyArea;

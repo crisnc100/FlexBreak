@@ -46,6 +46,7 @@ export type RootStackParamList = {
   Favorites: undefined;
   Progress: undefined;
   Settings: undefined;
+  ProgressTesting: undefined;
 };
 
 export type AppNavigationProp = NavigationProp<RootStackParamList>; 

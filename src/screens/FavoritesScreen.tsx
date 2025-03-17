@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
-import { getIsPremium, getFavorites } from '../utils/storage';
+import { getIsPremium, getFavorites } from '../services/storageService';
 import stretches from '../data/stretches';
 import { Stretch } from '../types';
 import SubscriptionModal from '../components/SubscriptionModal';

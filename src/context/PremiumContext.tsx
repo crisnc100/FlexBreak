@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { getIsPremium, saveIsPremium } from '../utils/storage';
+import { getIsPremium, saveIsPremium } from '../services/storageService';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 type PremiumContextType = {

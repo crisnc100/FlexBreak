@@ -1,262 +1,301 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useGamification } from '../../hooks/useGamification';
 
-// Enhanced achievement definitions with categories, XP rewards, and levels
+// Simple date formatter function to replace date-fns
+const formatTimeAgo = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    
+    // Convert to seconds, minutes, hours, days
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 30) {
+      const diffMonths = Math.floor(diffDays / 30);
+      return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+    }
+    if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    }
+    if (diffHours > 0) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    }
+    if (diffMins > 0) {
+      return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    }
+    return 'just now';
+  } catch (e) {
+    console.warn('Error formatting date:', e);
+    return '';
+  }
+};
+
+// Enhanced achievement definitions with categories, XP rewards, and levels aligned with achievementManager.ts
 const ACHIEVEMENTS = [
-  // Beginner achievements (0-500 XP)
+  // Beginner achievements (25-50 XP)
   {
-    id: 'first_stretch',
-    title: 'First Stretch!',
-    description: 'Completed your first stretching routine',
-    icon: 'star-outline',
-    requirement: 1,
-    xp: 50,
-    category: 'beginner'
+    id: 'routine_5',
+    title: 'Getting Started',
+    description: 'Complete 5 stretching routines',
+    icon: 'trophy-outline',
+    requirement: 5,
+    xp: 25,
+    category: 'beginner',
+    backendCategory: 'progress', 
+    type: 'routine_count'
   },
   {
-    id: 'three_day_streak',
+    id: 'streak_3',
     title: 'Getting Into It',
-    description: '3-day streak achieved',
+    description: 'Maintain a 3-day stretching streak',
     icon: 'flame-outline',
     requirement: 3,
-    xp: 100,
-    category: 'beginner'
+    xp: 25,
+    category: 'beginner',
+    backendCategory: 'streaks',
+    type: 'streak'
   },
   {
-    id: 'week_streak',
+    id: 'streak_7',
     title: 'Weekly Warrior',
-    description: '7-day streak achieved',
+    description: 'Maintain a 7-day stretching streak',
     icon: 'calendar-outline',
     requirement: 7,
-    xp: 200,
-    category: 'beginner'
+    xp: 50,
+    category: 'beginner',
+    backendCategory: 'streaks',
+    type: 'streak'
   },
   {
-    id: 'five_routines',
-    title: 'Getting Started',
-    description: 'Completed 5 stretching routines',
-    icon: 'checkmark-done-outline',
-    requirement: 5,
-    xp: 100,
-    category: 'beginner'
+    id: 'areas_3',
+    title: 'Variety Beginner',
+    description: 'Stretch 3 different body areas',
+    icon: 'body-outline',
+    requirement: 3,
+    xp: 30,
+    category: 'beginner',
+    backendCategory: 'variety',
+    type: 'area_variety'
   },
   {
-    id: 'time_investment',
+    id: 'minutes_60',
     title: 'Time Investment',
-    description: 'Spent 60+ minutes stretching',
+    description: 'Complete 60 total minutes of stretching',
     icon: 'time-outline',
     requirement: 60,
-    xp: 100,
-    category: 'beginner'
+    xp: 50,
+    category: 'beginner',
+    backendCategory: 'time',
+    type: 'total_minutes'
   },
   
-  // Intermediate achievements (600-2000 XP)
+  // Intermediate achievements (50-100 XP)
   {
-    id: 'variety_master',
+    id: 'areas_all',
     title: 'Variety Master',
-    description: 'Tried all 6 body areas',
+    description: 'Stretch all body areas at least once',
     icon: 'body-outline',
     requirement: 6,
-    xp: 150,
-    category: 'intermediate'
+    xp: 75,
+    category: 'intermediate',
+    backendCategory: 'variety',
+    type: 'area_variety'
   },
   {
-    id: 'dedication',
-    title: 'Dedication',
-    description: 'Completed 10 routines',
+    id: 'routine_20',
+    title: 'Regular Stretcher',
+    description: 'Complete 20 stretching routines',
     icon: 'trophy-outline',
-    requirement: 10,
-    xp: 200,
-    category: 'intermediate'
+    requirement: 20,
+    xp: 75,
+    category: 'intermediate',
+    backendCategory: 'progress',
+    type: 'routine_count'
   },
   {
-    id: 'consistency_champion',
-    title: 'Consistency Champion',
-    description: 'Completed a routine 5 days in a row',
-    icon: 'checkmark-circle-outline',
-    requirement: 5,
-    xp: 250,
-    category: 'intermediate'
-  },
-  {
-    id: 'dedicated_stretcher',
-    title: 'Dedicated Stretcher',
-    description: 'Spent 300+ minutes stretching',
-    icon: 'hourglass-outline',
-    requirement: 300,
-    xp: 250,
-    category: 'intermediate'
-  },
-  {
-    id: 'two_week_streak',
+    id: 'streak_14',
     title: 'Fortnight Flexer',
-    description: '14-day streak achieved',
+    description: 'Maintain a 14-day stretching streak',
     icon: 'flame-outline',
     requirement: 14,
-    xp: 300,
-    category: 'intermediate'
+    xp: 100,
+    category: 'intermediate',
+    backendCategory: 'streaks',
+    type: 'streak'
   },
   {
-    id: 'twenty_routines',
-    title: 'Regular Stretcher',
-    description: 'Completed 20 routines',
-    icon: 'ribbon-outline',
-    requirement: 20,
-    xp: 250,
-    category: 'intermediate'
+    id: 'minutes_300',
+    title: 'Dedicated Stretcher',
+    description: 'Complete 300 total minutes of stretching',
+    icon: 'hourglass-outline',
+    requirement: 300,
+    xp: 100,
+    category: 'intermediate',
+    backendCategory: 'time',
+    type: 'total_minutes'
   },
   
-  // Advanced achievements (2000-5000 XP)
+  // Advanced achievements (100-200 XP)
   {
-    id: 'stretch_master',
+    id: 'routine_30',
     title: 'Stretch Master',
-    description: 'Completed 30 routines',
+    description: 'Complete 30 stretching routines',
     icon: 'ribbon-outline',
     requirement: 30,
-    xp: 300,
-    category: 'advanced'
+    xp: 100,
+    category: 'advanced',
+    backendCategory: 'progress',
+    type: 'routine_count'
   },
   {
-    id: 'month_streak',
+    id: 'streak_30',
     title: 'Monthly Milestone',
-    description: '30-day streak achieved',
+    description: 'Maintain a 30-day stretching streak',
     icon: 'calendar-number-outline',
     requirement: 30,
-    xp: 500,
-    category: 'advanced'
+    xp: 200,
+    category: 'advanced',
+    backendCategory: 'streaks',
+    type: 'streak'
   },
   {
     id: 'area_expert',
     title: 'Area Expert',
-    description: 'Completed 15 routines in one body area',
+    description: 'Complete 15 routines in one body area',
     icon: 'fitness-outline',
     requirement: 15,
-    xp: 350,
-    category: 'advanced'
+    xp: 150,
+    category: 'advanced',
+    backendCategory: 'variety',
+    type: 'specific_area'
   },
   {
-    id: 'advanced_stretcher',
-    title: 'Advanced Stretcher',
-    description: 'Completed 10 advanced routines',
-    icon: 'trending-up-outline',
-    requirement: 10,
-    xp: 400,
-    category: 'advanced'
-  },
-  {
-    id: 'thousand_minutes',
-    title: 'Time Dedication',
-    description: 'Spent 1000+ minutes stretching',
-    icon: 'timer-outline',
-    requirement: 1000,
-    xp: 500,
-    category: 'advanced'
-  },
-  {
-    id: 'fifty_routines',
+    id: 'routine_50',
     title: 'Flexibility Devotee',
-    description: 'Completed 50 routines',
+    description: 'Complete 50 routines',
     icon: 'medal-outline',
     requirement: 50,
-    xp: 450,
-    category: 'advanced'
+    xp: 200,
+    category: 'advanced',
+    backendCategory: 'progress',
+    type: 'routine_count'
+  },
+  {
+    id: 'minutes_1000',
+    title: 'Time Dedication',
+    description: 'Complete 1000 total minutes of stretching',
+    icon: 'timer-outline',
+    requirement: 1000,
+    xp: 200,
+    category: 'advanced',
+    backendCategory: 'time',
+    type: 'total_minutes'
   },
   
-  // Elite achievements (5000+ XP)
+  // Elite achievements (300-500 XP)
   {
-    id: 'stretch_guru',
+    id: 'routine_100',
     title: 'Stretch Guru',
-    description: 'Completed 100 routines',
+    description: 'Complete 100 routines',
     icon: 'medal-outline',
     requirement: 100,
-    xp: 1000,
-    category: 'elite'
+    xp: 300,
+    category: 'elite',
+    backendCategory: 'progress',
+    type: 'routine_count'
   },
   {
-    id: 'iron_flexibility',
+    id: 'streak_60',
     title: 'Iron Flexibility',
-    description: '60-day streak achieved',
+    description: 'Maintain a 60-day stretching streak',
     icon: 'infinite-outline',
     requirement: 60,
-    xp: 1500,
-    category: 'elite'
+    xp: 350,
+    category: 'elite',
+    backendCategory: 'streaks',
+    type: 'streak'
   },
   {
-    id: 'yearly_flexibility',
+    id: 'streak_365',
     title: 'Year of Flexibility',
-    description: '365-day streak achieved',
+    description: 'Maintain a 365-day stretching streak',
     icon: 'calendar-outline',
     requirement: 365,
-    xp: 2000,
-    category: 'elite'
+    xp: 500,
+    category: 'elite',
+    backendCategory: 'streaks',
+    type: 'streak'
   },
   {
-    id: 'master_of_all_areas',
+    id: 'master_all_areas',
     title: 'Master of All Areas',
     description: 'Complete 30 routines in each body area',
     icon: 'grid-outline',
     requirement: 30,
-    xp: 1200,
-    category: 'elite'
+    xp: 400,
+    category: 'elite',
+    backendCategory: 'variety',
+    type: 'specific_area'
   },
   {
-    id: 'flexibility_legend',
+    id: 'routine_200',
     title: 'Flexibility Legend',
     description: 'Complete 200 routines',
     icon: 'star-outline',
     requirement: 200,
-    xp: 1800,
-    category: 'elite'
+    xp: 500,
+    category: 'elite',
+    backendCategory: 'progress',
+    type: 'routine_count'
   }
 ];
 
-// Expanded level definitions (20 levels)
+// Define level thresholds to match xpManager.ts
 const LEVELS = [
-  { level: 1, xpRequired: 0, title: 'Stretching Novice' },
-  { level: 2, xpRequired: 100, title: 'Flexibility Beginner' },
-  { level: 3, xpRequired: 250, title: 'Stretching Enthusiast' },
-  { level: 4, xpRequired: 400, title: 'Flexibility Starter' },
-  { level: 5, xpRequired: 500, title: 'Stretching Rookie' },
-  { level: 6, xpRequired: 750, title: 'Flexibility Student' },
-  { level: 7, xpRequired: 1000, title: 'Stretching Regular' },
-  { level: 8, xpRequired: 1250, title: 'Flexibility Adept' },
-  { level: 9, xpRequired: 1500, title: 'Stretching Practitioner' },
-  { level: 10, xpRequired: 2000, title: 'Flexibility Pro' },
-  { level: 11, xpRequired: 2500, title: 'Stretching Specialist' },
-  { level: 12, xpRequired: 3000, title: 'Flexibility Expert' },
-  { level: 13, xpRequired: 3500, title: 'Stretching Veteran' },
-  { level: 14, xpRequired: 4000, title: 'Flexibility Virtuoso' },
-  { level: 15, xpRequired: 5000, title: 'Stretching Master' },
-  { level: 16, xpRequired: 7000, title: 'Flexibility Champion' },
-  { level: 17, xpRequired: 9000, title: 'Stretching Elite' },
-  { level: 18, xpRequired: 11000, title: 'Flexibility Guru' },
-  { level: 19, xpRequired: 13000, title: 'Stretching Grandmaster' },
-  { level: 20, xpRequired: 15000, title: 'Ultimate Flexibility Legend' }
+  { level: 1, xpRequired: 0, title: 'Beginner' },
+  { level: 2, xpRequired: 250, title: 'Rookie' },
+  { level: 3, xpRequired: 500, title: 'Amateur' },
+  { level: 4, xpRequired: 750, title: 'Enthusiast' },
+  { level: 5, xpRequired: 1200, title: 'Committed' },
+  { level: 6, xpRequired: 1800, title: 'Dedicated' },
+  { level: 7, xpRequired: 2500, title: 'Pro' },
+  { level: 8, xpRequired: 3200, title: 'Expert' },
+  { level: 9, xpRequired: 4000, title: 'Master' },
+  { level: 10, xpRequired: 5000, title: 'Guru' }
 ];
 
-// Calculate XP for a completed routine
+// For levels 7+, xp = 1000 + 350 * (level - 6)
+
+// Update the routine XP calculation to match xpManager.ts
 export const calculateRoutineXP = (
-  stretchCount: number, 
-  hasAdvancedStretch: boolean, 
-  extendsStreak: boolean,
-  streakLength: number
+  routineDuration: number = 10,
+  isFirstRoutineEver: boolean = false,
+  streakLength: number = 0
 ): number => {
-  // Base XP: 10 XP per stretch
-  let totalXP = stretchCount * 10;
+  let xp = 0;
   
-  // Advanced stretch bonus (Premium perk)
-  if (hasAdvancedStretch) {
-    totalXP += 20;
+  // Base XP based on duration (5/10/15 min brackets)
+  if (routineDuration <= 5) {
+    xp = 30; // 5 min routine
+  } else if (routineDuration <= 10) {
+    xp = 60; // 10 min routine
+  } else {
+    xp = 90; // 15+ min routine
   }
   
-  // Streak bonus: +10 XP per day in streak if extending
-  if (extendsStreak && streakLength > 1) {
-    totalXP += 10;
+  // Bonus for first ever routine
+  if (isFirstRoutineEver) {
+    xp += 50;
   }
   
-  return totalXP;
+  return xp;
 };
 
 // Calculate total XP from achievements
@@ -264,131 +303,254 @@ export const calculateTotalXP = (achievements: Array<{id: string; xp: number}>):
   return achievements.reduce((total, achievement) => total + achievement.xp, 0);
 };
 
-// Achievement card component
-const AchievementCard = ({ achievement, isUnlocked, onPress }) => (
+// Achievement card component with progress indicator and completion time
+const AchievementCard = ({ achievement, onPress }) => (
   <TouchableOpacity 
-    style={[styles.achievementCard, !isUnlocked && styles.achievementLocked]}
+    style={[
+      styles.achievementCard, 
+      !achievement.isUnlocked && styles.achievementLocked,
+      achievement.isUnlocked && styles.achievementUnlocked
+    ]}
     onPress={() => onPress(achievement)}
   >
-    <View style={[styles.achievementIconContainer, isUnlocked && styles.achievementIconContainerUnlocked]}>
+    <View style={[
+      styles.achievementIconContainer, 
+      achievement.isUnlocked && styles.achievementIconContainerUnlocked,
+      achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementIconContainerInProgress
+    ]}>
       <Ionicons 
         name={achievement.icon} 
         size={24} 
-        color={isUnlocked ? '#FFFFFF' : '#999'} 
+        color={achievement.isUnlocked ? '#FFFFFF' : (achievement.currentProgress > 0 ? '#4CAF50' : '#999')} 
       />
     </View>
-    <Text style={[styles.achievementTitle, !isUnlocked && styles.achievementLockedText]}>
+    <Text style={[
+      styles.achievementTitle, 
+      !achievement.isUnlocked && styles.achievementLockedText,
+      achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementInProgressText
+    ]}>
       {achievement.title}
     </Text>
     <Text style={styles.achievementDescription}>
       {achievement.description}
     </Text>
-    {isUnlocked && (
-      <View style={styles.xpBadge}>
-        <Text style={styles.xpText}>+{achievement.xp} XP</Text>
+    
+    {achievement.isUnlocked ? (
+      <>
+        <View style={styles.xpBadge}>
+          <Text style={styles.xpText}>+{achievement.xp} XP</Text>
+        </View>
+        {achievement.completedTimeAgo && (
+          <Text style={styles.completionDate}>Earned {achievement.completedTimeAgo}</Text>
+        )}
+      </>
+    ) : achievement.currentProgress > 0 ? (
+      // Show progress for in-progress achievements
+      <View style={styles.progressWrapper}>
+        <View style={styles.progressMiniContainer}>
+          <View 
+            style={[
+              styles.progressMiniBar, 
+              { width: `${achievement.progressPercentage}%` }
+            ]}
+          />
+        </View>
+        <Text style={styles.progressText}>
+          {achievement.currentProgress}/{achievement.requirement} ({achievement.progressPercentage}%)
+        </Text>
+      </View>
+    ) : (
+      // Show locked indicator for completely locked achievements
+      <View style={styles.lockedBadge}>
+        <Text style={styles.lockedText}>Locked</Text>
       </View>
     )}
   </TouchableOpacity>
 );
 
+// Add an empty state component for when there are no achievements yet
+const EmptyAchievements = () => (
+  <View style={styles.emptyContainer}>
+    <Ionicons name="trophy-outline" size={64} color="#CCCCCC" />
+    <Text style={styles.emptyTitle}>No Achievements Yet</Text>
+    <Text style={styles.emptyDescription}>
+      Complete your first stretching routines to start earning achievements!
+    </Text>
+  </View>
+);
+
 // Define the props interface
 interface AchievementsProps {
-  totalRoutines: number;
-  currentStreak: number;
-  areaBreakdown: Record<string, number>;
+  totalRoutines?: number;
+  currentStreak?: number;
+  areaBreakdown?: Record<string, number>;
   totalXP?: number;
   level?: number;
-  completedAchievements?: Array<{id: string; title: string; xp: number; dateCompleted: string}>;
+  totalMinutes?: number;
+  completedAchievements?: Array<{id: string; title: string; xp: number; dateCompleted?: string}>;
 }
 
 const Achievements: React.FC<AchievementsProps> = ({
-  totalRoutines,
-  currentStreak,
-  areaBreakdown,
-  totalXP = 0,
-  level = 1,
-  completedAchievements = []
+  totalRoutines: propsRoutines,
+  currentStreak: propsStreak,
+  areaBreakdown: propsAreas,
+  totalXP: propsTotalXP,
+  level: propsLevel,
+  totalMinutes: propsMinutes,
+  completedAchievements: propsAchievements
 }) => {
-  // Log the stats for debugging
-  console.log(`Achievements received: ${totalRoutines} routines, streak: ${currentStreak}, areas: ${Object.keys(areaBreakdown).length}`);
+  // Use gamification hook
+  const { gamificationSummary, isLoading, refreshData } = useGamification();
   
-  // Check if an achievement is already completed
-  const isAchievementCompleted = (achievementId) => {
-    return completedAchievements.some(a => a.id === achievementId);
-  };
+  // Local state for UI
+  const [unlockedAchievements, setUnlockedAchievements] = useState<any[]>([]);
+  const [achievementsByCategory, setAchievementsByCategory] = useState<Record<string, any[]>>({});
+  const [refreshing, setRefreshing] = useState(false);
   
-  // Calculate which achievements are unlocked
-  const unlockedAchievements = ACHIEVEMENTS.map(achievement => {
-    // First check if it's in the completed list
-    if (isAchievementCompleted(achievement.id)) {
-      return { ...achievement, isUnlocked: true };
+  // Handle pull-to-refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshData();
+    } finally {
+      setRefreshing(false);
     }
-    
-    // Otherwise check if it should be unlocked based on the stats
-    let isUnlocked = false;
-    
-    switch (achievement.id) {
-      case 'first_stretch':
-        isUnlocked = totalRoutines >= achievement.requirement;
-        break;
-      case 'three_day_streak':
-      case 'week_streak':
-      case 'consistency_champion':
-      case 'month_streak':
-      case 'iron_flexibility':
-        // All streak-based achievements
-        isUnlocked = currentStreak >= achievement.requirement;
-        break;
-      case 'variety_master':
-        // Area variety achievements
-        isUnlocked = Object.keys(areaBreakdown).length >= achievement.requirement;
-        break;
-      case 'dedication':
-      case 'stretch_master':
-      case 'stretch_guru':
-        // Routine count achievements
-        isUnlocked = totalRoutines >= achievement.requirement;
-        break;
-      case 'area_expert':
-        // Check if any area has at least the required number of routines
-        isUnlocked = Object.values(areaBreakdown).some(count => count >= achievement.requirement);
-        break;
-      default:
-        break;
+  }, [refreshData]);
+  
+  // Explicitly refresh data when component mounts
+  useEffect(() => {
+    console.log('Achievements component mounted, refreshing data...');
+    refreshData();
+  }, [refreshData]);
+  
+  // Setup local values using either gamification data or props (for backward compatibility)
+  useEffect(() => {
+    if (gamificationSummary) {
+      console.log('Gamification summary received:', gamificationSummary);
+      // Use data from gamification hook 
+      const { achievements, statistics, level, totalXP } = gamificationSummary;
+      
+      // Get list of completed achievement IDs
+      const completedAchievementIds = achievements?.completed?.map(a => a.id) || [];
+      
+      // Get in-progress achievements
+      const inProgressAchievements = achievements?.inProgress || [];
+      
+      // Process achievements for display
+      const processedAchievements = ACHIEVEMENTS.map(achievement => {
+        // Find the backend achievement data
+        const completedAchievement = achievements?.completed?.find(a => a.id === achievement.id);
+        const inProgressAchievement = inProgressAchievements.find(a => a.id === achievement.id);
+        
+        // Determine if it's unlocked and get progress
+        const isUnlocked = !!completedAchievement;
+        const currentProgress = inProgressAchievement?.progress || 0;
+        const progressPercentage = Math.min(100, Math.round((currentProgress / achievement.requirement) * 100));
+        
+        // Format completion date if available
+        let completedTimeAgo = '';
+        if (completedAchievement?.dateCompleted) {
+          completedTimeAgo = formatTimeAgo(completedAchievement.dateCompleted);
+        }
+        
+        return {
+          ...achievement,
+          isUnlocked,
+          currentProgress,
+          progressPercentage,
+          dateCompleted: completedAchievement?.dateCompleted,
+          completedTimeAgo
+        };
+      });
+      
+      // Set the processed achievements
+      setUnlockedAchievements(processedAchievements);
+      
+      // Group achievements by UI category (beginner, intermediate, etc.)
+      const groupedAchievements = processedAchievements.reduce((acc, achievement) => {
+        const category = achievement.category || 'other';
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(achievement);
+        return acc;
+      }, {});
+      
+      // For each category, sort achievements by requirement level (easiest first)
+      Object.keys(groupedAchievements).forEach(category => {
+        groupedAchievements[category].sort((a, b) => a.requirement - b.requirement);
+      });
+      
+      setAchievementsByCategory(groupedAchievements);
     }
-    
-    return { ...achievement, isUnlocked };
-  });
+  }, [gamificationSummary, propsAchievements]);
   
-  // Calculate total XP from unlocked achievements if not provided
-  const calculatedTotalXP = totalXP || unlockedAchievements
-    .filter(a => a.isUnlocked)
-    .reduce((sum, a) => sum + (a.xp || 0), 0);
-  
-  // Determine current level if not provided
-  const currentLevel = level ? 
-    LEVELS.find(l => l.level === level) || LEVELS[0] :
-    LEVELS.reduce((highest, level) => {
-      if (calculatedTotalXP >= level.xpRequired && level.level > highest.level) {
-        return level;
-      }
-      return highest;
-    }, LEVELS[0]);
-  
-  // Calculate XP for next level
-  const nextLevel = LEVELS.find(l => l.level === currentLevel.level + 1);
-  const xpForNextLevel = nextLevel ? nextLevel.xpRequired : currentLevel.xpRequired;
-  const xpProgress = nextLevel ? 
-    (calculatedTotalXP - currentLevel.xpRequired) / (nextLevel.xpRequired - currentLevel.xpRequired) : 1;
-  
-  // Handle achievement press
+  // Handle achievement tap
   const handleAchievementPress = (achievement) => {
-    // In the future, this could show a detailed modal with more info about the achievement
-    console.log('Achievement pressed:', achievement.title);
+    // Show achievement details or feedback
+    console.log(`Tapped achievement: ${achievement.title}`);
   };
+  
+  // Use merged values from both sources
+  const totalRoutines = gamificationSummary?.statistics?.routinesCompleted || propsRoutines || 0;
+  const currentStreak = gamificationSummary?.statistics?.currentStreak || propsStreak || 0;
+  const totalXP = gamificationSummary?.totalXP || propsTotalXP || 0;
+  const level = gamificationSummary?.level || propsLevel || 1;
+  const totalMinutes = gamificationSummary?.statistics?.totalMinutes || propsMinutes || 0;
+  
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading achievements...</Text>
+      </View>
+    );
+  }
+  
+  // Calculate level progress
+  let xpProgress = 0;
+  let calculatedTotalXP = totalXP || 0;
+  
+  // Find current level data
+  const currentLevel = LEVELS.find(l => l.level === level) || LEVELS[0];
+  
+  // Find next level data
+  const nextLevel = LEVELS.find(l => l.level === level + 1);
+  
+  console.log(`Achievements component received: Level ${level}, XP: ${calculatedTotalXP}`);
+  
+  if (nextLevel) {
+    // Calculate progress to next level
+    const xpForCurrentLevel = currentLevel.xpRequired;
+    const xpForNextLevel = nextLevel.xpRequired;
+    const xpRangeForLevel = xpForNextLevel - xpForCurrentLevel;
+    const xpProgressInLevel = calculatedTotalXP - xpForCurrentLevel;
+    
+    // Calculate progress as a number between 0 and 1
+    xpProgress = Math.min(Math.max(xpProgressInLevel / xpRangeForLevel, 0), 1);
+    
+    // Ensure the progress bar updates when XP changes
+    console.log(`Level progress: ${xpProgressInLevel}/${xpRangeForLevel} = ${(xpProgress * 100).toFixed(1)}%`);
+    console.log(`Current XP: ${calculatedTotalXP}, Current Level: ${currentLevel.level}, Next Level: ${nextLevel.level} at ${nextLevel.xpRequired} XP`);
+  } else {
+    // At max level
+    xpProgress = 1;
+    console.log(`At max level ${currentLevel.level} with ${calculatedTotalXP} XP`);
+  }
   
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={['#4CAF50']}
+          tintColor="#4CAF50"
+          title="Refreshing achievements..."
+          titleColor="#666"
+        />
+      }
+    >
       {/* Level progress section */}
       <View style={styles.levelSection}>
         <View style={styles.levelHeader}>
@@ -397,7 +559,7 @@ const Achievements: React.FC<AchievementsProps> = ({
             <Text style={styles.levelSubtitle}>{currentLevel.title}</Text>
           </View>
           <View style={styles.xpContainer}>
-            <Ionicons name="flash" size={16} color="#FFD700" />
+            <Ionicons name="flash" size={18} color="#FFD700" />
             <Text style={styles.xpTotal}>{calculatedTotalXP} XP</Text>
           </View>
         </View>
@@ -413,90 +575,157 @@ const Achievements: React.FC<AchievementsProps> = ({
         
         {nextLevel && (
           <Text style={styles.nextLevelText}>
-            {xpForNextLevel - calculatedTotalXP} XP to Level {nextLevel.level}: {nextLevel.title}
+            {nextLevel.xpRequired - calculatedTotalXP} XP to Level {nextLevel.level}: {nextLevel.title}
+          </Text>
+        )}
+        {!nextLevel && (
+          <Text style={styles.nextLevelText}>
+            Maximum level reached! Congratulations!
           </Text>
         )}
       </View>
       
       {/* Achievements section */}
       <View style={styles.achievementsSection}>
-        <Text style={styles.sectionTitle}>Achievements</Text>
-        
-        {/* Beginner achievements */}
-        <Text style={styles.categoryTitle}>Beginner</Text>
-        <View style={styles.achievementsContainer}>
-          {unlockedAchievements
-            .filter(a => a.category === 'beginner')
-            .map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                isUnlocked={achievement.isUnlocked}
-                onPress={handleAchievementPress}
-              />
-            ))
-          }
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Achievements</Text>
+          {/* Achievement stats summary */}
+          <View style={styles.achievementStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {unlockedAchievements.length > 0 
+                  ? Object.values(unlockedAchievements).filter(a => a.isUnlocked).length 
+                  : 0}
+              </Text>
+              <Text style={styles.statLabel}>Earned</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {unlockedAchievements.length > 0
+                  ? Object.values(unlockedAchievements).filter(a => a.currentProgress > 0 && !a.isUnlocked).length
+                  : 0}
+              </Text>
+              <Text style={styles.statLabel}>In Progress</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {unlockedAchievements.length}
+              </Text>
+              <Text style={styles.statLabel}>Total</Text>
+            </View>
+          </View>
         </View>
         
-        {/* Intermediate achievements */}
-        <Text style={styles.categoryTitle}>Intermediate</Text>
-        <View style={styles.achievementsContainer}>
-          {unlockedAchievements
-            .filter(a => a.category === 'intermediate')
-            .map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                isUnlocked={achievement.isUnlocked}
-                onPress={handleAchievementPress}
-              />
-            ))
-          }
-        </View>
-        
-        {/* Advanced achievements */}
-        <Text style={styles.categoryTitle}>Advanced</Text>
-        <View style={styles.achievementsContainer}>
-          {unlockedAchievements
-            .filter(a => a.category === 'advanced')
-            .map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                isUnlocked={achievement.isUnlocked}
-                onPress={handleAchievementPress}
-              />
-            ))
-          }
-        </View>
-        
-        {/* Elite achievements */}
-        <Text style={styles.categoryTitle}>Elite</Text>
-        <View style={styles.achievementsContainer}>
-          {unlockedAchievements
-            .filter(a => a.category === 'elite')
-            .map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                isUnlocked={achievement.isUnlocked}
-                onPress={handleAchievementPress}
-              />
-            ))
-          }
-        </View>
+        {Object.keys(achievementsByCategory).length === 0 ? (
+          <EmptyAchievements />
+        ) : (
+          <>
+            {/* Beginner achievements - only show if there are achievements in this category */}
+            {achievementsByCategory['beginner']?.length > 0 && (
+              <>
+                <View style={styles.categoryHeader}>
+                  <Text style={styles.categoryTitle}>Beginner</Text>
+                  <Text style={styles.categoryCount}>
+                    {achievementsByCategory['beginner'].filter(a => a.isUnlocked).length} / {achievementsByCategory['beginner'].length}
+                  </Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.achievementsContainer}>
+                    {achievementsByCategory['beginner'].map(achievement => (
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+            
+            {/* Intermediate achievements - only show if there are achievements in this category */}
+            {achievementsByCategory['intermediate']?.length > 0 && (
+              <>
+                <View style={styles.categoryHeader}>
+                  <Text style={styles.categoryTitle}>Intermediate</Text>
+                  <Text style={styles.categoryCount}>
+                    {achievementsByCategory['intermediate'].filter(a => a.isUnlocked).length} / {achievementsByCategory['intermediate'].length}
+                  </Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.achievementsContainer}>
+                    {achievementsByCategory['intermediate'].map(achievement => (
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+            
+            {/* Advanced achievements - only show if there are achievements in this category */}
+            {achievementsByCategory['advanced']?.length > 0 && (
+              <>
+                <View style={styles.categoryHeader}>
+                  <Text style={styles.categoryTitle}>Advanced</Text>
+                  <Text style={styles.categoryCount}>
+                    {achievementsByCategory['advanced'].filter(a => a.isUnlocked).length} / {achievementsByCategory['advanced'].length}
+                  </Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.achievementsContainer}>
+                    {achievementsByCategory['advanced'].map(achievement => (
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+            
+            {/* Elite achievements - only show if there are achievements in this category */}
+            {achievementsByCategory['elite']?.length > 0 && (
+              <>
+                <View style={styles.categoryHeader}>
+                  <Text style={styles.categoryTitle}>Elite</Text>
+                  <Text style={styles.categoryCount}>
+                    {achievementsByCategory['elite'].filter(a => a.isUnlocked).length} / {achievementsByCategory['elite'].length}
+                  </Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.achievementsContainer}>
+                    {achievementsByCategory['elite'].map(achievement => (
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+          </>
+        )}
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 8,
+    flex: 1,
   },
   levelSection: {
     backgroundColor: '#FFF',
     marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 8,
     padding: 16,
     borderRadius: 16,
@@ -525,32 +754,34 @@ const styles = StyleSheet.create({
   xpContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 12,
+    backgroundColor: '#FFF9C4',
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFE082',
   },
   xpTotal: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#FF8F00',
     marginLeft: 4,
   },
   progressContainer: {
-    height: 12,
+    height: 8,
     backgroundColor: '#E0E0E0',
-    borderRadius: 6,
+    borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressBar: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 4,
   },
   nextLevelText: {
     fontSize: 12,
     color: '#666',
-    textAlign: 'right',
+    textAlign: 'center',
   },
   achievementsSection: {
     backgroundColor: '#FFF',
@@ -563,34 +794,68 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  sectionHeader: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 16,
   },
-  categoryTitle: {
-    fontSize: 16,
+  achievementStats: {
+    flexDirection: 'row',
+    marginTop: 8,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#555',
+    color: '#4CAF50',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 16,
     marginBottom: 8,
     paddingBottom: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#EEEEEE',
   },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  categoryCount: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: 'bold',
+  },
   achievementsContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    paddingBottom: 8,
   },
   achievementCard: {
     backgroundColor: '#FFF',
     padding: 16,
     borderRadius: 12,
-    marginBottom: 16,
+    marginRight: 12,
     alignItems: 'center',
-    width: '48%',
+    width: 160,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -602,6 +867,14 @@ const styles = StyleSheet.create({
   achievementLocked: {
     backgroundColor: '#F5F5F5',
     borderColor: '#E0E0E0',
+  },
+  achievementUnlocked: {
+    borderColor: '#4CAF50',
+    borderWidth: 1,
+    shadowColor: '#4CAF50',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
   },
   achievementIconContainer: {
     width: 48,
@@ -615,6 +888,11 @@ const styles = StyleSheet.create({
   achievementIconContainerUnlocked: {
     backgroundColor: '#4CAF50',
   },
+  achievementIconContainerInProgress: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+    borderWidth: 1,
+  },
   achievementTitle: {
     fontSize: 14,
     fontWeight: 'bold',
@@ -624,6 +902,9 @@ const styles = StyleSheet.create({
   },
   achievementLockedText: {
     color: '#999',
+  },
+  achievementInProgressText: {
+    color: '#4CAF50',
   },
   achievementDescription: {
     fontSize: 12,
@@ -643,6 +924,70 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     color: '#FF8F00',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressWrapper: {
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  progressMiniContainer: {
+    width: 80,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 2,
+  },
+  progressMiniBar: {
+    height: '100%',
+    backgroundColor: '#8BC34A',
+    borderRadius: 2,
+  },
+  progressText: {
+    fontSize: 10,
+    color: '#666',
+  },
+  lockedBadge: {
+    backgroundColor: '#EEEEEE',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  lockedText: {
+    fontSize: 10,
+    color: '#999',
+  },
+  completionDate: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic'
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    borderRadius: 8,
+    backgroundColor: '#F9F9F9',
+    marginVertical: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginHorizontal: 24,
   },
 });
 

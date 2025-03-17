@@ -1,6 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import useProgressSystem from '../../hooks/useProgressSystem';
+import * as rewardManager from '../../utils/progress/rewardManager';
 
 // Define the props interface
 interface RewardsProps {
@@ -9,8 +11,8 @@ interface RewardsProps {
   onUpgradeToPremium: () => void;
 }
 
-// Sample rewards data
-const REWARDS = [
+// Fallback rewards data in case loading fails
+const FALLBACK_REWARDS = [
   {
     id: 'dark_theme',
     title: 'Dark Theme',
@@ -19,7 +21,7 @@ const REWARDS = [
     levelRequired: 2,
     isPremiumOnly: true
   },
-   {
+  {
     id: 'custom_reminders',
     title: 'Custom Reminders',
     description: 'Set personalized reminders with custom messages',
@@ -31,7 +33,7 @@ const REWARDS = [
     id: 'xp_boost',
     title: 'XP Boost',
     description: 'Get a 2x boost in XP for your daily streak',
-    icon: 'sparkles-outline',
+    icon: 'flash-outline',
     levelRequired: 4,
     isPremiumOnly: true
   },
@@ -46,8 +48,8 @@ const REWARDS = [
   {
     id: 'streak_freezes',
     title: 'Streak Freezes',
-    description: 'Miss a day, keep your streak—perfect for busy schedules.',
-    icon: 'pause-outline',
+    description: 'Miss a day, keep your streak—perfect for busy schedules',
+    icon: 'snow-outline',
     levelRequired: 6,
     isPremiumOnly: true
   },
@@ -59,9 +61,8 @@ const REWARDS = [
     levelRequired: 7,
     isPremiumOnly: true
   },
-
   {
-    id: 'desk_break',
+    id: 'desk_break_boost',
     title: 'Desk Break Boost',
     description: 'Stretch in quick 15-sec bursts—3 fast routines!',
     icon: 'desktop-outline',
@@ -69,7 +70,7 @@ const REWARDS = [
     isPremiumOnly: true
   },
   {
-    id: 'focus_mastery',
+    id: 'focus_area_mastery',
     title: 'Focus Area Mastery',
     description: 'Get ultimate focus badges for your favorite areas',
     icon: 'star-outline',
@@ -82,6 +83,11 @@ const REWARDS = [
 const RewardCard = ({ reward, userLevel, onPress }) => {
   const isUnlocked = userLevel >= reward.levelRequired;
 
+  // Convert icon name to outline version for Ionicons
+  const iconName = reward.icon.includes('-outline') 
+    ? reward.icon 
+    : `${reward.icon}-outline`;
+
   return (
     <TouchableOpacity
       style={[styles.rewardCard, !isUnlocked && styles.rewardLocked]}
@@ -90,7 +96,7 @@ const RewardCard = ({ reward, userLevel, onPress }) => {
       <View style={styles.rewardHeader}>
         <View style={[styles.rewardIconContainer, isUnlocked && styles.rewardIconContainerUnlocked]}>
           <Ionicons
-            name={reward.icon}
+            name={iconName}
             size={24}
             color={isUnlocked ? '#FFFFFF' : '#999'}
           />
@@ -132,6 +138,38 @@ const Rewards: React.FC<RewardsProps> = ({
   isPremium,
   onUpgradeToPremium
 }) => {
+  // Get user progress data to display XP
+  const { userProgress } = useProgressSystem();
+  const [rewards, setRewards] = useState(FALLBACK_REWARDS);
+  const [loading, setLoading] = useState(true);
+  
+  // Load rewards from the reward manager
+  useEffect(() => {
+    const loadRewards = async () => {
+      try {
+        setLoading(true);
+        const allRewards = await rewardManager.getAllRewards();
+        
+        if (allRewards && allRewards.length > 0) {
+          // Convert rewards to the format expected by the component
+          const formattedRewards = allRewards.map(reward => ({
+            ...reward,
+            isPremiumOnly: true // All rewards require premium
+          }));
+          setRewards(formattedRewards);
+        }
+      } catch (error) {
+        console.error('Error loading rewards:', error);
+        // Fall back to the static rewards array
+        setRewards(FALLBACK_REWARDS);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadRewards();
+  }, []);
+  
   // Handle reward press
   const handleRewardPress = (reward, isUnlocked) => {
     if (!isPremium && reward.isPremiumOnly) {
@@ -150,16 +188,25 @@ const Rewards: React.FC<RewardsProps> = ({
   };
 
   // Filter rewards to show
-  const availableRewards = REWARDS.filter(reward =>
+  const availableRewards = rewards.filter(reward =>
     isPremium || !reward.isPremiumOnly || reward.levelRequired <= userLevel
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Loading rewards...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.title}>Rewards</Text>
         
-        {/* Improved level display */}
+        {/* Improved level and XP display */}
         <View style={styles.levelBadgeContainer}>
           <View style={styles.levelBadgeInner}>
             <Ionicons name="trophy" size={22} color="#4CAF50" />
@@ -168,6 +215,13 @@ const Rewards: React.FC<RewardsProps> = ({
               <Text style={styles.levelLabel}>LEVEL</Text>
             </View>
           </View>
+          
+          {userProgress && (
+            <View style={styles.xpBadge}>
+              <Ionicons name="flash" size={16} color="#FFD700" />
+              <Text style={styles.xpText}>{userProgress.totalXP} XP</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -393,6 +447,35 @@ const styles = StyleSheet.create({
   comingSoonText: {
     fontSize: 14,
     color: '#666',
+  },
+  xpBadge: {
+    backgroundColor: '#FFF9C4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFD600',
+  },
+  xpText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FF8F00',
+    marginLeft: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginTop: 16,
   },
 });
 

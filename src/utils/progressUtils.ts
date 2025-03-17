@@ -6,35 +6,49 @@ import { ProgressEntry } from '../types';
 export const calculateStreak = (data: ProgressEntry[]) => {
   if (data.length === 0) return 0;
   
-  // Get all dates and sort them in descending order (newest first)
-  const sortedDates = data
-    .map(entry => new Date(entry.date).setHours(0, 0, 0, 0))
-    .sort((a, b) => b - a);
+  // Get all dates and convert to date strings (YYYY-MM-DD format) to avoid time issues
+  const dateStrings = data.map(entry => {
+    const date = new Date(entry.date);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  });
   
-  // Get unique dates
-  const uniqueDates = [...new Set(sortedDates)];
+  // Get unique dates and sort them in descending order (newest first)
+  const uniqueDateStrings = [...new Set(dateStrings)].sort().reverse();
   
-  const today = new Date().setHours(0, 0, 0, 0);
+  console.log(`Calculating streak from ${uniqueDateStrings.length} unique dates:`, uniqueDateStrings);
   
-  // Check if they've done a routine today
-  const hasWorkoutToday = uniqueDates[0] === today;
+  if (uniqueDateStrings.length === 0) return 0;
   
-  let streak = hasWorkoutToday ? 1 : 0;
-  if (streak === 0) return 0; // No streak if didn't work out today
-
-  // Count consecutive days
-  let prevDate: number = uniqueDates[0] as number;
-  for (let i = 1; i < uniqueDates.length; i++) {
-    // Both prevDate and uniqueDates[i] are already numbers (milliseconds since epoch)
-    const diff = (prevDate - (uniqueDates[i] as number)) / (1000 * 60 * 60 * 24);
-    if (diff === 1) {
+  // Start counting from the most recent date
+  let streak = 1;
+  
+  // Convert date strings to Date objects for easier comparison
+  const uniqueDates = uniqueDateStrings.map(ds => {
+    const [year, month, day] = ds.split('-').map(Number);
+    return new Date(year, month - 1, day); // month is 0-indexed in JS Date
+  });
+  
+  // Loop through the dates to check for consecutive days
+  for (let i = 0; i < uniqueDates.length - 1; i++) {
+    const currentDate = uniqueDates[i];
+    const nextDate = uniqueDates[i + 1];
+    
+    // Calculate the difference in days
+    const diffTime = currentDate.getTime() - nextDate.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    
+    console.log(`Comparing ${currentDate.toISOString().split('T')[0]} with ${nextDate.toISOString().split('T')[0]}, diff: ${diffDays}`);
+    
+    // If the difference is exactly 1 day, it's consecutive
+    if (Math.abs(diffDays - 1) < 0.1) { // Using a small epsilon to account for potential floating point issues
       streak++;
-      prevDate = uniqueDates[i] as number;
     } else {
+      // Break the streak if days are not consecutive
       break;
     }
   }
   
+  console.log(`Final streak calculation: ${streak} days`);
   return streak;
 };
 
