@@ -146,21 +146,18 @@ export const getGamificationSummary = async (): Promise<{
   const currentLevel = userProgress.level || 1;
   let xpForNextLevel = 0;
   
+  // Import LEVELS from xpManager
+  const { LEVELS } = require('./xpManager');
+  
   // Calculate XP required for next level
-  if (currentLevel < 2) {
-    xpForNextLevel = 100 - userProgress.totalXP;
-  } else if (currentLevel < 3) {
-    xpForNextLevel = 250 - userProgress.totalXP;
-  } else if (currentLevel < 4) {
-    xpForNextLevel = 450 - userProgress.totalXP;
-  } else if (currentLevel < 5) {
-    xpForNextLevel = 700 - userProgress.totalXP;
-  } else if (currentLevel < 6) {
-    xpForNextLevel = 1000 - userProgress.totalXP;
-  } else if (currentLevel < 7) {
-    xpForNextLevel = 1350 - userProgress.totalXP;
+  if (currentLevel < LEVELS.length) {
+    // Use the next level's XP threshold from the LEVELS array
+    xpForNextLevel = LEVELS[currentLevel].xpRequired - userProgress.totalXP;
   } else {
-    xpForNextLevel = (1000 + 350 * (currentLevel - 5)) - userProgress.totalXP;
+    // For levels beyond defined LEVELS, use a formula based on the last defined level
+    const lastDefinedLevel = LEVELS[LEVELS.length - 1];
+    const nextLevelXP = lastDefinedLevel.xpRequired + 1000; // Add 1000 XP for each level beyond defined
+    xpForNextLevel = nextLevelXP - userProgress.totalXP;
   }
   
   // Get achievements
@@ -291,14 +288,17 @@ export const getUserLevelInfo = async (): Promise<{
   const currentLevel = userProgress.level || 1;
   const totalXP = userProgress.totalXP || 0;
   
-  // Calculate level thresholds
-  const levelThresholds = [0, 250, 500, 750, 1200, 1800, 2500, 3200, 4000, 5000];
+  // Import LEVELS from xpManager
+  const { LEVELS } = require('../progress/xpManager');
+  
+  // Function to get XP required for a specific level
   const xpForLevel = (level: number): number => {
-    if (level <= 10) {
-      return levelThresholds[level - 1];
+    if (level <= LEVELS.length) {
+      return LEVELS[level - 1].xpRequired;
     }
-    // Level 11+ formula
-    return 2400 + 350 * (level - 10);
+    // If level is beyond defined levels, use a formula (optional)
+    return LEVELS[LEVELS.length - 1].xpRequired + 
+           (level - LEVELS.length) * 1000; // Add 1000 XP per level beyond max defined
   };
   
   const xpForNextLevel = xpForLevel(currentLevel + 1);

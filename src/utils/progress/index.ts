@@ -66,7 +66,22 @@ export const xp = {
   },
   getLevelData: (level: number) => {
     console.warn('Deprecated: Use useGamification().gamificationSummary instead');
-    return { level, title: `Level ${level}`, xpRequired: 100 };
+    // Import LEVELS from xpManager
+    const { LEVELS } = require('./xpManager');
+    // Find the appropriate level data or use a default
+    if (level <= LEVELS.length) {
+      return { 
+        level, 
+        title: LEVELS[level-1].title || `Level ${level}`,
+        xpRequired: LEVELS[level-1].xpRequired 
+      };
+    }
+    // For levels beyond the defined array
+    return { 
+      level, 
+      title: `Level ${level}`,
+      xpRequired: LEVELS[LEVELS.length-1].xpRequired + 1000 * (level - LEVELS.length)
+    };
   }
 };
 

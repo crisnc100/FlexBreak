@@ -12,6 +12,7 @@ import { AppNavigationProp } from '../../types';
 import { BodyArea, Duration, RoutineParams } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
 import { saveFavoriteRoutine } from '../../services/storageService';
+import XpNotificationManager from '../XpNotificationManager';
 
 export interface CompletedRoutineProps {
   area: BodyArea;
@@ -121,115 +122,122 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   };
   
   return (
-    <TouchableOpacity 
-      style={styles.completedContainer} 
-      activeOpacity={1}
-      onPress={onShowDashboard}
-    >
-      <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
-      <Text style={styles.completedTitle}>Routine Complete!</Text>
-      <Text style={styles.completedSubtitle}>Great job on your stretching routine</Text>
+    <View style={styles.container}>
+      <XpNotificationManager />
       
-      {/* XP Earned display right after subtitle */}
-      <View style={styles.xpContainer}>
-        <Ionicons name="star" size={24} color="#FF9800" />
-        <Text style={styles.xpText}>
-          <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
-        </Text>
-      </View>
-      
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Ionicons name="time-outline" size={24} color="#666" />
-          <Text style={styles.statValue}>{duration} mins</Text>
-          <Text style={styles.statLabel}>Duration</Text>
+      <TouchableOpacity 
+        style={styles.completedContainer} 
+        activeOpacity={1}
+        onPress={onShowDashboard}
+      >
+        <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+        <Text style={styles.completedTitle}>Routine Complete!</Text>
+        <Text style={styles.completedSubtitle}>Great job on your stretching routine</Text>
+        
+        {/* XP Earned display right after subtitle */}
+        <View style={styles.xpContainer}>
+          <Ionicons name="star" size={24} color="#FF9800" />
+          <Text style={styles.xpText}>
+            <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
+          </Text>
         </View>
         
-        <View style={styles.statItem}>
-          <Ionicons name="fitness-outline" size={24} color="#666" />
-          <Text style={styles.statValue}>{routine.length}</Text>
-          <Text style={styles.statLabel}>Stretches</Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Ionicons name="time-outline" size={24} color="#666" />
+            <Text style={styles.statValue}>{duration} mins</Text>
+            <Text style={styles.statLabel}>Duration</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Ionicons name="fitness-outline" size={24} color="#666" />
+            <Text style={styles.statValue}>{routine.length}</Text>
+            <Text style={styles.statLabel}>Stretches</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Ionicons name="body-outline" size={24} color="#666" />
+            <Text style={styles.statValue}>{area}</Text>
+            <Text style={styles.statLabel}>Focus Area</Text>
+          </View>
         </View>
         
-        <View style={styles.statItem}>
-          <Ionicons name="body-outline" size={24} color="#666" />
-          <Text style={styles.statValue}>{area}</Text>
-          <Text style={styles.statLabel}>Focus Area</Text>
+        <Text style={styles.nextStepsText}>What would you like to do next?</Text>
+        
+        <View style={styles.buttonContainer}>
+          {isPremium ? (
+            <>
+              <TouchableOpacity 
+                style={[styles.button, styles.favoriteButton]} 
+                onPress={saveToFavorites}
+              >
+                <Ionicons name="star" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>Save</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, styles.shareButton]} 
+                onPress={handleShare}
+              >
+                <Ionicons name="share-social-outline" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>Share</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, styles.smartPickButton]} 
+                onPress={startSmartPick}
+              >
+                <Ionicons name="bulb" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>Smart Pick</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, styles.newRoutineButton]} 
+                onPress={handleNewRoutine}
+              >
+                <Ionicons name="home-outline" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>New Routine</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity 
+                style={[styles.button, styles.premiumButton]} 
+                onPress={onOpenSubscription}
+              >
+                <Ionicons name="lock-closed" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>Save</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, styles.shareButton]} 
+                onPress={handleShare}
+              >
+                <Ionicons name="share-social-outline" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>Share</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, styles.newRoutineButton]} 
+                onPress={handleNewRoutine}
+              >
+                <Ionicons name="home-outline" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>New Routine</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-      </View>
-      
-      <Text style={styles.nextStepsText}>What would you like to do next?</Text>
-      
-      <View style={styles.buttonContainer}>
-        {isPremium ? (
-          <>
-            <TouchableOpacity 
-              style={[styles.button, styles.favoriteButton]} 
-              onPress={saveToFavorites}
-            >
-              <Ionicons name="star" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.shareButton]} 
-              onPress={handleShare}
-            >
-              <Ionicons name="share-social-outline" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>Share</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.smartPickButton]} 
-              onPress={startSmartPick}
-            >
-              <Ionicons name="bulb" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>Smart Pick</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.newRoutineButton]} 
-              onPress={handleNewRoutine}
-            >
-              <Ionicons name="home-outline" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>New Routine</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TouchableOpacity 
-              style={[styles.button, styles.premiumButton]} 
-              onPress={onOpenSubscription}
-            >
-              <Ionicons name="lock-closed" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.shareButton]} 
-              onPress={handleShare}
-            >
-              <Ionicons name="share-social-outline" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>Share</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.newRoutineButton]} 
-              onPress={handleNewRoutine}
-            >
-              <Ionicons name="home-outline" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>New Routine</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-      
-      <Text style={styles.hintText}>Tap anywhere to view your routine history</Text>
-    </TouchableOpacity>
+        
+        <Text style={styles.hintText}>Tap anywhere to view your routine history</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   completedContainer: {
     flex: 1,
     alignItems: 'center',

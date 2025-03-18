@@ -46,9 +46,24 @@ export const isFirstRoutineOfDay = (
     return dateA.getTime() - dateB.getTime();
   });
   
-  // If this routine is the first one of the day
-  return routinesOnSameDay.length > 0 && 
-         routinesOnSameDay[0].date === routine.date;
+  // If there are routines on this day, check if this is the first one
+  if (routinesOnSameDay.length === 0) {
+    return false; // Should not happen, but just in case
+  }
+  
+  // Get the earliest routine of the day
+  const earliestRoutine = routinesOnSameDay[0];
+  
+  // Log for debugging
+  console.log(`Checking if routine is first of day: 
+    - This routine time: ${new Date(routine.date).toISOString()}
+    - Earliest routine time: ${new Date(earliestRoutine.date).toISOString()}
+    - Is first: ${earliestRoutine.date === routine.date}
+    - Total routines today: ${routinesOnSameDay.length}
+  `);
+  
+  // This routine is the first one of the day if its date matches the earliest one
+  return earliestRoutine.date === routine.date;
 };
 
 /**
@@ -62,32 +77,49 @@ export const calculateRoutineXP = (
   routine: ProgressEntry,
   isFirstEver: boolean = false
 ): { xp: number; breakdown: { source: string; amount: number; description: string }[] } => {
-  // Parse duration to number
-  const duration = typeof routine.duration === 'string'
-    ? parseInt(routine.duration, 10)
-    : (typeof routine.duration === 'number' ? routine.duration : 0);
+  // Handle various duration formats
+  let durationMinutes: number;
+  
+  if (typeof routine.duration === 'string') {
+    // Duration is a string like "5", "10", "15" (in minutes)
+    durationMinutes = parseInt(routine.duration, 10);
+  } else if (typeof routine.duration === 'number') {
+    // Duration is already a number, but could be in seconds
+    // If it's a large number (> 100), assume it's in seconds and convert to minutes
+    if (routine.duration > 100) {
+      durationMinutes = Math.round(routine.duration / 60);
+    } else {
+      // Otherwise assume it's already in minutes
+      durationMinutes = routine.duration;
+    }
+  } else {
+    // Default to 0 if no valid duration
+    durationMinutes = 0;
+  }
   
   let xp = 0;
   const breakdown: { source: string; amount: number; description: string }[] = [];
   
   // Base XP based on duration (5/10/15 min brackets)
   let baseXP = 0;
-  if (duration <= 300) { // 5 min (300 seconds)
-    baseXP = 30;
-  } else if (duration <= 600) { // 10 min (600 seconds)
-    baseXP = 60;
-  } else { // 15+ min
-    baseXP = 90;
+  
+  // Award XP based on minutes
+  if (durationMinutes <= 5) {
+    baseXP = 30; // 5 min routine
+  } else if (durationMinutes <= 10) {
+    baseXP = 60; // 10 min routine
+  } else {
+    baseXP = 90; // 15+ min routine
   }
   
   xp += baseXP;
   breakdown.push({
     source: 'routine',
     amount: baseXP,
-    description: `${Math.round(duration / 60)}-Minute Routine`
+    description: `${durationMinutes}-Minute Routine`
   });
   
-  // Welcome bonus for first ever routine
+  // Welcome bonus for first ever routine (only applied once ever)
   if (isFirstEver) {
     const welcomeBonus = 50;
     xp += welcomeBonus;
@@ -97,6 +129,8 @@ export const calculateRoutineXP = (
       description: 'First Ever Routine Completed'
     });
   }
+  
+  console.log(`Calculated XP for ${durationMinutes}-minute routine: ${xp} XP (isFirstEver: ${isFirstEver})`);
   
   return { xp, breakdown };
 };
@@ -127,19 +161,18 @@ export const addXP = async (
   
   // Determine level based on XP thresholds
   let newLevel = 1;
-  let xpThreshold = 0;
   
+  // Use the LEVELS array to determine the user's level based on XP
   const calculateLevel = (xp: number): number => {
-    if (xp < 100) return 1;
-    if (xp < 250) return 2;
-    if (xp < 450) return 3;
-    if (xp < 700) return 4;
-    if (xp < 1000) return 5;
-    if (xp < 1350) return 6;
-    if (xp < 1700) return 7;
-    if (xp < 2050) return 8;
-    if (xp < 2400) return 9;
-    return 10;
+    let level = 1;
+    for (let i = 0; i < LEVELS.length; i++) {
+      if (xp >= LEVELS[i].xpRequired) {
+        level = i + 1; // Level is 1-indexed
+      } else {
+        break;
+      }
+    }
+    return level;
   };
   
   newLevel = calculateLevel(newTotal);
@@ -219,11 +252,15 @@ export const processRoutineForXP = async (
     const userProgress = await storageService.getUserProgress();
     const allRoutines = await storageService.getAllRoutines();
     
+    console.log(`Processing routine for XP: ${routine.area} - ${routine.duration} minutes`);
+    
     // Check if this is the first ever routine
     const isFirstEver = allRoutines.length === 1 && allRoutines[0].date === routine.date;
     
     // Check if this is the first routine of its day
     const isFirstOfDay = isFirstRoutineOfDay(routine, allRoutines);
+    
+    console.log(`Routine status - First ever: ${isFirstEver}, First of day: ${isFirstOfDay}`);
     
     // Only award XP if this is the first routine of the day
     let xpEarned = 0;

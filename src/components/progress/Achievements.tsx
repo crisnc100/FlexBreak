@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshCon
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification } from '../../hooks/useGamification';
+import { LEVELS } from '../../utils/progress/xpManager';
 
 // Simple date formatter function to replace date-fns
 const formatTimeAgo = (dateString: string): string => {
@@ -256,22 +257,6 @@ const ACHIEVEMENTS = [
     type: 'routine_count'
   }
 ];
-
-// Define level thresholds to match xpManager.ts
-const LEVELS = [
-  { level: 1, xpRequired: 0, title: 'Beginner' },
-  { level: 2, xpRequired: 250, title: 'Rookie' },
-  { level: 3, xpRequired: 500, title: 'Amateur' },
-  { level: 4, xpRequired: 750, title: 'Enthusiast' },
-  { level: 5, xpRequired: 1200, title: 'Committed' },
-  { level: 6, xpRequired: 1800, title: 'Dedicated' },
-  { level: 7, xpRequired: 2500, title: 'Pro' },
-  { level: 8, xpRequired: 3200, title: 'Expert' },
-  { level: 9, xpRequired: 4000, title: 'Master' },
-  { level: 10, xpRequired: 5000, title: 'Guru' }
-];
-
-// For levels 7+, xp = 1000 + 350 * (level - 6)
 
 // Update the routine XP calculation to match xpManager.ts
 export const calculateRoutineXP = (

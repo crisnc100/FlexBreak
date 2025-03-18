@@ -12,6 +12,7 @@ import { UserProgress } from '../utils/progress/types';
 import ActiveRoutine from '../components/routine/ActiveRoutine';
 import CompletedRoutine from '../components/routine/CompletedRoutine';
 import RoutineDashboard from '../components/routine/RoutineDashboard';
+import XpNotificationManager from '../components/XpNotificationManager';
 
 // Import our custom hooks
 import { useRoutineParams } from '../hooks/useRoutineParams';
@@ -283,13 +284,14 @@ export default function RoutineScreen() {
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
-      );
-    }
-    
+    );
+  }
+  
   // Render dashboard
   if (screenState === 'DASHBOARD') {
-      return (
+    return (
       <SafeAreaView style={styles.container}>
+        <XpNotificationManager />
         <RoutineDashboard 
           recentRoutines={recentRoutines}
           isPremium={isPremium}
@@ -351,32 +353,38 @@ export default function RoutineScreen() {
     );
   }
   
-  // Render active routine (default case)
-  return (
-    <SafeAreaView style={styles.container}>
-      <ActiveRoutine 
-        area={area as BodyArea}
-        duration={duration as Duration}
-        level={level as StretchLevel}
-        onComplete={handleRoutineComplete}
-        onNavigateHome={handleCreateNewRoutine}
-      />
-      
-      <SubscriptionModal 
-        visible={subscriptionModalVisible}
-        onClose={() => setSubscriptionModalVisible(false)}
-      />
-      
-      <SmartPickModal
-        visible={smartPickModalVisible}
-        onClose={() => setSmartPickModalVisible(false)}
-        onUpgrade={() => {
-          setSmartPickModalVisible(false);
-          setSubscriptionModalVisible(true);
-        }}
-      />
-    </SafeAreaView>
-  );
+  // Render active routine
+  if (screenState === 'ACTIVE') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <XpNotificationManager />
+        <ActiveRoutine 
+          area={area as BodyArea}
+          duration={duration as Duration}
+          level={level as StretchLevel}
+          onComplete={handleRoutineComplete}
+          onNavigateHome={handleCreateNewRoutine}
+        />
+        
+        <SubscriptionModal 
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
+        
+        <SmartPickModal
+          visible={smartPickModalVisible}
+          onClose={() => setSmartPickModalVisible(false)}
+          onUpgrade={() => {
+            setSmartPickModalVisible(false);
+            setSubscriptionModalVisible(true);
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+  
+  // Default return (should never happen, but needed for typechecking)
+  return null;
 }
 
 const styles = StyleSheet.create({

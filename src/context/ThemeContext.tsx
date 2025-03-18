@@ -15,6 +15,7 @@ interface ThemeColors {
   accentLight: string;
   border: string;
   success: string;
+  successLight: string;
   error: string;
 }
 
@@ -29,6 +30,7 @@ const lightTheme: ThemeColors = {
   accentLight: '#81C784',
   border: '#DDDDDD',
   success: '#4CAF50',
+  successLight: '#81C784',
   error: '#F44336'
 };
 
@@ -43,6 +45,7 @@ const darkTheme: ThemeColors = {
   accentLight: '#4CAF50',
   border: '#333333',
   success: '#66BB6A',
+  successLight: '#81C784',
   error: '#E57373'
 };
 

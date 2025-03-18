@@ -44,6 +44,7 @@ import { ChallengeList } from '../components/progress/ChallengeList';
 import { PremiumLockSimple } from '../components/progress/PremiumLockSimple';
 import { RefreshableScrollView } from '../components/common';
 import XpNotificationManager from '../components/XpNotificationManager';
+import { useChallengeSystem } from '../hooks/useChallengeSystem';
 
 // Day names for labels
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -95,9 +96,8 @@ export default function ProgressScreen({ navigation }) {
     claimChallengeReward
   } = useProgressSystem();
   
-  // Legacy state for backward compatibility
-  const [userProgress, setUserProgress] = useState(INITIAL_PROGRESS_STATE);
-  const [isProgressLoading, setIsProgressLoading] = useState(true);
+  // Use the challenge system hook to refresh challenge data
+  const { refreshChallenges } = useChallengeSystem();
   
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('stats');
@@ -373,6 +373,14 @@ export default function ProgressScreen({ navigation }) {
     console.log(`Tab changed to: ${tab}`);
   };
 
+  // Add or update useEffect to refresh data when tab changes
+  useEffect(() => {
+    if (activeTab === 'challenges' && !isLoading) {
+      console.log('Challenges tab selected, refreshing challenge data');
+      refreshChallenges();
+    }
+  }, [activeTab, isLoading, refreshChallenges]);
+  
   // Premium locked screen
   if (!isPremium) {
     console.log('Showing PremiumLock with XP:', progressSystemData?.totalXP || 0, 'and level:', progressSystemData?.level || 1);

@@ -88,6 +88,41 @@ export const claimChallenge = async (
     const challenge = challenges[challengeId];
     console.log(`Claiming challenge "${challenge.title}" (${challengeId}): progress=${challenge.progress}/${challenge.requirement}, completed=${challenge.completed}, claimed=${challenge.claimed}`);
     
+    // Get today's date for daily challenge checks
+    const today = new Date().toISOString().split('T')[0];
+    
+    // For daily challenges, check if any challenge of this category was already claimed today
+    if (challenge.category === 'daily') {
+      // Check if ANY daily challenge was already claimed today
+      const dailyChallengesClaimedToday = userProgress.xpHistory?.filter(entry => 
+        entry.source === 'challenge' && 
+        entry.timestamp.includes(today) &&
+        entry.details?.includes('daily_') // Match any daily challenge
+      ).length || 0;
+      
+      if (dailyChallengesClaimedToday > 0) {
+        console.log(`A daily challenge was already claimed today`);
+        return {
+          success: false,
+          message: 'You can only claim one daily challenge per day',
+          progress: userProgress,
+          xpEarned: 0
+        };
+      }
+      
+      // Check if there's at least one routine completed today
+      const routinesCompletedToday = await getRoutinesCompletedToday();
+      if (routinesCompletedToday === 0) {
+        console.log(`No routines completed today, cannot claim daily challenge`);
+        return {
+          success: false,
+          message: 'Complete a stretching routine today to claim this challenge',
+          progress: userProgress,
+          xpEarned: 0
+        };
+      }
+    }
+    
     // Check if challenge is claimable
     if (!challenge.completed) {
       // ENHANCED LOGIC: Add more permissive conditions for claiming
@@ -97,11 +132,7 @@ export const claimChallenge = async (
           (challenge.type === 'routine_count' || challenge.type.includes('routine'))) {
         
         // Get routines completed today
-        const today = new Date().toISOString().split('T')[0];
-        const routinesCompletedToday = userProgress.xpHistory?.filter(entry => 
-          entry.source === 'routine' && 
-          entry.timestamp.includes(today)
-        ).length || 0;
+        const routinesCompletedToday = await getRoutinesCompletedToday();
         
         console.log(`Daily routine challenge: routines completed today = ${routinesCompletedToday}`);
         
@@ -177,7 +208,7 @@ export const claimChallenge = async (
     const xpResult = await xpManager.addXP(
       challenge.xp,
       'challenge',
-      `Claimed: ${challenge.title}`,
+      `Claimed: ${challenge.title} (${challengeId})`, // Include challenge ID in details for tracking
       updatedProgress
     );
     
@@ -1504,39 +1535,76 @@ export const forceUpdateDailyChallengesWithRoutines = async (): Promise<UserProg
   // Get current user progress
   const userProgress = await storageService.getUserProgress();
   
+  // Check if there are no daily challenges - generate them if needed
+  const dailyChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.category === 'daily' &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  if (dailyChallenges.length === 0) {
+    console.log('No active daily challenges found, generating new ones');
+    // Generate new daily challenges
+    const updatedProgress = await generateChallenges('daily');
+    // Continue with the updated progress
+    return updatedProgress;
+  }
+  
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0];
   
-  // Check if any routines were completed today
-  const routinesCompletedToday = userProgress.xpHistory?.filter(entry => 
-    entry.source === 'routine' && 
-    entry.timestamp.includes(today)
-  ).length || 0;
-  
+  // Get actual completed routines count for today
+  const routinesCompletedToday = await getRoutinesCompletedToday();
   console.log(`Routines completed today: ${routinesCompletedToday}`);
   
   // Find all daily routine challenges
   const dailyRoutineChallenges = Object.values(userProgress.challenges).filter(challenge => 
     challenge.category === 'daily' && 
     challenge.type === 'routine_count' &&
-    !challenge.claimed
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
   );
   
   console.log(`Found ${dailyRoutineChallenges.length} daily routine challenges`);
   
   let updatedAny = false;
   
-  // If any routines were completed today, force-mark all daily routine challenges as completed
+  // Check for challenges already claimed today (to prevent duplicates)
+  const challengesClaimedToday = userProgress.xpHistory?.filter(entry => 
+    entry.source === 'challenge' && 
+    entry.timestamp.includes(today)
+  ) || [];
+  
+  const claimedChallengeIds = challengesClaimedToday.map(entry => {
+    // Extract challenge ID from details like "Claimed: Daily Stretch (daily_any_123456)"
+    const match = entry.details?.match(/\((.*?)\)/);
+    return match ? match[1] : null;
+  }).filter(Boolean);
+  
+  console.log(`Challenges already claimed today: ${claimedChallengeIds.length}`);
+  
+  // If any routines were completed today, ensure daily challenges reflect that progress
   if (routinesCompletedToday > 0) {
     console.log(`User has completed ${routinesCompletedToday} routines today, updating daily challenges`);
     
+    // For daily challenges, mark them as completed if at least one routine is done today
+    // This is linked to the first routine of the day
     dailyRoutineChallenges.forEach(challenge => {
       console.log(`Checking challenge: ${challenge.title} (${challenge.id})`);
       
+      // Skip if already claimed today (prevent duplicate claims)
+      if (claimedChallengeIds.includes(challenge.id)) {
+        console.log(`Challenge ${challenge.id} already claimed today, skipping`);
+        return;
+      }
+      
       if (!challenge.completed) {
         console.log(`Marking challenge ${challenge.id} as completed`);
-        userProgress.challenges[challenge.id].progress = Math.max(challenge.progress, 1);
-        userProgress.challenges[challenge.id].completed = true;
+        userProgress.challenges[challenge.id].progress = Math.min(routinesCompletedToday, challenge.requirement);
+        
+        // Only mark as completed if the progress meets the requirement
+        if (userProgress.challenges[challenge.id].progress >= challenge.requirement) {
+          userProgress.challenges[challenge.id].completed = true;
+        }
         updatedAny = true;
       } else {
         console.log(`Challenge ${challenge.id} already marked as completed`);
@@ -1547,32 +1615,77 @@ export const forceUpdateDailyChallengesWithRoutines = async (): Promise<UserProg
     Object.values(userProgress.challenges).forEach(challenge => {
       if (challenge.category === 'daily' && 
           !challenge.claimed && 
+          challenge.progress > 0 &&
+          challenge.progress >= challenge.requirement &&
           !challenge.completed &&
-          challenge.progress > 0) {
-        console.log(`Marking partially-completed daily challenge ${challenge.title} as completed`);
+          !claimedChallengeIds.includes(challenge.id)) {
+        console.log(`Marking completed daily challenge ${challenge.title} as completed`);
         userProgress.challenges[challenge.id].completed = true;
         updatedAny = true;
       }
     });
     
-    // Also update weekly routine count challenges
+    // Get accurate counts of completed routines for this week and month
+    const completedRoutinesThisWeek = await getRoutinesCompletedThisWeek();
+    const completedRoutinesThisMonth = await getRoutinesCompletedThisMonth();
+    
+    console.log(`Completed routines this week: ${completedRoutinesThisWeek}`);
+    console.log(`Completed routines this month: ${completedRoutinesThisMonth}`);
+    
+    // Update weekly routine count challenges with the ACTUAL count
     const weeklyRoutineChallenges = Object.values(userProgress.challenges).filter(challenge => 
       challenge.category === 'weekly' && 
       challenge.type === 'routine_count' &&
       !challenge.claimed &&
-      !challenge.completed
+      new Date(challenge.endDate) > new Date() // Not expired
     );
     
     weeklyRoutineChallenges.forEach(challenge => {
       console.log(`Updating weekly challenge ${challenge.title} progress`);
-      userProgress.challenges[challenge.id].progress = challenge.progress + 1;
       
-      if (challenge.progress + 1 >= challenge.requirement) {
-        console.log(`Weekly challenge ${challenge.title} now completed`);
-        userProgress.challenges[challenge.id].completed = true;
+      // For routine_count challenges, update to actual count
+      if (challenge.type === 'routine_count') {
+        const newProgress = Math.min(completedRoutinesThisWeek, challenge.requirement);
+        if (newProgress !== challenge.progress) {
+          userProgress.challenges[challenge.id].progress = newProgress;
+          console.log(`Updated weekly challenge progress to ${newProgress}/${challenge.requirement}`);
+          updatedAny = true;
+        }
+        
+        if (newProgress >= challenge.requirement && !challenge.completed) {
+          console.log(`Weekly challenge ${challenge.title} now completed`);
+          userProgress.challenges[challenge.id].completed = true;
+          updatedAny = true;
+        }
       }
+    });
+    
+    // Update monthly challenges with the ACTUAL count
+    const monthlyChallenges = Object.values(userProgress.challenges).filter(challenge => 
+      challenge.category === 'monthly' && 
+      challenge.type === 'routine_count' &&
+      !challenge.claimed &&
+      new Date(challenge.endDate) > new Date() // Not expired
+    );
+    
+    monthlyChallenges.forEach(challenge => {
+      console.log(`Updating monthly challenge ${challenge.title} progress`);
       
-      updatedAny = true;
+      // For routine_count challenges, update to actual count
+      if (challenge.type === 'routine_count') {
+        const newProgress = Math.min(completedRoutinesThisMonth, challenge.requirement);
+        if (newProgress !== challenge.progress) {
+          userProgress.challenges[challenge.id].progress = newProgress;
+          console.log(`Updated monthly challenge progress to ${newProgress}/${challenge.requirement}`);
+          updatedAny = true;
+        }
+        
+        if (newProgress >= challenge.requirement && !challenge.completed) {
+          console.log(`Monthly challenge ${challenge.title} now completed`);
+          userProgress.challenges[challenge.id].completed = true;
+          updatedAny = true;
+        }
+      }
     });
   }
   
@@ -1585,4 +1698,54 @@ export const forceUpdateDailyChallengesWithRoutines = async (): Promise<UserProg
   }
   
   return userProgress;
-}; 
+};
+
+/**
+ * Get the number of routines completed today
+ * @returns Number of routines completed today
+ */
+async function getRoutinesCompletedToday(): Promise<number> {
+  const routines = await storageService.getAllRoutines();
+  const today = new Date().toISOString().split('T')[0];
+  
+  return routines.filter(routine => {
+    const routineDate = new Date(routine.date).toISOString().split('T')[0];
+    return routineDate === today;
+  }).length;
+}
+
+/**
+ * Get the number of routines completed this week
+ * @returns Number of routines completed this week
+ */
+async function getRoutinesCompletedThisWeek(): Promise<number> {
+  const routines = await storageService.getAllRoutines();
+  const now = new Date();
+  
+  // Create date for the beginning of the week (Sunday)
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  return routines.filter(routine => {
+    const routineDate = new Date(routine.date);
+    return routineDate >= startOfWeek;
+  }).length;
+}
+
+/**
+ * Get the number of routines completed this month
+ * @returns Number of routines completed this month
+ */
+async function getRoutinesCompletedThisMonth(): Promise<number> {
+  const routines = await storageService.getAllRoutines();
+  const now = new Date();
+  
+  // Create date for the beginning of the month
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  
+  return routines.filter(routine => {
+    const routineDate = new Date(routine.date);
+    return routineDate >= startOfMonth;
+  }).length;
+} 

@@ -6,35 +6,25 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification } from '../../hooks/useGamification';
-import * as challengeManager from '../../utils/progress/challengeManager';
 
 export const ChallengeList = () => {
-  const { activeChallenges, loading, claimChallenge, generateNewChallenges, refreshChallenges } = useChallengeSystem();
+  const { activeChallenges, loading, claimChallenge, refreshChallenges } = useChallengeSystem();
   const { theme } = useTheme();
   const { addXp } = useGamification();
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'special'>('daily');
-  const [refreshing, setRefreshing] = useState(false);
-
-  // Add useEffect to refresh challenges and check expirations when component mounts
+  
+  // Refresh challenges when component mounts to ensure accurate data
   useEffect(() => {
-    const initializeChallenges = async () => {
-      try {
-        console.log('Initializing challenges and forcing update of daily challenges');
-        
-        // CRITICAL FIX: Force update daily challenges based on any completed routines
-        // This ensures challenges can be claimed if routines have been completed
-        await challengeManager.forceUpdateDailyChallengesWithRoutines();
-        
-        // Then refresh the challenge display
-        await refreshChallenges();
-      } catch (error) {
-        console.error('Error initializing challenges:', error);
-      }
-    };
-
-    initializeChallenges();
+    console.log('ChallengeList component mounted, refreshing data...');
+    refreshChallenges();
   }, [refreshChallenges]);
+  
+  // Refresh challenges when active tab changes to ensure data is current
+  useEffect(() => {
+    console.log(`Tab changed to ${activeTab}, updating challenges`);
+    refreshChallenges();
+  }, [activeTab, refreshChallenges]);
 
   // Handle claiming a challenge
   const handleClaim = async (challenge: Challenge) => {
@@ -44,8 +34,9 @@ export const ChallengeList = () => {
     try {
       const result = await claimChallenge(challenge.id);
       if (result.success) {
-        // Add XP for the completed challenge
-        addXp(result.xpEarned, 'challenge', `Completed: ${challenge.title}`);
+        // XP is already awarded by the challengeManager.claimChallenge function
+        // No need to add XP again here
+        console.log(`Successfully claimed ${challenge.title} challenge for ${result.xpEarned} XP`);
       } else {
         console.error('Failed to claim challenge:', result.message);
       }
@@ -53,19 +44,6 @@ export const ChallengeList = () => {
       console.error('Error claiming challenge:', error);
     } finally {
       setClaimingId(null);
-    }
-  };
-
-  // Handle refreshing challenges
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await generateNewChallenges();
-      await refreshChallenges();
-    } catch (error) {
-      console.error('Error refreshing challenges:', error);
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -115,15 +93,22 @@ export const ChallengeList = () => {
     const isClaimInProgress = claimingId === challenge.id;
     const isExpiring = challenge.expiryWarning;
     const timeRemaining = formatTimeRemaining(challenge.endDate);
+    
+    // Determine if this is an "in progress" challenge
+    const isInProgress = !isEffectivelyCompleted && !isClaimed && challenge.progress > 0;
+    
+    // Calculate percentage for display
+    const progressPercentage = Math.round(progress * 100);
 
     // For debugging
     console.log(`Rendering challenge ${challenge.id}: 
       - Title: ${challenge.title}
       - Type: ${challenge.type} (${challenge.category})
-      - Progress: ${challenge.progress}/${challenge.requirement}
+      - Progress: ${challenge.progress}/${challenge.requirement} (${progressPercentage}%)
       - Completed: ${isCompleted}
       - Eligible for completion: ${isEligibleForCompletion}
       - Effectively completed: ${isEffectivelyCompleted}
+      - In Progress: ${isInProgress}
       - Claimed: ${isClaimed}
       - Claimable: ${isClaimable}
     `);
@@ -139,6 +124,11 @@ export const ChallengeList = () => {
           isClaimable && { 
             borderLeftWidth: 4,
             borderLeftColor: theme.success 
+          },
+          // Style for in-progress challenges
+          isInProgress && {
+            borderLeftWidth: 4,
+            borderLeftColor: theme.accent
           }
         ]}
       >
@@ -173,7 +163,7 @@ export const ChallengeList = () => {
             ]}
           >
             <LinearGradient
-              colors={[theme.accent, theme.accentLight]}
+              colors={isEffectivelyCompleted ? [theme.success, theme.successLight] : [theme.accent, theme.accentLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[
@@ -182,8 +172,14 @@ export const ChallengeList = () => {
               ]}
             />
           </View>
-          <Text style={[styles.progressText, { color: theme.textSecondary }]}>
-            {challenge.progress}/{challenge.requirement}
+          <Text style={[
+            styles.progressText, 
+            { 
+              color: isEffectivelyCompleted ? theme.success : 
+                    (isInProgress ? theme.accent : theme.textSecondary) 
+            }
+          ]}>
+            {challenge.progress}/{challenge.requirement} ({progressPercentage}%)
           </Text>
         </View>
         
@@ -211,11 +207,20 @@ export const ChallengeList = () => {
           </View>
         )}
         
-        {!isEffectivelyCompleted && !isClaimed && challenge.progress > 0 && (
+        {isInProgress && (
           <View style={styles.inProgressContainer}>
             <MaterialCommunityIcons name="progress-clock" size={20} color={theme.accent} />
             <Text style={[styles.inProgressText, { color: theme.accent }]}>
-              {challenge.progress > 0 ? 'In Progress' : 'Not Started'}
+              In Progress ({progressPercentage}% Complete)
+            </Text>
+          </View>
+        )}
+        
+        {!isEffectivelyCompleted && !isClaimed && challenge.progress === 0 && (
+          <View style={styles.inProgressContainer}>
+            <MaterialCommunityIcons name="timer-outline" size={20} color={theme.textSecondary} />
+            <Text style={[styles.inProgressText, { color: theme.textSecondary }]}>
+              Not Started
             </Text>
           </View>
         )}
@@ -269,7 +274,7 @@ export const ChallengeList = () => {
     return activeChallenges[activeTab] || [];
   };
 
-  if (loading && !refreshing) {
+  if (loading) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={theme.accent} />
@@ -285,18 +290,6 @@ export const ChallengeList = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        <TouchableOpacity
-          style={[styles.refreshButton, { backgroundColor: theme.accent }]}
-          onPress={handleRefresh}
-          disabled={refreshing}
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.refreshButtonText}>Refresh Challenges</Text>
-          )}
-        </TouchableOpacity>
-        
         {getActiveChallengesForTab().length > 0 ? (
           getActiveChallengesForTab().map(challenge => renderChallengeCard(challenge))
         ) : (
@@ -309,17 +302,6 @@ export const ChallengeList = () => {
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
               No active {activeTab} challenges
             </Text>
-            <TouchableOpacity
-              style={[styles.refreshButton, { backgroundColor: theme.accent }]}
-              onPress={handleRefresh}
-              disabled={refreshing}
-            >
-              {refreshing ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.refreshButtonText}>Generate New Challenges</Text>
-              )}
-            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -457,18 +439,5 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     marginVertical: 16,
-  },
-  refreshButton: {
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  refreshButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
   },
 }); 
