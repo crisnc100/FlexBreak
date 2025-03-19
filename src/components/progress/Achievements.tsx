@@ -322,8 +322,8 @@ const AchievementCard = ({ achievement, onPress }) => (
     
     {achievement.isUnlocked ? (
       <>
-        <View style={styles.xpBadge}>
-          <Text style={styles.xpText}>+{achievement.xp} XP</Text>
+      <View style={styles.xpBadge}>
+        <Text style={styles.xpText}>+{achievement.xp} XP</Text>
         </View>
         {achievement.completedTimeAgo && (
           <Text style={styles.completionDate}>Earned {achievement.completedTimeAgo}</Text>
@@ -573,7 +573,7 @@ const Achievements: React.FC<AchievementsProps> = ({
       {/* Achievements section */}
       <View style={styles.achievementsSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Achievements</Text>
+        <Text style={styles.sectionTitle}>Achievements</Text>
           {/* Achievement stats summary */}
           <View style={styles.achievementStats}>
             <View style={styles.statItem}>
@@ -609,90 +609,90 @@ const Achievements: React.FC<AchievementsProps> = ({
             {achievementsByCategory['beginner']?.length > 0 && (
               <>
                 <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryTitle}>Beginner</Text>
+        <Text style={styles.categoryTitle}>Beginner</Text>
                   <Text style={styles.categoryCount}>
                     {achievementsByCategory['beginner'].filter(a => a.isUnlocked).length} / {achievementsByCategory['beginner'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.achievementsContainer}>
+        <View style={styles.achievementsContainer}>
                     {achievementsByCategory['beginner'].map(achievement => (
-                      <AchievementCard
-                        key={achievement.id}
-                        achievement={achievement}
-                        onPress={handleAchievementPress}
-                      />
+              <AchievementCard
+                key={achievement.id}
+                achievement={achievement}
+                onPress={handleAchievementPress}
+              />
                     ))}
-                  </View>
+        </View>
                 </ScrollView>
               </>
             )}
-            
+        
             {/* Intermediate achievements - only show if there are achievements in this category */}
             {achievementsByCategory['intermediate']?.length > 0 && (
               <>
                 <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryTitle}>Intermediate</Text>
+        <Text style={styles.categoryTitle}>Intermediate</Text>
                   <Text style={styles.categoryCount}>
                     {achievementsByCategory['intermediate'].filter(a => a.isUnlocked).length} / {achievementsByCategory['intermediate'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.achievementsContainer}>
+        <View style={styles.achievementsContainer}>
                     {achievementsByCategory['intermediate'].map(achievement => (
-                      <AchievementCard
-                        key={achievement.id}
-                        achievement={achievement}
-                        onPress={handleAchievementPress}
-                      />
+              <AchievementCard
+                key={achievement.id}
+                achievement={achievement}
+                onPress={handleAchievementPress}
+              />
                     ))}
-                  </View>
+        </View>
                 </ScrollView>
               </>
             )}
-            
+        
             {/* Advanced achievements - only show if there are achievements in this category */}
             {achievementsByCategory['advanced']?.length > 0 && (
               <>
                 <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryTitle}>Advanced</Text>
+        <Text style={styles.categoryTitle}>Advanced</Text>
                   <Text style={styles.categoryCount}>
                     {achievementsByCategory['advanced'].filter(a => a.isUnlocked).length} / {achievementsByCategory['advanced'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.achievementsContainer}>
+        <View style={styles.achievementsContainer}>
                     {achievementsByCategory['advanced'].map(achievement => (
-                      <AchievementCard
-                        key={achievement.id}
-                        achievement={achievement}
-                        onPress={handleAchievementPress}
-                      />
+              <AchievementCard
+                key={achievement.id}
+                achievement={achievement}
+                onPress={handleAchievementPress}
+              />
                     ))}
-                  </View>
+        </View>
                 </ScrollView>
               </>
             )}
-            
+        
             {/* Elite achievements - only show if there are achievements in this category */}
             {achievementsByCategory['elite']?.length > 0 && (
               <>
                 <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryTitle}>Elite</Text>
+        <Text style={styles.categoryTitle}>Elite</Text>
                   <Text style={styles.categoryCount}>
                     {achievementsByCategory['elite'].filter(a => a.isUnlocked).length} / {achievementsByCategory['elite'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.achievementsContainer}>
+        <View style={styles.achievementsContainer}>
                     {achievementsByCategory['elite'].map(achievement => (
-                      <AchievementCard
-                        key={achievement.id}
-                        achievement={achievement}
-                        onPress={handleAchievementPress}
-                      />
+              <AchievementCard
+                key={achievement.id}
+                achievement={achievement}
+                onPress={handleAchievementPress}
+              />
                     ))}
-                  </View>
+        </View>
                 </ScrollView>
               </>
             )}

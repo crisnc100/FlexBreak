@@ -60,6 +60,9 @@ export default function RoutineScreen() {
   // Add state for XP earned
   const [routineXpEarned, setRoutineXpEarned] = useState(0);
   
+  // Add state for storing XP breakdown
+  const [xpBreakdown, setXpBreakdown] = useState<Array<{ source: string; amount: number; description: string }>>([]);
+  
   // Effect for initial load and param changes
   useEffect(() => {
     // If we have params, we should show the active routine
@@ -114,11 +117,67 @@ export default function RoutineScreen() {
         const result = await processRoutine(entry);
         
         if (result && result.success) {
-          // Set XP earned
-          setRoutineXpEarned(result.xpEarned);
+          // Create an XP breakdown array based on the actual XP earned
+          const breakdownItems: Array<{ source: string; amount: number; description: string }> = [];
+          let totalXpEarned = 0;
+          
+          // Check if this was the first routine of day (base XP > 0)
+          const isFirstOfDay = result.xpEarned > 0;
+          
+          if (isFirstOfDay) {
+            // Determine base routine XP (only if this is first routine of day)
+            let routineBaseXP = 0;
+            if (Number(routineDuration) <= 5) routineBaseXP = 30;
+            else if (Number(routineDuration) <= 10) routineBaseXP = 60;
+            else routineBaseXP = 90;
+            
+            // Add routine base XP
+            breakdownItems.push({
+              source: 'routine',
+              amount: routineBaseXP,
+              description: `${routineDuration}-Minute Routine`
+            });
+            totalXpEarned += routineBaseXP;
+            
+            // If there's exactly 50 XP more than base, it's likely the first ever routine
+            if (result.xpEarned === routineBaseXP + 50) {
+              breakdownItems.push({
+                source: 'first_ever',
+                amount: 50,
+                description: 'Welcome Bonus: First Ever Stretch!'
+              });
+              totalXpEarned += 50;
+            }
+          } else {
+            // If no base XP earned, add a note explaining why
+            breakdownItems.push({
+              source: 'routine',
+              amount: 0,
+              description: 'Not the first routine today (XP already earned today)'
+            });
+          }
+          
+          // Add achievement bonuses if any were unlocked - these always count even if not first of day
+          if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
+            result.unlockedAchievements.forEach(achievement => {
+              breakdownItems.push({
+                source: 'achievement',
+                amount: achievement.xp,
+                description: `Achievement: ${achievement.title}`
+              });
+              totalXpEarned += achievement.xp;
+            });
+          }
+          
+          // Set the total XP earned - this should be the actual total from all sources
+          setRoutineXpEarned(totalXpEarned);
+          
+          // Set the breakdown
+          setXpBreakdown(breakdownItems);
           
           // Log results
-          console.log(`Total XP earned: ${result.xpEarned}`);
+          console.log(`Total XP earned: ${totalXpEarned}`);
+          console.log('XP Breakdown:', breakdownItems);
           
           // Check for level up
           if (result.levelUp) {
@@ -143,11 +202,13 @@ export default function RoutineScreen() {
           // If processing failed, set a default XP
           console.error('Error processing routine in gamification system');
           setRoutineXpEarned(50); // Default fallback XP value
+          setXpBreakdown([{ source: 'routine', amount: 50, description: 'Stretching Routine' }]);
         }
       } catch (error) {
         console.error('Error processing routine:', error);
         // Set a default XP amount in case of error
         setRoutineXpEarned(50); // Default fallback XP value
+        setXpBreakdown([{ source: 'routine', amount: 50, description: 'Stretching Routine' }]);
       }
       
       // Update state to show completed screen
@@ -158,6 +219,7 @@ export default function RoutineScreen() {
       setScreenState('COMPLETED');
       // Set a default XP in case of error
       setRoutineXpEarned(50); // Default fallback XP value
+      setXpBreakdown([{ source: 'routine', amount: 50, description: 'Stretching Routine' }]);
     }
   };
   
@@ -331,6 +393,7 @@ export default function RoutineScreen() {
           duration={duration as Duration}
           isPremium={isPremium}
           xpEarned={routineXpEarned}
+          xpBreakdown={xpBreakdown}
           onShowDashboard={showDashboard}
           onNavigateHome={handleCreateNewRoutine}
           onOpenSubscription={() => setSubscriptionModalVisible(true)}

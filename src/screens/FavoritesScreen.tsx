@@ -84,7 +84,7 @@ export default function FavoritesScreen() {
         <RefreshableFlatList
           data={favorites}
           renderItem={renderFavoriteItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item: Stretch) => item.id.toString()}
           style={styles.favoritesList}
           onRefresh={handleRefresh}
           refreshing={isRefreshing}

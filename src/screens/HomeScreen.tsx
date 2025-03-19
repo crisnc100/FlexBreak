@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  Switch, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Switch,
   Alert,
   ScrollView,
   ActivityIndicator,
@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getIsPremium, getReminderEnabled, getReminderTime, saveReminderTime, clearAllData } from '../services/storageService';
+import { getReminderEnabled, getReminderTime, saveReminderTime } from '../services/storageService';
 import { requestNotificationsPermissions, scheduleDailyReminder, cancelReminders } from '../utils/notifications';
 import { tw } from '../utils/tw';
 import { usePremium } from '../context/PremiumContext';
@@ -40,14 +40,14 @@ export default function HomeScreen() {
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
-  
+
   // Optimized animation values
   const slideAnim = useRef(new Animated.Value(height)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  
+
   // State for dropdown
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  
+
   // Scroll position tracking
   const [scrollPosition, setScrollPosition] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -55,33 +55,33 @@ export default function HomeScreen() {
   // Handle refresh
   const handleRefresh = async () => {
     console.log('Refreshing home screen...');
-    
+
     // Get a new random tip
     const randomTip = tips[Math.floor(Math.random() * tips.length)];
     setDailyTip(randomTip);
-    
+
     // Refresh other home data
     await refreshHome();
   };
 
   useEffect(() => {
     console.log('HomeScreen: Starting data loading');
-    
+
     const loadData = async () => {
       try {
         console.log('HomeScreen: Loading reminder settings');
-        
+
         // Load reminder settings
         const reminderEnabled = await getReminderEnabled();
         setReminderEnabled(reminderEnabled);
-        
+
         const reminderTime = await getReminderTime();
         setReminderTime(reminderTime || '08:00');
-        
+
         // Get a random tip
         const randomTip = tips[Math.floor(Math.random() * tips.length)];
         setDailyTip(randomTip);
-        
+
         console.log('HomeScreen: Data loading completed successfully');
       } catch (error) {
         console.error('HomeScreen: Error loading data:', error);
@@ -90,16 +90,16 @@ export default function HomeScreen() {
         setIsLoading(false);
       }
     };
-    
+
     // Set a timeout to ensure loading state is updated even if loadData fails
     const timeoutId = setTimeout(() => {
       console.log('HomeScreen: Timeout reached, forcing isLoading to false');
       setIsLoading(false);
     }, 3000); // 3 second timeout as a fallback
-    
+
     // Start loading data
     loadData();
-    
+
     // Clean up the timeout if component unmounts
     return () => {
       clearTimeout(timeoutId);
@@ -112,9 +112,9 @@ export default function HomeScreen() {
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ y: scrollPosition, animated: false });
     }
-    
+
     setActiveDropdown(dropdownName);
-    
+
     // Run animations in parallel for smoother effect
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -150,7 +150,7 @@ export default function HomeScreen() {
   // Handle option selection with optimized animation
   const handleOptionSelect = useCallback((setValue: (value: any) => void, value: any) => {
     setValue(value);
-    
+
     // Quick fade out before closing dropdown
     Animated.timing(backdropOpacity, {
       toValue: 0,
@@ -168,7 +168,7 @@ export default function HomeScreen() {
       duration,
       level
     };
-    
+
     navigation.navigate('Routine', routineParams);
   };
 
@@ -178,14 +178,14 @@ export default function HomeScreen() {
       setSubscriptionModalVisible(true);
       return;
     }
-    
+
     try {
       setReminderEnabled(value);
-      
+
       if (value) {
         // Request permissions first
         const hasPermission = await requestNotificationsPermissions();
-        
+
         if (!hasPermission) {
           Alert.alert(
             'Permission Required',
@@ -195,7 +195,7 @@ export default function HomeScreen() {
           setReminderEnabled(false);
           return;
         }
-        
+
         // Schedule the reminder
         await scheduleDailyReminder(reminderTime);
       } else {
@@ -214,7 +214,7 @@ export default function HomeScreen() {
       setSubscriptionModalVisible(true);
       return;
     }
-    
+
     // In a real app, this would open a time picker
     Alert.alert(
       'Set Reminder Time',
@@ -244,7 +244,7 @@ export default function HomeScreen() {
   const handleTimeChange = async (time: string) => {
     setReminderTime(time);
     await saveReminderTime(time);
-    
+
     if (reminderEnabled) {
       // Update the scheduled reminder with the new time
       await scheduleDailyReminder(time);
@@ -271,7 +271,7 @@ export default function HomeScreen() {
   };
 
   const getDurationLabel = (value: Duration) => {
-    switch(value) {
+    switch (value) {
       case '5': return '5 minutes';
       case '10': return '10 minutes';
       case '15': return '15 minutes';
@@ -280,7 +280,7 @@ export default function HomeScreen() {
   };
 
   const getLevelLabel = (value: StretchLevel) => {
-    switch(value) {
+    switch (value) {
       case 'beginner': return 'Beginner';
       case 'intermediate': return 'Intermediate';
       case 'advanced': return 'Advanced';
@@ -290,7 +290,7 @@ export default function HomeScreen() {
 
   // Add this function to get a descriptive message for each body area
   const getAreaDescription = (area: string): string => {
-    switch(area) {
+    switch (area) {
       case 'Hips & Legs':
         return 'For sitting-related stiffness';
       case 'Lower Back':
@@ -361,7 +361,7 @@ export default function HomeScreen() {
           title: '',
           options: [],
           value: '',
-          onChange: () => {}
+          onChange: () => { }
         };
     }
   };
@@ -387,11 +387,11 @@ export default function HomeScreen() {
       console.log('HomeScreen unmounted');
     };
   }, []);
-  
+
   useEffect(() => {
     console.log('isPremium changed:', isPremium);
   }, [isPremium]);
-  
+
   useEffect(() => {
     console.log('isLoading changed:', isLoading);
   }, [isLoading]);
@@ -410,7 +410,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={tw('flex-1 bg-bg')}>
-      <RefreshableScrollView 
+      <RefreshableScrollView
         ref={scrollViewRef}
         style={tw('flex-1 p-4')}
         scrollEnabled={!activeDropdown}
@@ -420,63 +420,65 @@ export default function HomeScreen() {
         refreshing={isRefreshing}
         showRefreshingFeedback={true}
       >
-        {/* Header */}
-        <View style={tw('items-center mb-5')}>
-          <Text style={tw('text-2xl font-bold text-text text-center')}>DeskStretch</Text>
-          <Text style={tw('text-sm text-muted text-center')}>Move Better, Work Better</Text>
+        {/* Header without settings icon */}
+        <View style={tw('mb-5 pt-1')}>
+          <View style={tw('items-center')}>
+            <Text style={tw('text-2xl font-bold text-text text-center')}>DeskStretch</Text>
+            <Text style={tw('text-sm text-muted text-center')}>Move Better, Work Better</Text>
+          </View>
         </View>
-        
+
         {/* Daily Tip */}
         <View style={tw('bg-gray-200 rounded-lg p-3 mb-4 flex-row items-center')}>
           <Ionicons name="bulb-outline" size={20} color="#FF9800" style={tw('mr-2')} />
           <Text style={tw('text-base text-text flex-1')}>{dailyTip.text}</Text>
         </View>
-        
+
         {/* Routine Picker - Redesigned */}
         <View style={tw('bg-white shadow-md p-4 rounded-lg mb-4')}>
           <Text style={tw('text-lg font-semibold text-text mb-3')}>Create Your Routine</Text>
-          
+
           <View style={tw('mb-3')}>
             <Text style={tw('text-sm text-text mb-1')}>What's tight?</Text>
             {renderCustomDropdown("Body Area", getAreaLabel(area), () => openDropdown('area'))}
           </View>
-          
+
           <View style={tw('mb-3')}>
             <Text style={tw('text-sm text-text mb-1')}>How long?</Text>
             {renderCustomDropdown("Duration", getDurationLabel(duration), () => openDropdown('duration'))}
           </View>
-          
+
           <View style={tw('mb-3')}>
             <Text style={tw('text-sm text-text mb-1')}>How flexible?</Text>
             {renderCustomDropdown("Level", getLevelLabel(level), () => openDropdown('level'))}
           </View>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             onPress={handleStartStretching}
             style={tw('bg-primary p-3 rounded-lg mt-2 items-center')}
           >
             <Text style={tw('text-white font-semibold text-base')}>Start Stretching</Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Subscription Teaser */}
         <View style={tw('bg-white border border-gray-200 rounded-lg p-4 mb-4 flex-row justify-between items-center')}>
           <View style={tw('flex-row items-center flex-1')}>
             <Ionicons name="star" size={20} color="#FF9800" style={tw('mr-2')} />
             <Text style={tw('text-sm text-muted flex-1')}>Unlock Progress, Reminders & Favorites</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={showPremiumModal}
             style={tw('bg-accent p-2 rounded-lg')}
           >
             <Text style={tw('text-white text-xs font-semibold')}>Go Premium</Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Reminder Section */}
         <View style={[tw('bg-white border border-gray-200 rounded-lg p-4 mb-4'), !isPremium && tw('opacity-50')]}>
           <Text style={tw('text-lg font-semibold text-text mb-3')}>Daily Reminder</Text>
-          
+
           <View style={tw('flex-row justify-between items-center')}>
             <View style={tw('flex-row items-center')}>
               <Ionicons name="alarm-outline" size={20} color="#333" style={tw('mr-2')} />
@@ -490,8 +492,8 @@ export default function HomeScreen() {
               disabled={!isPremium}
             />
           </View>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             onPress={handleTimePress}
             style={[tw('bg-gray-100 p-2 rounded mt-3'), !isPremium && tw('bg-gray-200')]}
             disabled={!isPremium}
@@ -500,16 +502,16 @@ export default function HomeScreen() {
               {formatTimeFor12Hour(reminderTime)}
             </Text>
           </TouchableOpacity>
-          
+
           {!isPremium && (
             <Text style={tw('text-xs text-gray-500 italic text-center mt-2')}>
               Premium feature
             </Text>
           )}
         </View>
-        
+
         {/* Subscription Modal */}
-        <SubscriptionModal 
+        <SubscriptionModal
           visible={subscriptionModalVisible}
           onClose={() => setSubscriptionModalVisible(false)}
         />
@@ -518,7 +520,7 @@ export default function HomeScreen() {
       {/* Optimized Dropdown Modal */}
       {activeDropdown && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <Animated.View 
+          <Animated.View
             style={[
               StyleSheet.absoluteFill,
               {
@@ -527,13 +529,13 @@ export default function HomeScreen() {
               },
             ]}
           >
-            <Pressable 
+            <Pressable
               style={StyleSheet.absoluteFill}
               onPress={closeDropdown}
             />
           </Animated.View>
-          
-          <Animated.View 
+
+          <Animated.View
             style={[
               styles.dropdownContainer,
               {
@@ -547,23 +549,23 @@ export default function HomeScreen() {
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
-            
-            <ScrollView 
+
+            <ScrollView
               style={styles.optionsContainer}
               showsVerticalScrollIndicator={false}
               bounces={false}
               contentContainerStyle={styles.optionsContent}
             >
               {activeOptions.options.map((item) => (
-                <Pressable 
+                <Pressable
                   key={item.value}
-                  style={({pressed}) => [
+                  style={({ pressed }) => [
                     styles.optionItem,
                     activeOptions.value === item.value && styles.selectedOptionItem,
                     pressed && styles.pressedOptionItem
                   ]}
                   onPress={() => handleOptionSelect(activeOptions.onChange, item.value)}
-                  android_ripple={{color: 'rgba(0,0,0,0.1)'}}
+                  android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
                 >
                   <View>
                     <Text style={[
@@ -586,33 +588,6 @@ export default function HomeScreen() {
             </ScrollView>
           </Animated.View>
         </View>
-      )}
-
-      {__DEV__ && (
-        <TouchableOpacity 
-          style={{
-            position: 'absolute',
-            bottom: 20,
-            right: 20,
-            backgroundColor: 'red',
-            padding: 10,
-            borderRadius: 5,
-            zIndex: 999
-          }}
-          onPress={async () => {
-            const success = await clearAllData();
-            if (success) {
-              Alert.alert('Success', 'All app data has been reset');
-              // Reset local state
-              setReminderEnabled(false);
-              setReminderTime('09:00');
-            } else {
-              Alert.alert('Error', 'Failed to reset app data');
-            }
-          }}
-        >
-          <Text style={{ color: 'white', fontWeight: 'bold' }}>Reset Data</Text>
-        </TouchableOpacity>
       )}
     </SafeAreaView>
   );
@@ -709,5 +684,21 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginLeft: 8,
-  }
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
 });

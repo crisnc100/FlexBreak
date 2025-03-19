@@ -19,6 +19,7 @@ export interface CompletedRoutineProps {
   duration: Duration;
   isPremium: boolean;
   xpEarned?: number;
+  xpBreakdown?: Array<{ source: string; amount: number; description: string }>;
   onShowDashboard: () => void;
   onNavigateHome: () => void;
   onOpenSubscription: () => void;
@@ -29,6 +30,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   duration,
   isPremium,
   xpEarned = 0,
+  xpBreakdown = [],
   onShowDashboard,
   onNavigateHome,
   onOpenSubscription
@@ -134,13 +136,66 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         <Text style={styles.completedTitle}>Routine Complete!</Text>
         <Text style={styles.completedSubtitle}>Great job on your stretching routine</Text>
         
-        {/* XP Earned display right after subtitle */}
-        <View style={styles.xpContainer}>
-          <Ionicons name="star" size={24} color="#FF9800" />
-          <Text style={styles.xpText}>
-            <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
-          </Text>
-        </View>
+        {/* XP Display - Show either breakdown or simple display */}
+        {xpBreakdown && xpBreakdown.length > 0 ? (
+          <View style={styles.xpBreakdownContainer}>
+            <View style={styles.xpTotalRow}>
+              <Ionicons name="star" size={24} color="#FF9800" />
+              <Text style={styles.xpTotalText}>
+                <Text style={styles.xpValue}>{xpEarned}</Text> XP {xpEarned > 0 ? 'Earned' : 'Earned from Previous Stretch'}
+              </Text>
+            </View>
+            
+            <View style={styles.xpSeparator} />
+            
+            {xpBreakdown.map((item, index) => {
+              // Get appropriate icon based on source
+              let iconName = 'star-outline';
+              switch (item.source) {
+                case 'routine':
+                  iconName = 'fitness-outline';
+                  break;
+                case 'achievement':
+                  iconName = 'trophy-outline';
+                  break;
+                case 'first_ever':
+                  iconName = 'gift-outline';
+                  break;
+                case 'streak':
+                  iconName = 'flame-outline';
+                  break;
+                case 'challenge':
+                  iconName = 'flag-outline';
+                  break;
+              }
+              
+              return (
+                <View key={`${item.source}-${index}`} style={styles.xpBreakdownItem}>
+                  <Ionicons name={iconName} size={16} color={item.amount > 0 ? "#FF9800" : "#999"} />
+                  <Text style={[
+                    styles.xpBreakdownText, 
+                    item.amount === 0 && styles.xpBreakdownZero
+                  ]}>
+                    {item.amount > 0 ? (
+                      <Text style={styles.xpBreakdownValue}>+{item.amount} XP</Text>
+                    ) : (
+                      <Text style={styles.xpBreakdownZero}>+0 XP</Text>
+                    )}
+                    {" "}{item.description}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          // Simple XP display when no breakdown is available
+          <View style={styles.xpContainer}>
+            <Ionicons name="star" size={24} color="#FF9800" />
+            <Text style={styles.xpText}>
+              <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
+            </Text>
+          </View>
+        )}
         
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
@@ -274,6 +329,53 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FF9800',
     fontSize: 18,
+  },
+  xpBreakdownContainer: {
+    marginVertical: 16,
+    backgroundColor: '#FFF8E1',
+    borderRadius: 12,
+    padding: 16,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  xpTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  xpTotalText: {
+    fontSize: 18,
+    color: '#333',
+    marginLeft: 8,
+    fontWeight: 'bold',
+  },
+  xpSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255, 152, 0, 0.3)',
+    marginVertical: 8,
+  },
+  xpBreakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingVertical: 4,
+  },
+  xpBreakdownText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  xpBreakdownValue: {
+    fontWeight: 'bold',
+    color: '#FF9800',
+  },
+  xpBreakdownZero: {
+    fontWeight: 'bold',
+    color: '#999',
   },
   statsContainer: {
     flexDirection: 'row',

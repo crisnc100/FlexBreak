@@ -64,7 +64,31 @@ export const processCompletedRoutine = async (
     // Check if this is the first routine of the day (only first earns XP)
     const { xpEarned, updatedProgress: afterXP } = await xpManager.processRoutineForXP(routine);
     
-    // Update achievements
+    // Get all routines to calculate streak
+    const allRoutines = await storageService.getAllRoutines();
+    
+    // Calculate streak from all routines including the newly added one
+    const { calculateStreak } = require('../progressUtils');
+    const calculatedStreak = calculateStreak(allRoutines);
+    
+    // Update the streak in statistics to reflect actual calculated value
+    if (calculatedStreak > 0) {
+      console.log(`Updating streak from ${afterXP.statistics.currentStreak} to calculated ${calculatedStreak}`);
+      afterXP.statistics.currentStreak = calculatedStreak;
+      
+      // Update best streak if needed
+      if (calculatedStreak > afterXP.statistics.bestStreak) {
+        afterXP.statistics.bestStreak = calculatedStreak;
+      }
+    }
+    
+    // Make sure total routines count is accurate
+    afterXP.statistics.totalRoutines = allRoutines.length;
+    
+    // Save the progress with updated statistics
+    await storageService.saveUserProgress(afterXP);
+    
+    // Now update achievements with the properly updated statistics
     const achievementResult = await achievementManager.updateAchievements(afterXP);
     
     // Create array of routines to update challenges with

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { ProgressEntry, RoutineParams, BodyArea, Duration } from '../types';
 import { UserProgress } from '../utils/progress/types';
 import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
+import { measureAsyncOperation } from '../utils/performance';
 
 // ========== STORAGE KEYS ==========
 export const KEYS = {

@@ -19,8 +19,14 @@ const ONE_DAY = 24 * 60 * 60 * 1000; // One day in milliseconds
  * @returns ISO date string
  */
 export const getDateForOffset = (daysOffset: number): string => {
+  // Ensure daysOffset is always negative or zero (today) to avoid future dates
+  const offsetToUse = daysOffset <= 0 ? daysOffset : 0;
+  
+  // If the requested offset is 0 (today), force it to be at least -1 (yesterday)
+  const finalOffset = offsetToUse === 0 ? -1 : offsetToUse;
+  
   const date = new Date();
-  date.setTime(date.getTime() + daysOffset * ONE_DAY);
+  date.setTime(date.getTime() + finalOffset * ONE_DAY);
   return date.toISOString();
 };
 
@@ -30,13 +36,16 @@ export const getDateForOffset = (daysOffset: number): string => {
 export const createMockRoutine = (
   area: BodyArea = 'Full Body',
   duration: Duration = '5',
-  daysOffset: number = 0,
+  daysOffset: number = -1, // Default to yesterday instead of today (0)
   stretchCount: number = 5
 ): ProgressEntry => {
+  // Ensure daysOffset is always at least -1 (yesterday) or earlier
+  const safeOffset = daysOffset <= -1 ? daysOffset : -1;
+  
   return {
     area,
     duration,
-    date: getDateForOffset(daysOffset),
+    date: getDateForOffset(safeOffset),
     stretchCount
   };
 };
@@ -47,7 +56,7 @@ export const createMockRoutine = (
 export const addMockRoutine = async (
   area: BodyArea = 'Full Body',
   duration: Duration = '5',
-  daysOffset: number = 0,
+  daysOffset: number = -1,
   stretchCount: number = 5,
   processForXP: boolean = true
 ): Promise<{
@@ -65,9 +74,78 @@ export const addMockRoutine = async (
   
   // Process through gamification if requested
   if (processForXP) {
+    // Get current user progress to ensure statistics are up to date
+    const userProgress = await storageService.getUserProgress();
+    
+    // Ensure streak is calculated based on all routines
+    const allRoutines = await storageService.getAllRoutines();
+    
+    // Calculate streak directly
+    const { calculateStreak } = require('../progressUtils');
+    const calculatedStreak = calculateStreak(allRoutines);
+    
+    console.log(`Calculated streak from mock routine: ${calculatedStreak} days`);
+    
+    // Update statistics based on the new routine
+    if (!userProgress.statistics) {
+      userProgress.statistics = {
+        totalRoutines: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        uniqueAreas: [],
+        routinesByArea: {},
+        lastUpdated: new Date().toISOString(),
+        totalMinutes: 0
+      };
+    }
+    
+    // Update streak and best streak
+    userProgress.statistics.currentStreak = calculatedStreak;
+    if (calculatedStreak > userProgress.statistics.bestStreak) {
+      userProgress.statistics.bestStreak = calculatedStreak;
+    }
+    
+    // Convert duration to number
+    const durationNum = parseInt(duration);
+    if (!isNaN(durationNum)) {
+      userProgress.statistics.totalMinutes = (userProgress.statistics.totalMinutes || 0) + durationNum;
+    }
+    
+    // Update statistics based on the new routine
+    userProgress.statistics.totalRoutines = allRoutines.length;
+    
+    // Add area to uniqueAreas if not already present
+    if (!userProgress.statistics.uniqueAreas.includes(area)) {
+      userProgress.statistics.uniqueAreas.push(area);
+    }
+    
+    // Update routinesByArea counter
+    if (!userProgress.statistics.routinesByArea[area]) {
+      userProgress.statistics.routinesByArea[area] = 1;
+    } else {
+      userProgress.statistics.routinesByArea[area]++;
+    }
+    
+    console.log(`Updated statistics: totalRoutines=${userProgress.statistics.totalRoutines}, currentStreak=${userProgress.statistics.currentStreak}`);
+    
+    // Save updated statistics
+    await storageService.saveUserProgress(userProgress);
+    
+    // Now process the routine with updated statistics
     const result = await gamificationManager.processCompletedRoutine(routine);
     xpEarned = result.xpEarned;
     unlockedAchievements = result.unlockedAchievements;
+    
+    // Do a final check for achievements in case they weren't unlocked
+    if (unlockedAchievements.length === 0) {
+      console.log('No achievements unlocked during routine processing, checking again...');
+      const updatedProgress = await storageService.getUserProgress();
+      const achievementResult = await achievementManager.updateAchievements(updatedProgress);
+      if (achievementResult.unlockedAchievements.length > 0) {
+        console.log(`Found ${achievementResult.unlockedAchievements.length} unlocked achievements in second check`);
+        unlockedAchievements = achievementResult.unlockedAchievements;
+      }
+    }
   }
   
   return {
@@ -82,7 +160,7 @@ export const addMockRoutine = async (
  */
 export const createMockStreak = async (
   length: number,
-  endToday: boolean = true
+  endToday: boolean = false
 ): Promise<{
   routines: ProgressEntry[];
   totalXpEarned: number;
@@ -92,8 +170,16 @@ export const createMockStreak = async (
   let totalXpEarned = 0;
   const allUnlockedAchievements: any[] = [];
   
-  // Determine starting offset
-  const startOffset = endToday ? -(length - 1) : -length;
+  // Always ensure we're using dates in the past
+  // If endToday is true, end with yesterday (-1)
+  // If endToday is false, end with the day before yesterday (-2)
+  const endDayOffset = endToday ? -1 : -2;
+  
+  // Calculate starting offset: For a 3-day streak ending yesterday (-1),
+  // we'd need to start at -3 (3 days ago)
+  const startOffset = endDayOffset - (length - 1);
+  
+  console.log(`Creating ${length}-day streak from ${startOffset} to ${endDayOffset}`);
   
   // Create a routine for each day in the streak
   for (let i = 0; i < length; i++) {
@@ -121,12 +207,21 @@ export const createMockStreak = async (
   
   // Ensure streak is properly set in user progress
   const userProgress = await storageService.getUserProgress();
-  if (userProgress.statistics.currentStreak < length) {
-    userProgress.statistics.currentStreak = length;
-    if (length > userProgress.statistics.bestStreak) {
-      userProgress.statistics.bestStreak = length;
-    }
-    await storageService.saveUserProgress(userProgress);
+  
+  // Manually calculate streak for verification
+  const allRoutines = await storageService.getAllRoutines();
+  
+  // Update statistics to match the created streak
+  userProgress.statistics.currentStreak = length;
+  if (length > userProgress.statistics.bestStreak) {
+    userProgress.statistics.bestStreak = length;
+  }
+  await storageService.saveUserProgress(userProgress);
+  
+  // Force achievement check after setting the streak
+  const achievementResult = await achievementManager.updateAchievements(userProgress);
+  if (achievementResult.unlockedAchievements.length > 0) {
+    allUnlockedAchievements.push(...achievementResult.unlockedAchievements);
   }
   
   return {
@@ -279,7 +374,7 @@ export const generateRoutineHistory = async (
   const {
     count,
     startDaysAgo,
-    endDaysAgo = 0,
+    endDaysAgo = 1, // Changed default from 0 to 1 to avoid today's date
     randomizeAreas = true,
     randomizeDurations = true,
     specificArea = 'Full Body',
@@ -287,10 +382,21 @@ export const generateRoutineHistory = async (
     processForXP = true
   } = options;
   
-  // Validate inputs
-  if (count <= 0 || startDaysAgo <= endDaysAgo) {
-    throw new Error('Invalid options for generating routine history');
+  // Validate inputs and ensure we're not using today's date
+  if (count <= 0) {
+    throw new Error('Invalid options for generating routine history: count must be positive');
   }
+  
+  // Ensure startDaysAgo is greater than endDaysAgo and both are at least 1
+  const safeStartDaysAgo = Math.max(startDaysAgo, endDaysAgo + 1, 2);
+  const safeEndDaysAgo = Math.max(endDaysAgo, 1); // At least yesterday
+  
+  // Check if range is valid
+  if (safeStartDaysAgo <= safeEndDaysAgo) {
+    throw new Error('Invalid date range for generating routine history');
+  }
+  
+  console.log(`Generating ${count} routines between ${safeStartDaysAgo} and ${safeEndDaysAgo} days ago`);
   
   const routines: ProgressEntry[] = [];
   let totalXpEarned = 0;
@@ -301,12 +407,12 @@ export const generateRoutineHistory = async (
   const durations: Duration[] = ['5', '10', '15'];
   
   // Calculate day range
-  const dayRange = startDaysAgo - endDaysAgo;
+  const dayRange = safeStartDaysAgo - safeEndDaysAgo;
   
   // Generate routines
   for (let i = 0; i < count; i++) {
-    // Random day within range
-    const dayOffset = -startDaysAgo + Math.floor(Math.random() * dayRange);
+    // Random day within range, always in the past
+    const dayOffset = -safeStartDaysAgo + Math.floor(Math.random() * dayRange);
     
     // Select area and duration
     const area = randomizeAreas ? areas[Math.floor(Math.random() * areas.length)] : specificArea;
@@ -342,6 +448,32 @@ export const resetAllUserProgress = async (): Promise<boolean> => {
   try {
     // Use the initialization function from gamification manager
     await gamificationManager.initializeUserProgress();
+    
+    // Extra check to make sure achievements and statistics are properly reset
+    const userProgress = await storageService.getUserProgress();
+    
+    // Ensure statistics are properly reset
+    userProgress.statistics = {
+      totalRoutines: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      uniqueAreas: [],
+      routinesByArea: {},
+      lastUpdated: new Date().toISOString(),
+      totalMinutes: 0
+    };
+    
+    // Ensure achievements are reset to initial state
+    userProgress.achievements = achievementManager.initializeAchievements();
+    
+    // Ensure XP and level are reset
+    userProgress.totalXP = 0;
+    userProgress.level = 1;
+    
+    // Save the fully reset progress
+    await storageService.saveUserProgress(userProgress);
+    
+    console.log("User progress fully reset for testing");
     return true;
   } catch (error) {
     console.error('Error resetting user progress:', error);

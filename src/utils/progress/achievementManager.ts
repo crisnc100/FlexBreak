@@ -309,6 +309,7 @@ export const updateAchievements = async (
   userProgress: UserProgress
 ): Promise<ProgressUpdateResult> => {
   console.log('Checking for achievement updates...');
+  console.log('Statistics for achievement updates:', JSON.stringify(userProgress.statistics));
   
   // Create a copy of the user's achievements
   let achievements = { ...userProgress.achievements };
@@ -339,24 +340,31 @@ export const updateAchievements = async (
     switch (achievement.type) {
       case 'routine_count':
         newProgress = statistics.totalRoutines;
+        console.log(`Routine count achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement}`);
         break;
         
       case 'streak':
+        console.log(`Checking Streak achievement ${achievement.id}:`);
+        console.log(`Current streak: ${statistics.currentStreak}, Requirement: ${achievement.requirement}`);
         newProgress = statistics.currentStreak;
+        console.log(`Setting achievement progress to: ${newProgress}`);
         break;
         
       case 'total_minutes':
         // Handle if totalMinutes doesn't exist yet
         newProgress = (statistics as any).totalMinutes || 0;
+        console.log(`Total minutes achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement}`);
         break;
         
       case 'area_variety':
         newProgress = statistics.uniqueAreas.length;
+        console.log(`Area variety achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement}`);
         break;
         
       case 'specific_area':
         if (achievement.area) {
           newProgress = statistics.routinesByArea[achievement.area] || 0;
+          console.log(`Specific area achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement}`);
         }
         break;
     }
@@ -368,7 +376,9 @@ export const updateAchievements = async (
     };
     
     // Check if achievement is newly completed
-    if (newProgress >= achievement.requirement && !achievement.completed) {
+    const shouldComplete = newProgress >= achievement.requirement && !achievement.completed;
+    
+    if (shouldComplete) {
       // Mark as completed with timestamp
       updatedAchievement.completed = true;
       updatedAchievement.dateCompleted = new Date().toISOString();
@@ -387,6 +397,8 @@ export const updateAchievements = async (
       updatedProgress = result.progress;
       totalXpEarned += achievement.xp;
       unlockedAchievements.push(updatedAchievement);
+    } else if (achievement.progress !== newProgress) {
+      console.log(`Achievement progress updated: ${achievement.title} (${achievement.progress} -> ${newProgress})`);
     }
     
     // Save updated achievement
