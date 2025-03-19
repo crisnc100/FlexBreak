@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { createThemedStyles } from '../utils/themeUtils';
 
 interface XpNotificationProps {
   amount: number;
@@ -16,6 +18,8 @@ const XpNotification: React.FC<XpNotificationProps> = ({
   onDismiss 
 }) => {
   const [animation] = useState(new Animated.Value(0));
+  const { theme, isDark } = useTheme();
+  const styles = themedStyles(theme, isDark);
   
   useEffect(() => {
     // Animate in
@@ -87,18 +91,26 @@ const XpNotification: React.FC<XpNotificationProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+// Use themed styles
+const themedStyles = (theme, isDark) => StyleSheet.create({
   container: {
     position: 'absolute',
     top: 50,
     left: 20,
     right: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: isDark 
+      ? 'rgba(40, 40, 40, 0.9)' 
+      : 'rgba(0, 0, 0, 0.8)',
     borderRadius: 10,
     padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 1000,
+    shadowColor: theme.text,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 5,
   },
   iconContainer: {
     marginRight: 15,
@@ -112,7 +124,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   description: {
-    color: 'white',
+    color: isDark ? theme.text : 'white',
     fontSize: 14,
   }
 });

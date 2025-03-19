@@ -1,28 +1,47 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
+import { useTheme } from '../../context/ThemeContext';
 
 interface StretchingPatternsProps {
   dayOfWeekBreakdown: number[];
   dayNames: string[];
   mostActiveDay: string;
+  theme?: any; // Optional theme prop passed from parent
+  isDark?: boolean; // Optional isDark flag passed from parent
 }
 
 const StretchingPatterns: React.FC<StretchingPatternsProps> = ({
   dayOfWeekBreakdown,
   dayNames,
-  mostActiveDay
+  mostActiveDay,
+  theme: propTheme,
+  isDark: propIsDark
 }) => {
+  // Use theme from props if provided, otherwise use theme context
+  const themeContext = useTheme();
+  const theme = propTheme || themeContext.theme;
+  const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, { 
+      backgroundColor: isDark ? theme.cardBackground : '#FFF',
+      shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
+    }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Stretching Patterns</Text>
-        <Text style={styles.dateRangeText}>All Time</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+          Stretching Patterns
+        </Text>
+        <Text style={[styles.dateRangeText, { color: isDark ? theme.textSecondary : '#666' }]}>
+          All Time
+        </Text>
       </View>
       <View style={styles.patternContainer}>
         <View style={styles.patternLegend}>
-          <Text style={styles.patternLabel}>Most Active Day:</Text>
-          <Text style={styles.patternValue}>
+          <Text style={[styles.patternLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+            Most Active Day:
+          </Text>
+          <Text style={[styles.patternValue, { color: isDark ? theme.accent : '#4CAF50' }]}>
             {mostActiveDay}
           </Text>
         </View>
@@ -42,12 +61,16 @@ const StretchingPatterns: React.FC<StretchingPatternsProps> = ({
           yAxisLabel=""
           yAxisSuffix=""
           chartConfig={{
-            backgroundColor: '#FFF',
-            backgroundGradientFrom: '#FFF',
-            backgroundGradientTo: '#FFF',
+            backgroundColor: isDark ? theme.cardBackground : '#FFF',
+            backgroundGradientFrom: isDark ? theme.cardBackground : '#FFF',
+            backgroundGradientTo: isDark ? theme.cardBackground : '#FFF',
             decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+            color: (opacity = 1) => isDark 
+              ? `rgba(${theme.accent.replace('#', '').match(/.{1,2}/g).map(hex => parseInt(hex, 16)).join(', ')}, ${opacity})`
+              : `rgba(76, 175, 80, ${opacity})`,
+            labelColor: (opacity = 1) => isDark 
+              ? `rgba(255, 255, 255, ${opacity})`
+              : `rgba(0, 0, 0, ${opacity})`,
             barPercentage: 0.7,
           }}
         />
@@ -107,4 +130,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StretchingPatterns; 
+export default StretchingPatterns;

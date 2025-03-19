@@ -2,13 +2,13 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { getIsPremium, saveIsPremium } from '../services/storageService';
 import { ActivityIndicator, Text, View } from 'react-native';
 
-type PremiumContextType = {
+export type PremiumContextType = {
   isPremium: boolean;
   setPremiumStatus: (status: boolean) => Promise<void>;
   refreshPremiumStatus: () => Promise<void>;
 };
 
-const PremiumContext = createContext<PremiumContextType | undefined>(undefined);
+export const PremiumContext = createContext<PremiumContextType | undefined>(undefined);
 
 export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isPremium, setIsPremium] = useState(false);
@@ -44,21 +44,19 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []); // Remove isInitialized from the dependency array to avoid circular dependency
 
   // Function to refresh premium status from storage
-  const refreshPremiumStatus = async () => {
+  const refreshPremiumStatus = async (): Promise<void> => {
     try {
       console.log('Refreshing premium status from storage');
       const premiumStatus = await getIsPremium();
       console.log('Premium status from storage:', premiumStatus);
       setIsPremium(premiumStatus);
-      return premiumStatus;
     } catch (error) {
       console.error('Error loading premium status:', error);
-      return false;
     }
   };
 
   // Function to update premium status
-  const setPremiumStatus = async (status: boolean) => {
+  const setPremiumStatus = async (status: boolean): Promise<void> => {
     try {
       console.log('Setting premium status to:', status);
       await saveIsPremium(status);

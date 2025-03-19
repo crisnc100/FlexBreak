@@ -2,21 +2,40 @@ import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { getWeeklyActivityDateRange } from '../../utils/progressUtils';
+import { useTheme } from '../../context/ThemeContext';
 
 interface WeeklyActivityProps {
   weeklyActivity: number[];
   orderedDayNames: string[];
+  theme?: any; // Optional theme prop passed from parent
+  isDark?: boolean; // Optional isDark flag passed from parent
 }
 
 const WeeklyActivity: React.FC<WeeklyActivityProps> = ({
   weeklyActivity,
-  orderedDayNames
+  orderedDayNames,
+  theme: propTheme,
+  isDark: propIsDark
 }) => {
+  // Use theme from props if provided, otherwise use theme context
+  const themeContext = useTheme();
+  const theme = propTheme || themeContext.theme;
+  const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, { 
+      backgroundColor: isDark ? theme.cardBackground : '#FFF',
+      shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
+      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
+      borderWidth: isDark ? 1 : 0
+    }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Weekly Activity</Text>
-        <Text style={styles.dateRangeText}>{getWeeklyActivityDateRange()}</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+          Weekly Activity
+        </Text>
+        <Text style={[styles.dateRangeText, { color: isDark ? theme.textSecondary : '#666' }]}>
+          {getWeeklyActivityDateRange()}
+        </Text>
       </View>
       
       {weeklyActivity.some(val => val > 0) ? (
@@ -31,19 +50,33 @@ const WeeklyActivity: React.FC<WeeklyActivityProps> = ({
           height={180}
           yAxisInterval={1}
           chartConfig={{
-            backgroundColor: '#FFF',
-            backgroundGradientFrom: '#FFF',
-            backgroundGradientTo: '#FFF',
+            backgroundColor: isDark ? theme.cardBackground : '#FFF',
+            backgroundGradientFrom: isDark ? theme.cardBackground : '#FFF',
+            backgroundGradientTo: isDark ? theme.cardBackground : '#FFF',
             decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+            color: (opacity = 1) => isDark 
+              ? `rgba(${theme.accent.replace('#', '').match(/.{1,2}/g).map(hex => parseInt(hex, 16)).join(', ')}, ${opacity})`
+              : `rgba(76, 175, 80, ${opacity})`,
+            labelColor: (opacity = 1) => isDark 
+              ? `rgba(255, 255, 255, ${opacity})`
+              : `rgba(0, 0, 0, ${opacity})`,
             style: {
               borderRadius: 16
             },
             propsForDots: {
               r: "6",
               strokeWidth: "2",
-              stroke: "#4CAF50"
+              stroke: isDark ? theme.accent : "#4CAF50"
+            },
+            // Add these for better dark mode visibility
+            strokeWidth: 2,
+            propsForBackgroundLines: {
+              stroke: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+              strokeDasharray: ''
+            },
+            propsForLabels: {
+              fontSize: '12',
+              fill: isDark ? theme.textSecondary : '#666'
             }
           }}
           bezier
@@ -53,7 +86,9 @@ const WeeklyActivity: React.FC<WeeklyActivityProps> = ({
           }}
         />
       ) : (
-        <Text style={styles.emptyText}>Complete some routines to see your weekly activity</Text>
+        <Text style={[styles.emptyText, { color: isDark ? theme.textSecondary : '#666' }]}>
+          Complete some routines to see your weekly activity
+        </Text>
       )}
     </View>
   );
@@ -97,4 +132,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default WeeklyActivity; 
+export default WeeklyActivity;

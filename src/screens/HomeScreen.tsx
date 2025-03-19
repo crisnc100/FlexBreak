@@ -11,7 +11,9 @@ import {
   Animated,
   Dimensions,
   Pressable,
-  StyleSheet
+  StyleSheet,
+  Modal,
+  TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +27,17 @@ import { tw } from '../utils/tw';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
 import { RefreshableScrollView } from '../components/common';
+import { useFeatureAccess } from '../hooks/useFeatureAccess';
+import { useTheme } from '../context/ThemeContext';
+import { 
+  HomeHeader, 
+  DailyTip, 
+  SubscriptionTeaser, 
+  RoutinePicker, 
+  ReminderSection, 
+  CustomReminderModal,
+  OptionDropdown
+} from '../components/home';
 
 const { height, width } = Dimensions.get('window');
 
@@ -40,12 +53,14 @@ export default function HomeScreen() {
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
+  const { canAccessFeature, meetsLevelRequirement, getRequiredLevel } = useFeatureAccess();
+  const [reminderMessage, setReminderMessage] = useState('Time for your daily stretch!');
+  const [customReminderModalVisible, setCustomReminderModalVisible] = useState(false);
+  const { theme, isDark } = useTheme();
 
-  // Optimized animation values
+  // Animated values for dropdowns
   const slideAnim = useRef(new Animated.Value(height)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-
-  // State for dropdown
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   // Scroll position tracking
@@ -106,7 +121,7 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Memoized animation functions for better performance
+  // Animation functions for dropdowns
   const openDropdown = useCallback((dropdownName: string) => {
     // Save scroll position to restore later
     if (scrollViewRef.current) {
@@ -146,20 +161,6 @@ export default function HomeScreen() {
       setActiveDropdown(null);
     });
   }, [slideAnim, backdropOpacity]);
-
-  // Handle option selection with optimized animation
-  const handleOptionSelect = useCallback((setValue: (value: any) => void, value: any) => {
-    setValue(value);
-
-    // Quick fade out before closing dropdown
-    Animated.timing(backdropOpacity, {
-      toValue: 0,
-      duration: 100,
-      useNativeDriver: true,
-    }).start(() => {
-      closeDropdown();
-    });
-  }, [closeDropdown]);
 
   // Start stretching routine
   const handleStartStretching = () => {
@@ -255,161 +256,48 @@ export default function HomeScreen() {
   const showPremiumModal = () => {
     setSubscriptionModalVisible(true);
   };
-
-  // Format time for display (24h to 12h)
-  const formatTimeFor12Hour = (time24h: string) => {
-    const [hours, minutes] = time24h.split(':');
-    const hour = parseInt(hours, 10);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-  };
-
-  // Helper label functions
-  const getAreaLabel = (value: BodyArea): string => {
-    return value;
-  };
-
-  const getDurationLabel = (value: Duration) => {
-    switch (value) {
-      case '5': return '5 minutes';
-      case '10': return '10 minutes';
-      case '15': return '15 minutes';
-      default: return '5 minutes';
+  
+  // Save custom reminder message
+  const saveCustomReminderMessage = (message: string) => {
+    if (message.trim() === '') {
+      setReminderMessage('Time for your daily stretch!');
+    } else {
+      setReminderMessage(message);
     }
+    setCustomReminderModalVisible(false);
   };
 
-  const getLevelLabel = (value: StretchLevel) => {
-    switch (value) {
-      case 'beginner': return 'Beginner';
-      case 'intermediate': return 'Intermediate';
-      case 'advanced': return 'Advanced';
-      default: return 'Beginner';
+  // Handle custom reminder
+  const handleCustomReminderPress = () => {
+    if (!isPremium) {
+      setSubscriptionModalVisible(true);
+      return;
     }
-  };
-
-  // Add this function to get a descriptive message for each body area
-  const getAreaDescription = (area: string): string => {
-    switch (area) {
-      case 'Hips & Legs':
-        return 'For sitting-related stiffness';
-      case 'Lower Back':
-        return 'For desk posture relief';
-      case 'Upper Back & Chest':
-        return 'For hunching & slouching';
-      case 'Shoulders & Arms':
-        return 'For desk-typing tension';
-      case 'Neck':
-        return 'For screen-staring strain';
-      case 'Full Body':
-        return 'For complete rejuvenation';
-      default:
-        return '';
+    
+    if (!canAccessFeature('custom_reminders')) {
+      Alert.alert(
+        'Feature Locked',
+        `Custom Reminders unlock at level ${getRequiredLevel('custom_reminders')}. Keep stretching to reach this level!`,
+        [{ text: 'OK' }]
+      );
+      return;
     }
+    
+    setCustomReminderModalVisible(true);
   };
-
-  // Update the area options array
-  const areaOptions = [
-    { label: 'Hips & Legs', value: 'Hips & Legs', description: 'For sitting-related stiffness' },
-    { label: 'Lower Back', value: 'Lower Back', description: 'For desk posture relief' },
-    { label: 'Upper Back & Chest', value: 'Upper Back & Chest', description: 'For hunching & slouching' },
-    { label: 'Shoulders & Arms', value: 'Shoulders & Arms', description: 'For desk-typing tension' },
-    { label: 'Neck', value: 'Neck', description: 'For screen-staring strain' },
-    { label: 'Full Body', value: 'Full Body', description: 'For complete rejuvenation' }
-  ];
-
-  // Define duration options
-  const durationOptions = [
-    { label: '5 minutes', value: '5', description: 'Quick refresh' },
-    { label: '10 minutes', value: '10', description: 'Standard session' },
-    { label: '15 minutes', value: '15', description: 'Deep relief' }
-  ];
-
-  // Define level options
-  const levelOptions = [
-    { label: 'Beginner', value: 'beginner', description: 'Easy gentle stretches' },
-    { label: 'Intermediate', value: 'intermediate', description: 'Moderate intensity' },
-    { label: 'Advanced', value: 'advanced', description: 'Deep stretching' }
-  ];
-
-  // Get active options based on dropdown
-  const getActiveOptions = () => {
-    switch (activeDropdown) {
-      case 'area':
-        return {
-          title: 'Select Body Area',
-          options: areaOptions,
-          value: area,
-          onChange: (value: string) => setArea(value as BodyArea)
-        };
-      case 'duration':
-        return {
-          title: 'Select Duration',
-          options: durationOptions,
-          value: duration,
-          onChange: (value: string) => setDuration(value as Duration)
-        };
-      case 'level':
-        return {
-          title: 'Select Level',
-          options: levelOptions,
-          value: level,
-          onChange: (value: string) => setLevel(value as StretchLevel)
-        };
-      default:
-        return {
-          title: '',
-          options: [],
-          value: '',
-          onChange: () => { }
-        };
-    }
-  };
-
-  // Render a custom dropdown field with optimized styling
-  const renderCustomDropdown = (label: string, value: string, onPress: () => void) => {
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        style={styles.dropdownButton}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.dropdownButtonText}>{value}</Text>
-        <Ionicons name="chevron-down" size={20} color="#666" />
-      </TouchableOpacity>
-    );
-  };
-
-  // Add console logs to track component lifecycle
-  useEffect(() => {
-    console.log('HomeScreen mounted');
-    return () => {
-      console.log('HomeScreen unmounted');
-    };
-  }, []);
-
-  useEffect(() => {
-    console.log('isPremium changed:', isPremium);
-  }, [isPremium]);
-
-  useEffect(() => {
-    console.log('isLoading changed:', isLoading);
-  }, [isLoading]);
 
   // Loading state
   if (isLoading) {
     return (
-      <SafeAreaView style={tw('flex-1 bg-white justify-center items-center')}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={tw('mt-3 text-base text-gray-500')}>Loading DeskStretch...</Text>
+      <SafeAreaView style={[tw('flex-1 justify-center items-center'), { backgroundColor: theme.background }]}>
+        <ActivityIndicator size="large" color={theme.accent} />
+        <Text style={[tw('mt-3 text-base'), { color: theme.textSecondary }]}>Loading DeskStretch...</Text>
       </SafeAreaView>
     );
   }
 
-  const activeOptions = getActiveOptions();
-
   return (
-    <SafeAreaView style={tw('flex-1 bg-bg')}>
+    <SafeAreaView style={[tw('flex-1'), { backgroundColor: theme.background }]}>
       <RefreshableScrollView
         ref={scrollViewRef}
         style={tw('flex-1 p-4')}
@@ -420,95 +308,43 @@ export default function HomeScreen() {
         refreshing={isRefreshing}
         showRefreshingFeedback={true}
       >
-        {/* Header without settings icon */}
-        <View style={tw('mb-5 pt-1')}>
-          <View style={tw('items-center')}>
-            <Text style={tw('text-2xl font-bold text-text text-center')}>DeskStretch</Text>
-            <Text style={tw('text-sm text-muted text-center')}>Move Better, Work Better</Text>
-          </View>
-        </View>
+        {/* Header */}
+        <HomeHeader />
 
         {/* Daily Tip */}
-        <View style={tw('bg-gray-200 rounded-lg p-3 mb-4 flex-row items-center')}>
-          <Ionicons name="bulb-outline" size={20} color="#FF9800" style={tw('mr-2')} />
-          <Text style={tw('text-base text-text flex-1')}>{dailyTip.text}</Text>
-        </View>
+        <DailyTip tip={dailyTip.text} />
 
-        {/* Routine Picker - Redesigned */}
-        <View style={tw('bg-white shadow-md p-4 rounded-lg mb-4')}>
-          <Text style={tw('text-lg font-semibold text-text mb-3')}>Create Your Routine</Text>
-
-          <View style={tw('mb-3')}>
-            <Text style={tw('text-sm text-text mb-1')}>What's tight?</Text>
-            {renderCustomDropdown("Body Area", getAreaLabel(area), () => openDropdown('area'))}
-          </View>
-
-          <View style={tw('mb-3')}>
-            <Text style={tw('text-sm text-text mb-1')}>How long?</Text>
-            {renderCustomDropdown("Duration", getDurationLabel(duration), () => openDropdown('duration'))}
-          </View>
-
-          <View style={tw('mb-3')}>
-            <Text style={tw('text-sm text-text mb-1')}>How flexible?</Text>
-            {renderCustomDropdown("Level", getLevelLabel(level), () => openDropdown('level'))}
-          </View>
-
-          <TouchableOpacity
-            onPress={handleStartStretching}
-            style={tw('bg-primary p-3 rounded-lg mt-2 items-center')}
-          >
-            <Text style={tw('text-white font-semibold text-base')}>Start Stretching</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Routine Picker */}
+        <RoutinePicker
+          area={area}
+          duration={duration}
+          level={level}
+          onAreaPress={() => openDropdown('area')}
+          onDurationPress={() => openDropdown('duration')}
+          onLevelPress={() => openDropdown('level')}
+          onStartStretching={handleStartStretching}
+          canAccessCustomRoutines={canAccessFeature('custom_routines')}
+          onCustomRoutinesPress={() => 
+            Alert.alert('Custom Routines', 'This feature will allow you to create and save your own personalized stretching routines.', [{ text: 'OK' }])
+          }
+        />
 
         {/* Subscription Teaser */}
-        <View style={tw('bg-white border border-gray-200 rounded-lg p-4 mb-4 flex-row justify-between items-center')}>
-          <View style={tw('flex-row items-center flex-1')}>
-            <Ionicons name="star" size={20} color="#FF9800" style={tw('mr-2')} />
-            <Text style={tw('text-sm text-muted flex-1')}>Unlock Progress, Reminders & Favorites</Text>
-          </View>
-          <TouchableOpacity
-            onPress={showPremiumModal}
-            style={tw('bg-accent p-2 rounded-lg')}
-          >
-            <Text style={tw('text-white text-xs font-semibold')}>Go Premium</Text>
-          </TouchableOpacity>
-        </View>
+        <SubscriptionTeaser onPremiumPress={showPremiumModal} />
 
         {/* Reminder Section */}
-        <View style={[tw('bg-white border border-gray-200 rounded-lg p-4 mb-4'), !isPremium && tw('opacity-50')]}>
-          <Text style={tw('text-lg font-semibold text-text mb-3')}>Daily Reminder</Text>
-
-          <View style={tw('flex-row justify-between items-center')}>
-            <View style={tw('flex-row items-center')}>
-              <Ionicons name="alarm-outline" size={20} color="#333" style={tw('mr-2')} />
-              <Text style={tw('text-sm text-text')}>Remind me to stretch</Text>
-            </View>
-            <Switch
-              value={reminderEnabled}
-              onValueChange={handleReminderToggle}
-              trackColor={{ false: '#D1D1D1', true: '#4CAF50' }}
-              thumbColor={reminderEnabled ? '#FFFFFF' : '#F4F4F4'}
-              disabled={!isPremium}
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={handleTimePress}
-            style={[tw('bg-gray-100 p-2 rounded mt-3'), !isPremium && tw('bg-gray-200')]}
-            disabled={!isPremium}
-          >
-            <Text style={[tw('text-sm text-center'), !isPremium ? tw('text-gray-500') : tw('text-text')]}>
-              {formatTimeFor12Hour(reminderTime)}
-            </Text>
-          </TouchableOpacity>
-
-          {!isPremium && (
-            <Text style={tw('text-xs text-gray-500 italic text-center mt-2')}>
-              Premium feature
-            </Text>
-          )}
-        </View>
+        <ReminderSection
+          isPremium={isPremium}
+          reminderEnabled={reminderEnabled}
+          reminderTime={reminderTime}
+          reminderMessage={reminderMessage}
+          onToggleReminder={handleReminderToggle}
+          onTimePress={handleTimePress}
+          onCustomMessagePress={handleCustomReminderPress}
+          canAccessCustomReminders={canAccessFeature('custom_reminders')}
+          requiredLevel={getRequiredLevel('custom_reminders')}
+          currentLevel={0} // Replace with actual user level when available
+        />
 
         {/* Subscription Modal */}
         <SubscriptionModal
@@ -517,188 +353,71 @@ export default function HomeScreen() {
         />
       </RefreshableScrollView>
 
-      {/* Optimized Dropdown Modal */}
+      {/* Custom Reminder Modal */}
+      <CustomReminderModal
+        visible={customReminderModalVisible}
+        message={reminderMessage}
+        onMessageChange={setReminderMessage}
+        onSave={saveCustomReminderMessage}
+        onCancel={() => setCustomReminderModalVisible(false)}
+        maxLength={50}
+      />
+      
+      {/* Option Dropdown */}
       {activeDropdown && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                opacity: backdropOpacity,
-              },
-            ]}
-          >
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={closeDropdown}
-            />
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.dropdownContainer,
-              {
-                transform: [{ translateY: slideAnim }],
-              }
-            ]}
-          >
-            <View style={styles.dropdownHeader}>
-              <Text style={styles.dropdownTitle}>{activeOptions.title}</Text>
-              <TouchableOpacity onPress={closeDropdown} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.optionsContainer}
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-              contentContainerStyle={styles.optionsContent}
-            >
-              {activeOptions.options.map((item) => (
-                <Pressable
-                  key={item.value}
-                  style={({ pressed }) => [
-                    styles.optionItem,
-                    activeOptions.value === item.value && styles.selectedOptionItem,
-                    pressed && styles.pressedOptionItem
-                  ]}
-                  onPress={() => handleOptionSelect(activeOptions.onChange, item.value)}
-                  android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
-                >
-                  <View>
-                    <Text style={[
-                      styles.optionText,
-                      activeOptions.value === item.value && styles.selectedOptionText
-                    ]}>
-                      {item.label}
-                    </Text>
-                    {item.description && (
-                      <Text style={styles.optionDescription}>
-                        {item.description}
-                      </Text>
-                    )}
-                  </View>
-                  {activeOptions.value === item.value && (
-                    <Ionicons name="checkmark" size={22} color="#4CAF50" style={styles.checkIcon} />
-                  )}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        </View>
+        <OptionDropdown
+          visible={!!activeDropdown}
+          title={
+            activeDropdown === 'area' 
+              ? 'Select Body Area' 
+              : activeDropdown === 'duration'
+                ? 'Select Duration'
+                : 'Select Level'
+          }
+          options={
+            activeDropdown === 'area'
+              ? [
+                  { label: 'Hips & Legs', value: 'Hips & Legs', description: 'For sitting-related stiffness' },
+                  { label: 'Lower Back', value: 'Lower Back', description: 'For desk posture relief' },
+                  { label: 'Upper Back & Chest', value: 'Upper Back & Chest', description: 'For hunching & slouching' },
+                  { label: 'Shoulders & Arms', value: 'Shoulders & Arms', description: 'For desk-typing tension' },
+                  { label: 'Neck', value: 'Neck', description: 'For screen-staring strain' },
+                  { label: 'Full Body', value: 'Full Body', description: 'For complete rejuvenation' }
+                ]
+              : activeDropdown === 'duration'
+                ? [
+                    { label: '5 minutes', value: '5', description: 'Quick refresh' },
+                    { label: '10 minutes', value: '10', description: 'Standard session' },
+                    { label: '15 minutes', value: '15', description: 'Deep relief' }
+                  ]
+                : [
+                    { label: 'Beginner', value: 'beginner', description: 'Easy gentle stretches' },
+                    { label: 'Intermediate', value: 'intermediate', description: 'Moderate intensity' },
+                    { label: 'Advanced', value: 'advanced', description: 'Deep stretching' }
+                  ]
+          }
+          selectedValue={
+            activeDropdown === 'area'
+              ? area
+              : activeDropdown === 'duration'
+                ? duration
+                : level
+          }
+          onSelect={(value) => {
+            if (activeDropdown === 'area') {
+              setArea(value as BodyArea);
+            } else if (activeDropdown === 'duration') {
+              setDuration(value as Duration);
+            } else if (activeDropdown === 'level') {
+              setLevel(value as StretchLevel);
+            }
+            closeDropdown();
+          }}
+          onClose={closeDropdown}
+          slideAnim={slideAnim}
+          backdropOpacity={backdropOpacity}
+        />
       )}
     </SafeAreaView>
   );
 }
-
-// Optimized styles with memoized StyleSheet for better performance
-const styles = StyleSheet.create({
-  dropdownButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 15,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  dropdownButtonText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  dropdownContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: height * 0.7,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  dropdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  dropdownTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  optionsContainer: {
-    maxHeight: height * 0.6,
-  },
-  optionsContent: {
-    paddingBottom: Platform.OS === 'ios' ? 40 : 16,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  selectedOptionItem: {
-    backgroundColor: 'rgba(76, 175, 80, 0.08)',
-  },
-  pressedOptionItem: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  optionText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  selectedOptionText: {
-    fontWeight: '600',
-    color: '#4CAF50',
-  },
-  optionDescription: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  checkIcon: {
-    marginLeft: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 12 : 16,
-    paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-});

@@ -113,7 +113,7 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <Ionicons name={getIcon()} size={28} color="#FFFFFF" />
+        <Ionicons name={getIcon() as any} size={28} color="#FFFFFF" />
       </LinearGradient>
       
       <View style={styles.textContainer}>

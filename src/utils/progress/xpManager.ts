@@ -1,6 +1,7 @@
 import { ProgressEntry } from '../../types';
 import { UserProgress, XpAddResult, XpHistoryEntry, Level } from './types';
 import * as storageService from '../../services/storageService';
+import * as xpBoostManager from './xpBoostManager';
 
 /**
  * XP levels configuration
@@ -67,72 +68,80 @@ export const isFirstRoutineOfDay = (
 };
 
 /**
- * Calculates XP for a routine based on duration
- * Only first routine of the day earns XP
- * @param routine The routine to calculate XP for
- * @param isFirstEver Whether this is the very first routine ever
- * @returns XP amount and breakdown
+ * Calculate XP for a completed routine
+ * @param routine The completed routine
+ * @param isFirstRoutineOfDay Whether this is the first routine of the day
+ * @param isFirstEverRoutine Whether this is the user's first ever routine
+ * @returns XP earned and breakdown
  */
-export const calculateRoutineXP = (
+export const calculateRoutineXp = async (
   routine: ProgressEntry,
-  isFirstEver: boolean = false
-): { xp: number; breakdown: { source: string; amount: number; description: string }[] } => {
-  // Handle various duration formats
-  let durationMinutes: number;
+  isFirstRoutineOfDay: boolean,
+  isFirstEverRoutine: boolean
+): Promise<{ xp: number; breakdown: Array<{source: string; amount: number; description: string}> }> => {
+  // Initialize XP and breakdown
+  let totalXp = 0;
+  const breakdown: Array<{source: string; amount: number; description: string}> = [];
   
-  if (typeof routine.duration === 'string') {
-    // Duration is a string like "5", "10", "15" (in minutes)
-    durationMinutes = parseInt(routine.duration, 10);
-  } else if (typeof routine.duration === 'number') {
-    // Duration is already a number, but could be in seconds
-    // If it's a large number (> 100), assume it's in seconds and convert to minutes
-    if (routine.duration > 100) {
-      durationMinutes = Math.round(routine.duration / 60);
+  // Check if XP boost is active
+  const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
+  const xpMultiplier = isXpBoostActive ? xpBoostData.multiplier : 1;
+  
+  // Base XP for the routine - only awarded on first routine of the day
+  let baseXp = 0;
+  if (isFirstRoutineOfDay) {
+    // Calculate base XP based on duration
+    const duration = parseInt(routine.duration, 10);
+    if (duration <= 5) {
+      baseXp = 30;
+    } else if (duration <= 10) {
+      baseXp = 60;
     } else {
-      // Otherwise assume it's already in minutes
-      durationMinutes = routine.duration;
+      baseXp = 90;
     }
-  } else {
-    // Default to 0 if no valid duration
-    durationMinutes = 0;
+    
+    // Apply XP boost if active
+    if (isXpBoostActive) {
+      baseXp = Math.floor(baseXp * xpMultiplier);
+      
+      // Add base XP to breakdown with indication of boost
+      breakdown.push({
+        source: 'routine',
+        amount: baseXp,
+        description: `${duration}-Minute Routine (2x XP Boost Applied)`
+      });
+    } else {
+      // Add standard base XP to breakdown
+      breakdown.push({
+        source: 'routine',
+        amount: baseXp,
+        description: `${duration}-Minute Routine`
+      });
+    }
+    
+    totalXp += baseXp;
   }
   
-  let xp = 0;
-  const breakdown: { source: string; amount: number; description: string }[] = [];
-  
-  // Base XP based on duration (5/10/15 min brackets)
-  let baseXP = 0;
-  
-  // Award XP based on minutes
-  if (durationMinutes <= 5) {
-    baseXP = 30; // 5 min routine
-  } else if (durationMinutes <= 10) {
-    baseXP = 60; // 10 min routine
-  } else {
-    baseXP = 90; // 15+ min routine
-  }
-  
-  xp += baseXP;
-  breakdown.push({
-    source: 'routine',
-    amount: baseXP,
-    description: `${durationMinutes}-Minute Routine`
-  });
-  
-  // Welcome bonus for first ever routine (only applied once ever)
-  if (isFirstEver) {
+  // First-ever routine bonus (50 XP, not affected by XP boost)
+  if (isFirstEverRoutine) {
     const welcomeBonus = 50;
-    xp += welcomeBonus;
+    
+    // Add welcome bonus to breakdown
     breakdown.push({
       source: 'first_ever',
       amount: welcomeBonus,
       description: 'First Ever Routine Completed'
     });
+    
+    totalXp += welcomeBonus;
   }
   
-  console.log(`Calculated XP for ${durationMinutes}-minute routine: ${xp} XP (isFirstEver: ${isFirstEver})`);
+  // Any custom bonuses can be added here...
   
-  return { xp, breakdown };
+  return {
+    xp: totalXp,
+    breakdown
+  };
 };
 
 /**
@@ -268,7 +277,7 @@ export const processRoutineForXP = async (
     
     if (isFirstOfDay) {
       // Calculate XP for the routine
-      const { xp, breakdown } = calculateRoutineXP(routine, isFirstEver);
+      const { xp, breakdown } = await calculateRoutineXp(routine, isFirstOfDay, isFirstEver);
       
       console.log(`Routine qualifies for XP (first of day). Awarding ${xp} XP.`);
       

@@ -17,6 +17,7 @@ import { usePremium } from '../context/PremiumContext';
 import { useRoutineStorage } from '../hooks/useRoutineStorage';
 import { useRefresh } from '../context/RefreshContext';
 import useProgressSystem from '../hooks/useProgressSystem';
+import { useTheme } from '../context/ThemeContext';
 import {
   calculateStreak,
   calculateWeeklyActivity,
@@ -45,6 +46,9 @@ import { PremiumLockSimple } from '../components/progress/PremiumLockSimple';
 import { RefreshableScrollView } from '../components/common';
 import XpNotificationManager from '../components/XpNotificationManager';
 import { useChallengeSystem } from '../hooks/useChallengeSystem';
+import XpBoostCard from '../components/progress/XpBoostCard';
+import StreakFreezeCard from '../components/progress/StreakFreezeCard';
+import { useFeatureAccess } from '../hooks/useFeatureAccess';
 
 // Day names for labels
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -64,6 +68,7 @@ const INITIAL_PROGRESS_STATE = {
 
 export default function ProgressScreen({ navigation }) {
   const { isPremium } = usePremium();
+  const { theme, isDark } = useTheme();
   const { 
     recentRoutines, 
     getAllRoutines,
@@ -113,6 +118,9 @@ export default function ProgressScreen({ navigation }) {
     getMostActiveDay(stats.dayOfWeekBreakdown, DAY_NAMES), 
     [stats.dayOfWeekBreakdown]
   );
+  
+  // Use the feature access hook
+  const { canAccessFeature } = useFeatureAccess();
   
   // Synchronize data and load all routines when component mounts
   useEffect(() => {
@@ -381,6 +389,18 @@ export default function ProgressScreen({ navigation }) {
     }
   }, [activeTab, isLoading, refreshChallenges]);
   
+  // Handle XP Boost activation
+  const handleActivateXpBoost = () => {
+    Alert.alert(
+      'XP Boost Activated!',
+      'Your XP Boost is now active. All XP earned in the next 24 hours will be doubled.',
+      [{ text: 'OK' }]
+    );
+    
+    // Refresh progress data to reflect changes
+    handleRefresh();
+  };
+
   // Premium locked screen
   if (!isPremium) {
     console.log('Showing PremiumLock with XP:', progressSystemData?.totalXP || 0, 'and level:', progressSystemData?.level || 1);
@@ -395,12 +415,16 @@ export default function ProgressScreen({ navigation }) {
     );
   }
 
-  // Empty state
-  if (progressData.length === 0) {
+  // Check if user has completed routines but they're all hidden
+  const hasHiddenRoutinesOnly = allProgressData.length > 0 && progressData.length === 0;
+  
+  // Only show empty state if there's truly no data (not even hidden routines)
+  if (progressData.length === 0 && !hasHiddenRoutinesOnly) {
     return (
       <EmptyState
         isLoading={isLoading && isPremium}
         onStartRoutine={() => navigation.navigate('Home')}
+        allRoutinesHidden={false}
       />
     );
   }
@@ -441,11 +465,29 @@ export default function ProgressScreen({ navigation }) {
       case 'stats':
         return (
           <>
+            {/* Show notice when all routines are hidden */}
+            {hasHiddenRoutinesOnly && (
+              <View style={[styles.hiddenRouticesNotice, { 
+                backgroundColor: isDark ? theme.cardBackground : '#FFF',
+                borderColor: isDark ? '#FF9800' : '#FF9800'
+              }]}>
+                <Ionicons name="eye-off-outline" size={20} color="#FF9800" />
+                <Text style={styles.hiddenRoutinesText}>
+                  All routines are hidden. Stats are still available.
+                </Text>
+              </View>
+            )}
+            
             <StatsOverview
               totalMinutes={stats.totalMinutes}
               currentStreak={stats.currentStreak}
               totalRoutines={stats.totalRoutines}
             />
+            
+            {/* Only show streak freeze card for premium users with level 6+ */}
+            {isPremium && canAccessFeature('streak_freezes') && (
+              <StreakFreezeCard currentStreak={stats.currentStreak} />
+            )}
             
             <ConsistencyInsights
               activeRoutineDays={stats.activeRoutineDays}
@@ -508,12 +550,30 @@ export default function ProgressScreen({ navigation }) {
         );
         
       case 'rewards':
+        if (!isPremium) {
+          return (
+            <PremiumLock
+              onOpenSubscription={handleUpgradeToPremium}
+              subscriptionModalVisible={false}
+              onCloseSubscription={() => {}}
+              totalXP={progressSystemData?.totalXP || 0}
+              level={progressSystemData?.level || 1}
+            />
+          );
+        }
+        
         return (
-          <Rewards
-            userLevel={progressSystemData?.level || 1}
-            isPremium={isPremium}
-            onUpgradeToPremium={handleUpgradeToPremium}
-          />
+          <View style={styles.tabContent}>
+            {/* Include XP Boost card at the top of rewards tab */}
+            <XpBoostCard onActivateBoost={handleActivateXpBoost} />
+            
+            {/* Existing rewards section */}
+            <Rewards
+              userLevel={progressSystemData?.level || 1}
+              isPremium={isPremium}
+              onUpgradeToPremium={handleUpgradeToPremium}
+            />
+          </View>
         );
         
       default:
@@ -829,5 +889,22 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     padding: 24,
+  },
+  hiddenRouticesNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#FF9800',
+    borderRadius: 8,
+  },
+  hiddenRoutinesText: {
+    color: '#FF9800',
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });

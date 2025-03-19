@@ -1,18 +1,30 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
+import { useTheme } from '../../context/ThemeContext';
 
 interface FocusAreasProps {
   areaBreakdown: Record<string, number>;
   totalRoutines: number;
+  theme?: any; // Optional theme prop passed from parent
+  isDark?: boolean; // Optional isDark flag passed from parent
 }
 
 const FocusAreas: React.FC<FocusAreasProps> = ({
   areaBreakdown,
-  totalRoutines
+  totalRoutines,
+  theme: propTheme,
+  isDark: propIsDark
 }) => {
+  // Use theme from props if provided, otherwise use theme context
+  const themeContext = useTheme();
+  const theme = propTheme || themeContext.theme;
+  const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+
   // Convert area breakdown to chart data
   const getAreaBreakdownChartData = () => {
+    // We'll keep the same colors regardless of theme for the pie slices
+    // The colors provide enough contrast on their own in both light/dark modes
     const colors = [
       '#4CAF50', // Primary green
       '#8BC34A', // Light green
@@ -21,7 +33,7 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
       '#9C27B0', // Purple
       '#F44336'  // Red
     ];
-    
+
     return Object.entries(areaBreakdown)
       .sort((a, b) => b[1] - a[1]) // Sort by frequency descending
       .map(([area, count], index) => {
@@ -29,26 +41,46 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
           name: area,
           count: count,
           color: colors[index % colors.length],
-          legendFontColor: '#7F7F7F',
+          legendFontColor: isDark ? theme.textSecondary : '#7F7F7F',
           legendFontSize: 12
         };
       });
   };
 
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, {
+      backgroundColor: isDark ? theme.cardBackground : '#FFF',
+      shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
+      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
+      borderWidth: isDark ? 1 : 0
+    }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Focus Areas</Text>
-        <Text style={styles.dateRangeText}>All Time</Text>
+        <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+          Focus Areas
+        </Text>
+        <Text style={[styles.dateRangeText, { color: isDark ? theme.textSecondary : '#666' }]}>
+          All Time
+        </Text>
       </View>
       {Object.keys(areaBreakdown).length > 0 ? (
         <View>
           <PieChart
-            data={getAreaBreakdownChartData()}
+            data={getAreaBreakdownChartData().map(item => ({
+              ...item,
+              // Truncate long names in the legend
+              name: item.name.length > 15 ? item.name.substring(0, 13) + '...' : item.name,
+              // Smaller font size for the legend to fit more text
+              legendFontSize: 11
+            }))}
             width={Dimensions.get('window').width - 32}
-            height={180}
+            height={200}
             chartConfig={{
-              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              color: (opacity = 1) => isDark
+                ? `rgba(255, 255, 255, ${opacity})`
+                : `rgba(0, 0, 0, ${opacity})`,
+              labelColor: (opacity = 1) => isDark
+                ? `rgba(255, 255, 255, ${opacity})`
+                : `rgba(0, 0, 0, ${opacity})`,
             }}
             accessor="count"
             backgroundColor="transparent"
@@ -59,10 +91,15 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
             {Object.entries(areaBreakdown)
               .sort((a, b) => b[1] - a[1])
               .map(([area, count], index) => (
-                <View key={area} style={styles.areaBreakdownItem}>
-                  <Text style={styles.areaBreakdownName}>{area}</Text>
-                  <Text style={styles.areaBreakdownCount}>
-                    {String(count)} {count === 1 ? 'activity' : 'activities'} 
+                <View key={area} style={[
+                  styles.areaBreakdownItem,
+                  { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#F0F0F0' }
+                ]}>
+                  <Text style={[styles.areaBreakdownName, { color: isDark ? theme.text : '#333' }]}>
+                    {area}
+                  </Text>
+                  <Text style={[styles.areaBreakdownCount, { color: isDark ? theme.textSecondary : '#666' }]}>
+                    {String(count)} {count === 1 ? 'activity' : 'activities'}
                     {' '}({Math.round((count / totalRoutines) * 100)}%)
                   </Text>
                 </View>
@@ -71,7 +108,9 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
           </View>
         </View>
       ) : (
-        <Text style={styles.emptyText}>Complete some routines to see your focus area breakdown</Text>
+        <Text style={[styles.emptyText, { color: isDark ? theme.textSecondary : '#666' }]}>
+          Complete some routines to see your focus area breakdown
+        </Text>
       )}
     </View>
   );
@@ -133,4 +172,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FocusAreas; 
+export default FocusAreas;

@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration, Stretch, StretchLevel } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
 import { useRoutineTimer } from '../../hooks/useRoutineTimer';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -33,6 +34,8 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   onComplete,
   onNavigateHome
 }) => {
+  const { theme, isDark } = useTheme();
+  
   // Generate the routine
   const [routine, setRoutine] = useState<Stretch[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -177,16 +180,19 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // If routine is not loaded yet, show loading
   if (!routine || routine.length === 0 || !currentStretch) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Creating your routine...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
+        <Text style={[styles.loadingText, { color: isDark ? theme.text : '#333' }]}>Creating your routine...</Text>
       </View>
     );
   }
   
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: isDark ? theme.background : '#FFF' }}>
       {/* Header with progress */}
-      <View style={styles.header}>
+      <View style={[styles.header, { 
+        backgroundColor: isDark ? theme.cardBackground : '#FFF',
+        borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
+      }]}>
         <TouchableOpacity 
           style={styles.backButton} 
           onPress={() => {
@@ -200,43 +206,56 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
             );
           }}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={isDark ? theme.text : "#333"} />
         </TouchableOpacity>
         
         <View style={styles.progressContainer}>
-          <View style={styles.progressTrack}>
+          <View style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0' }]}>
             <Animated.View 
               style={[
                 styles.progressFill, 
-                { width: progressAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['100%', '0%']
-                })}
+                { 
+                  backgroundColor: isDark ? theme.accent : '#4CAF50',
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['100%', '0%']
+                  })
+                }
               ]} 
             />
           </View>
-          <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
+          <Text style={[styles.timerText, { color: isDark ? theme.textSecondary : '#666' }]}>
+            {formatTime(timeRemaining)}
+          </Text>
         </View>
         
-        <Text style={styles.progressText}>
+        <Text style={[styles.progressText, { color: isDark ? theme.textSecondary : '#666' }]}>
           {currentIndex + 1}/{routine.length}
         </Text>
       </View>
       
       {/* Main content */}
       <Animated.View 
-        style={[styles.stretchContainer, { opacity: fadeAnim }]}
+        style={[styles.stretchContainer, { 
+          opacity: fadeAnim,
+          backgroundColor: isDark ? theme.background : '#FFF'
+        }]}
       >
-        <Text style={styles.stretchName}>{currentStretch.name}</Text>
+        <Text style={[styles.stretchName, { color: isDark ? theme.text : '#333' }]}>
+          {currentStretch.name}
+        </Text>
         
         {currentStretch.bilateral && (
-          <View style={styles.bilateralBadge}>
+          <View style={[styles.bilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
             <Ionicons name="swap-horizontal" size={16} color="#FFF" />
             <Text style={styles.bilateralText}>Both Sides</Text>
           </View>
         )}
         
-        <View style={styles.imageContainer}>
+        <View style={[styles.imageContainer, { 
+          backgroundColor: isDark ? theme.cardBackground : '#FFF',
+          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+        }]}>
           {currentStretch.image && (
             <Image 
               source={currentStretch.image} 
@@ -246,15 +265,26 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           )}
         </View>
         
-        <ScrollView style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText}>
+        <ScrollView style={[styles.descriptionContainer, { 
+          backgroundColor: isDark ? theme.cardBackground : '#FFF',
+          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+        }]}>
+          <Text style={[styles.descriptionText, { color: isDark ? theme.text : '#333' }]}>
             {currentStretch.description}
           </Text>
           
           {currentStretch.bilateral && (
-            <View style={styles.bilateralInstructions}>
-              <Ionicons name="information-circle-outline" size={20} color="#4CAF50" />
-              <Text style={styles.bilateralInstructionsText}>
+            <View style={[styles.bilateralInstructions, { 
+              backgroundColor: isDark ? 'rgba(76, 175, 80, 0.2)' : '#E8F5E9'
+            }]}>
+              <Ionicons 
+                name="information-circle-outline" 
+                size={20} 
+                color={isDark ? theme.accent : "#4CAF50"} 
+              />
+              <Text style={[styles.bilateralInstructionsText, { 
+                color: isDark ? theme.accent : '#2E7D32'
+              }]}>
                 This stretch should be performed on both sides. The timer will count down for the total time.
               </Text>
             </View>
@@ -263,12 +293,19 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       </Animated.View>
       
       {/* Improved Controls */}
-      <View style={styles.controlsContainer}>
+      <View style={[styles.controlsContainer, { 
+        backgroundColor: isDark ? theme.cardBackground : '#FFF',
+        borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
+      }]}>
         <TouchableOpacity 
           style={[
             styles.controlButton, 
             styles.sideButton,
-            currentIndex === 0 && styles.disabledButton
+            currentIndex === 0 && styles.disabledButton,
+            { 
+              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
+              opacity: currentIndex === 0 ? 0.7 : 1
+            }
           ]} 
           onPress={handlePrevious}
           disabled={currentIndex === 0}
@@ -277,11 +314,16 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
             <Ionicons 
               name="chevron-back" 
               size={28} 
-              color={currentIndex === 0 ? "#CCC" : "#333"} 
+              color={currentIndex === 0 
+                ? (isDark ? "rgba(255,255,255,0.3)" : "#CCC") 
+                : (isDark ? theme.text : "#333")} 
             />
             <Text style={[
               styles.controlText, 
-              currentIndex === 0 && styles.disabledText
+              currentIndex === 0 && styles.disabledText,
+              { color: currentIndex === 0 
+                ? (isDark ? "rgba(255,255,255,0.3)" : "#AAA") 
+                : (isDark ? theme.text : "#333") }
             ]}>
               Previous
             </Text>
@@ -292,25 +334,36 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           style={styles.centerButton} 
           onPress={togglePause}
         >
-          <View style={styles.centerButtonInner}>
+          <View style={[styles.centerButtonInner, { 
+            backgroundColor: isDark ? theme.accent : '#4CAF50',
+            shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+          }]}>
             <Ionicons 
               name={isPaused ? "play" : "pause"} 
               size={32} 
               color="#FFF" 
             />
           </View>
-          <Text style={styles.pauseText}>
+          <Text style={[styles.pauseText, { color: isDark ? theme.text : '#333' }]}>
             {isPaused ? "Resume" : "Pause"}
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.controlButton, styles.sideButton]} 
+          style={[
+            styles.controlButton, 
+            styles.sideButton,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }
+          ]} 
           onPress={handleNext}
         >
           <View style={styles.buttonContentWrapper}>
-            <Ionicons name="chevron-forward" size={28} color="#333" />
-            <Text style={styles.controlText}>
+            <Ionicons 
+              name="chevron-forward" 
+              size={28} 
+              color={isDark ? theme.text : "#333"} 
+            />
+            <Text style={[styles.controlText, { color: isDark ? theme.text : '#333' }]}>
               {currentIndex < routine.length - 1 ? "Next" : "Finish"}
             </Text>
           </View>
@@ -318,17 +371,24 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       </View>
       
       {/* Overall progress */}
-      <View style={styles.overallProgressContainer}>
-        <View style={styles.overallProgressTrack}>
+      <View style={[styles.overallProgressContainer, { 
+        backgroundColor: isDark ? theme.cardBackground : '#FFF'
+      }]}>
+        <View style={[styles.overallProgressTrack, { 
+          backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'
+        }]}>
           <Animated.View 
             style={[
               styles.overallProgressFill, 
-              { width: `${calculateOverallProgress() * 100}%` }
+              { 
+                width: `${calculateOverallProgress() * 100}%`,
+                backgroundColor: '#FF9800' // Keep this color for visibility in both modes
+              }
             ]} 
           />
         </View>
       </View>
-    </>
+    </View>
   );
 };
 

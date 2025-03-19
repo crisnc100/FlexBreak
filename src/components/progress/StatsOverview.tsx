@@ -1,51 +1,101 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
 
 interface StatsOverviewProps {
   totalMinutes: number;
   currentStreak: number;
   totalRoutines: number;
+  theme?: any; // Optional theme prop passed from parent
+  isDark?: boolean; // Optional isDark flag passed from parent
 }
 
 const StatsOverview: React.FC<StatsOverviewProps> = ({
   totalMinutes,
   currentStreak,
-  totalRoutines
+  totalRoutines,
+  theme: propTheme,
+  isDark: propIsDark
 }) => {
+  // Use theme from props if provided, otherwise use theme context
+  const themeContext = useTheme();
+  const theme = propTheme || themeContext.theme;
+  const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+
   return (
-    <>
+    <View style={{ backgroundColor: isDark ? theme.background : 'transparent' }}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Progress</Text>
-        <Text style={styles.headerSubtitle}>Keep up the great work!</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? theme.text : '#333' }]}>
+          Your Progress
+        </Text>
+        <Text style={[styles.headerSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+          Keep up the great work!
+        </Text>
       </View>
       
       <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
+        {/* Total Minutes Stat */}
+        <View style={[styles.statCard, { 
+          backgroundColor: isDark ? theme.cardBackground : '#FFF',
+          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
+          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
+          borderWidth: isDark ? 1 : 0
+        }]}>
+          <View style={[styles.statIconContainer, { 
+            backgroundColor: isDark ? 'rgba(76, 175, 80, 0.2)' : '#F0F0F0'
+          }]}>
             <Ionicons name="time-outline" size={20} color="#4CAF50" />
           </View>
-          <Text style={styles.statValue}>{totalMinutes}</Text>
-          <Text style={styles.statLabel}>Total Minutes</Text>
+          <Text style={[styles.statValue, { color: isDark ? theme.text : '#333' }]}>
+            {totalMinutes}
+          </Text>
+          <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+            Total Minutes
+          </Text>
         </View>
         
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
+        {/* Streak Stat */}
+        <View style={[styles.statCard, { 
+          backgroundColor: isDark ? theme.cardBackground : '#FFF',
+          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
+          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
+          borderWidth: isDark ? 1 : 0
+        }]}>
+          <View style={[styles.statIconContainer, { 
+            backgroundColor: isDark ? 'rgba(255, 152, 0, 0.2)' : '#F0F0F0'
+          }]}>
             <Ionicons name="flame-outline" size={20} color="#FF9800" />
           </View>
-          <Text style={styles.statValue}>{currentStreak}</Text>
-          <Text style={styles.statLabel}>Day Streak</Text>
+          <Text style={[styles.statValue, { color: isDark ? theme.text : '#333' }]}>
+            {currentStreak}
+          </Text>
+          <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+            Day Streak
+          </Text>
         </View>
         
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
+        {/* Routines Stat */}
+        <View style={[styles.statCard, { 
+          backgroundColor: isDark ? theme.cardBackground : '#FFF',
+          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
+          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
+          borderWidth: isDark ? 1 : 0
+        }]}>
+          <View style={[styles.statIconContainer, { 
+            backgroundColor: isDark ? 'rgba(33, 150, 243, 0.2)' : '#F0F0F0'
+          }]}>
             <Ionicons name="fitness-outline" size={20} color="#2196F3" />
           </View>
-          <Text style={styles.statValue}>{totalRoutines}</Text>
-          <Text style={styles.statLabel}>Routines</Text>
+          <Text style={[styles.statValue, { color: isDark ? theme.text : '#333' }]}>
+            {totalRoutines}
+          </Text>
+          <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+            Routines
+          </Text>
         </View>
       </View>
-    </>
+    </View>
   );
 };
 
@@ -105,4 +155,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StatsOverview; 
+export default StatsOverview;

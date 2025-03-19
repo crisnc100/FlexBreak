@@ -13,6 +13,8 @@ import { BodyArea, Duration, RoutineParams } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
 import { saveFavoriteRoutine } from '../../services/storageService';
 import XpNotificationManager from '../XpNotificationManager';
+import { useTheme } from '../../context/ThemeContext';
+import { createThemedStyles } from '../../utils/themeUtils';
 
 export interface CompletedRoutineProps {
   area: BodyArea;
@@ -36,6 +38,8 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   onOpenSubscription
 }) => {
   const navigation = useNavigation<AppNavigationProp>();
+  const { theme, isDark } = useTheme();
+  const styles = themedStyles(theme);
   
   // Generate the routine to get the number of stretches
   const routine = generateRoutine(area, duration, 'beginner');
@@ -132,7 +136,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         activeOpacity={1}
         onPress={onShowDashboard}
       >
-        <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+        <Ionicons name="checkmark-circle" size={80} color={theme.success} />
         <Text style={styles.completedTitle}>Routine Complete!</Text>
         <Text style={styles.completedSubtitle}>Great job on your stretching routine</Text>
         
@@ -171,7 +175,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
               
               return (
                 <View key={`${item.source}-${index}`} style={styles.xpBreakdownItem}>
-                  <Ionicons name={iconName} size={16} color={item.amount > 0 ? "#FF9800" : "#999"} />
+                  <Ionicons name={iconName as any} size={16} color={item.amount > 0 ? "#FF9800" : theme.textSecondary} />
                   <Text style={[
                     styles.xpBreakdownText, 
                     item.amount === 0 && styles.xpBreakdownZero
@@ -199,19 +203,19 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={24} color="#666" />
+            <Ionicons name="time-outline" size={24} color={theme.textSecondary} />
             <Text style={styles.statValue}>{duration} mins</Text>
             <Text style={styles.statLabel}>Duration</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="fitness-outline" size={24} color="#666" />
+            <Ionicons name="fitness-outline" size={24} color={theme.textSecondary} />
             <Text style={styles.statValue}>{routine.length}</Text>
             <Text style={styles.statLabel}>Stretches</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="body-outline" size={24} color="#666" />
+            <Ionicons name="body-outline" size={24} color={theme.textSecondary} />
             <Text style={styles.statValue}>{area}</Text>
             <Text style={styles.statLabel}>Focus Area</Text>
           </View>
@@ -245,102 +249,80 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                 <Ionicons name="bulb" size={20} color="#FFF" />
                 <Text style={styles.buttonText}>Smart Pick</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.button, styles.newRoutineButton]} 
-                onPress={handleNewRoutine}
-              >
-                <Ionicons name="home-outline" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>New Routine</Text>
-              </TouchableOpacity>
             </>
           ) : (
-            <>
-              <TouchableOpacity 
-                style={[styles.button, styles.premiumButton]} 
-                onPress={onOpenSubscription}
-              >
-                <Ionicons name="lock-closed" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>Save</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.button, styles.shareButton]} 
-                onPress={handleShare}
-              >
-                <Ionicons name="share-social-outline" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>Share</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.button, styles.newRoutineButton]} 
-                onPress={handleNewRoutine}
-              >
-                <Ionicons name="home-outline" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>New Routine</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity 
+              style={[styles.button, styles.premiumButton]} 
+              onPress={onOpenSubscription}
+            >
+              <Ionicons name="star" size={20} color="#FFF" />
+              <Text style={styles.buttonText}>Get Premium</Text>
+            </TouchableOpacity>
           )}
+          
+          <TouchableOpacity 
+            style={[styles.button, styles.newRoutineButton]} 
+            onPress={handleNewRoutine}
+          >
+            <Ionicons name="home-outline" size={20} color="#FFF" />
+            <Text style={styles.buttonText}>New Routine</Text>
+          </TouchableOpacity>
         </View>
-        
-        <Text style={styles.hintText}>Tap anywhere to view your routine history</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+// Use the createThemedStyles function to create styles that adapt to the theme
+const themedStyles = createThemedStyles(theme => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.background,
   },
   completedContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 20,
+    backgroundColor: theme.cardBackground,
   },
   completedTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
+    marginTop: 20,
+    marginBottom: 10,
+    color: theme.text,
   },
   completedSubtitle: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    color: theme.textSecondary,
   },
-  // New XP container styling
   xpContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E1',
-    paddingVertical: 8,
+    backgroundColor: theme.backgroundLight,
     paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 20,
     marginBottom: 24,
   },
   xpText: {
     fontSize: 16,
-    color: '#333',
     marginLeft: 8,
+    color: theme.text,
   },
   xpValue: {
     fontWeight: 'bold',
     color: '#FF9800',
-    fontSize: 18,
   },
   xpBreakdownContainer: {
-    marginVertical: 16,
-    backgroundColor: '#FFF8E1',
-    borderRadius: 12,
-    padding: 16,
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: theme.backgroundLight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 24,
   },
   xpTotalRow: {
     flexDirection: 'row',
@@ -349,25 +331,24 @@ const styles = StyleSheet.create({
   },
   xpTotalText: {
     fontSize: 18,
-    color: '#333',
     marginLeft: 8,
-    fontWeight: 'bold',
+    color: theme.text,
   },
   xpSeparator: {
     height: 1,
-    backgroundColor: 'rgba(255, 152, 0, 0.3)',
+    backgroundColor: theme.border,
     marginVertical: 8,
   },
   xpBreakdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    paddingVertical: 4,
+    marginVertical: 4,
   },
   xpBreakdownText: {
-    marginLeft: 8,
     fontSize: 14,
-    color: '#666',
+    marginLeft: 8,
+    color: theme.text,
+    flex: 1,
   },
   xpBreakdownValue: {
     fontWeight: 'bold',
@@ -375,42 +356,39 @@ const styles = StyleSheet.create({
   },
   xpBreakdownZero: {
     fontWeight: 'bold',
-    color: '#999',
+    color: theme.textSecondary,
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     width: '100%',
-    marginBottom: 32,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 16,
+    marginBottom: 30,
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 8,
+    color: theme.text,
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSecondary,
   },
   nextStepsText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
     marginBottom: 16,
-    textAlign: 'center',
+    color: theme.text,
   },
   buttonContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    marginBottom: 24,
+    width: '100%',
   },
   button: {
     flexDirection: 'row',
@@ -418,37 +396,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 8,
-    margin: 8,
+    borderRadius: 25,
+    marginHorizontal: 6,
+    marginBottom: 12,
     minWidth: 120,
   },
   buttonText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 14,
-    marginLeft: 8,
+    marginLeft: 6,
   },
   favoriteButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF9800',
   },
   shareButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#03A9F4',
   },
-  newRoutineButton: {
+  smartPickButton: {
     backgroundColor: '#9C27B0',
   },
   premiumButton: {
     backgroundColor: '#FF9800',
+    minWidth: 150,
   },
-  smartPickButton: {
-    backgroundColor: '#FF9800',
+  newRoutineButton: {
+    backgroundColor: theme.accent,
+    minWidth: 150,
   },
-  hintText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 8,
-  }
-});
+}));
 
 export default CompletedRoutine;
