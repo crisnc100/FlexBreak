@@ -7,9 +7,19 @@ import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification } from '../../hooks/useGamification';
 
-export const ChallengeList = () => {
+interface ChallengeListProps {
+  isDark?: boolean;
+  theme?: any;
+}
+
+export const ChallengeList: React.FC<ChallengeListProps> = ({ isDark: propIsDark, theme: propTheme }) => {
   const { activeChallenges, loading, claimChallenge, refreshChallenges } = useChallengeSystem();
-  const { theme } = useTheme();
+  const themeContext = useTheme();
+  
+  // Use props if provided, otherwise use the context values
+  const theme = propTheme || themeContext.theme;
+  const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+  
   const { addXp } = useGamification();
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'special'>('daily');
@@ -118,7 +128,10 @@ export const ChallengeList = () => {
         key={challenge.id} 
         style={[
           styles.challengeCard, 
-          { backgroundColor: theme.cardBackground },
+          { 
+            backgroundColor: theme.cardBackground,
+            shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+          },
           isExpiring && styles.expiringCard,
           // Highlight claimable challenges
           isClaimable && { 
@@ -159,24 +172,46 @@ export const ChallengeList = () => {
           <View 
             style={[
               styles.progressBar, 
-              { backgroundColor: theme.backgroundLight }
+              { 
+                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : theme.backgroundLight,
+                borderWidth: isDark ? 1 : 0,
+                borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'transparent'
+              }
             ]}
           >
             <LinearGradient
-              colors={isEffectivelyCompleted ? [theme.success, theme.successLight] : [theme.accent, theme.accentLight]}
+              colors={
+                isEffectivelyCompleted 
+                  ? isDark 
+                    ? ['#2E7D32', '#4CAF50'] // Darker success gradient for dark mode
+                    : [theme.success, theme.successLight] 
+                  : isDark 
+                    ? ['#1976D2', '#42A5F5'] // Darker accent gradient for dark mode
+                    : [theme.accent, theme.accentLight]
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[
                 styles.progressFill,
-                { width: `${progress * 100}%` }
+                { 
+                  width: `${progress * 100}%`,
+                  // Add subtle glow in dark mode
+                  shadowColor: isDark ? (isEffectivelyCompleted ? '#4CAF50' : '#2196F3') : 'transparent',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: isDark ? 0.5 : 0,
+                  shadowRadius: isDark ? 3 : 0
+                }
               ]}
             />
           </View>
           <Text style={[
             styles.progressText, 
             { 
-              color: isEffectivelyCompleted ? theme.success : 
-                    (isInProgress ? theme.accent : theme.textSecondary) 
+              color: isEffectivelyCompleted 
+                ? theme.success
+                : isInProgress 
+                  ? theme.accent 
+                  : theme.textSecondary
             }
           ]}>
             {challenge.progress}/{challenge.requirement} ({progressPercentage}%)
@@ -187,7 +222,15 @@ export const ChallengeList = () => {
           <TouchableOpacity 
             style={[
               styles.claimButton, 
-              { backgroundColor: theme.accent }
+              { 
+                backgroundColor: theme.accent,
+                // Add subtle glow effect in dark mode
+                shadowColor: isDark ? theme.accent : 'transparent',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: isDark ? 0.5 : 0,
+                shadowRadius: isDark ? 5 : 0,
+                elevation: isDark ? 4 : 2
+              }
             ]}
             onPress={() => handleClaim(challenge)}
             disabled={isClaimInProgress}
@@ -238,7 +281,7 @@ export const ChallengeList = () => {
     ];
 
     return (
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE', borderBottomWidth: 1 }]}>
         {tabs.map(tab => (
           <TouchableOpacity
             key={tab.key}
@@ -250,7 +293,7 @@ export const ChallengeList = () => {
               },
               activeTab !== tab.key && { 
                 backgroundColor: 'transparent',
-                borderColor: theme.border
+                borderColor: isDark ? 'rgba(255,255,255,0.2)' : theme.border
               }
             ]}
             onPress={() => setActiveTab(tab.key)}
@@ -258,7 +301,7 @@ export const ChallengeList = () => {
             <Text 
               style={[
                 styles.tabText,
-                { color: activeTab === tab.key ? '#fff' : theme.textSecondary }
+                { color: activeTab === tab.key ? '#fff' : isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary }
               ]}
             >
               {tab.label}
@@ -276,30 +319,30 @@ export const ChallengeList = () => {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
+      <View style={[styles.container, styles.centered, { backgroundColor: isDark ? theme.background : '#FAFAFA' }]}>
         <ActivityIndicator size="large" color={theme.accent} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? theme.background : '#FAFAFA' }]}>
       {renderTabButtons()}
       
       <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}
       >
         {getActiveChallengesForTab().length > 0 ? (
           getActiveChallengesForTab().map(challenge => renderChallengeCard(challenge))
         ) : (
-          <View style={styles.emptyContainer}>
+          <View style={[styles.emptyContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9F9F9' }]}>
             <MaterialCommunityIcons 
               name="trophy-outline" 
               size={50} 
-              color={theme.textSecondary} 
+              color={isDark ? 'rgba(255,255,255,0.3)' : theme.textSecondary} 
             />
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            <Text style={[styles.emptyText, { color: isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary }]}>
               No active {activeTab} challenges
             </Text>
           </View>

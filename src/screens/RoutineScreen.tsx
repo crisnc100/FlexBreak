@@ -23,6 +23,18 @@ import { useGamification } from '../hooks/useGamification';
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
 
+// Add type for the levelUp prop to match CompletedRoutineProps
+type LevelUpData = {
+  oldLevel: number;
+  newLevel: number;
+  rewards?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    type: 'feature' | 'item' | 'cosmetic';
+  }>;
+};
+
 export default function RoutineScreen() {
   // Use our custom hooks
   const { area, duration, level, hasParams, navigateToHome, resetParams, navigateToRoutine } = useRoutineParams();
@@ -62,6 +74,9 @@ export default function RoutineScreen() {
   
   // Add state for storing XP breakdown
   const [xpBreakdown, setXpBreakdown] = useState<Array<{ source: string; amount: number; description: string }>>([]);
+  
+  // Add state for level-up data
+  const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
   
   // Effect for initial load and param changes
   useEffect(() => {
@@ -179,9 +194,88 @@ export default function RoutineScreen() {
           console.log(`Total XP earned: ${totalXpEarned}`);
           console.log('XP Breakdown:', breakdownItems);
           
-          // Check for level up
-          if (result.levelUp) {
-            console.log(`Level up! New level: ${result.newLevel}`);
+          // Extract level-up information if available
+          let levelUpInfo: LevelUpData | null = null;
+          
+          // Check if we have a level-up condition
+          if (result.levelUp === true && result.newLevel > 0) {
+            // Calculate oldLevel as newLevel-1 if not provided
+            const oldLevel = result.newLevel > 1 ? result.newLevel - 1 : 1;
+            console.log(`🎉 Level Up! ${oldLevel} → ${result.newLevel}`);
+            console.log('Level up data detected, result content:', JSON.stringify(result, null, 2));
+            
+            // Create the levelUp object to pass to CompletedRoutine
+            levelUpInfo = {
+              oldLevel: oldLevel,
+              newLevel: result.newLevel,
+              rewards: []
+            };
+            
+            // Handle different property names for rewards in the result
+            const rewards = result.unlockedRewards || 
+                           (result as any).newlyUnlockedRewards || 
+                           [];
+            
+            // Add unlocked rewards if any
+            if (rewards && rewards.length > 0) {
+              // Create properly typed rewards array
+              levelUpInfo.rewards = rewards.map(reward => {
+                // Extract reward details, providing defaults if properties don't exist
+                const rewardName = reward.title || reward.name || 'New Reward';
+                console.log(`Reward unlocked: ${rewardName} (Level ${result.newLevel})`);
+                
+                // Ensure the type is one of the allowed values
+                let rewardType: 'feature' | 'item' | 'cosmetic' = 'feature';
+                if (reward.type === 'item' || reward.type === 'cosmetic') {
+                  rewardType = reward.type;
+                } else if (reward.type === 'app_feature') {
+                  rewardType = 'feature';
+                }
+                
+                return {
+                  id: reward.id || `reward-${Date.now()}`,
+                  name: rewardName,
+                  description: reward.description || `Unlocked at level ${result.newLevel}`,
+                  type: rewardType
+                };
+              });
+            }
+            
+            // If we have a level up but no rewards, create a fake reward for dark mode
+            // This is a fallback for testing
+            if (levelUpInfo.rewards.length === 0 && result.newLevel === 2) {
+              console.log('Adding fallback reward for Dark Theme at level 2');
+              levelUpInfo.rewards.push({
+                id: 'dark_theme',
+                name: 'Dark Theme',
+                description: 'Enable a sleek dark mode for comfortable evening stretching',
+                type: 'feature'
+              });
+            }
+          } else {
+            console.log('No level up detected in result. levelUp:', result.levelUp);
+          }
+          
+          // Store level-up data in component state
+          setLevelUpData(levelUpInfo);
+          console.log('Level-up data being passed to CompletedRoutine:', JSON.stringify(levelUpInfo, null, 2));
+          
+          // For testing: Force a level-up UI if none is detected but XP is earned
+          // Remove this in production
+          if (!levelUpInfo && result.xpEarned > 0) {
+            console.log('⚠️ TESTING OVERRIDE: Creating mock level-up data for UI testing');
+            const mockLevelUpData: LevelUpData = {
+              oldLevel: 1,
+              newLevel: 2,
+              rewards: [{
+                id: 'dark_theme',
+                name: 'Dark Theme',
+                description: 'Enable a sleek dark mode for comfortable evening stretching',
+                type: 'feature'
+              }]
+            };
+            setLevelUpData(mockLevelUpData);
+            console.log('Mock level-up data:', JSON.stringify(mockLevelUpData, null, 2));
           }
           
           // Check for completed challenges
@@ -394,6 +488,7 @@ export default function RoutineScreen() {
           isPremium={isPremium}
           xpEarned={routineXpEarned}
           xpBreakdown={xpBreakdown}
+          levelUp={levelUpData}
           onShowDashboard={showDashboard}
           onNavigateHome={handleCreateNewRoutine}
           onOpenSubscription={() => setSubscriptionModalVisible(true)}

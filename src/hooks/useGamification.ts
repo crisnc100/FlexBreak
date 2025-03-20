@@ -65,6 +65,7 @@ export function useGamification() {
     try {
       // Process through the gamification system
       const result = await gamificationManager.processCompletedRoutine(routine);
+      console.log('Raw result from gamificationManager.processCompletedRoutine:', JSON.stringify(result, null, 2));
       
       // Update state with results
       if (result.xpEarned > 0) {
@@ -72,6 +73,7 @@ export function useGamification() {
       }
       
       if (result.levelUp) {
+        console.log('Level up detected in useGamification.processRoutine!');
         setLevel(result.newLevel);
       }
       
@@ -83,7 +85,8 @@ export function useGamification() {
       // Refresh all data
       await loadGamificationData();
       
-      return {
+      // Log what's being returned to the component
+      const returnValue = {
         success: true,
         xpEarned: result.xpEarned,
         levelUp: result.levelUp,
@@ -92,6 +95,9 @@ export function useGamification() {
         completedChallenges: result.completedChallenges,
         unlockedRewards: result.newlyUnlockedRewards
       };
+      console.log('Returning from useGamification.processRoutine:', JSON.stringify(returnValue, null, 2));
+      
+      return returnValue;
     } catch (error) {
       console.error('Error processing routine:', error);
       return {

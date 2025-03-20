@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification } from '../../hooks/useGamification';
 import { LEVELS } from '../../utils/progress/xpManager';
-
+import { useTheme } from '../../context/ThemeContext';
 // Simple date formatter function to replace date-fns
 const formatTimeAgo = (dateString: string): string => {
   try {
@@ -289,34 +289,57 @@ export const calculateTotalXP = (achievements: Array<{id: string; xp: number}>):
 };
 
 // Achievement card component with progress indicator and completion time
-const AchievementCard = ({ achievement, onPress }) => (
+const AchievementCard = ({ achievement, onPress, isDark, theme }) => (
   <TouchableOpacity 
     style={[
       styles.achievementCard, 
       !achievement.isUnlocked && styles.achievementLocked,
-      achievement.isUnlocked && styles.achievementUnlocked
+      achievement.isUnlocked && styles.achievementUnlocked,
+      { 
+        backgroundColor: isDark ? theme.cardBackground : '#FFF',
+        borderColor: achievement.isUnlocked 
+          ? isDark ? theme.accent : '#4CAF50'
+          : isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE'
+      }
     ]}
     onPress={() => onPress(achievement)}
   >
     <View style={[
       styles.achievementIconContainer, 
       achievement.isUnlocked && styles.achievementIconContainerUnlocked,
-      achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementIconContainerInProgress
+      achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementIconContainerInProgress,
+      {
+        backgroundColor: achievement.isUnlocked 
+          ? isDark ? theme.accent : '#4CAF50'
+          : achievement.currentProgress > 0 
+            ? isDark ? 'rgba(76,175,80,0.3)' : '#E8F5E9'
+            : isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0'
+      }
     ]}>
       <Ionicons 
         name={achievement.icon} 
         size={24} 
-        color={achievement.isUnlocked ? '#FFFFFF' : (achievement.currentProgress > 0 ? '#4CAF50' : '#999')} 
+        color={achievement.isUnlocked ? '#FFFFFF' : (achievement.currentProgress > 0 ? (isDark ? theme.accent : '#4CAF50') : (isDark ? 'rgba(255,255,255,0.5)' : '#999'))} 
       />
     </View>
     <Text style={[
       styles.achievementTitle, 
       !achievement.isUnlocked && styles.achievementLockedText,
-      achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementInProgressText
+      achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementInProgressText,
+      { 
+        color: achievement.isUnlocked 
+          ? isDark ? theme.text : '#333'
+          : achievement.currentProgress > 0 
+            ? isDark ? theme.accent : '#4CAF50'
+            : isDark ? 'rgba(255,255,255,0.5)' : '#999'
+      }
     ]}>
       {achievement.title}
     </Text>
-    <Text style={styles.achievementDescription}>
+    <Text style={[
+      styles.achievementDescription,
+      { color: isDark ? theme.textSecondary : '#666' }
+    ]}>
       {achievement.description}
     </Text>
     
@@ -326,39 +349,44 @@ const AchievementCard = ({ achievement, onPress }) => (
         <Text style={styles.xpText}>+{achievement.xp} XP</Text>
         </View>
         {achievement.completedTimeAgo && (
-          <Text style={styles.completionDate}>Earned {achievement.completedTimeAgo}</Text>
+          <Text style={[styles.completionDate, { color: isDark ? 'rgba(255,255,255,0.5)' : '#666' }]}>
+            Earned {achievement.completedTimeAgo}
+          </Text>
         )}
       </>
     ) : achievement.currentProgress > 0 ? (
       // Show progress for in-progress achievements
       <View style={styles.progressWrapper}>
-        <View style={styles.progressMiniContainer}>
+        <View style={[styles.progressMiniContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }]}>
           <View 
             style={[
               styles.progressMiniBar, 
-              { width: `${achievement.progressPercentage}%` }
+              { 
+                width: `${achievement.progressPercentage}%`,
+                backgroundColor: isDark ? theme.accent : '#8BC34A'
+              }
             ]}
           />
         </View>
-        <Text style={styles.progressText}>
+        <Text style={[styles.progressText, { color: isDark ? 'rgba(255,255,255,0.6)' : '#666' }]}>
           {achievement.currentProgress}/{achievement.requirement} ({achievement.progressPercentage}%)
         </Text>
       </View>
     ) : (
       // Show locked indicator for completely locked achievements
-      <View style={styles.lockedBadge}>
-        <Text style={styles.lockedText}>Locked</Text>
+      <View style={[styles.lockedBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}>
+        <Text style={[styles.lockedText, { color: isDark ? 'rgba(255,255,255,0.5)' : '#999' }]}>Locked</Text>
       </View>
     )}
   </TouchableOpacity>
 );
 
 // Add an empty state component for when there are no achievements yet
-const EmptyAchievements = () => (
-  <View style={styles.emptyContainer}>
-    <Ionicons name="trophy-outline" size={64} color="#CCCCCC" />
-    <Text style={styles.emptyTitle}>No Achievements Yet</Text>
-    <Text style={styles.emptyDescription}>
+const EmptyAchievements = ({ isDark, theme }) => (
+  <View style={[styles.emptyContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9F9F9' }]}>
+    <Ionicons name="trophy-outline" size={64} color={isDark ? 'rgba(255,255,255,0.2)' : "#CCCCCC"} />
+    <Text style={[styles.emptyTitle, { color: isDark ? theme.textSecondary : '#666' }]}>No Achievements Yet</Text>
+    <Text style={[styles.emptyDescription, { color: isDark ? 'rgba(255,255,255,0.5)' : '#999' }]}>
       Complete your first stretching routines to start earning achievements!
     </Text>
   </View>
@@ -373,6 +401,7 @@ interface AchievementsProps {
   level?: number;
   totalMinutes?: number;
   completedAchievements?: Array<{id: string; title: string; xp: number; dateCompleted?: string}>;
+  isDark?: boolean;
 }
 
 const Achievements: React.FC<AchievementsProps> = ({
@@ -391,7 +420,7 @@ const Achievements: React.FC<AchievementsProps> = ({
   const [unlockedAchievements, setUnlockedAchievements] = useState<any[]>([]);
   const [achievementsByCategory, setAchievementsByCategory] = useState<Record<string, any[]>>({});
   const [refreshing, setRefreshing] = useState(false);
-  
+  const { theme, isDark } = useTheme();
   // Handle pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -524,34 +553,40 @@ const Achievements: React.FC<AchievementsProps> = ({
   
   return (
     <ScrollView 
-      style={styles.container}
+      style={[styles.container, { backgroundColor: isDark ? theme.background : '#FFF' }]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          colors={['#4CAF50']}
-          tintColor="#4CAF50"
+          colors={[isDark ? theme.accent : '#4CAF50']}
+          tintColor={isDark ? theme.accent : '#4CAF50'}
           title="Refreshing achievements..."
-          titleColor="#666"
+          titleColor={isDark ? theme.textSecondary : '#666'}
         />
       }
     >
       {/* Level progress section */}
-      <View style={styles.levelSection}>
+      <View style={[styles.levelSection, { 
+        backgroundColor: isDark ? theme.cardBackground : '#FFF',
+        shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+      }]}>
         <View style={styles.levelHeader}>
           <View>
-            <Text style={styles.levelTitle}>Level {currentLevel.level}</Text>
-            <Text style={styles.levelSubtitle}>{currentLevel.title}</Text>
+            <Text style={[styles.levelTitle, { color: isDark ? theme.text : '#333' }]}>Level {currentLevel.level}</Text>
+            <Text style={[styles.levelSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>{currentLevel.title}</Text>
           </View>
-          <View style={styles.xpContainer}>
-            <Ionicons name="flash" size={18} color="#FFD700" />
-            <Text style={styles.xpTotal}>{calculatedTotalXP} XP</Text>
+          <View style={[styles.xpContainer, { 
+            backgroundColor: isDark ? 'rgba(255,249,196,0.2)' : '#FFF9C4',
+            borderColor: isDark ? 'rgba(255,224,130,0.5)' : '#FFE082'
+          }]}>
+            <Ionicons name="flash" size={18} color={isDark ? "#FFD700" : "#FFD700"} />
+            <Text style={[styles.xpTotal, { color: isDark ? '#FFD700' : '#FF8F00' }]}>{calculatedTotalXP} XP</Text>
           </View>
         </View>
         
-        <View style={styles.progressContainer}>
+        <View style={[styles.progressContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }]}>
           <LinearGradient
-            colors={['#4CAF50', '#8BC34A']}
+            colors={isDark ? ['#388E3C', '#7CB342'] : ['#4CAF50', '#8BC34A']}
             style={[styles.progressBar, { width: `${xpProgress * 100}%` }]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -559,71 +594,76 @@ const Achievements: React.FC<AchievementsProps> = ({
         </View>
         
         {nextLevel && (
-          <Text style={styles.nextLevelText}>
+          <Text style={[styles.nextLevelText, { color: isDark ? theme.textSecondary : '#666' }]}>
             {nextLevel.xpRequired - calculatedTotalXP} XP to Level {nextLevel.level}: {nextLevel.title}
           </Text>
         )}
         {!nextLevel && (
-          <Text style={styles.nextLevelText}>
+          <Text style={[styles.nextLevelText, { color: isDark ? theme.textSecondary : '#666' }]}>
             Maximum level reached! Congratulations!
           </Text>
         )}
       </View>
       
       {/* Achievements section */}
-      <View style={styles.achievementsSection}>
+      <View style={[styles.achievementsSection, { 
+        backgroundColor: isDark ? theme.cardBackground : '#FFF',
+        shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+      }]}>
         <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Achievements</Text>
+          <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>Achievements</Text>
           {/* Achievement stats summary */}
-          <View style={styles.achievementStats}>
+          <View style={[styles.achievementStats, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f5f5f5' }]}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
+              <Text style={[styles.statValue, { color: isDark ? theme.accent : '#4CAF50' }]}>
                 {unlockedAchievements.length > 0 
                   ? Object.values(unlockedAchievements).filter(a => a.isUnlocked).length 
                   : 0}
               </Text>
-              <Text style={styles.statLabel}>Earned</Text>
+              <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>Earned</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
+              <Text style={[styles.statValue, { color: isDark ? theme.accent : '#4CAF50' }]}>
                 {unlockedAchievements.length > 0
                   ? Object.values(unlockedAchievements).filter(a => a.currentProgress > 0 && !a.isUnlocked).length
                   : 0}
               </Text>
-              <Text style={styles.statLabel}>In Progress</Text>
+              <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>In Progress</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
+              <Text style={[styles.statValue, { color: isDark ? theme.accent : '#4CAF50' }]}>
                 {unlockedAchievements.length}
               </Text>
-              <Text style={styles.statLabel}>Total</Text>
+              <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>Total</Text>
             </View>
           </View>
         </View>
         
         {Object.keys(achievementsByCategory).length === 0 ? (
-          <EmptyAchievements />
+          <EmptyAchievements isDark={isDark} theme={theme} />
         ) : (
           <>
             {/* Beginner achievements - only show if there are achievements in this category */}
             {achievementsByCategory['beginner']?.length > 0 && (
               <>
-                <View style={styles.categoryHeader}>
-        <Text style={styles.categoryTitle}>Beginner</Text>
-                  <Text style={styles.categoryCount}>
+                <View style={[styles.categoryHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}>
+                  <Text style={[styles.categoryTitle, { color: isDark ? theme.text : '#555' }]}>Beginner</Text>
+                  <Text style={[styles.categoryCount, { color: isDark ? theme.textSecondary : '#666' }]}>
                     {achievementsByCategory['beginner'].filter(a => a.isUnlocked).length} / {achievementsByCategory['beginner'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.achievementsContainer}>
+                  <View style={styles.achievementsContainer}>
                     {achievementsByCategory['beginner'].map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                onPress={handleAchievementPress}
-              />
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                        isDark={isDark}
+                        theme={theme}
+                      />
                     ))}
-        </View>
+                  </View>
                 </ScrollView>
               </>
             )}
@@ -631,22 +671,24 @@ const Achievements: React.FC<AchievementsProps> = ({
             {/* Intermediate achievements - only show if there are achievements in this category */}
             {achievementsByCategory['intermediate']?.length > 0 && (
               <>
-                <View style={styles.categoryHeader}>
-        <Text style={styles.categoryTitle}>Intermediate</Text>
-                  <Text style={styles.categoryCount}>
+                <View style={[styles.categoryHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}>
+                  <Text style={[styles.categoryTitle, { color: isDark ? theme.text : '#555' }]}>Intermediate</Text>
+                  <Text style={[styles.categoryCount, { color: isDark ? theme.textSecondary : '#666' }]}>
                     {achievementsByCategory['intermediate'].filter(a => a.isUnlocked).length} / {achievementsByCategory['intermediate'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.achievementsContainer}>
+                  <View style={styles.achievementsContainer}>
                     {achievementsByCategory['intermediate'].map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                onPress={handleAchievementPress}
-              />
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                        isDark={isDark}
+                        theme={theme}
+                      />
                     ))}
-        </View>
+                  </View>
                 </ScrollView>
               </>
             )}
@@ -654,22 +696,24 @@ const Achievements: React.FC<AchievementsProps> = ({
             {/* Advanced achievements - only show if there are achievements in this category */}
             {achievementsByCategory['advanced']?.length > 0 && (
               <>
-                <View style={styles.categoryHeader}>
-        <Text style={styles.categoryTitle}>Advanced</Text>
-                  <Text style={styles.categoryCount}>
+                <View style={[styles.categoryHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}>
+                  <Text style={[styles.categoryTitle, { color: isDark ? theme.text : '#555' }]}>Advanced</Text>
+                  <Text style={[styles.categoryCount, { color: isDark ? theme.textSecondary : '#666' }]}>
                     {achievementsByCategory['advanced'].filter(a => a.isUnlocked).length} / {achievementsByCategory['advanced'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.achievementsContainer}>
+                  <View style={styles.achievementsContainer}>
                     {achievementsByCategory['advanced'].map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                onPress={handleAchievementPress}
-              />
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                        isDark={isDark}
+                        theme={theme}
+                      />
                     ))}
-        </View>
+                  </View>
                 </ScrollView>
               </>
             )}
@@ -677,22 +721,24 @@ const Achievements: React.FC<AchievementsProps> = ({
             {/* Elite achievements - only show if there are achievements in this category */}
             {achievementsByCategory['elite']?.length > 0 && (
               <>
-                <View style={styles.categoryHeader}>
-        <Text style={styles.categoryTitle}>Elite</Text>
-                  <Text style={styles.categoryCount}>
+                <View style={[styles.categoryHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}>
+                  <Text style={[styles.categoryTitle, { color: isDark ? theme.text : '#555' }]}>Elite</Text>
+                  <Text style={[styles.categoryCount, { color: isDark ? theme.textSecondary : '#666' }]}>
                     {achievementsByCategory['elite'].filter(a => a.isUnlocked).length} / {achievementsByCategory['elite'].length}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.achievementsContainer}>
+                  <View style={styles.achievementsContainer}>
                     {achievementsByCategory['elite'].map(achievement => (
-              <AchievementCard
-                key={achievement.id}
-                achievement={achievement}
-                onPress={handleAchievementPress}
-              />
+                      <AchievementCard
+                        key={achievement.id}
+                        achievement={achievement}
+                        onPress={handleAchievementPress}
+                        isDark={isDark}
+                        theme={theme}
+                      />
                     ))}
-        </View>
+                  </View>
                 </ScrollView>
               </>
             )}

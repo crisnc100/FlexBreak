@@ -15,6 +15,7 @@ import { saveFavoriteRoutine } from '../../services/storageService';
 import XpNotificationManager from '../XpNotificationManager';
 import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export interface CompletedRoutineProps {
   area: BodyArea;
@@ -22,6 +23,11 @@ export interface CompletedRoutineProps {
   isPremium: boolean;
   xpEarned?: number;
   xpBreakdown?: Array<{ source: string; amount: number; description: string }>;
+  levelUp?: {
+    oldLevel: number;
+    newLevel: number;
+    rewards?: Array<{ id: string; name: string; description: string; type: 'feature' | 'item' | 'cosmetic' }>;
+  };
   onShowDashboard: () => void;
   onNavigateHome: () => void;
   onOpenSubscription: () => void;
@@ -33,6 +39,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   isPremium,
   xpEarned = 0,
   xpBreakdown = [],
+  levelUp,
   onShowDashboard,
   onNavigateHome,
   onOpenSubscription
@@ -41,13 +48,18 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   const { theme, isDark } = useTheme();
   const styles = themedStyles(theme);
   
+  // Add debug logging for the levelUp prop
+  console.log('CompletedRoutine received levelUp prop:', levelUp ? JSON.stringify(levelUp, null, 2) : 'null');
+  
   // Generate the routine to get the number of stretches
   const routine = generateRoutine(area, duration, 'beginner');
   
   // Handle share
   const handleShare = async () => {
     try {
-      const message = `I just completed a ${duration}-minute beginner ${area} stretching routine with DeskStretch! 💪 Earned ${xpEarned} XP!`;
+      // Include level up in share message if applicable
+      const levelUpText = levelUp ? ` and leveled up to level ${levelUp.newLevel}!` : '!';
+      const message = `I just completed a ${duration}-minute beginner ${area} stretching routine with DeskStretch! 💪 Earned ${xpEarned} XP${levelUpText}`;
       
       await Share.share({
         message,
@@ -127,127 +139,259 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     onNavigateHome();
   };
   
+  // Render reward item
+  const renderRewardItem = (reward, index) => {
+    // Skip rendering if reward is invalid
+    if (!reward) return null;
+    
+    let iconName = 'gift-outline';
+    
+    // Choose icon based on reward type
+    switch (reward.type) {
+      case 'feature':
+        iconName = 'unlock-outline';
+        break;
+      case 'item':
+        iconName = 'cube-outline';
+        break;
+      case 'cosmetic':
+        iconName = 'color-palette-outline';
+        break;
+    }
+    
+    return (
+      <View key={`reward-${index}`} style={styles.rewardItem}>
+        <Ionicons name={iconName as any} size={20} color="#FFD700" />
+        <View style={styles.rewardContent}>
+          <Text style={styles.rewardName}>{reward.name || 'Reward'}</Text>
+          <Text style={styles.rewardDescription}>{reward.description || 'New feature unlocked!'}</Text>
+        </View>
+      </View>
+    );
+  };
+  
   return (
     <View style={styles.container}>
       <XpNotificationManager />
       
       <TouchableOpacity 
-        style={styles.completedContainer} 
+        style={[
+          styles.completedContainer,
+          levelUp && isPremium && styles.completedContainerWithLevelUp
+        ]} 
         activeOpacity={1}
         onPress={onShowDashboard}
       >
-        <Ionicons name="checkmark-circle" size={80} color={theme.success} />
+        <Ionicons name="checkmark-circle" size={levelUp && isPremium ? 60 : 80} color={theme.success} />
         <Text style={styles.completedTitle}>Routine Complete!</Text>
-        <Text style={styles.completedSubtitle}>Great job on your stretching routine</Text>
+        <Text style={[
+          styles.completedSubtitle, 
+          levelUp && isPremium && styles.reducedMargin
+        ]}>Great job on your stretching routine</Text>
+        
+        {/* Level Up Section */}
+        {levelUp && isPremium && (
+          <View style={styles.levelUpContainer}>
+            <LinearGradient
+              colors={isDark ? ['#1a237e', '#3949ab'] : ['#3f51b5', '#7986cb']}
+              style={styles.levelUpGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <View style={styles.levelUpHeader}>
+                <Ionicons name="trending-up" size={24} color="#FFD700" />
+                <Text style={styles.levelUpTitle}>Level Up!</Text>
+              </View>
+              
+              <View style={styles.levelNumbers}>
+                <View style={styles.levelCircle}>
+                  <Text style={styles.levelNumber}>{levelUp.oldLevel}</Text>
+                </View>
+                <View style={styles.levelArrow}>
+                  <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                </View>
+                <View style={[styles.levelCircle, styles.newLevelCircle]}>
+                  <Text style={styles.levelNumber}>{levelUp.newLevel}</Text>
+                </View>
+              </View>
+              
+              {levelUp.rewards && levelUp.rewards.length > 0 && (
+                <View style={styles.rewardsContainer}>
+                  <Text style={styles.rewardsTitle}>Rewards Unlocked</Text>
+                  {levelUp.rewards.map((reward, index) => {
+                    // Only show the first reward in the UI to save space
+                    if (index > 0) return null;
+                    return renderRewardItem(reward, index);
+                  })}
+                  {levelUp.rewards.length > 1 && (
+                    <Text style={[styles.rewardDescription, {textAlign: 'center', marginTop: 4}]}>
+                      +{levelUp.rewards.length - 1} more {levelUp.rewards.length - 1 === 1 ? 'reward' : 'rewards'}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </LinearGradient>
+          </View>
+        )}
         
         {/* XP Display - Show either breakdown or simple display */}
         {xpBreakdown && xpBreakdown.length > 0 ? (
-          <View style={styles.xpBreakdownContainer}>
+          <View style={[
+            styles.xpBreakdownContainer,
+            levelUp && isPremium && styles.xpBreakdownCompact
+          ]}>
             <View style={styles.xpTotalRow}>
-              <Ionicons name="star" size={24} color="#FF9800" />
-              <Text style={styles.xpTotalText}>
-                <Text style={styles.xpValue}>{xpEarned}</Text> XP {xpEarned > 0 ? 'Earned' : 'Earned from Previous Stretch'}
+              <Ionicons name="star" size={levelUp && isPremium ? 20 : 24} color="#FF9800" />
+              <Text style={[
+                styles.xpTotalText,
+                levelUp && isPremium && {fontSize: 16}
+              ]}>
+                <Text style={styles.xpValue}>{xpEarned}</Text> Total XP {xpEarned > 0 ? 'Earned' : 'Earned from Previous Stretch'}
               </Text>
             </View>
             
             <View style={styles.xpSeparator} />
             
-            {xpBreakdown.map((item, index) => {
-              // Get appropriate icon based on source
-              let iconName = 'star-outline';
-              switch (item.source) {
-                case 'routine':
-                  iconName = 'fitness-outline';
-                  break;
-                case 'achievement':
-                  iconName = 'trophy-outline';
-                  break;
-                case 'first_ever':
-                  iconName = 'gift-outline';
-                  break;
-                case 'streak':
-                  iconName = 'flame-outline';
-                  break;
-                case 'challenge':
-                  iconName = 'flag-outline';
-                  break;
-              }
+            {/* If level-up is shown, only display non-zero XP items to save space */}
+            {xpBreakdown
+              .filter(item => !(levelUp && isPremium) || item.amount > 0)
+              .map((item, index) => {
+                // Get appropriate icon based on source
+                let iconName = 'star-outline';
+                switch (item.source) {
+                  case 'routine':
+                    iconName = 'fitness-outline';
+                    break;
+                  case 'achievement':
+                    iconName = 'trophy-outline';
+                    break;
+                  case 'first_ever':
+                    iconName = 'gift-outline';
+                    break;
+                  case 'streak':
+                    iconName = 'flame-outline';
+                    break;
+                  case 'challenge':
+                    iconName = 'flag-outline';
+                    break;
+                }
               
-              return (
-                <View key={`${item.source}-${index}`} style={styles.xpBreakdownItem}>
-                  <Ionicons name={iconName as any} size={16} color={item.amount > 0 ? "#FF9800" : theme.textSecondary} />
-                  <Text style={[
-                    styles.xpBreakdownText, 
-                    item.amount === 0 && styles.xpBreakdownZero
-                  ]}>
-                    {item.amount > 0 ? (
-                      <Text style={styles.xpBreakdownValue}>+{item.amount} XP</Text>
-                    ) : (
-                      <Text style={styles.xpBreakdownZero}>+0 XP</Text>
-                    )}
-                    {" "}{item.description}
-                  </Text>
-                </View>
-              );
-            })}
+                return (
+                  <View key={`${item.source}-${index}`} style={styles.xpBreakdownItem}>
+                    <Ionicons 
+                      name={iconName as any} 
+                      size={levelUp && isPremium ? 14 : 16} 
+                      color={item.amount > 0 ? "#FF9800" : theme.textSecondary} 
+                    />
+                    <Text style={[
+                      styles.xpBreakdownText, 
+                      item.amount === 0 && styles.xpBreakdownZero,
+                      levelUp && isPremium && {fontSize: 12}
+                    ]}>
+                      {item.amount > 0 ? (
+                        <Text style={styles.xpBreakdownValue}>+{item.amount} XP</Text>
+                      ) : (
+                        <Text style={styles.xpBreakdownZero}>+0 XP</Text>
+                      )}
+                      {" "}{item.description}
+                    </Text>
+                  </View>
+                );
+              })}
           </View>
         ) : (
           // Simple XP display when no breakdown is available
-          <View style={styles.xpContainer}>
-            <Ionicons name="star" size={24} color="#FF9800" />
-            <Text style={styles.xpText}>
+          <View style={[
+            styles.xpContainer,
+            levelUp && isPremium && styles.xpContainerCompact
+          ]}>
+            <Ionicons name="star" size={levelUp && isPremium ? 20 : 24} color="#FF9800" />
+            <Text style={[
+              styles.xpText,
+              levelUp && isPremium && {fontSize: 14}
+            ]}>
               <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
             </Text>
           </View>
         )}
         
-        <View style={styles.statsContainer}>
+        <View style={[
+          styles.statsContainer,
+          levelUp && isPremium && styles.reducedMargin
+        ]}>
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={24} color={theme.textSecondary} />
-            <Text style={styles.statValue}>{duration} mins</Text>
-            <Text style={styles.statLabel}>Duration</Text>
+            <Ionicons name="time-outline" size={levelUp && isPremium ? 20 : 24} color={theme.textSecondary} />
+            <Text style={[styles.statValue, levelUp && isPremium && styles.statValueCompact]}>{duration} mins</Text>
+            <Text style={[styles.statLabel, levelUp && isPremium && styles.statLabelCompact]}>Duration</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="fitness-outline" size={24} color={theme.textSecondary} />
-            <Text style={styles.statValue}>{routine.length}</Text>
-            <Text style={styles.statLabel}>Stretches</Text>
+            <Ionicons name="fitness-outline" size={levelUp && isPremium ? 20 : 24} color={theme.textSecondary} />
+            <Text style={[styles.statValue, levelUp && isPremium && styles.statValueCompact]}>{routine.length}</Text>
+            <Text style={[styles.statLabel, levelUp && isPremium && styles.statLabelCompact]}>Stretches</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="body-outline" size={24} color={theme.textSecondary} />
-            <Text style={styles.statValue}>{area}</Text>
-            <Text style={styles.statLabel}>Focus Area</Text>
+            <Ionicons name="body-outline" size={levelUp && isPremium ? 20 : 24} color={theme.textSecondary} />
+            <Text style={[styles.statValue, levelUp && isPremium && styles.statValueCompact]}>{area}</Text>
+            <Text style={[styles.statLabel, levelUp && isPremium && styles.statLabelCompact]}>Focus Area</Text>
           </View>
         </View>
         
-        <Text style={styles.nextStepsText}>What would you like to do next?</Text>
+        <Text style={[
+          styles.nextStepsText,
+          levelUp && isPremium && styles.nextStepsTextCompact
+        ]}>What would you like to do next?</Text>
         
-        <View style={styles.buttonContainer}>
+        <View style={[
+          styles.buttonContainer,
+          levelUp && isPremium && styles.buttonContainerCompact
+        ]}>
           {isPremium ? (
             <>
               <TouchableOpacity 
-                style={[styles.button, styles.favoriteButton]} 
+                style={[
+                  styles.button, 
+                  styles.favoriteButton,
+                  levelUp && isPremium && styles.buttonCompact
+                ]} 
                 onPress={saveToFavorites}
               >
-                <Ionicons name="star" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>Save</Text>
+                <Ionicons name="star" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
+                <Text style={[
+                  styles.buttonText,
+                  levelUp && isPremium && styles.buttonTextCompact
+                ]}>Save</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.button, styles.shareButton]} 
+                style={[
+                  styles.button, 
+                  styles.shareButton,
+                  levelUp && isPremium && styles.buttonCompact
+                ]} 
                 onPress={handleShare}
               >
-                <Ionicons name="share-social-outline" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>Share</Text>
+                <Ionicons name="share-social-outline" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
+                <Text style={[
+                  styles.buttonText,
+                  levelUp && isPremium && styles.buttonTextCompact
+                ]}>Share</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.button, styles.smartPickButton]} 
+                style={[
+                  styles.button, 
+                  styles.smartPickButton,
+                  levelUp && isPremium && styles.buttonCompact
+                ]} 
                 onPress={startSmartPick}
               >
-                <Ionicons name="bulb" size={20} color="#FFF" />
-                <Text style={styles.buttonText}>Smart Pick</Text>
+                <Ionicons name="bulb" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
+                <Text style={[
+                  styles.buttonText,
+                  levelUp && isPremium && styles.buttonTextCompact
+                ]}>Smart Pick</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -261,11 +405,18 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
           )}
           
           <TouchableOpacity 
-            style={[styles.button, styles.newRoutineButton]} 
+            style={[
+              styles.button, 
+              styles.newRoutineButton,
+              levelUp && isPremium && styles.buttonCompact
+            ]} 
             onPress={handleNewRoutine}
           >
-            <Ionicons name="home-outline" size={20} color="#FFF" />
-            <Text style={styles.buttonText}>New Routine</Text>
+            <Ionicons name="home-outline" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
+            <Text style={[
+              styles.buttonText,
+              levelUp && isPremium && styles.buttonTextCompact
+            ]}>New Routine</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -286,6 +437,10 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     padding: 20,
     backgroundColor: theme.cardBackground,
   },
+  completedContainerWithLevelUp: {
+    paddingTop: 15,
+    paddingBottom: 15,
+  },
   completedTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -298,6 +453,98 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
     color: theme.textSecondary,
+  },
+  reducedMargin: {
+    marginBottom: 12,
+  },
+  levelUpContainer: {
+    width: '100%',
+    marginBottom: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  levelUpGradient: {
+    padding: 12,
+    borderRadius: 12,
+  },
+  levelUpHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  levelUpTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+  levelNumbers: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  levelCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  newLevelCircle: {
+    backgroundColor: 'rgba(255,215,0,0.3)',
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  levelNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  levelArrow: {
+    marginHorizontal: 10,
+  },
+  rewardsContainer: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  rewardsTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  rewardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 6,
+  },
+  rewardContent: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  rewardName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  rewardDescription: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    opacity: 0.8,
   },
   xpContainer: {
     flexDirection: 'row',
@@ -374,15 +621,26 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     marginTop: 8,
     color: theme.text,
   },
+  statValueCompact: {
+    fontSize: 16,
+    marginTop: 4,
+  },
   statLabel: {
     fontSize: 14,
     color: theme.textSecondary,
+  },
+  statLabelCompact: {
+    fontSize: 12,
   },
   nextStepsText: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
     color: theme.text,
+  },
+  nextStepsTextCompact: {
+    fontSize: 16,
+    marginBottom: 12,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -423,6 +681,27 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
   newRoutineButton: {
     backgroundColor: theme.accent,
     minWidth: 150,
+  },
+  xpBreakdownCompact: {
+    padding: 8,
+    marginBottom: 15,
+  },
+  xpContainerCompact: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginBottom: 15,
+  },
+  buttonContainerCompact: {
+    marginTop: 0,
+  },
+  buttonCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 100,
+    marginBottom: 8,
+  },
+  buttonTextCompact: {
+    fontSize: 12,
   },
 }));
 

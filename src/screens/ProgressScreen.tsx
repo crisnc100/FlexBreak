@@ -269,26 +269,7 @@ export default function ProgressScreen({ navigation }) {
     });
   };
 
-  // Handle completing a challenge
-  const handleCompleteChallenge = async (challengeId) => {
-    try {
-      console.log(`Completing challenge: ${challengeId}`);
-      
-      // Claim the challenge reward
-      const result = await claimChallengeReward(challengeId);
-      
-      if (result.success) {
-        console.log(`Challenge completed, earned ${result.xpEarned} XP`);
-        
-        // Refresh progress data after claiming challenge
-        refreshProgress();
-      } else {
-        console.log(`Failed to complete challenge: ${result.message}`);
-      }
-    } catch (error) {
-      console.error('Error completing challenge:', error);
-    }
-  };
+
 
   // Handle upgrade to premium
   const handleUpgradeToPremium = () => {
@@ -435,7 +416,7 @@ export default function ProgressScreen({ navigation }) {
     if (!progressSystemData && !isProgressSystemLoading) {
       console.log('Warning: progressSystemData is null but not loading');
       return (
-        <View style={{ padding: 20, alignItems: 'center' }}>
+        <View style={{ padding: 20, alignItems: 'center', }}>
           <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
             Loading progress data...
           </Text>
@@ -653,7 +634,7 @@ export default function ProgressScreen({ navigation }) {
         {renderTabContent()}
         
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
+          <Text style={[styles.footerText, { color: isDark ? '#FFFFFF' : '#666' }]}>
             DeskStretch Premium • Level {progressSystemData?.level || 1} • {progressSystemData?.totalXP || 0} XP
           </Text>
           
@@ -688,11 +669,10 @@ export default function ProgressScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+   
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#EEEEEE',
     paddingVertical: 8,
