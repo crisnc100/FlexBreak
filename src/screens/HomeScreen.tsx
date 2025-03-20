@@ -3,17 +3,13 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Switch,
   Alert,
   ScrollView,
   ActivityIndicator,
   Platform,
   Animated,
   Dimensions,
-  Pressable,
-  StyleSheet,
-  Modal,
-  TextInput
+  StyleSheet
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,8 +17,6 @@ import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getReminderEnabled, getReminderTime, saveReminderTime } from '../services/storageService';
-import { requestNotificationsPermissions, scheduleDailyReminder, cancelReminders } from '../utils/notifications';
 import { tw } from '../utils/tw';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
@@ -36,8 +30,11 @@ import {
   RoutinePicker, 
   ReminderSection, 
   CustomReminderModal,
-  OptionDropdown
+  OptionDropdown,
+  TimePicker,
+  DaySelector
 } from '../components/home';
+import * as notifications from '../utils/notifications';
 
 const { height, width } = Dimensions.get('window');
 
@@ -48,14 +45,23 @@ export default function HomeScreen() {
   const [level, setLevel] = useState<StretchLevel>('beginner');
   const { isPremium } = usePremium();
   const { isRefreshing, refreshHome } = useRefresh();
+  
+  // Reminder state
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('09:00');
+  const [reminderDays, setReminderDays] = useState<string[]>([]);
+  const [reminderFrequency, setReminderFrequency] = useState<notifications.ReminderFrequency>('daily');
+  const [reminderMessage, setReminderMessage] = useState('');
+  
+  // Modal visibility states
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+  const [customReminderModalVisible, setCustomReminderModalVisible] = useState(false);
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [daySelectorVisible, setDaySelectorVisible] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
-  const { canAccessFeature, meetsLevelRequirement, getRequiredLevel } = useFeatureAccess();
-  const [reminderMessage, setReminderMessage] = useState('Time for your daily stretch!');
-  const [customReminderModalVisible, setCustomReminderModalVisible] = useState(false);
+  const { canAccessFeature, meetsLevelRequirement, getRequiredLevel, getUserLevel } = useFeatureAccess();
   const { theme, isDark } = useTheme();
 
   // Animated values for dropdowns
@@ -66,6 +72,14 @@ export default function HomeScreen() {
   // Scroll position tracking
   const [scrollPosition, setScrollPosition] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // User level for custom reminders
+  const [userLevel, setUserLevel] = useState(0);
+
+  // Initialize notifications system
+  useEffect(() => {
+    notifications.configureNotifications();
+  }, []);
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -79,6 +93,7 @@ export default function HomeScreen() {
     await refreshHome();
   };
 
+  // Load data
   useEffect(() => {
     console.log('HomeScreen: Starting data loading');
 
@@ -86,12 +101,17 @@ export default function HomeScreen() {
       try {
         console.log('HomeScreen: Loading reminder settings');
 
-        // Load reminder settings
-        const reminderEnabled = await getReminderEnabled();
-        setReminderEnabled(reminderEnabled);
+        // Load user level
+        const level = await getUserLevel();
+        setUserLevel(level);
 
-        const reminderTime = await getReminderTime();
-        setReminderTime(reminderTime || '08:00');
+        // Load reminder settings
+        const settings = await notifications.getAllReminderSettings();
+        setReminderEnabled(settings.enabled);
+        setReminderTime(settings.time);
+        setReminderDays(settings.days);
+        setReminderFrequency(settings.frequency);
+        setReminderMessage(settings.message);
 
         // Get a random tip
         const randomTip = tips[Math.floor(Math.random() * tips.length)];
@@ -174,38 +194,89 @@ export default function HomeScreen() {
   };
 
   // Toggle reminder
-  const handleReminderToggle = async (value: boolean) => {
-    if (!isPremium) {
-      setSubscriptionModalVisible(true);
-      return;
-    }
-
+  const handleToggleReminders = async (value: boolean) => {
+    console.log(`Setting reminders enabled to: ${value}`);
+    
     try {
-      setReminderEnabled(value);
-
       if (value) {
-        // Request permissions first
-        const hasPermission = await requestNotificationsPermissions();
-
-        if (!hasPermission) {
+        // If enabling reminders, ensure we schedule them
+        console.log('Enabling reminders, requesting permissions...');
+        const hasPermission = await notifications.requestNotificationsPermissions();
+        console.log('Notification permission status:', hasPermission);
+        
+        if (hasPermission) {
+          // Update state and storage
+          setReminderEnabled(true);
+          await notifications.saveReminderEnabled(true);
+          
+          // Schedule "dummy" reminders with current settings (just saves settings)
+          console.log(`Scheduling reminders for time: ${reminderTime}`);
+          await notifications.scheduleReminders();
+          
+          // Actually schedule the real notification
+          console.log('Now scheduling a real notification that will appear at the set time');
+          await notifications.scheduleRealReminder();
+          
+          // Get updated settings to verify
+          const updatedSettings = await notifications.getAllReminderSettings();
+          console.log('Updated reminder settings after enabling:', updatedSettings);
+          
+          // No alert - the UI already shows the state has changed
+        } else {
+          // If permissions were denied, revert the switch
+          console.log('Notification permissions denied, not enabling reminders');
+          setReminderEnabled(false);
           Alert.alert(
             'Permission Required',
-            'Please enable notifications to use this feature.',
+            'Please enable notifications in your device settings to use this feature.',
             [{ text: 'OK' }]
           );
-          setReminderEnabled(false);
-          return;
         }
-
-        // Schedule the reminder
-        await scheduleDailyReminder(reminderTime);
       } else {
-        // Cancel reminders
-        await cancelReminders();
+        // If disabling reminders, cancel any scheduled ones
+        console.log('Disabling reminders, cancelling any scheduled');
+        setReminderEnabled(false);
+        await notifications.saveReminderEnabled(false);
+        await notifications.cancelReminders();
       }
     } catch (error) {
-      console.error('Error toggling reminder:', error);
+      console.error('Error toggling reminders:', error);
       Alert.alert('Error', 'Could not set reminder');
+    }
+  };
+
+  // Helper function to format time from 24h to 12h
+  const formatTimeFor12h = (time24h: string) => {
+    try {
+      const [hours, minutes] = time24h.split(':');
+      const hour = parseInt(hours, 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch (e) {
+      return time24h;
+    }
+  };
+
+  // Handle time change
+  const handleTimeChange = async (time: string) => {
+    console.log(`Setting reminder time to: ${time}`);
+    setReminderTime(time);
+    await notifications.saveReminderTime(time);
+    setTimePickerVisible(false);
+
+    if (reminderEnabled) {
+      // Update the scheduled reminder with the new time
+      console.log('Reminders are enabled, rescheduling with new time');
+      await notifications.scheduleReminders();
+      
+      // Get updated settings to verify
+      const updatedSettings = await notifications.getAllReminderSettings();
+      console.log('Updated reminder settings after time change:', updatedSettings);
+      
+      // No alert - the UI already shows the time has changed
+    } else {
+      console.log('Reminders are not enabled, time saved but no scheduling needed');
     }
   };
 
@@ -216,22 +287,80 @@ export default function HomeScreen() {
       return;
     }
 
-    // In a real app, this would open a time picker
+    setTimePickerVisible(true);
+  };
+
+  // Handle days selection
+  const handleDaysSelected = async (days: string[]) => {
+    setReminderDays(days);
+    await notifications.saveReminderDays(days);
+    setDaySelectorVisible(false);
+
+    if (reminderEnabled) {
+      // Update the scheduled reminder with the new days
+      await notifications.scheduleReminders();
+    }
+  };
+
+  // Handle days press
+  const handleDaysPress = () => {
+    if (!isPremium || !canAccessFeature('custom_reminders')) {
+      showPremiumOrLevelAlert('custom_reminders');
+      return;
+    }
+
+    setDaySelectorVisible(true);
+  };
+
+  // Handle frequency change
+  const handleFrequencyChange = async (frequency: notifications.ReminderFrequency) => {
+    setReminderFrequency(frequency);
+    await notifications.saveReminderFrequency(frequency);
+
+    // Update days based on frequency selection
+    if (frequency === 'daily') {
+      const allDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      setReminderDays(allDays);
+      await notifications.saveReminderDays(allDays);
+    } else if (frequency === 'weekdays') {
+      const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri'];
+      setReminderDays(weekdays);
+      await notifications.saveReminderDays(weekdays);
+    }
+
+    if (reminderEnabled) {
+      // Update the scheduled reminder with the new frequency
+      await notifications.scheduleReminders();
+    }
+  };
+
+  // Handle frequency press
+  const handleFrequencyPress = () => {
+    if (!isPremium || !canAccessFeature('custom_reminders')) {
+      showPremiumOrLevelAlert('custom_reminders');
+      return;
+    }
+
+    // Show frequency options
     Alert.alert(
-      'Set Reminder Time',
-      'Choose a time for your daily stretching reminder',
+      'Reminder Frequency',
+      'How often do you want to receive reminders?',
       [
         {
-          text: 'Morning (9:00)',
-          onPress: () => handleTimeChange('09:00'),
+          text: 'Every Day',
+          onPress: () => handleFrequencyChange('daily'),
         },
         {
-          text: 'Afternoon (14:00)',
-          onPress: () => handleTimeChange('14:00'),
+          text: 'Weekdays Only',
+          onPress: () => handleFrequencyChange('weekdays'),
         },
         {
-          text: 'Evening (18:00)',
-          onPress: () => handleTimeChange('18:00'),
+          text: 'Custom Days',
+          onPress: () => {
+            handleFrequencyChange('custom');
+            // Then show day selector after a brief delay
+            setTimeout(() => setDaySelectorVisible(true), 500);
+          },
         },
         {
           text: 'Cancel',
@@ -241,14 +370,43 @@ export default function HomeScreen() {
     );
   };
 
-  // Handle time change
-  const handleTimeChange = async (time: string) => {
-    setReminderTime(time);
-    await saveReminderTime(time);
+  // Save custom reminder message
+  const saveCustomReminderMessage = async (message: string) => {
+    // Default message if empty
+    const finalMessage = message.trim() === '' 
+      ? 'Time for your daily stretch!' 
+      : message;
+    
+    setReminderMessage(finalMessage);
+    await notifications.saveReminderMessage(finalMessage);
+    setCustomReminderModalVisible(false);
 
     if (reminderEnabled) {
-      // Update the scheduled reminder with the new time
-      await scheduleDailyReminder(time);
+      // Update the scheduled reminder with the new message
+      await notifications.scheduleReminders();
+    }
+  };
+
+  // Handle custom reminder
+  const handleCustomReminderPress = () => {
+    if (!isPremium || !canAccessFeature('custom_reminders')) {
+      showPremiumOrLevelAlert('custom_reminders');
+      return;
+    }
+    
+    setCustomReminderModalVisible(true);
+  };
+
+  // Show premium modal or level requirement alert
+  const showPremiumOrLevelAlert = (featureName: string) => {
+    if (!isPremium) {
+      setSubscriptionModalVisible(true);
+    } else {
+      Alert.alert(
+        'Feature Locked',
+        `This feature unlocks at level ${getRequiredLevel(featureName)}. Keep stretching to reach this level!`,
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -256,34 +414,38 @@ export default function HomeScreen() {
   const showPremiumModal = () => {
     setSubscriptionModalVisible(true);
   };
-  
-  // Save custom reminder message
-  const saveCustomReminderMessage = (message: string) => {
-    if (message.trim() === '') {
-      setReminderMessage('Time for your daily stretch!');
-    } else {
-      setReminderMessage(message);
-    }
-    setCustomReminderModalVisible(false);
-  };
 
-  // Handle custom reminder
-  const handleCustomReminderPress = () => {
-    if (!isPremium) {
-      setSubscriptionModalVisible(true);
-      return;
-    }
-    
-    if (!canAccessFeature('custom_reminders')) {
+  // Handle test notification
+  const handleTestNotification = async () => {
+    try {
+      console.log('Testing notification system...');
+      const hasPermission = await notifications.requestNotificationsPermissions();
+      console.log('Notification permission status:', hasPermission);
+
+      if (!hasPermission) {
+        console.log('Notification permission denied');
+        Alert.alert(
+          'Permission Required',
+          'Please enable notifications to test this feature.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Schedule the test notification for 5 seconds in the future
+      // Using a much shorter delay for interactive testing
+      const delaySeconds = 5;
+      const testId = await notifications.scheduleTestNotification(delaySeconds);
+      console.log('TEST notification scheduled with ID:', testId);
+      
       Alert.alert(
-        'Feature Locked',
-        `Custom Reminders unlock at level ${getRequiredLevel('custom_reminders')}. Keep stretching to reach this level!`,
-        [{ text: 'OK' }]
+        'Test Notification Scheduled',
+        `A notification will appear in ${delaySeconds} seconds.\n\nIMPORTANT EXPO LIMITATIONS:\n- You may need to exit the app completely to see it\n- If reminders aren't working, try restarting the app`
       );
-      return;
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      Alert.alert('Error', 'Could not send test notification');
     }
-    
-    setCustomReminderModalVisible(true);
   };
 
   // Loading state
@@ -338,29 +500,58 @@ export default function HomeScreen() {
           reminderEnabled={reminderEnabled}
           reminderTime={reminderTime}
           reminderMessage={reminderMessage}
-          onToggleReminder={handleReminderToggle}
+          reminderDays={reminderDays}
+          reminderFrequency={reminderFrequency}
+          onToggleReminder={handleToggleReminders}
           onTimePress={handleTimePress}
+          onDaysPress={handleDaysPress}
+          onFrequencyPress={handleFrequencyPress}
           onCustomMessagePress={handleCustomReminderPress}
           canAccessCustomReminders={canAccessFeature('custom_reminders')}
           requiredLevel={getRequiredLevel('custom_reminders')}
-          currentLevel={0} // Replace with actual user level when available
+          currentLevel={userLevel}
         />
 
-        {/* Subscription Modal */}
-        <SubscriptionModal
-          visible={subscriptionModalVisible}
-          onClose={() => setSubscriptionModalVisible(false)}
-        />
+        {/* Test Notification Button (for development/testing) */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: theme.accent }]}
+            onPress={handleTestNotification}
+          >
+            <Text style={styles.testButtonText}>Test Notifications (Development Only)</Text>
+          </TouchableOpacity>
+        )}
       </RefreshableScrollView>
+
+      {/* Time Picker Modal */}
+      <TimePicker
+        visible={timePickerVisible}
+        selectedTime={reminderTime}
+        onTimeSelected={handleTimeChange}
+        onCancel={() => setTimePickerVisible(false)}
+      />
+
+      {/* Day Selector Modal */}
+      <DaySelector
+        visible={daySelectorVisible}
+        selectedDays={reminderDays}
+        onDaysSelected={handleDaysSelected}
+        onCancel={() => setDaySelectorVisible(false)}
+      />
 
       {/* Custom Reminder Modal */}
       <CustomReminderModal
         visible={customReminderModalVisible}
         message={reminderMessage}
+        days={reminderDays}
+        frequency={reminderFrequency}
         onMessageChange={setReminderMessage}
+        onDaysChange={setReminderDays}
+        onFrequencyChange={setReminderFrequency}
         onSave={saveCustomReminderMessage}
         onCancel={() => setCustomReminderModalVisible(false)}
-        maxLength={50}
+        maxLength={80}
+        isCustomFrequencyEnabled={canAccessFeature('custom_reminders')}
       />
       
       {/* Option Dropdown */}
@@ -418,6 +609,25 @@ export default function HomeScreen() {
           backdropOpacity={backdropOpacity}
         />
       )}
+
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        visible={subscriptionModalVisible}
+        onClose={() => setSubscriptionModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  testButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  testButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  }
+});

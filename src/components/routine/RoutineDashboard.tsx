@@ -25,6 +25,10 @@ interface WeeklyRoutines {
   [key: string]: ProgressEntry[];
 }
 
+// Time period types for the navigation
+type TimePeriod = 'This Week' | 'Last Week' | '2 Weeks Ago' | '3 Weeks Ago' | '1 Month Ago' | 'Older';
+const TIME_PERIODS: TimePeriod[] = ['This Week', 'Last Week', '2 Weeks Ago', '3 Weeks Ago', '1 Month Ago', 'Older'];
+
 const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   recentRoutines,
   isPremium,
@@ -40,6 +44,9 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   const { theme, isDark } = useTheme();
   // Move hooks to the top level of the component
   const [hasCompletedRoutinesBefore, setHasCompletedRoutinesBefore] = useState<boolean | null>(null);
+  const [activeTimePeriod, setActiveTimePeriod] = useState<TimePeriod>('This Week');
+  const [organizedRoutines, setOrganizedRoutines] = useState<WeeklyRoutines>({});
+  const [availableTimePeriods, setAvailableTimePeriods] = useState<TimePeriod[]>([]);
   
   // Check if user has completed routines before
   useEffect(() => {
@@ -63,34 +70,70 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
     }
   }, [recentRoutines.length]);
   
-  // Organize routines by week
-  const organizeRoutinesByWeek = (routines: ProgressEntry[]): WeeklyRoutines => {
-    const weeks: WeeklyRoutines = {};
-    
-    routines.forEach(routine => {
-      const date = new Date(routine.date);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - date.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Organize routines by time period
+  useEffect(() => {
+    const organizeRoutinesByPeriod = (routines: ProgressEntry[]): WeeklyRoutines => {
+      const periodRoutines: WeeklyRoutines = {};
       
-      let weekLabel = '';
-      if (diffDays <= 7) {
-        weekLabel = 'This Week';
-      } else if (diffDays <= 14) {
-        weekLabel = 'Last Week';
-      } else if (diffDays <= 21) {
-        weekLabel = '2 Weeks Ago';
-      } else {
-        weekLabel = '3 Weeks Ago';
+      routines.forEach(routine => {
+        const date = new Date(routine.date);
+        const today = new Date();
+        const diffTime = Math.abs(today.getTime() - date.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        let periodLabel: TimePeriod;
+        if (diffDays <= 7) {
+          periodLabel = 'This Week';
+        } else if (diffDays <= 14) {
+          periodLabel = 'Last Week';
+        } else if (diffDays <= 21) {
+          periodLabel = '2 Weeks Ago';
+        } else if (diffDays <= 28) {
+          periodLabel = '3 Weeks Ago';
+        } else if (diffDays <= 31) {
+          periodLabel = '1 Month Ago';
+        } else {
+          periodLabel = 'Older';
+        }
+        
+        if (!periodRoutines[periodLabel]) {
+          periodRoutines[periodLabel] = [];
+        }
+        periodRoutines[periodLabel].push(routine);
+      });
+      
+      // Create a list of available time periods (only those with routines)
+      const periods = Object.keys(periodRoutines) as TimePeriod[];
+      setAvailableTimePeriods(periods.sort((a, b) => {
+        return TIME_PERIODS.indexOf(a) - TIME_PERIODS.indexOf(b);
+      }));
+      
+      // Set active time period to the most recent one with routines
+      if (periods.length > 0 && !periodRoutines[activeTimePeriod]) {
+        setActiveTimePeriod(periods[0]);
       }
       
-      if (!weeks[weekLabel]) {
-        weeks[weekLabel] = [];
-      }
-      weeks[weekLabel].push(routine);
-    });
+      return periodRoutines;
+    };
     
-    return weeks;
+    const organized = organizeRoutinesByPeriod(recentRoutines);
+    setOrganizedRoutines(organized);
+  }, [recentRoutines, activeTimePeriod]);
+  
+  // Navigation for time periods
+  const navigateToPeriod = (direction: 'next' | 'prev') => {
+    if (availableTimePeriods.length <= 1) return;
+    
+    const currentIndex = availableTimePeriods.indexOf(activeTimePeriod);
+    let newIndex: number;
+    
+    if (direction === 'next') {
+      newIndex = (currentIndex + 1) % availableTimePeriods.length;
+    } else {
+      newIndex = (currentIndex - 1 + availableTimePeriods.length) % availableTimePeriods.length;
+    }
+    
+    setActiveTimePeriod(availableTimePeriods[newIndex]);
   };
 
   // Loading state
@@ -241,9 +284,6 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
     ? recentRoutines 
     : recentRoutines.slice(0, 3);
   
-  // Recent routines list
-  const weeks = organizeRoutinesByWeek(displayRoutines);
-  
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
       <RefreshableScrollView
@@ -264,24 +304,76 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
           )}
         </View>
         
-        {/* Recent routines list */}
-        {Object.entries(weeks).map(([weekLabel, weekRoutines]) => (
-          <View key={weekLabel}>
-            <Text style={[styles.weekLabel, { color: isDark ? theme.textSecondary : '#666' }]}>{weekLabel}</Text>
-            {weekRoutines.map((item, index) => (
+        {/* If not premium, just show the first 3 routines as a flat list */}
+        {!isPremium && (
+          <View>
+            {displayRoutines.map((item, index) => (
               <RoutineItem 
                 key={`${item.date}-${index}`}
                 item={item}
                 onPress={() => onStartRecent(item)}
                 onDelete={() => onDeleteRoutine(item.date)}
                 hideLabel="Hide"
-                // Pass theme to child component if RoutineItem accepts it
                 theme={theme}
                 isDark={isDark}
               />
             ))}
           </View>
-        ))}
+        )}
+        
+        {/* For premium users, show time period navigation */}
+        {isPremium && availableTimePeriods.length > 0 && (
+          <>
+            {/* Time period navigation */}
+            <View style={styles.timeNavigation}>
+              <TouchableOpacity
+                style={[styles.navButton, { opacity: availableTimePeriods.length > 1 ? 1 : 0.3 }]}
+                onPress={() => navigateToPeriod('prev')}
+                disabled={availableTimePeriods.length <= 1}
+              >
+                <Ionicons 
+                  name="chevron-back" 
+                  size={24} 
+                  color={isDark ? theme.text : '#333'} 
+                />
+              </TouchableOpacity>
+              
+              <View style={styles.timePeriodContainer}>
+                <Text style={[styles.timePeriodText, { color: isDark ? theme.text : '#333' }]}>
+                  {activeTimePeriod}
+                </Text>
+                <Text style={[styles.timePeriodCount, { color: isDark ? theme.textSecondary : '#666' }]}>
+                  {organizedRoutines[activeTimePeriod]?.length || 0} routines
+                </Text>
+              </View>
+              
+              <TouchableOpacity
+                style={[styles.navButton, { opacity: availableTimePeriods.length > 1 ? 1 : 0.3 }]}
+                onPress={() => navigateToPeriod('next')}
+                disabled={availableTimePeriods.length <= 1}
+              >
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={24} 
+                  color={isDark ? theme.text : '#333'} 
+                />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Routines for current time period */}
+            {organizedRoutines[activeTimePeriod]?.map((item, index) => (
+              <RoutineItem 
+                key={`${item.date}-${index}`}
+                item={item}
+                onPress={() => onStartRecent(item)}
+                onDelete={() => onDeleteRoutine(item.date)}
+                hideLabel="Hide"
+                theme={theme}
+                isDark={isDark}
+              />
+            ))}
+          </>
+        )}
         
         {/* Suggestions section */}
         <View style={styles.suggestionsContainer}>
@@ -416,6 +508,32 @@ const styles = StyleSheet.create({
   premiumNote: {
     fontSize: 14,
     color: '#FF9800',
+  },
+  timeNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  navButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  timePeriodContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  timePeriodText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  timePeriodCount: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   weekLabel: {
     fontSize: 16,

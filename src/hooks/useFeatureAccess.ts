@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useGamification } from './useGamification';
 import { usePremium } from '../context/PremiumContext';
 import * as rewardManager from '../utils/progress/rewardManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ProgressEntry } from '../types';
+import * as xpManager from '../utils/progress/xpManager';
+import * as storageService from '../services/storageService';
 
 /**
  * Hook to check if features are accessible based on user level and premium status
@@ -108,12 +112,30 @@ export function useFeatureAccess() {
     return level >= requiredLevel;
   }, [level, getRequiredLevel]);
   
+  /**
+   * Get the current user's level
+   * @returns Promise<number> - The user's current level
+   */
+  const getUserLevel = async (): Promise<number> => {
+    try {
+      // Get the user progress from storage service
+      const userProgress = await storageService.getUserProgress();
+      
+      // Return the level from user progress
+      return userProgress?.level || 1;
+    } catch (error) {
+      console.error('Error getting user level:', error);
+      return 1; // Default to level 1 on error
+    }
+  };
+  
   return {
     isLoading,
     canAccessFeature,
     meetsLevelRequirement,
     getRequiredLevel,
     features,
-    refreshAccess: loadFeatureAccess
+    refreshAccess: loadFeatureAccess,
+    getUserLevel
   };
 } 

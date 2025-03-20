@@ -50,6 +50,7 @@ import { useChallengeSystem } from '../hooks/useChallengeSystem';
 import XpBoostCard from '../components/progress/XpBoostCard';
 import StreakFreezeCard from '../components/progress/StreakFreezeCard';
 import { useFeatureAccess } from '../hooks/useFeatureAccess';
+import SubscriptionModal from '../components/SubscriptionModal';
 
 // Day names for labels
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -107,6 +108,8 @@ interface RewardsTabContentProps {
   progressSystemData: any;
   handleUpgradeToPremium: () => void;
   handleActivateXpBoost: () => void;
+  subscriptionModalVisible: boolean;
+  onCloseSubscription: () => void;
 }
 
 export default function ProgressScreen({ navigation }) {
@@ -386,13 +389,15 @@ export default function ProgressScreen({ navigation }) {
     isPremium, 
     progressSystemData, 
     handleUpgradeToPremium, 
-    handleActivateXpBoost 
+    handleActivateXpBoost,
+    subscriptionModalVisible,
+    onCloseSubscription
   }: RewardsTabContentProps) => (
     !isPremium ? (
       <PremiumLock
         onOpenSubscription={handleUpgradeToPremium}
-        subscriptionModalVisible={false}
-        onCloseSubscription={() => {}}
+        subscriptionModalVisible={subscriptionModalVisible}
+        onCloseSubscription={onCloseSubscription}
         totalXP={progressSystemData?.totalXP || 0}
         level={progressSystemData?.level || 1}
       />
@@ -466,6 +471,13 @@ export default function ProgressScreen({ navigation }) {
     }
   };
 
+  // Handle subscription completion - moved after handleRefresh
+  const handleSubscriptionComplete = useCallback(() => {
+    setSubscriptionModalVisible(false);
+    // Refresh data after subscription completes
+    handleRefresh();
+  }, []);
+
   // Preload tabs to avoid flickering
   useEffect(() => {
     // Generate all tab contents on first render
@@ -520,6 +532,8 @@ export default function ProgressScreen({ navigation }) {
             progressSystemData={progressSystemData}
             handleUpgradeToPremium={handleUpgradeToPremium}
             handleActivateXpBoost={handleActivateXpBoost}
+            subscriptionModalVisible={subscriptionModalVisible}
+            onCloseSubscription={() => setSubscriptionModalVisible(false)}
           />
         );
       }
@@ -549,7 +563,8 @@ export default function ProgressScreen({ navigation }) {
     StatsTabContent,
     AchievementsTabContent,
     ChallengesTabContent,
-    RewardsTabContent
+    RewardsTabContent,
+    subscriptionModalVisible
   ]);
   
   // Smooth tab change handler with animation
@@ -685,6 +700,20 @@ export default function ProgressScreen({ navigation }) {
 
   // Modify renderTabContent to use memoized components
   const renderTabContent = useCallback(() => {
+    // First check if user is premium - if not, show premium lock for all tabs except rewards
+    // (which already handles premium lock internally)
+    if (!isPremium && activeTab !== 'rewards') {
+      return (
+        <PremiumLock
+          onOpenSubscription={handleUpgradeToPremium}
+          subscriptionModalVisible={subscriptionModalVisible}
+          onCloseSubscription={() => setSubscriptionModalVisible(false)}
+          totalXP={progressSystemData?.totalXP || 0}
+          level={progressSystemData?.level || 1}
+        />
+      );
+    }
+    
     // Add a loading state if progressSystemData is not available yet
     if (!progressSystemData && !isProgressSystemLoading) {
       console.log('Warning: progressSystemData is null but not loading');
@@ -754,6 +783,8 @@ export default function ProgressScreen({ navigation }) {
             progressSystemData={progressSystemData}
             handleUpgradeToPremium={handleUpgradeToPremium}
             handleActivateXpBoost={handleActivateXpBoost}
+            subscriptionModalVisible={subscriptionModalVisible}
+            onCloseSubscription={handleSubscriptionComplete}
           />
         );
         
@@ -794,12 +825,49 @@ export default function ProgressScreen({ navigation }) {
 
   // Only show empty state if there's truly no data (not even hidden routines)
   if (progressData.length === 0 && !hasHiddenRoutinesOnly) {
+    // Show premium lock for non-premium users instead of empty state
+    if (!isPremium) {
+      return (
+        <View style={styles.container}>
+          <XpNotificationManager />
+          <PremiumLock
+            onOpenSubscription={handleUpgradeToPremium}
+            subscriptionModalVisible={subscriptionModalVisible}
+            onCloseSubscription={() => setSubscriptionModalVisible(false)}
+            totalXP={progressSystemData?.totalXP || 0}
+            level={progressSystemData?.level || 1}
+          />
+          
+          {/* Subscription Modal moved to main component return */}
+        </View>
+      );
+    }
+    
+    // Show empty state only for premium users with no routines
     return (
       <EmptyState
         isLoading={isLoading && isPremium}
         onStartRoutine={() => navigation.navigate('Home')}
         allRoutinesHidden={false}
       />
+    );
+  }
+
+  // Always check if user is premium before showing the main progress screen
+  if (!isPremium) {
+    return (
+      <View style={styles.container}>
+        <XpNotificationManager />
+        <PremiumLock
+          onOpenSubscription={handleUpgradeToPremium}
+          subscriptionModalVisible={subscriptionModalVisible}
+          onCloseSubscription={() => setSubscriptionModalVisible(false)}
+          totalXP={progressSystemData?.totalXP || 0}
+          level={progressSystemData?.level || 1}
+        />
+        
+        {/* Subscription Modal moved to main component return */}
+      </View>
     );
   }
 
@@ -904,6 +972,13 @@ export default function ProgressScreen({ navigation }) {
           </View>
         </RefreshableScrollView>
       </Animated.View>
+      
+      {/* Subscription Modal - always available */}
+      <SubscriptionModal
+        visible={subscriptionModalVisible}
+        onClose={() => setSubscriptionModalVisible(false)}
+        onSubscribe={handleSubscriptionComplete}
+      />
     </View>
   );
 }

@@ -1,8 +1,9 @@
-import React from 'react';
-import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar } from 'react-native';
+import React, { useEffect } from 'react';
+import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import HomeScreen from './src/screens/HomeScreen';
 import RoutineScreen from './src/screens/RoutineScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
@@ -13,6 +14,7 @@ import { PremiumProvider } from './src/context/PremiumContext';
 import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { useState } from 'react';
+import * as notifications from './src/utils/notifications';
 
 const Tab = createBottomTabNavigator();
 
@@ -20,6 +22,55 @@ const Tab = createBottomTabNavigator();
 function MainApp() {
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const { theme, isDark } = useTheme();
+  
+  // Set up background notification scheduling
+  useEffect(() => {
+    console.log('App started - configuring notifications');
+    
+    // Configure and init notifications
+    notifications.configureNotifications();
+    
+    // Call setupBackgroundScheduling to ensure reminders get scheduled
+    notifications.setupBackgroundScheduling();
+    
+    // Add listener for notification received/responded to
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      // This is fired when a notification is received while the app is foregrounded
+      console.log('Notification received while app is open:', notification);
+    });
+    
+    // Setup notification response listener (when user taps on notification)
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('User tapped on notification:', response);
+      // Here you could navigate to a specific screen based on notification
+    });
+    
+    // Listen for app state changes but only schedule on cold starts
+    let appJustStarted = true;
+    
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        // Only check reminders when app is first opened or reopened after a long time
+        if (appJustStarted) {
+          console.log('App just started - scheduling reminders if needed');
+          notifications.setupBackgroundScheduling(); // Also call here when app returns to foreground
+          appJustStarted = false;
+        }
+      } else if (nextAppState === 'background') {
+        // App going to background, reset flag after a delay
+        setTimeout(() => {
+          appJustStarted = true;
+        }, 60000); // Reset after 1 minute in background
+      }
+    });
+    
+    // Cleanup
+    return () => {
+      subscription.remove();
+      notificationListener.remove();
+      responseListener.remove();
+    };
+  }, []);
   
   // Create custom navigation theme based on our app theme
   const navigationTheme = {
