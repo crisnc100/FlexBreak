@@ -45,11 +45,40 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   onOpenSubscription
 }) => {
   const navigation = useNavigation<AppNavigationProp>();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, themeType, setThemeType, canUseDarkTheme } = useTheme();
   const styles = themedStyles(theme);
   
   // Add debug logging for the levelUp prop
   console.log('CompletedRoutine received levelUp prop:', levelUp ? JSON.stringify(levelUp, null, 2) : 'null');
+  console.log('CompletedRoutine isPremium:', isPremium);
+  console.log('Theme status in CompletedRoutine - isDark:', isDark, 'canUseDarkTheme:', canUseDarkTheme, 'themeType:', themeType);
+  
+  // Extra validation for the levelUp prop - should only show if we have a true level-up event
+  // NOTE: The user just completed a routine but already reached level 2 previously,
+  // so we need to show the level-up celebration if they're at level 2 now
+  const showLevelUp = levelUp && 
+                     typeof levelUp === 'object' && 
+                     isPremium &&
+                     // Either show if there was a level change OR if user is at level 2 with Dark Theme reward
+                     (levelUp.oldLevel < levelUp.newLevel || 
+                      (levelUp.newLevel === 2 && levelUp.rewards && levelUp.rewards.some(r => r.id === 'dark_theme')));
+  
+  // Check if dark theme is unlocked but not activated
+  const hasDarkThemeReward = levelUp?.rewards?.some(r => r.id === 'dark_theme');
+  const canEnableDarkTheme = isPremium && hasDarkThemeReward && themeType !== 'dark';
+  
+  console.log('Will show level-up UI:', showLevelUp, 
+              'isPremium:', isPremium, 
+              'levelUp exists:', !!levelUp, 
+              levelUp ? `oldLevel: ${levelUp.oldLevel}, newLevel: ${levelUp.newLevel}` : '',
+              levelUp && levelUp.rewards ? `rewards: ${levelUp.rewards.length}` : '',
+              'canEnableDarkTheme:', canEnableDarkTheme);
+  
+  // Function to enable dark theme
+  const enableDarkTheme = () => {
+    console.log('Enabling dark theme');
+    setThemeType('dark');
+  };
   
   // Generate the routine to get the number of stretches
   const routine = generateRoutine(area, duration, 'beginner');
@@ -139,7 +168,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     onNavigateHome();
   };
   
-  // Render reward item
+  // Render reward item with optional activate button
   const renderRewardItem = (reward, index) => {
     // Skip rendering if reward is invalid
     if (!reward) return null;
@@ -159,12 +188,25 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         break;
     }
     
+    // Check if this is the dark theme reward
+    const isDarkThemeReward = reward.id === 'dark_theme';
+    
     return (
       <View key={`reward-${index}`} style={styles.rewardItem}>
         <Ionicons name={iconName as any} size={20} color="#FFD700" />
         <View style={styles.rewardContent}>
           <Text style={styles.rewardName}>{reward.name || 'Reward'}</Text>
           <Text style={styles.rewardDescription}>{reward.description || 'New feature unlocked!'}</Text>
+          
+          {/* Add button to activate dark theme if this reward is dark theme */}
+          {isDarkThemeReward && canEnableDarkTheme && (
+            <TouchableOpacity 
+              style={styles.activateButton}
+              onPress={enableDarkTheme}
+            >
+              <Text style={styles.activateButtonText}>Activate Now</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -177,20 +219,20 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
       <TouchableOpacity 
         style={[
           styles.completedContainer,
-          levelUp && isPremium && styles.completedContainerWithLevelUp
+          showLevelUp && styles.completedContainerWithLevelUp
         ]} 
         activeOpacity={1}
         onPress={onShowDashboard}
       >
-        <Ionicons name="checkmark-circle" size={levelUp && isPremium ? 60 : 80} color={theme.success} />
+        <Ionicons name="checkmark-circle" size={showLevelUp ? 60 : 80} color={theme.success} />
         <Text style={styles.completedTitle}>Routine Complete!</Text>
         <Text style={[
           styles.completedSubtitle, 
-          levelUp && isPremium && styles.reducedMargin
+          showLevelUp && styles.reducedMargin
         ]}>Great job on your stretching routine</Text>
         
         {/* Level Up Section */}
-        {levelUp && isPremium && (
+        {showLevelUp && (
           <View style={styles.levelUpContainer}>
             <LinearGradient
               colors={isDark ? ['#1a237e', '#3949ab'] : ['#3f51b5', '#7986cb']}
@@ -238,15 +280,15 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         {xpBreakdown && xpBreakdown.length > 0 ? (
           <View style={[
             styles.xpBreakdownContainer,
-            levelUp && isPremium && styles.xpBreakdownCompact
+            showLevelUp && styles.xpBreakdownCompact
           ]}>
             <View style={styles.xpTotalRow}>
-              <Ionicons name="star" size={levelUp && isPremium ? 20 : 24} color="#FF9800" />
+              <Ionicons name="star" size={showLevelUp ? 20 : 24} color="#FF9800" />
               <Text style={[
                 styles.xpTotalText,
-                levelUp && isPremium && {fontSize: 16}
+                showLevelUp && {fontSize: 16}
               ]}>
-                <Text style={styles.xpValue}>{xpEarned}</Text> Total XP {xpEarned > 0 ? 'Earned' : 'Earned from Previous Stretch'}
+                <Text style={styles.xpValue}>{xpEarned}</Text> XP {xpEarned > 0 ? 'Earned' : 'Earned from Previous Stretch'}
               </Text>
             </View>
             
@@ -254,7 +296,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
             
             {/* If level-up is shown, only display non-zero XP items to save space */}
             {xpBreakdown
-              .filter(item => !(levelUp && isPremium) || item.amount > 0)
+              .filter(item => !showLevelUp || item.amount > 0)
               .map((item, index) => {
                 // Get appropriate icon based on source
                 let iconName = 'star-outline';
@@ -280,13 +322,13 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                   <View key={`${item.source}-${index}`} style={styles.xpBreakdownItem}>
                     <Ionicons 
                       name={iconName as any} 
-                      size={levelUp && isPremium ? 14 : 16} 
+                      size={showLevelUp ? 14 : 16} 
                       color={item.amount > 0 ? "#FF9800" : theme.textSecondary} 
                     />
                     <Text style={[
                       styles.xpBreakdownText, 
                       item.amount === 0 && styles.xpBreakdownZero,
-                      levelUp && isPremium && {fontSize: 12}
+                      showLevelUp && {fontSize: 12}
                     ]}>
                       {item.amount > 0 ? (
                         <Text style={styles.xpBreakdownValue}>+{item.amount} XP</Text>
@@ -303,12 +345,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
           // Simple XP display when no breakdown is available
           <View style={[
             styles.xpContainer,
-            levelUp && isPremium && styles.xpContainerCompact
+            showLevelUp && styles.xpContainerCompact
           ]}>
-            <Ionicons name="star" size={levelUp && isPremium ? 20 : 24} color="#FF9800" />
+            <Ionicons name="star" size={showLevelUp ? 20 : 24} color="#FF9800" />
             <Text style={[
               styles.xpText,
-              levelUp && isPremium && {fontSize: 14}
+              showLevelUp && {fontSize: 14}
             ]}>
               <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
             </Text>
@@ -317,35 +359,35 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         
         <View style={[
           styles.statsContainer,
-          levelUp && isPremium && styles.reducedMargin
+          showLevelUp && styles.reducedMargin
         ]}>
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={levelUp && isPremium ? 20 : 24} color={theme.textSecondary} />
-            <Text style={[styles.statValue, levelUp && isPremium && styles.statValueCompact]}>{duration} mins</Text>
-            <Text style={[styles.statLabel, levelUp && isPremium && styles.statLabelCompact]}>Duration</Text>
+            <Ionicons name="time-outline" size={showLevelUp ? 20 : 24} color={theme.textSecondary} />
+            <Text style={[styles.statValue, showLevelUp && styles.statValueCompact]}>{duration} mins</Text>
+            <Text style={[styles.statLabel, showLevelUp && styles.statLabelCompact]}>Duration</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="fitness-outline" size={levelUp && isPremium ? 20 : 24} color={theme.textSecondary} />
-            <Text style={[styles.statValue, levelUp && isPremium && styles.statValueCompact]}>{routine.length}</Text>
-            <Text style={[styles.statLabel, levelUp && isPremium && styles.statLabelCompact]}>Stretches</Text>
+            <Ionicons name="fitness-outline" size={showLevelUp ? 20 : 24} color={theme.textSecondary} />
+            <Text style={[styles.statValue, showLevelUp && styles.statValueCompact]}>{routine.length}</Text>
+            <Text style={[styles.statLabel, showLevelUp && styles.statLabelCompact]}>Stretches</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="body-outline" size={levelUp && isPremium ? 20 : 24} color={theme.textSecondary} />
-            <Text style={[styles.statValue, levelUp && isPremium && styles.statValueCompact]}>{area}</Text>
-            <Text style={[styles.statLabel, levelUp && isPremium && styles.statLabelCompact]}>Focus Area</Text>
+            <Ionicons name="body-outline" size={showLevelUp ? 20 : 24} color={theme.textSecondary} />
+            <Text style={[styles.statValue, showLevelUp && styles.statValueCompact]}>{area}</Text>
+            <Text style={[styles.statLabel, showLevelUp && styles.statLabelCompact]}>Focus Area</Text>
           </View>
         </View>
         
         <Text style={[
           styles.nextStepsText,
-          levelUp && isPremium && styles.nextStepsTextCompact
+          showLevelUp && styles.nextStepsTextCompact
         ]}>What would you like to do next?</Text>
         
         <View style={[
           styles.buttonContainer,
-          levelUp && isPremium && styles.buttonContainerCompact
+          showLevelUp && styles.buttonContainerCompact
         ]}>
           {isPremium ? (
             <>
@@ -353,44 +395,30 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                 style={[
                   styles.button, 
                   styles.favoriteButton,
-                  levelUp && isPremium && styles.buttonCompact
+                  showLevelUp && styles.buttonCompact
                 ]} 
                 onPress={saveToFavorites}
               >
-                <Ionicons name="star" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
+                <Ionicons name="star" size={showLevelUp ? 16 : 20} color="#FFF" />
                 <Text style={[
                   styles.buttonText,
-                  levelUp && isPremium && styles.buttonTextCompact
+                  showLevelUp && styles.buttonTextCompact
                 ]}>Save</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity 
-                style={[
-                  styles.button, 
-                  styles.shareButton,
-                  levelUp && isPremium && styles.buttonCompact
-                ]} 
-                onPress={handleShare}
-              >
-                <Ionicons name="share-social-outline" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
-                <Text style={[
-                  styles.buttonText,
-                  levelUp && isPremium && styles.buttonTextCompact
-                ]}>Share</Text>
-              </TouchableOpacity>
               
               <TouchableOpacity 
                 style={[
                   styles.button, 
                   styles.smartPickButton,
-                  levelUp && isPremium && styles.buttonCompact
+                  showLevelUp && styles.buttonCompact
                 ]} 
                 onPress={startSmartPick}
               >
-                <Ionicons name="bulb" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
+                <Ionicons name="bulb" size={showLevelUp ? 16 : 20} color="#FFF" />
                 <Text style={[
                   styles.buttonText,
-                  levelUp && isPremium && styles.buttonTextCompact
+                  showLevelUp && styles.buttonTextCompact
                 ]}>Smart Pick</Text>
               </TouchableOpacity>
             </>
@@ -408,16 +436,22 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
             style={[
               styles.button, 
               styles.newRoutineButton,
-              levelUp && isPremium && styles.buttonCompact
+              showLevelUp && styles.buttonCompact
             ]} 
             onPress={handleNewRoutine}
           >
-            <Ionicons name="home-outline" size={levelUp && isPremium ? 16 : 20} color="#FFF" />
+            <Ionicons name="home-outline" size={showLevelUp ? 16 : 20} color="#FFF" />
             <Text style={[
               styles.buttonText,
-              levelUp && isPremium && styles.buttonTextCompact
+              showLevelUp && styles.buttonTextCompact
             ]}>New Routine</Text>
           </TouchableOpacity>
+        </View>
+        
+        {/* Tap anywhere to continue indicator */}
+        <View style={styles.tapIndicatorContainer}>
+          <Ionicons name="finger-print-outline" size={16} color={theme.textSecondary} />
+          <Text style={styles.tapIndicatorText}>Tap anywhere to continue</Text>
         </View>
       </TouchableOpacity>
     </View>
@@ -526,7 +560,7 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
   },
   rewardItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: 8,
     padding: 8,
@@ -702,6 +736,31 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
   },
   buttonTextCompact: {
     fontSize: 12,
+  },
+  activateButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  activateButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  tapIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    opacity: 0.7,
+  },
+  tapIndicatorText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginLeft: 6,
   },
 }));
 

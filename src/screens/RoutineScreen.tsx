@@ -19,6 +19,7 @@ import { useRoutineParams } from '../hooks/useRoutineParams';
 import { useRoutineStorage } from '../hooks/useRoutineStorage';
 import { useRoutineSuggestions } from '../hooks/useRoutineSuggestions';
 import { useGamification } from '../hooks/useGamification';
+import { useTheme } from '../context/ThemeContext';
 
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
@@ -61,6 +62,9 @@ export default function RoutineScreen() {
   
   // Get refresh functionality from context
   const { isRefreshing, refreshRoutine } = useRefresh();
+  
+  // Get theme context for refreshing access to dark theme
+  const { refreshThemeAccess } = useTheme();
   
   // Single screen state to track what we're showing
   const [screenState, setScreenState] = useState<RoutineScreenState>('LOADING');
@@ -125,6 +129,10 @@ export default function RoutineScreen() {
       
       await saveRoutineProgress(entry);
       console.log('Routine saved successfully');
+      
+      // Refresh theme access to check if user unlocked dark theme
+      await refreshThemeAccess();
+      console.log('Theme access refreshed after routine completion');
       
       // Use the new gamification system to process the routine
       try {
@@ -197,10 +205,10 @@ export default function RoutineScreen() {
           // Extract level-up information if available
           let levelUpInfo: LevelUpData | null = null;
           
-          // Check if we have a level-up condition
-          if (result.levelUp === true && result.newLevel > 0) {
-            // Calculate oldLevel as newLevel-1 if not provided
-            const oldLevel = result.newLevel > 1 ? result.newLevel - 1 : 1;
+          // Check if we have a level-up condition - only if result.levelUp is strictly true
+          if (result.levelUp === true && result.newLevel > ((result as any).previousLevel || 0)) {
+            // Calculate oldLevel from the result's previousLevel property
+            const oldLevel = (result as any).previousLevel || (result.newLevel > 1 ? result.newLevel - 1 : 1);
             console.log(`🎉 Level Up! ${oldLevel} → ${result.newLevel}`);
             console.log('Level up data detected, result content:', JSON.stringify(result, null, 2));
             
@@ -254,6 +262,30 @@ export default function RoutineScreen() {
             }
           } else {
             console.log('No level up detected in result. levelUp:', result.levelUp);
+            
+            // Check if user is already at level 2 and has unlocked dark theme
+            // This ensures we show the level-up UI for level 2 users who have dark theme
+            if (result.newLevel === 2 || (result as any).level === 2) {
+              console.log('User is at level 2, checking if dark theme is unlocked');
+              
+              // Check if dark theme is in the unlocked rewards
+              const hasUnlockedDarkTheme = result.unlockedRewards && 
+                result.unlockedRewards.some((r: any) => r.id === 'dark_theme' || r.title === 'Dark Theme');
+              
+              if (hasUnlockedDarkTheme || isPremium) {
+                console.log('Creating level-up data for already unlocked dark theme');
+                levelUpInfo = {
+                  oldLevel: 1,
+                  newLevel: 2,
+                  rewards: [{
+                    id: 'dark_theme',
+                    name: 'Dark Theme',
+                    description: 'Enable a sleek dark mode for comfortable evening stretching',
+                    type: 'feature'
+                  }]
+                };
+              }
+            }
           }
           
           // Store level-up data in component state
@@ -263,19 +295,34 @@ export default function RoutineScreen() {
           // For testing: Force a level-up UI if none is detected but XP is earned
           // Remove this in production
           if (!levelUpInfo && result.xpEarned > 0) {
-            console.log('⚠️ TESTING OVERRIDE: Creating mock level-up data for UI testing');
-            const mockLevelUpData: LevelUpData = {
-              oldLevel: 1,
-              newLevel: 2,
-              rewards: [{
-                id: 'dark_theme',
-                name: 'Dark Theme',
-                description: 'Enable a sleek dark mode for comfortable evening stretching',
-                type: 'feature'
-              }]
-            };
-            setLevelUpData(mockLevelUpData);
-            console.log('Mock level-up data:', JSON.stringify(mockLevelUpData, null, 2));
+            console.log('XP earned but no level-up data, checking user progress for rewards...');
+            
+            try {
+              // Import storageService to get user progress
+              const { getUserProgress } = require('../services/storageService');
+              const userProgress = await getUserProgress();
+              
+              console.log('Current user level:', userProgress.level);
+              
+              // If user is level 2 or higher, show the dark theme reward
+              if (userProgress.level >= 2) {
+                console.log('User is level 2+, creating level-up info with dark theme');
+                const mockLevelUpData: LevelUpData = {
+                  oldLevel: 1,
+                  newLevel: 2,
+                  rewards: [{
+                    id: 'dark_theme',
+                    name: 'Dark Theme',
+                    description: 'Enable a sleek dark mode for comfortable evening stretching',
+                    type: 'feature'
+                  }]
+                };
+                setLevelUpData(mockLevelUpData);
+                console.log('Created level-up data for dark theme:', JSON.stringify(mockLevelUpData, null, 2));
+              }
+            } catch (error) {
+              console.error('Error checking user progress:', error);
+            }
           }
           
           // Check for completed challenges

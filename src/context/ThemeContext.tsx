@@ -59,6 +59,7 @@ interface ThemeContextType {
   setThemeType: (type: ThemeType) => void;
   isDark: boolean;
   canUseDarkTheme: boolean;
+  refreshThemeAccess: () => Promise<void>;
 }
 
 // Create the context
@@ -67,7 +68,8 @@ const ThemeContext = createContext<ThemeContextType>({
   themeType: 'system',
   setThemeType: () => {},
   isDark: false,
-  canUseDarkTheme: false
+  canUseDarkTheme: false,
+  refreshThemeAccess: async () => {}
 });
 
 // Storage key for theme preference
@@ -97,41 +99,43 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
   
   // Check if user can access dark theme based on premium status and level
-  useEffect(() => {
-    const checkDarkThemeAccess = async () => {
-      try {
-        // Default to false
-        let hasAccess = false;
+  const checkDarkThemeAccess = async () => {
+    try {
+      // Default to false
+      let hasAccess = false;
+      
+      // If user is premium, check their level
+      if (isPremium) {
+        const userProgress = await storageService.getUserProgress();
         
-        // If user is premium, check their level
-        if (isPremium) {
-          const userProgress = await storageService.getUserProgress();
-          
-          // Level 2+ unlocks dark theme
-          if (userProgress.level >= 2) {
-            hasAccess = true;
-          }
-          
-          // Also check if the dark_theme reward is unlocked
-          if (userProgress.rewards && userProgress.rewards.dark_theme) {
-            hasAccess = userProgress.rewards.dark_theme.unlocked;
-          }
+        // Level 2+ unlocks dark theme
+        if (userProgress.level >= 2) {
+          hasAccess = true;
         }
         
-        setCanUseDarkTheme(hasAccess);
-        
-        // If user can't use dark theme but currently has it set, revert to light
-        if (!hasAccess && themeType === 'dark') {
-          await saveThemePreference('light');
-          setThemeType('light');
+        // Also check if the dark_theme reward is unlocked
+        if (userProgress.rewards && userProgress.rewards.dark_theme) {
+          hasAccess = userProgress.rewards.dark_theme.unlocked;
         }
-      } catch (error) {
-        console.error('Error checking dark theme access:', error);
       }
-    };
-    
+      
+      console.log('Dark theme access check:', hasAccess ? 'GRANTED' : 'DENIED');
+      setCanUseDarkTheme(hasAccess);
+      
+      // If user can't use dark theme but currently has it set, revert to light
+      if (!hasAccess && themeType === 'dark') {
+        await saveThemePreference('light');
+        setThemeType('light');
+      }
+    } catch (error) {
+      console.error('Error checking dark theme access:', error);
+    }
+  };
+  
+  // Effect to check access on premium status change
+  useEffect(() => {
     checkDarkThemeAccess();
-  }, [isPremium, themeType]);
+  }, [isPremium]);
   
   // Load saved theme preference
   useEffect(() => {
@@ -180,13 +184,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     console.log(`Theme status - Type: ${themeType}, isDark: ${isDark}, canUseDark: ${canUseDarkTheme}`);
   }, [themeType, isDark, canUseDarkTheme]);
   
+  // Public method to refresh theme access
+  const refreshThemeAccess = async () => {
+    console.log('Refreshing theme access...');
+    // Reload premium status
+    try {
+      const status = await storageService.getIsPremium();
+      setIsPremium(status);
+    } catch (error) {
+      console.error('Error refreshing premium status:', error);
+    }
+    
+    // Check access directly
+    await checkDarkThemeAccess();
+  };
+  
   return (
     <ThemeContext.Provider value={{ 
       theme: actualTheme, 
       themeType, 
       setThemeType: handleSetThemeType, 
       isDark: isDark && canUseDarkTheme,
-      canUseDarkTheme
+      canUseDarkTheme,
+      refreshThemeAccess
     }}>
       {children}
     </ThemeContext.Provider>
