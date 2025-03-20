@@ -64,7 +64,7 @@ export default function RoutineScreen() {
   const { isRefreshing, refreshRoutine } = useRefresh();
   
   // Get theme context for refreshing access to dark theme
-  const { refreshThemeAccess } = useTheme();
+  const { refreshThemeAccess, themeType, setThemeType } = useTheme();
   
   // Single screen state to track what we're showing
   const [screenState, setScreenState] = useState<RoutineScreenState>('LOADING');
@@ -286,6 +286,23 @@ export default function RoutineScreen() {
                 };
               }
             }
+          }
+          
+          // Check if dark theme was unlocked and set it automatically
+          const hasDarkThemeReward = levelUpInfo?.rewards?.some(r => r.id === 'dark_theme');
+          if (hasDarkThemeReward && isPremium) {
+            console.log('Dark theme unlocked! Setting theme to dark automatically');
+            // Allow a moment for the context to update permissions
+            setTimeout(() => {
+              // Force refresh theme access before attempting to change the theme
+              refreshThemeAccess().then(() => {
+                // Only set to dark if not already dark
+                if (themeType !== 'dark') {
+                  console.log('Changing theme to dark mode');
+                  setThemeType('dark');
+                }
+              });
+            }, 500);
           }
           
           // Store level-up data in component state

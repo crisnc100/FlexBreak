@@ -7,10 +7,12 @@ import SubscriptionModal from '../components/SubscriptionModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
 import { RefreshableFlatList } from '../components/common';
+import { useTheme } from '../context/ThemeContext';
 
 export default function FavoritesScreen() {
   const { isPremium } = usePremium();
   const { isRefreshing, refreshFavorites } = useRefresh();
+  const { theme, isDark } = useTheme();
   
   const [favorites, setFavorites] = useState<Stretch[]>([]);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
@@ -44,11 +46,24 @@ export default function FavoritesScreen() {
   };
 
   const renderFavoriteItem = ({ item }: { item: Stretch }) => (
-    <View style={styles.favoriteItem}>
+    <View style={[
+      styles.favoriteItem, 
+      { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
+    ]}>
       <Image source={item.image} style={styles.stretchImage} />
       <View style={styles.stretchInfo}>
-        <Text style={styles.stretchName}>{item.name}</Text>
-        <Text style={styles.stretchDescription}>{item.description}</Text>
+        <Text style={[
+          styles.stretchName,
+          { color: isDark ? theme.text : '#333' }
+        ]}>
+          {item.name}
+        </Text>
+        <Text style={[
+          styles.stretchDescription,
+          { color: isDark ? theme.textSecondary : '#666' }
+        ]}>
+          {item.description}
+        </Text>
         <Text style={styles.stretchDuration}>{item.duration}s</Text>
       </View>
     </View>
@@ -56,9 +71,22 @@ export default function FavoritesScreen() {
 
   if (!isPremium) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.text}>Favorites Screen</Text>
-        <Text style={styles.subtext}>Unlock favorites with Premium!</Text>
+      <View style={[
+        styles.container,
+        { backgroundColor: isDark ? theme.background : '#fff' }
+      ]}>
+        <Text style={[
+          styles.text,
+          { color: isDark ? theme.text : '#000' }
+        ]}>
+          Favorites Screen
+        </Text>
+        <Text style={[
+          styles.subtext,
+          { color: isDark ? theme.textSecondary : '#666' }
+        ]}>
+          Unlock favorites with Premium!
+        </Text>
         <TouchableOpacity 
           style={styles.button}
           onPress={() => setSubscriptionModalVisible(true)}
@@ -75,11 +103,24 @@ export default function FavoritesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Favorites</Text>
+    <View style={[
+      styles.container,
+      { backgroundColor: isDark ? theme.background : '#fff' }
+    ]}>
+      <Text style={[
+        styles.header,
+        { color: isDark ? theme.text : '#333' }
+      ]}>
+        Favorites
+      </Text>
       
       {favorites.length === 0 ? (
-        <Text style={styles.emptyText}>No favorites yet. Star stretches during your routine to save them here!</Text>
+        <Text style={[
+          styles.emptyText,
+          { color: isDark ? theme.textSecondary : '#666' }
+        ]}>
+          No favorites yet. Star stretches during your routine to save them here!
+        </Text>
       ) : (
         <RefreshableFlatList
           data={favorites}
@@ -169,4 +210,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 32,
   },
-}); 
+});

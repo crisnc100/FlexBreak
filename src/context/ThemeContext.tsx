@@ -74,6 +74,8 @@ const ThemeContext = createContext<ThemeContextType>({
 
 // Storage key for theme preference
 const THEME_STORAGE_KEY = '@app_theme_preference';
+// Add a new storage key for tracking theme changes
+const LAST_THEME_CHECK_KEY = '@last_theme_permission_check';
 
 // Theme provider component
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -83,6 +85,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Use a simpler approach - just initialize isPremium to false
   const [isPremium, setIsPremium] = useState(false);
+  // Track the last time we checked theme access
+  const [lastThemeCheck, setLastThemeCheck] = useState<number>(0);
   
   // Load premium status
   useEffect(() => {
@@ -96,6 +100,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     
     loadPremiumStatus();
+    
+    // Load the last time theme access was checked
+    const loadLastThemeCheck = async () => {
+      try {
+        const lastCheck = await AsyncStorage.getItem(LAST_THEME_CHECK_KEY);
+        if (lastCheck) {
+          setLastThemeCheck(parseInt(lastCheck, 10));
+        }
+      } catch (error) {
+        console.error('Error loading last theme check time:', error);
+      }
+    };
+    
+    loadLastThemeCheck();
   }, []);
   
   // Check if user can access dark theme based on premium status and level
@@ -127,6 +145,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await saveThemePreference('light');
         setThemeType('light');
       }
+      
+      // Update the last check timestamp
+      const now = Date.now();
+      await AsyncStorage.setItem(LAST_THEME_CHECK_KEY, now.toString());
+      setLastThemeCheck(now);
     } catch (error) {
       console.error('Error checking dark theme access:', error);
     }
@@ -136,6 +159,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     checkDarkThemeAccess();
   }, [isPremium]);
+  
+  // Add a periodic check to ensure theme permissions are up to date
+  useEffect(() => {
+    // Check for new theme permissions every time the app is focused
+    const checkForThemeUpdates = async () => {
+      const now = Date.now();
+      // Only check if it's been at least 1 second since the last check
+      if (now - lastThemeCheck > 1000) {
+        console.log('Periodic theme permission check...');
+        await checkDarkThemeAccess();
+      }
+    };
+    
+    // Initial check
+    checkForThemeUpdates();
+    
+    // Set up interval to check every few seconds
+    const intervalId = setInterval(checkForThemeUpdates, 5000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [lastThemeCheck]);
   
   // Load saved theme preference
   useEffect(() => {

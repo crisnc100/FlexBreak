@@ -9,7 +9,8 @@ import {
   Image,
   ActivityIndicator,
   Alert,
-  Platform
+  Platform,
+  Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ProgressEntry, BodyArea } from '../types';
@@ -66,6 +67,48 @@ const INITIAL_PROGRESS_STATE = {
   lastUpdated: new Date().toISOString()
 };
 
+// Define interfaces for the memoized components
+interface StatsTabContentProps {
+  hasHiddenRoutinesOnly: boolean;
+  stats: {
+    totalMinutes: number;
+    currentStreak: number;
+    totalRoutines: number;
+    activeRoutineDays: number;
+    weeklyActivity: number[];
+    areaBreakdown: Record<string, number>;
+    dayOfWeekBreakdown: number[];
+  };
+  orderedDayNames: string[];
+  mostActiveDay: string;
+  isPremium: boolean;
+  canAccessFeature: (feature: string) => boolean;
+  theme: any;
+  isDark: boolean;
+}
+
+interface AchievementsTabContentProps {
+  stats: {
+    totalRoutines: number;
+    currentStreak: number;
+    areaBreakdown: Record<string, number>;
+    totalMinutes: number;
+  };
+  progressSystemData: any;
+}
+
+interface ChallengesTabContentProps {
+  isPremium: boolean;
+  handleUpgradeToPremium: () => void;
+}
+
+interface RewardsTabContentProps {
+  isPremium: boolean;
+  progressSystemData: any;
+  handleUpgradeToPremium: () => void;
+  handleActivateXpBoost: () => void;
+}
+
 export default function ProgressScreen({ navigation }) {
   const { isPremium } = usePremium();
   const { theme, isDark } = useTheme();
@@ -89,6 +132,14 @@ export default function ProgressScreen({ navigation }) {
     dayOfWeekBreakdown: [0, 0, 0, 0, 0, 0, 0],
     activeRoutineDays: 0
   });
+
+  // Add state to cache tab content
+  const [tabContentCache, setTabContentCache] = useState<{
+    stats?: React.ReactNode;
+    achievements?: React.ReactNode;
+    challenges?: React.ReactNode;
+    rewards?: React.ReactNode;
+  }>({});
   
   // Use the progress system hook for XP tracking
   const { 
@@ -122,89 +173,6 @@ export default function ProgressScreen({ navigation }) {
   // Use the feature access hook
   const { canAccessFeature } = useFeatureAccess();
   
-  // Synchronize data and load all routines when component mounts
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // For both free and premium users, load routines to calculate XP
-        const allRoutines = await getAllRoutines();
-        
-        if (allRoutines && allRoutines.length > 0) {
-          console.log('Loaded routines for XP calculation:', allRoutines.length);
-          setAllProgressData(allRoutines);
-          
-          // Calculate stats first to ensure streak is calculated
-          calculateStats(allRoutines);
-          
-          // Force refresh user progress to ensure XP is up to date
-          await refreshUserProgress();
-          
-          // Update progress with routines for both free and premium users
-          // Only do this once per component mount to avoid infinite loops
-          if (progressSystemData && !hasUpdatedChallenges.current) {
-            console.log('Updating challenges with routines (first time only)');
-            await updateChallengesWithRoutines(allRoutines);
-            hasUpdatedChallenges.current = true;
-          } else if (!progressSystemData) {
-            console.log('Skipping updateChallengesWithRoutines because progressSystemData is null');
-          } else {
-            console.log('Skipping updateChallengesWithRoutines because it was already done');
-          }
-          
-          // For premium users, also synchronize
-          if (isPremium && !hasSynchronized) {
-            console.log('Loading progress data for premium user...');
-            await synchronizeProgressData();
-          }
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-      }
-    };
-    
-    loadData();
-    // Remove progressSystemData from dependency array to prevent loops
-  }, [isPremium, hasSynchronized, synchronizeProgressData, getAllRoutines, updateChallengesWithRoutines, refreshUserProgress]);
-  
-  // Update visible routines for display
-  useEffect(() => {
-    if (isPremium && recentRoutines.length > 0) {
-      console.log('Updating visible routines:', recentRoutines.length);
-      setProgressData(recentRoutines);
-    }
-  }, [isPremium, recentRoutines]);
-  
-  // Handle refresh
-  const handleRefresh = async () => {
-    console.log('Refreshing progress screen...');
-    await refreshProgress();
-    
-    try {
-      // Get all routines for both premium and free users
-      const allRoutines = await getAllRoutines();
-      console.log('Refreshed all routines:', allRoutines.length);
-      setAllProgressData(allRoutines);
-      
-      // Calculate stats first
-      calculateStats(allRoutines);
-      
-      // Force refresh user progress
-      await refreshUserProgress();
-      
-      // Update progress with routines for both free and premium users
-      // This also handles updating challenges appropriately
-      await updateChallengesWithRoutines(allRoutines);
-      
-      // If on the challenges tab, specifically refresh challenge data
-      if (activeTab === 'challenges') {
-        // The ChallengeList component will handle its own refresh
-        console.log('Refreshing challenges tab');
-      }
-    } catch (error) {
-      console.error('Error refreshing all routines:', error);
-    }
-  };
-
   // Calculate all stats from progress data
   const calculateStats = (data) => {
     if (!data || data.length === 0) {
@@ -268,16 +236,26 @@ export default function ProgressScreen({ navigation }) {
       areaBreakdown
     });
   };
-
-
-
+  
   // Handle upgrade to premium
-  const handleUpgradeToPremium = () => {
+  const handleUpgradeToPremium = useCallback(() => {
     setSubscriptionModalVisible(true);
-  };
-
+  }, []);
+  
+  // Handle XP Boost activation
+  const handleActivateXpBoost = useCallback(() => {
+    Alert.alert(
+      'XP Boost Activated!',
+      'Your XP Boost is now active. All XP earned in the next 24 hours will be doubled.',
+      [{ text: 'OK' }]
+    );
+    
+    // Refresh progress data to reflect changes
+    handleRefresh();
+  }, []);
+  
   // Reset user progress (DEV only)
-  const handleResetProgress = async () => {
+  const handleResetProgress = useCallback(async () => {
     if (__DEV__) {
       Alert.alert(
         'Reset Progress',
@@ -303,7 +281,358 @@ export default function ProgressScreen({ navigation }) {
         ]
       );
     }
+  }, []);
+
+  // Check if user has completed routines but they're all hidden
+  const hasHiddenRoutinesOnly = allProgressData.length > 0 && progressData.length === 0;
+
+  // Define memoized tab components
+  const StatsTabContent = useCallback(({ 
+    hasHiddenRoutinesOnly, 
+    stats, 
+    orderedDayNames, 
+    mostActiveDay, 
+    isPremium, 
+    canAccessFeature,
+    theme,
+    isDark
+  }: StatsTabContentProps) => (
+    <>
+      {/* Show notice when all routines are hidden */}
+      {hasHiddenRoutinesOnly && (
+        <View style={[styles.hiddenRouticesNotice, { 
+          backgroundColor: isDark ? theme.cardBackground : '#FFF',
+          borderColor: isDark ? '#FF9800' : '#FF9800'
+        }]}>
+          <Ionicons name="eye-off-outline" size={20} color="#FF9800" />
+          <Text style={styles.hiddenRoutinesText}>
+            All routines are hidden. Stats are still available.
+          </Text>
+        </View>
+      )}
+      
+      <StatsOverview
+        totalMinutes={stats.totalMinutes}
+        currentStreak={stats.currentStreak}
+        totalRoutines={stats.totalRoutines}
+      />
+      
+      {/* Only show streak freeze card for premium users with level 6+ */}
+      {isPremium && canAccessFeature('streak_freezes') && (
+        <StreakFreezeCard currentStreak={stats.currentStreak} />
+      )}
+      
+      <ConsistencyInsights
+        activeRoutineDays={stats.activeRoutineDays}
+        mostActiveDay={mostActiveDay}
+      />
+      
+      <WeeklyActivity
+        weeklyActivity={stats.weeklyActivity}
+        orderedDayNames={orderedDayNames}
+      />
+      
+      <FocusAreas
+        areaBreakdown={stats.areaBreakdown}
+        totalRoutines={stats.totalRoutines}
+      />
+      
+      <StretchingPatterns
+        dayOfWeekBreakdown={stats.dayOfWeekBreakdown}
+        dayNames={DAY_NAMES}
+        mostActiveDay={mostActiveDay}
+      />
+      
+      <TipSection
+        currentStreak={stats.currentStreak}
+      />
+    </>
+  ), []);
+
+  const AchievementsTabContent = useCallback(({ stats, progressSystemData }: AchievementsTabContentProps) => (
+    <Achievements
+      totalRoutines={stats.totalRoutines}
+      currentStreak={stats.currentStreak}
+      areaBreakdown={stats.areaBreakdown}
+      totalXP={progressSystemData?.totalXP || 0}
+      level={progressSystemData?.level || 1}
+      totalMinutes={stats.totalMinutes}
+      completedAchievements={progressSystemData?.achievements ? 
+        Object.values(progressSystemData.achievements || {})
+          .filter((a: any) => a.completed)
+          .map((a: any) => ({
+            id: a.id,
+            title: a.title,
+            xp: a.xp,
+            dateCompleted: a.dateCompleted || new Date().toISOString()
+          })) : 
+        []}
+    />
+  ), []);
+
+  const ChallengesTabContent = useCallback(({ isPremium, handleUpgradeToPremium }: ChallengesTabContentProps) => (
+    isPremium ? (
+      <ChallengeList />
+    ) : (
+      <PremiumLockSimple
+        feature="Challenges"
+        description="Complete daily, weekly, and monthly challenges to earn XP and track your progress."
+        onUpgrade={handleUpgradeToPremium}
+      />
+    )
+  ), []);
+
+  const RewardsTabContent = useCallback(({ 
+    isPremium, 
+    progressSystemData, 
+    handleUpgradeToPremium, 
+    handleActivateXpBoost 
+  }: RewardsTabContentProps) => (
+    !isPremium ? (
+      <PremiumLock
+        onOpenSubscription={handleUpgradeToPremium}
+        subscriptionModalVisible={false}
+        onCloseSubscription={() => {}}
+        totalXP={progressSystemData?.totalXP || 0}
+        level={progressSystemData?.level || 1}
+      />
+    ) : (
+      <View style={styles.tabContent}>
+        {/* Include XP Boost card at the top of rewards tab */}
+        <XpBoostCard onActivateBoost={handleActivateXpBoost} />
+        
+        {/* Existing rewards section */}
+        <Rewards
+          userLevel={progressSystemData?.level || 1}
+          isPremium={isPremium}
+          onUpgradeToPremium={handleUpgradeToPremium}
+        />
+      </View>
+    )
+  ), []);
+
+  // Add animation values for tab transitions
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  
+  // Prepare all tab contents in advance
+  const [tabContents, setTabContents] = useState<{
+    stats: React.ReactNode | null;
+    achievements: React.ReactNode | null;
+    challenges: React.ReactNode | null;
+    rewards: React.ReactNode | null;
+  }>({
+    stats: null,
+    achievements: null,
+    challenges: null,
+    rewards: null
+  });
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    console.log('Refreshing progress screen...');
+    await refreshProgress();
+    
+    try {
+      // Get all routines for both premium and free users
+      const allRoutines = await getAllRoutines();
+      console.log('Refreshed all routines:', allRoutines.length);
+      setAllProgressData(allRoutines);
+      
+      // Calculate stats first
+      calculateStats(allRoutines);
+      
+      // Force refresh user progress
+      await refreshUserProgress();
+      
+      // Update progress with routines for both free and premium users
+      // This also handles updating challenges appropriately
+      await updateChallengesWithRoutines(allRoutines);
+      
+      // Clear the tab contents to force a refresh
+      setTabContents({
+        stats: null,
+        achievements: null,
+        challenges: null,
+        rewards: null
+      });
+      
+      // If on the challenges tab, specifically refresh challenge data
+      if (activeTab === 'challenges') {
+        // The ChallengeList component will handle its own refresh
+        console.log('Refreshing challenges tab');
+      }
+    } catch (error) {
+      console.error('Error refreshing all routines:', error);
+    }
   };
+
+  // Preload tabs to avoid flickering
+  useEffect(() => {
+    // Generate all tab contents on first render
+    const generateAllContents = () => {
+      const tempActiveTab = activeTab;
+      
+      // Generate content for each tab
+      const contents = {
+        stats: null,
+        achievements: null,
+        challenges: null,
+        rewards: null
+      };
+      
+      // Stats tab
+      contents.stats = (
+        <StatsTabContent 
+          hasHiddenRoutinesOnly={hasHiddenRoutinesOnly}
+          stats={stats}
+          orderedDayNames={orderedDayNames}
+          mostActiveDay={mostActiveDay}
+          isPremium={isPremium}
+          canAccessFeature={canAccessFeature}
+          theme={theme}
+          isDark={isDark}
+        />
+      );
+      
+      // Achievements tab
+      if (progressSystemData) {
+        contents.achievements = (
+          <AchievementsTabContent 
+            stats={stats}
+            progressSystemData={progressSystemData}
+          />
+        );
+      }
+      
+      // Challenges tab
+      contents.challenges = (
+        <ChallengesTabContent 
+          isPremium={isPremium}
+          handleUpgradeToPremium={handleUpgradeToPremium}
+        />
+      );
+      
+      // Rewards tab
+      if (progressSystemData) {
+        contents.rewards = (
+          <RewardsTabContent 
+            isPremium={isPremium}
+            progressSystemData={progressSystemData}
+            handleUpgradeToPremium={handleUpgradeToPremium}
+            handleActivateXpBoost={handleActivateXpBoost}
+          />
+        );
+      }
+      
+      // Save all contents
+      setTabContents(contents);
+    };
+    
+    // Only generate if not already done or if data has changed
+    if (!tabContents.stats && progressSystemData) {
+      generateAllContents();
+    }
+  }, [
+    progressSystemData, 
+    stats, 
+    hasHiddenRoutinesOnly, 
+    orderedDayNames, 
+    mostActiveDay, 
+    isPremium, 
+    canAccessFeature, 
+    theme, 
+    isDark,
+    handleUpgradeToPremium,
+    handleActivateXpBoost,
+    activeTab,
+    tabContents.stats,
+    StatsTabContent,
+    AchievementsTabContent,
+    ChallengesTabContent,
+    RewardsTabContent
+  ]);
+  
+  // Smooth tab change handler with animation
+  const handleTabChange = useCallback((tab: TabType) => {
+    if (tab === activeTab) return; // Skip if same tab
+    
+    console.log(`Tab changed to: ${tab}`);
+    
+    // Fade out
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 100,
+      useNativeDriver: true
+    }).start(() => {
+      // Change tab
+      setActiveTab(tab);
+      
+      // Fade in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true
+      }).start();
+      
+      // Refresh data if needed (after animation completes)
+      if (tab === 'challenges' && !isLoading) {
+        setTimeout(() => {
+          refreshChallenges();
+        }, 200);
+      }
+    });
+  }, [activeTab, isLoading, refreshChallenges, fadeAnim]);
+
+  // Synchronize data and load all routines when component mounts - CRITICAL 
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // For both free and premium users, load routines to calculate XP
+        const allRoutines = await getAllRoutines();
+        
+        if (allRoutines && allRoutines.length > 0) {
+          console.log('Loaded routines for XP calculation:', allRoutines.length);
+          setAllProgressData(allRoutines);
+          
+          // Calculate stats first to ensure streak is calculated
+          calculateStats(allRoutines);
+          
+          // Force refresh user progress to ensure XP is up to date
+          await refreshUserProgress();
+          
+          // Update progress with routines for both free and premium users
+          // Only do this once per component mount to avoid infinite loops
+          if (progressSystemData && !hasUpdatedChallenges.current) {
+            console.log('Updating challenges with routines (first time only)');
+            await updateChallengesWithRoutines(allRoutines);
+            hasUpdatedChallenges.current = true;
+          } else if (!progressSystemData) {
+            console.log('Skipping updateChallengesWithRoutines because progressSystemData is null');
+          } else {
+            console.log('Skipping updateChallengesWithRoutines because it was already done');
+          }
+          
+          // For premium users, also synchronize
+          if (isPremium && !hasSynchronized) {
+            console.log('Loading progress data for premium user...');
+            await synchronizeProgressData();
+          }
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+    
+    loadData();
+  }, [isPremium, hasSynchronized, synchronizeProgressData, getAllRoutines, updateChallengesWithRoutines, refreshUserProgress, progressSystemData]);
+  
+  // Update visible routines for display
+  useEffect(() => {
+    if (isPremium && recentRoutines.length > 0) {
+      console.log('Updating visible routines:', recentRoutines.length);
+      setProgressData(recentRoutines);
+    }
+  }, [isPremium, recentRoutines]);
 
   // Add an effect to refresh challenges when the Challenges tab is selected
   useEffect(() => {
@@ -353,65 +682,9 @@ export default function ProgressScreen({ navigation }) {
       refreshChallengeData();
     }
   }, [activeTab, isProgressSystemLoading, getAllRoutines, updateChallengesWithRoutines, refreshUserProgress]);
-  
-  // Change tab handler
-  const handleTabChange = (tab: TabType) => {
-    setActiveTab(tab);
-    
-    // Track tab change in analytics if needed
-    console.log(`Tab changed to: ${tab}`);
-  };
 
-  // Add or update useEffect to refresh data when tab changes
-  useEffect(() => {
-    if (activeTab === 'challenges' && !isLoading) {
-      console.log('Challenges tab selected, refreshing challenge data');
-      refreshChallenges();
-    }
-  }, [activeTab, isLoading, refreshChallenges]);
-  
-  // Handle XP Boost activation
-  const handleActivateXpBoost = () => {
-    Alert.alert(
-      'XP Boost Activated!',
-      'Your XP Boost is now active. All XP earned in the next 24 hours will be doubled.',
-      [{ text: 'OK' }]
-    );
-    
-    // Refresh progress data to reflect changes
-    handleRefresh();
-  };
-
-  // Premium locked screen
-  if (!isPremium) {
-    console.log('Showing PremiumLock with XP:', progressSystemData?.totalXP || 0, 'and level:', progressSystemData?.level || 1);
-    return (
-      <PremiumLock
-        onOpenSubscription={handleUpgradeToPremium}
-        subscriptionModalVisible={subscriptionModalVisible}
-        onCloseSubscription={() => setSubscriptionModalVisible(false)}
-        totalXP={progressSystemData?.totalXP || 0}
-        level={progressSystemData?.level || 1}
-      />
-    );
-  }
-
-  // Check if user has completed routines but they're all hidden
-  const hasHiddenRoutinesOnly = allProgressData.length > 0 && progressData.length === 0;
-  
-  // Only show empty state if there's truly no data (not even hidden routines)
-  if (progressData.length === 0 && !hasHiddenRoutinesOnly) {
-    return (
-      <EmptyState
-        isLoading={isLoading && isPremium}
-        onStartRoutine={() => navigation.navigate('Home')}
-        allRoutinesHidden={false}
-      />
-    );
-  }
-
-  // Render tab content
-  const renderTabContent = () => {
+  // Modify renderTabContent to use memoized components
+  const renderTabContent = useCallback(() => {
     // Add a loading state if progressSystemData is not available yet
     if (!progressSystemData && !isProgressSystemLoading) {
       console.log('Warning: progressSystemData is null but not loading');
@@ -442,125 +715,93 @@ export default function ProgressScreen({ navigation }) {
       );
     }
 
+    // Create content based on active tab
     switch (activeTab) {
       case 'stats':
         return (
-          <>
-            {/* Show notice when all routines are hidden */}
-            {hasHiddenRoutinesOnly && (
-              <View style={[styles.hiddenRouticesNotice, { 
-                backgroundColor: isDark ? theme.cardBackground : '#FFF',
-                borderColor: isDark ? '#FF9800' : '#FF9800'
-              }]}>
-                <Ionicons name="eye-off-outline" size={20} color="#FF9800" />
-                <Text style={styles.hiddenRoutinesText}>
-                  All routines are hidden. Stats are still available.
-                </Text>
-              </View>
-            )}
-            
-            <StatsOverview
-              totalMinutes={stats.totalMinutes}
-              currentStreak={stats.currentStreak}
-              totalRoutines={stats.totalRoutines}
-            />
-            
-            {/* Only show streak freeze card for premium users with level 6+ */}
-            {isPremium && canAccessFeature('streak_freezes') && (
-              <StreakFreezeCard currentStreak={stats.currentStreak} />
-            )}
-            
-            <ConsistencyInsights
-              activeRoutineDays={stats.activeRoutineDays}
-              mostActiveDay={mostActiveDay}
-            />
-            
-            <WeeklyActivity
-              weeklyActivity={stats.weeklyActivity}
-              orderedDayNames={orderedDayNames}
-            />
-            
-            <FocusAreas
-              areaBreakdown={stats.areaBreakdown}
-              totalRoutines={stats.totalRoutines}
-            />
-            
-            <StretchingPatterns
-              dayOfWeekBreakdown={stats.dayOfWeekBreakdown}
-              dayNames={DAY_NAMES}
-              mostActiveDay={mostActiveDay}
-            />
-            
-            <TipSection
-              currentStreak={stats.currentStreak}
-            />
-          </>
+          <StatsTabContent 
+            hasHiddenRoutinesOnly={hasHiddenRoutinesOnly}
+            stats={stats}
+            orderedDayNames={orderedDayNames}
+            mostActiveDay={mostActiveDay}
+            isPremium={isPremium}
+            canAccessFeature={canAccessFeature}
+            theme={theme}
+            isDark={isDark}
+          />
         );
         
       case 'achievements':
         return (
-          <Achievements
-            totalRoutines={stats.totalRoutines}
-            currentStreak={stats.currentStreak}
-            areaBreakdown={stats.areaBreakdown}
-            totalXP={progressSystemData?.totalXP || 0}
-            level={progressSystemData?.level || 1}
-            totalMinutes={stats.totalMinutes}
-            completedAchievements={progressSystemData?.achievements ? 
-              Object.values(progressSystemData.achievements || {})
-                .filter(a => a.completed)
-                .map(a => ({
-                  id: a.id,
-                  title: a.title,
-                  xp: a.xp,
-                  dateCompleted: a.dateCompleted || new Date().toISOString()
-                })) : 
-              []}
+          <AchievementsTabContent 
+            stats={stats}
+            progressSystemData={progressSystemData}
           />
         );
         
       case 'challenges':
-        return isPremium ? (
-          <ChallengeList />
-        ) : (
-          <PremiumLockSimple
-            feature="Challenges"
-            description="Complete daily, weekly, and monthly challenges to earn XP and track your progress."
-            onUpgrade={handleUpgradeToPremium}
+        return (
+          <ChallengesTabContent 
+            isPremium={isPremium}
+            handleUpgradeToPremium={handleUpgradeToPremium}
           />
         );
         
       case 'rewards':
-        if (!isPremium) {
-          return (
-            <PremiumLock
-              onOpenSubscription={handleUpgradeToPremium}
-              subscriptionModalVisible={false}
-              onCloseSubscription={() => {}}
-              totalXP={progressSystemData?.totalXP || 0}
-              level={progressSystemData?.level || 1}
-            />
-          );
-        }
-        
         return (
-          <View style={styles.tabContent}>
-            {/* Include XP Boost card at the top of rewards tab */}
-            <XpBoostCard onActivateBoost={handleActivateXpBoost} />
-            
-            {/* Existing rewards section */}
-            <Rewards
-              userLevel={progressSystemData?.level || 1}
-              isPremium={isPremium}
-              onUpgradeToPremium={handleUpgradeToPremium}
-            />
-          </View>
+          <RewardsTabContent 
+            isPremium={isPremium}
+            progressSystemData={progressSystemData}
+            handleUpgradeToPremium={handleUpgradeToPremium}
+            handleActivateXpBoost={handleActivateXpBoost}
+          />
         );
         
       default:
         return null;
     }
-  };
+  }, [
+    activeTab, 
+    progressSystemData, 
+    isProgressSystemLoading, 
+    stats, 
+    hasHiddenRoutinesOnly, 
+    isPremium,
+    orderedDayNames,
+    mostActiveDay,
+    canAccessFeature,
+    refreshProgress,
+    handleUpgradeToPremium,
+    handleActivateXpBoost,
+    theme,
+    isDark,
+    StatsTabContent,
+    AchievementsTabContent,
+    ChallengesTabContent,
+    RewardsTabContent
+  ]);
+  
+  // Changed renderTabContent to use the pre-generated contents
+  const renderCurrentTabContent = useCallback(() => {
+    // If we have pre-generated content, use it
+    if (tabContents[activeTab]) {
+      return tabContents[activeTab];
+    }
+    
+    // Otherwise fall back to original rendering
+    return renderTabContent();
+  }, [activeTab, tabContents, renderTabContent]);
+
+  // Only show empty state if there's truly no data (not even hidden routines)
+  if (progressData.length === 0 && !hasHiddenRoutinesOnly) {
+    return (
+      <EmptyState
+        isLoading={isLoading && isPremium}
+        onStartRoutine={() => navigation.navigate('Home')}
+        allRoutinesHidden={false}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -624,44 +865,45 @@ export default function ProgressScreen({ navigation }) {
         </TouchableOpacity>
       </View>
       
-      {/* Tab content */}
-      <RefreshableScrollView 
-        style={styles.content}
-        onRefresh={handleRefresh}
-        refreshing={isRefreshing || isProgressSystemLoading}
-        showRefreshingFeedback={true}
-      >
-        {renderTabContent()}
-        
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: isDark ? '#FFFFFF' : '#666' }]}>
-            DeskStretch Premium • Level {progressSystemData?.level || 1} • {progressSystemData?.totalXP || 0} XP
-          </Text>
+      {/* Tab content with animation */}
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <RefreshableScrollView 
+          onRefresh={handleRefresh}
+          refreshing={isRefreshing || isProgressSystemLoading}
+          showRefreshingFeedback={true}
+        >
+          {renderCurrentTabContent()}
           
-          {/* Add testing buttons in development mode */}
-          {__DEV__ && (
-            <View style={styles.devTools}>
-              <TouchableOpacity
-                style={styles.testingButton}
-                onPress={() => Alert.alert('Progress Testing', 'Select the Testing tab to access the testing tools.')}
-              >
-                <Text style={styles.testingButtonText}>
-                  Progress Testing Available
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.testingButton, { backgroundColor: '#F44336', marginTop: 8 }]}
-                onPress={handleResetProgress}
-              >
-                <Text style={styles.testingButtonText}>
-                  Reset Progress Data
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </RefreshableScrollView>
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: isDark ? '#FFFFFF' : '#666' }]}>
+              DeskStretch Premium • Level {progressSystemData?.level || 1} • {progressSystemData?.totalXP || 0} XP
+            </Text>
+            
+            {/* Add testing buttons in development mode */}
+            {__DEV__ && (
+              <View style={styles.devTools}>
+                <TouchableOpacity
+                  style={styles.testingButton}
+                  onPress={() => Alert.alert('Progress Testing', 'Select the Testing tab to access the testing tools.')}
+                >
+                  <Text style={styles.testingButtonText}>
+                    Progress Testing Available
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.testingButton, { backgroundColor: '#F44336', marginTop: 8 }]}
+                  onPress={handleResetProgress}
+                >
+                  <Text style={styles.testingButtonText}>
+                    Reset Progress Data
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </RefreshableScrollView>
+      </Animated.View>
     </View>
   );
 }

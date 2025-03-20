@@ -65,20 +65,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   // Check if dark theme is unlocked but not activated
   const hasDarkThemeReward = levelUp?.rewards?.some(r => r.id === 'dark_theme');
-  const canEnableDarkTheme = isPremium && hasDarkThemeReward && themeType !== 'dark';
   
   console.log('Will show level-up UI:', showLevelUp, 
               'isPremium:', isPremium, 
               'levelUp exists:', !!levelUp, 
               levelUp ? `oldLevel: ${levelUp.oldLevel}, newLevel: ${levelUp.newLevel}` : '',
-              levelUp && levelUp.rewards ? `rewards: ${levelUp.rewards.length}` : '',
-              'canEnableDarkTheme:', canEnableDarkTheme);
-  
-  // Function to enable dark theme
-  const enableDarkTheme = () => {
-    console.log('Enabling dark theme');
-    setThemeType('dark');
-  };
+              levelUp && levelUp.rewards ? `rewards: ${levelUp.rewards.length}` : '');
   
   // Generate the routine to get the number of stretches
   const routine = generateRoutine(area, duration, 'beginner');
@@ -188,25 +180,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         break;
     }
     
-    // Check if this is the dark theme reward
-    const isDarkThemeReward = reward.id === 'dark_theme';
-    
     return (
       <View key={`reward-${index}`} style={styles.rewardItem}>
         <Ionicons name={iconName as any} size={20} color="#FFD700" />
         <View style={styles.rewardContent}>
           <Text style={styles.rewardName}>{reward.name || 'Reward'}</Text>
           <Text style={styles.rewardDescription}>{reward.description || 'New feature unlocked!'}</Text>
-          
-          {/* Add button to activate dark theme if this reward is dark theme */}
-          {isDarkThemeReward && canEnableDarkTheme && (
-            <TouchableOpacity 
-              style={styles.activateButton}
-              onPress={enableDarkTheme}
-            >
-              <Text style={styles.activateButtonText}>Activate Now</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     );
@@ -735,19 +714,6 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     marginBottom: 8,
   },
   buttonTextCompact: {
-    fontSize: 12,
-  },
-  activateButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    marginTop: 6,
-    alignSelf: 'flex-start',
-  },
-  activateButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
     fontSize: 12,
   },
   tapIndicatorContainer: {

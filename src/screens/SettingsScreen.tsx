@@ -101,20 +101,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     );
   };
 
-  // Handle dark mode toggle
-  const handleDarkModeToggle = () => {
-    if (!canAccessFeature('dark_theme')) {
-      // Display premium requirement alert
-      Alert.alert(
-        'Premium Feature',
-        `Dark Theme is a premium feature that unlocks at level ${getRequiredLevel('dark_theme')}. Upgrade to premium and reach the required level to enable this feature.`,
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    setThemeType(isDark ? 'light' : 'dark');
-  };
   
   // Handle theme type selection
   const handleThemeTypeSelection = (type: 'light' | 'dark' | 'system') => {
@@ -216,7 +202,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           
           {/* Theme selection */}
           <View style={styles.settingItem}>
-          <View style={styles.settingContent}>
+            <View style={styles.settingContent}>
               <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons 
                   name={isDark ? "moon" : "sunny"} 
@@ -248,7 +234,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 ]}
                 onPress={() => handleThemeTypeSelection('light')}
               >
-                <View style={styles.themeIconContainer}>
+                <View style={[styles.themeIconContainer, {backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
                   <Ionicons name="sunny" size={22} color="#FF9800" />
                 </View>
                 <Text style={[styles.themeOptionText, {color: theme.text}]}>Light</Text>
@@ -267,7 +253,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 ]}
                 onPress={() => handleThemeTypeSelection('dark')}
               >
-                <View style={styles.themeIconContainer}>
+                <View style={[styles.themeIconContainer, {backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
                   <Ionicons name="moon" size={22} color="#BB86FC" />
                 </View>
                 <Text style={[styles.themeOptionText, {color: theme.text}]}>Dark</Text>
@@ -286,7 +272,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 ]}
                 onPress={() => handleThemeTypeSelection('system')}
               >
-                <View style={styles.themeIconContainer}>
+                <View style={[styles.themeIconContainer, {backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
                   <Ionicons name="phone-portrait" size={22} color="#64B5F6" />
                 </View>
                 <Text style={[styles.themeOptionText, {color: theme.text}]}>System</Text>
@@ -424,15 +410,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                   <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
                 </View>
               </View>
-        </TouchableOpacity>
+            </TouchableOpacity>
           </View>
         )}
         
         {/* Version info at bottom */}
         <View style={styles.footer}>
           <Text style={[styles.footerText, {color: theme.textSecondary}]}>Made with ♥ by Your App Team</Text>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
       
       {/* Diagnostics Modal */}
       <Modal
@@ -543,7 +529,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     color: '#666',
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
