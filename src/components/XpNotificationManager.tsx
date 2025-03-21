@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useGamification } from '../hooks/useGamification';
+import { useGamification } from '../hooks/progress/useGamification';
 import XpNotification from './XpNotification';
 import AchievementNotification from './AchievementNotification';
 import AsyncStorage from '@react-native-async-storage/async-storage';

@@ -7,6 +7,7 @@ interface StatsOverviewProps {
   totalMinutes: number;
   currentStreak: number;
   totalRoutines: number;
+  isTodayComplete?: boolean; // Add this prop
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
 }
@@ -15,6 +16,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   totalMinutes,
   currentStreak,
   totalRoutines,
+  isTodayComplete = false, // Default to false if not provided
   theme: propTheme,
   isDark: propIsDark
 }) => {
@@ -22,6 +24,13 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+
+  // Determine if today's activity is complete - use the prop instead of calculating here
+  const today = new Date();
+  const todayStr = today.toLocaleDateString();
+  
+  // For streak of 5+ days, show a warning indicator if today's activity isn't done
+  const showWarning = currentStreak >= 5 && !isTodayComplete;
 
   return (
     <View style={{ backgroundColor: isDark ? theme.background : 'transparent' }}>
@@ -63,16 +72,25 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
           borderWidth: isDark ? 1 : 0
         }]}>
           <View style={[styles.statIconContainer, { 
-            backgroundColor: isDark ? 'rgba(255, 152, 0, 0.2)' : '#F0F0F0'
+            backgroundColor: isDark ? showWarning ? 'rgba(255, 87, 34, 0.2)' : 'rgba(255, 152, 0, 0.2)' : '#F0F0F0'
           }]}>
-            <Ionicons name="flame-outline" size={20} color="#FF9800" />
+            <Ionicons 
+              name={showWarning ? "warning-outline" : "flame-outline"} 
+              size={20} 
+              color={showWarning ? "#FF5722" : "#FF9800"} 
+            />
           </View>
           <Text style={[styles.statValue, { color: isDark ? theme.text : '#333' }]}>
             {currentStreak}
           </Text>
           <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
-            Day Streak
+            Day Streak{showWarning ? " (at risk)" : ""}
           </Text>
+          {showWarning && (
+            <Text style={[styles.streakNote, { color: '#FF5722' }]}>
+              Complete today to maintain!
+            </Text>
+          )}
         </View>
         
         {/* Routines Stat */}
@@ -153,6 +171,12 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
+  streakNote: {
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '500',
+    textAlign: 'center',
+  }
 });
 
 export default StatsOverview;

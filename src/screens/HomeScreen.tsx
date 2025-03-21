@@ -21,7 +21,7 @@ import { tw } from '../utils/tw';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
 import { RefreshableScrollView } from '../components/common';
-import { useFeatureAccess } from '../hooks/useFeatureAccess';
+import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
 import { useTheme } from '../context/ThemeContext';
 import { 
   HomeHeader, 

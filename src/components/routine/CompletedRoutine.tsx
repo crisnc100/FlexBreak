@@ -63,13 +63,17 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                      (levelUp.oldLevel < levelUp.newLevel || 
                       (levelUp.newLevel === 2 && levelUp.rewards && levelUp.rewards.some(r => r.id === 'dark_theme')));
   
+  // Dynamic level display - use actual current level values instead of fixed ones
+  const oldLevel = levelUp ? levelUp.oldLevel : 0;
+  const newLevel = levelUp ? levelUp.newLevel : 0;
+  
   // Check if dark theme is unlocked but not activated
   const hasDarkThemeReward = levelUp?.rewards?.some(r => r.id === 'dark_theme');
   
   console.log('Will show level-up UI:', showLevelUp, 
               'isPremium:', isPremium, 
               'levelUp exists:', !!levelUp, 
-              levelUp ? `oldLevel: ${levelUp.oldLevel}, newLevel: ${levelUp.newLevel}` : '',
+              levelUp ? `oldLevel: ${oldLevel}, newLevel: ${newLevel}` : '',
               levelUp && levelUp.rewards ? `rewards: ${levelUp.rewards.length}` : '');
   
   // Generate the routine to get the number of stretches
@@ -79,7 +83,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   const handleShare = async () => {
     try {
       // Include level up in share message if applicable
-      const levelUpText = levelUp ? ` and leveled up to level ${levelUp.newLevel}!` : '!';
+      const levelUpText = levelUp ? ` and leveled up to level ${newLevel}!` : '!';
       const message = `I just completed a ${duration}-minute beginner ${area} stretching routine with DeskStretch! 💪 Earned ${xpEarned} XP${levelUpText}`;
       
       await Share.share({
@@ -226,13 +230,13 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
               
               <View style={styles.levelNumbers}>
                 <View style={styles.levelCircle}>
-                  <Text style={styles.levelNumber}>{levelUp.oldLevel}</Text>
+                  <Text style={styles.levelNumber}>{oldLevel}</Text>
                 </View>
                 <View style={styles.levelArrow}>
                   <Ionicons name="arrow-forward" size={16} color="#FFF" />
                 </View>
                 <View style={[styles.levelCircle, styles.newLevelCircle]}>
-                  <Text style={styles.levelNumber}>{levelUp.newLevel}</Text>
+                  <Text style={styles.levelNumber}>{newLevel}</Text>
                 </View>
               </View>
               

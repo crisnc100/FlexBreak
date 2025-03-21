@@ -12,7 +12,7 @@ interface HomeHeaderProps {
  * Header component for the home screen
  */
 const HomeHeader: React.FC<HomeHeaderProps> = ({
-  title = 'DeskStretch',
+  title = 'FlexBreak',
   subtitle = 'Move Better, Work Better'
 }) => {
   const { theme, isDark } = useTheme();

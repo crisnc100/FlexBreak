@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BodyArea, Duration, RootStackParamList, StretchLevel } from '../types';
+import { BodyArea, Duration, RootStackParamList, StretchLevel } from '../../types';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 
 type RoutineScreenRouteProp = RouteProp<RootStackParamList, 'Routine'>;

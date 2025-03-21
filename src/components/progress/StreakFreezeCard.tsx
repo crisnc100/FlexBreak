@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as streakFreezeManager from '../../utils/progress/streakFreezeManager';
-import { useFeatureAccess } from '../../hooks/useFeatureAccess';
+import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import { usePremium } from '../../context/PremiumContext';
 
 interface StreakFreezeCardProps {

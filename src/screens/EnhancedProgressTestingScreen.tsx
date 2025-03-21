@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration } from '../types';
-import { useGamification } from '../hooks/useGamification';
+import { useGamification } from '../hooks/progress/useGamification';
 import { useRefresh } from '../context/RefreshContext';
 import * as gamificationTester from '../utils/testing/gamificationTester';
 import { XpNotificationManager } from '../components/notifications';

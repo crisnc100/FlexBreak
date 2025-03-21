@@ -2,6 +2,7 @@ import { ProgressEntry } from '../types';
 
 /**
  * Calculate the user's current streak based on consecutive days of activity
+ * Will reset streak if a day is missed
  */
 export const calculateStreak = (data: ProgressEntry[]) => {
   if (data.length === 0) return 0;
@@ -18,6 +19,61 @@ export const calculateStreak = (data: ProgressEntry[]) => {
   console.log(`Calculating streak from ${uniqueDateStrings.length} unique dates:`, uniqueDateStrings);
   
   if (uniqueDateStrings.length === 0) return 0;
+  
+  // Get the most recent date (first date in the array)
+  const mostRecentDateStr = uniqueDateStrings[0];
+  const mostRecentDate = new Date(mostRecentDateStr);
+  
+  // Format today and yesterday for comparison
+  const today = new Date();
+  const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  
+  // Format yesterday for comparison
+  const yesterdayFormatted = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  
+  // Convert most recent date to midnight for comparison
+  mostRecentDate.setHours(0, 0, 0, 0);
+  
+  // Check if either today or yesterday has an activity
+  const hasTodayActivity = uniqueDateStrings.includes(todayFormatted);
+  const hasYesterdayActivity = uniqueDateStrings.includes(yesterdayFormatted);
+  
+  console.log(`Today activity: ${hasTodayActivity}, Yesterday activity: ${hasYesterdayActivity}`);
+  
+  // If the most recent activity was before yesterday, the streak is broken
+  // UNLESS the user has already completed a 5-day streak
+  if (mostRecentDate < yesterday && !hasTodayActivity && !hasYesterdayActivity) {
+    // Check if there's enough data for a 5+ day streak that should be preserved until end of today
+    if (uniqueDateStrings.length >= 5) {
+      // Check if the last 5 days before today were consecutive
+      let isPreviousStreakValid = true;
+      let prevDate = yesterday;
+      
+      for (let i = 0; i < 5; i++) {
+        const checkDate = new Date(prevDate);
+        checkDate.setDate(prevDate.getDate() - i);
+        const checkDateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+        
+        if (!uniqueDateStrings.includes(checkDateStr)) {
+          isPreviousStreakValid = false;
+          break;
+        }
+      }
+      
+      if (isPreviousStreakValid) {
+        console.log('Previous 5-day streak found, maintaining streak until end of today');
+        return 5; // Return the 5-day streak that's valid until end of today
+      }
+    }
+    
+    console.log('Streak reset: No activity yesterday or today');
+    return 0;
+  }
   
   // Start counting from the most recent date
   let streak = 1;

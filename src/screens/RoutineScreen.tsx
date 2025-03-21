@@ -6,7 +6,6 @@ import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
 import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../types';
-import { UserProgress } from '../utils/progress/types';
 
 // Import our components
 import ActiveRoutine from '../components/routine/ActiveRoutine';
@@ -15,10 +14,10 @@ import RoutineDashboard from '../components/routine/RoutineDashboard';
 import XpNotificationManager from '../components/XpNotificationManager';
 
 // Import our custom hooks
-import { useRoutineParams } from '../hooks/useRoutineParams';
-import { useRoutineStorage } from '../hooks/useRoutineStorage';
-import { useRoutineSuggestions } from '../hooks/useRoutineSuggestions';
-import { useGamification } from '../hooks/useGamification';
+import { useRoutineParams } from '../hooks/routines/useRoutineParams';
+import { useRoutineStorage } from '../hooks/routines/useRoutineStorage';
+import { useRoutineSuggestions } from '../hooks/routines/useRoutineSuggestions';
+import { useGamification } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
 
 // Define the possible screens in the routine flow
@@ -205,17 +204,22 @@ export default function RoutineScreen() {
           // Extract level-up information if available
           let levelUpInfo: LevelUpData | null = null;
           
+          // Import storageService to get user progress
+          const { getUserProgress } = require('../services/storageService');
+          const userProgress = await getUserProgress();
+          console.log('Current user level from storage:', userProgress.level);
+          
           // Check if we have a level-up condition - only if result.levelUp is strictly true
           if (result.levelUp === true && result.newLevel > ((result as any).previousLevel || 0)) {
-            // Calculate oldLevel from the result's previousLevel property
-            const oldLevel = (result as any).previousLevel || (result.newLevel > 1 ? result.newLevel - 1 : 1);
-            console.log(`🎉 Level Up! ${oldLevel} → ${result.newLevel}`);
+            // Calculate oldLevel from the current user progress instead of using fixed values
+            const oldLevel = userProgress.level - 1; // The old level is one less than current
+            console.log(`🎉 Level Up! ${oldLevel} → ${userProgress.level}`);
             console.log('Level up data detected, result content:', JSON.stringify(result, null, 2));
             
-            // Create the levelUp object to pass to CompletedRoutine
+            // Create the levelUp object to pass to CompletedRoutine with accurate levels
             levelUpInfo = {
               oldLevel: oldLevel,
-              newLevel: result.newLevel,
+              newLevel: userProgress.level, // Use the current level from user progress
               rewards: []
             };
             
@@ -230,7 +234,7 @@ export default function RoutineScreen() {
               levelUpInfo.rewards = rewards.map(reward => {
                 // Extract reward details, providing defaults if properties don't exist
                 const rewardName = reward.title || reward.name || 'New Reward';
-                console.log(`Reward unlocked: ${rewardName} (Level ${result.newLevel})`);
+                console.log(`Reward unlocked: ${rewardName} (Level ${userProgress.level})`);
                 
                 // Ensure the type is one of the allowed values
                 let rewardType: 'feature' | 'item' | 'cosmetic' = 'feature';
@@ -243,47 +247,114 @@ export default function RoutineScreen() {
                 return {
                   id: reward.id || `reward-${Date.now()}`,
                   name: rewardName,
-                  description: reward.description || `Unlocked at level ${result.newLevel}`,
+                  description: reward.description || `Unlocked at level ${userProgress.level}`,
                   type: rewardType
                 };
               });
             }
             
-            // If we have a level up but no rewards, create a fake reward for dark mode
-            // This is a fallback for testing
-            if (levelUpInfo.rewards.length === 0 && result.newLevel === 2) {
-              console.log('Adding fallback reward for Dark Theme at level 2');
-              levelUpInfo.rewards.push({
-                id: 'dark_theme',
-                name: 'Dark Theme',
-                description: 'Enable a sleek dark mode for comfortable evening stretching',
-                type: 'feature'
-              });
+            // If we have a level up but no rewards, add appropriate level-based rewards
+            if (levelUpInfo.rewards.length === 0) {
+              // Add level-specific rewards
+              if (userProgress.level === 2) {
+                console.log('Adding Dark Theme reward for level 2');
+                levelUpInfo.rewards.push({
+                  id: 'dark_theme',
+                  name: 'Dark Theme',
+                  description: 'Enable a sleek dark mode for comfortable evening stretching',
+                  type: 'feature'
+                });
+              } else if (userProgress.level === 3) {
+                console.log('Adding Custom Reminders reward for level 3');
+                levelUpInfo.rewards.push({
+                  id: 'custom_reminders',
+                  name: 'Custom Reminders',
+                  description: 'Set personalized reminders with custom messages',
+                  type: 'feature'
+                });
+              } else if (userProgress.level === 4) {
+                console.log('Adding XP Boost reward for level 4');
+                levelUpInfo.rewards.push({
+                  id: 'xp_boost',
+                  name: 'XP Boost',
+                  description: 'Get a 2x boost in XP for your daily streak',
+                  type: 'feature'
+                });
+              } else if (userProgress.level === 5) {
+                console.log('Adding Custom Routines reward for level 5');
+                levelUpInfo.rewards.push({
+                  id: 'custom_routines',
+                  name: 'Custom Routines',
+                  description: 'Create and save your own personalized stretching routines',
+                  type: 'feature'
+                });
+              } else if (userProgress.level >= 6) {
+                console.log(`Adding reward for level ${userProgress.level}`);
+                levelUpInfo.rewards.push({
+                  id: `level_${userProgress.level}_reward`,
+                  name: `Level ${userProgress.level} Reward`,
+                  description: `Special features unlocked at level ${userProgress.level}`,
+                  type: 'feature'
+                });
+              }
             }
-          } else {
+          } else if (userProgress.level >= 2) {
             console.log('No level up detected in result. levelUp:', result.levelUp);
+            console.log('Current user level:', userProgress.level);
             
-            // Check if user is already at level 2 and has unlocked dark theme
-            // This ensures we show the level-up UI for level 2 users who have dark theme
-            if (result.newLevel === 2 || (result as any).level === 2) {
-              console.log('User is at level 2, checking if dark theme is unlocked');
+            // Check if we should show level-specific rewards
+            // This is useful for users who already leveled up but need to see their rewards
+            if (result.xpEarned > 0) {
+              console.log(`User is already at level ${userProgress.level}, checking if we should show level-specific rewards`);
               
-              // Check if dark theme is in the unlocked rewards
-              const hasUnlockedDarkTheme = result.unlockedRewards && 
-                result.unlockedRewards.some((r: any) => r.id === 'dark_theme' || r.title === 'Dark Theme');
+              // Create level-up info with accurate current level
+              levelUpInfo = {
+                oldLevel: userProgress.level - 1,
+                newLevel: userProgress.level,
+                rewards: []
+              };
               
-              if (hasUnlockedDarkTheme || isPremium) {
-                console.log('Creating level-up data for already unlocked dark theme');
-                levelUpInfo = {
-                  oldLevel: 1,
-                  newLevel: 2,
-                  rewards: [{
-                    id: 'dark_theme',
-                    name: 'Dark Theme',
-                    description: 'Enable a sleek dark mode for comfortable evening stretching',
-                    type: 'feature'
-                  }]
-                };
+              // Add level-specific rewards based on user's current level
+              if (userProgress.level === 2) {
+                console.log('Adding Dark Theme reward for level 2');
+                levelUpInfo.rewards.push({
+                  id: 'dark_theme',
+                  name: 'Dark Theme',
+                  description: 'Enable a sleek dark mode for comfortable evening stretching',
+                  type: 'feature'
+                });
+              } else if (userProgress.level === 3) {
+                console.log('Adding Custom Reminders reward for level 3');
+                levelUpInfo.rewards.push({
+                  id: 'custom_reminders',
+                  name: 'Custom Reminders',
+                  description: 'Set personalized reminders with custom messages',
+                  type: 'feature'
+                });
+              } else if (userProgress.level === 4) {
+                console.log('Adding XP Boost reward for level 4');
+                levelUpInfo.rewards.push({
+                  id: 'xp_boost',
+                  name: 'XP Boost',
+                  description: 'Get a 2x boost in XP for your daily streak',
+                  type: 'feature'
+                });
+              } else if (userProgress.level === 5) {
+                console.log('Adding Custom Routines reward for level 5');
+                levelUpInfo.rewards.push({
+                  id: 'custom_routines',
+                  name: 'Custom Routines',
+                  description: 'Create and save your own personalized stretching routines',
+                  type: 'feature'
+                });
+              } else if (userProgress.level >= 6) {
+                console.log(`Adding reward for level ${userProgress.level}`);
+                levelUpInfo.rewards.push({
+                  id: `level_${userProgress.level}_reward`,
+                  name: `Level ${userProgress.level} Reward`,
+                  description: `Special features unlocked at level ${userProgress.level}`,
+                  type: 'feature'
+                });
               }
             }
           }
@@ -310,32 +381,64 @@ export default function RoutineScreen() {
           console.log('Level-up data being passed to CompletedRoutine:', JSON.stringify(levelUpInfo, null, 2));
           
           // For testing: Force a level-up UI if none is detected but XP is earned
-          // Remove this in production
+          // This can be removed in production
           if (!levelUpInfo && result.xpEarned > 0) {
             console.log('XP earned but no level-up data, checking user progress for rewards...');
             
             try {
-              // Import storageService to get user progress
-              const { getUserProgress } = require('../services/storageService');
-              const userProgress = await getUserProgress();
-              
+              // We already have userProgress from above
               console.log('Current user level:', userProgress.level);
               
-              // If user is level 2 or higher, show the dark theme reward
+              // If user is already at a level with rewards, show those rewards
               if (userProgress.level >= 2) {
-                console.log('User is level 2+, creating level-up info with dark theme');
+                console.log(`User is at level ${userProgress.level}, creating level-up info with appropriate rewards`);
                 const mockLevelUpData: LevelUpData = {
-                  oldLevel: 1,
-                  newLevel: 2,
-                  rewards: [{
+                  oldLevel: userProgress.level - 1,
+                  newLevel: userProgress.level,
+                  rewards: []
+                };
+                
+                // Add level-specific rewards based on user's current level
+                if (userProgress.level === 2) {
+                  mockLevelUpData.rewards.push({
                     id: 'dark_theme',
                     name: 'Dark Theme',
                     description: 'Enable a sleek dark mode for comfortable evening stretching',
                     type: 'feature'
-                  }]
-                };
+                  });
+                } else if (userProgress.level === 3) {
+                  mockLevelUpData.rewards.push({
+                    id: 'custom_reminders',
+                    name: 'Custom Reminders',
+                    description: 'Set personalized reminders with custom messages',
+                    type: 'feature'
+                  });
+                } else if (userProgress.level === 4) {
+                  mockLevelUpData.rewards.push({
+                    id: 'xp_boost',
+                    name: 'XP Boost',
+                    description: 'Get a 2x boost in XP for your daily streak',
+                    type: 'feature'
+                  });
+                } else if (userProgress.level === 5) {
+                  mockLevelUpData.rewards.push({
+                    id: 'custom_routines',
+                    name: 'Custom Routines',
+                    description: 'Create and save your own personalized stretching routines',
+                    type: 'feature'
+                  });
+                } else if (userProgress.level >= 6) {
+                  // For higher levels, use a generic format or add specific rewards as needed
+                  mockLevelUpData.rewards.push({
+                    id: `level_${userProgress.level}_reward`,
+                    name: `Level ${userProgress.level} Reward`,
+                    description: `Special features unlocked at level ${userProgress.level}`,
+                    type: 'feature'
+                  });
+                }
+                
                 setLevelUpData(mockLevelUpData);
-                console.log('Created level-up data for dark theme:', JSON.stringify(mockLevelUpData, null, 2));
+                console.log(`Created level-up data for level ${userProgress.level}:`, JSON.stringify(mockLevelUpData, null, 2));
               }
             } catch (error) {
               console.error('Error checking user progress:', error);

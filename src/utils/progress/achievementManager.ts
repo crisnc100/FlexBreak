@@ -345,8 +345,14 @@ export const updateAchievements = async (
         
       case 'streak':
         console.log(`Checking Streak achievement ${achievement.id}:`);
-        console.log(`Current streak: ${statistics.currentStreak}, Requirement: ${achievement.requirement}`);
-        newProgress = statistics.currentStreak;
+        
+        // Consider both current streak and best streak for achievements
+        // This ensures achievements aren't lost if streak is reset but was previously achieved
+        const effectiveStreak = Math.max(statistics.currentStreak, statistics.bestStreak || 0);
+        console.log(`Current streak: ${statistics.currentStreak}, Best streak: ${statistics.bestStreak}, Effective streak: ${effectiveStreak}, Requirement: ${achievement.requirement}`);
+        
+        // Use the effective streak for achievement progress
+        newProgress = effectiveStreak;
         console.log(`Setting achievement progress to: ${newProgress}`);
         break;
         
@@ -357,12 +363,108 @@ export const updateAchievements = async (
         break;
         
       case 'area_variety':
-        newProgress = statistics.uniqueAreas.length;
-        console.log(`Area variety achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement}`);
+        // Map area names to standard categories for accurate tracking
+        const areaMapping = {
+          'neck': ['neck', 'Neck'],
+          'shoulders': ['shoulders', 'Shoulders', 'Shoulders & Arms'],
+          'back': ['back', 'Back', 'Upper Back', 'Lower Back', 'Upper Back & Chest'],
+          'hips': ['hips', 'Hips'],
+          'legs': ['legs', 'Legs'],
+          'full_body': ['full_body', 'Full Body']
+        };
+        
+        // Count unique standard categories
+        const standardAreasUsed = new Set();
+        statistics.uniqueAreas.forEach(area => {
+          // Try to map this area to a standard category
+          for (const [standardArea, variations] of Object.entries(areaMapping)) {
+            if (variations.includes(area)) {
+              standardAreasUsed.add(standardArea);
+              break;
+            }
+          }
+        });
+        
+        // Progress is based on number of unique standard categories
+        newProgress = standardAreasUsed.size;
+        console.log(`Area variety achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement} (standard categories)`);
         break;
         
       case 'specific_area':
-        if (achievement.area) {
+        // Area expert achievement - for most stretched area
+        if (achievement.id === 'area_expert') {
+          // Find the area with the most routines
+          let maxRoutines = 0;
+          Object.entries(statistics.routinesByArea || {}).forEach(([area, count]) => {
+            const routineCount = count as number;
+            if (routineCount > maxRoutines) {
+              maxRoutines = routineCount;
+            }
+          });
+          newProgress = maxRoutines;
+          console.log(`Area expert achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement} (most routines in a single area)`);
+        }
+        // Master of all areas - check if ALL areas have at least the required number
+        else if (achievement.id === 'master_all_areas') {
+          // Map area names to account for variations in naming
+          const areaMapping = {
+            'neck': ['neck', 'Neck'],
+            'shoulders': ['shoulders', 'Shoulders', 'Shoulders & Arms'],
+            'back': ['back', 'Back', 'Upper Back', 'Lower Back', 'Upper Back & Chest'],
+            'hips': ['hips', 'Hips'],
+            'legs': ['legs', 'Legs'],
+            'full_body': ['full_body', 'Full Body']
+          };
+          
+          // Count areas that meet the requirement
+          let areasWithRequiredRoutines = 0;
+          
+          // Keep track of which areas have been checked
+          const checkedAreas = new Set();
+          
+          // Check each area category
+          Object.entries(areaMapping).forEach(([standardArea, variations]) => {
+            let totalRoutinesForArea = 0;
+            
+            // Sum up all variations for this area
+            variations.forEach(variation => {
+              const count = statistics.routinesByArea[variation] || 0;
+              totalRoutinesForArea += count;
+              console.log(`Area ${variation} (maps to ${standardArea}): ${count} routines`);
+            });
+            
+            // If this area meets the requirement, increment counter
+            if (totalRoutinesForArea >= achievement.requirement) {
+              areasWithRequiredRoutines++;
+              console.log(`${standardArea} area has enough routines: ${totalRoutinesForArea} >= ${achievement.requirement}`);
+            } else {
+              console.log(`${standardArea} area needs more routines: ${totalRoutinesForArea}/${achievement.requirement}`);
+            }
+            
+            // Mark area as checked
+            checkedAreas.add(standardArea);
+          });
+          
+          // Check for any areas that might not be in the mapping
+          Object.keys(statistics.routinesByArea).forEach(area => {
+            let mapped = false;
+            Object.entries(areaMapping).forEach(([standardArea, variations]) => {
+              if (variations.includes(area)) {
+                mapped = true;
+              }
+            });
+            
+            if (!mapped) {
+              console.log(`Unmapped area found: ${area} with ${statistics.routinesByArea[area]} routines`);
+            }
+          });
+          
+          // Progress is based on how many standard areas have the required number
+          newProgress = areasWithRequiredRoutines;
+          console.log(`Master all areas achievement ${achievement.id}: Progress=${newProgress}/${Object.keys(areaMapping).length} areas with ${achievement.requirement}+ routines`);
+        }
+        // Other specific area achievements
+        else if (achievement.area) {
           newProgress = statistics.routinesByArea[achievement.area] || 0;
           console.log(`Specific area achievement ${achievement.id}: Progress=${newProgress}/${achievement.requirement}`);
         }
@@ -459,4 +561,65 @@ export const getAchievementProgress = async (
     required: achievement.requirement,
     percent
   };
+};
+
+/**
+ * Reset streak-related achievement progress when a streak is broken
+ * This preserves completed achievements but resets the in-progress ones
+ */
+export const resetStreakAchievements = async (): Promise<UserProgress> => {
+  console.log('Resetting streak-related achievements due to broken streak');
+  
+  try {
+    // Get current user progress
+    const userProgress = await storageService.getUserProgress();
+    let achievementsUpdated = false;
+    
+    // Check if achievements exist
+    if (!userProgress.achievements || typeof userProgress.achievements !== 'object') {
+      console.log('No achievements found or achievements is not an object');
+      // Initialize achievements if needed
+      userProgress.achievements = initializeAchievements();
+      return userProgress;
+    }
+    
+    // Clone the achievements object
+    const updatedAchievements = { ...userProgress.achievements };
+    
+    // Get all streak-related achievements
+    const streakAchievementIds = Object.keys(updatedAchievements).filter(id => 
+      id.startsWith('streak_') && !updatedAchievements[id].completed
+    );
+    
+    console.log(`Found ${streakAchievementIds.length} incomplete streak achievements to reset`);
+    
+    // Reset progress for incomplete streak achievements
+    streakAchievementIds.forEach(id => {
+      if (!updatedAchievements[id].completed) {
+        updatedAchievements[id].progress = 0;
+        achievementsUpdated = true;
+        console.log(`Reset progress for achievement: ${id}`);
+      }
+    });
+    
+    // Only save if we made changes
+    if (achievementsUpdated) {
+      // Create updated progress object
+      const updatedProgress = {
+        ...userProgress,
+        achievements: updatedAchievements
+      };
+      
+      // Save to storage
+      await storageService.saveUserProgress(updatedProgress);
+      console.log('Saved updated user progress with reset streak achievements');
+      
+      return updatedProgress;
+    }
+    
+    return userProgress;
+  } catch (error) {
+    console.error('Error resetting streak achievements:', error);
+    return await storageService.getUserProgress();
+  }
 }; 

@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ProgressEntry } from '../types';
-import { UserProgress } from '../utils/progress/types';
+import { ProgressEntry } from '../../types';
+import { UserProgress } from '../../utils/progress/types';
 
 // Import from the central storageService
-import * as storageService from '../services/storageService';
+import * as storageService from '../../services/storageService';
 
 // Import from the new gamification system
-import * as gamificationManager from '../utils/progress/gamificationManager';
-import * as xpManager from '../utils/progress/xpManager';
-import * as achievementManager from '../utils/progress/achievementManager';
-import * as challengeManager from '../utils/progress/challengeManager';
-import * as rewardManager from '../utils/progress/rewardManager';
+import * as gamificationManager from '../../utils/progress/gamificationManager';
+import * as xpManager from '../../utils/progress/xpManager';
+import * as achievementManager from '../../utils/progress/achievementManager';
+import * as challengeManager from '../../utils/progress/challengeManager';
+import * as rewardManager from '../../utils/progress/rewardManager';
 
 /**
  * Hook to access and update all progress functionality

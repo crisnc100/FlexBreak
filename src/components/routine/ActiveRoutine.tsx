@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration, Stretch, StretchLevel } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
-import { useRoutineTimer } from '../../hooks/useRoutineTimer';
+import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
 import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');

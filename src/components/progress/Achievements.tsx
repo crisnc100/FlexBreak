@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useGamification } from '../../hooks/useGamification';
+import { useGamification } from '../../hooks/progress/useGamification';
 import { LEVELS } from '../../utils/progress/xpManager';
 import { useTheme } from '../../context/ThemeContext';
 // Simple date formatter function to replace date-fns

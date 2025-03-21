@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ProgressEntry, BodyArea, Duration } from '../types';
-import * as storageService from '../services/storageService';
+import { ProgressEntry, BodyArea, Duration } from '../../types';
+import * as storageService from '../../services/storageService';
 
 interface UseRoutineStorageReturn {
   recentRoutines: ProgressEntry[];

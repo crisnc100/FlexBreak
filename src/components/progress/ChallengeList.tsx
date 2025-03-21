@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useChallengeSystem } from '../../hooks/useChallengeSystem';
+import { useChallengeSystem } from '../../hooks/progress/useChallengeSystem';
 import { Challenge } from '../../utils/progress/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useGamification } from '../../hooks/useGamification';
+import { useGamification } from '../../hooks/progress/useGamification';
 
 interface ChallengeListProps {
   isDark?: boolean;

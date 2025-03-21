@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import useProgressSystem from '../../hooks/useProgressSystem';
 import * as rewardManager from '../../utils/progress/rewardManager';
 import { Reward } from '../../utils/progress/types';
 import RewardCard from './RewardCard';

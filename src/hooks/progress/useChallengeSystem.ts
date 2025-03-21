@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as challengeManager from '../utils/progress/challengeManager';
-import { Challenge } from '../utils/progress/types';
+import * as challengeManager from '../../utils/progress/challengeManager';
+import { Challenge } from '../../utils/progress/types';
 import { useGamification } from './useGamification';
-import * as storageService from '../services/storageService';
+import * as storageService from '../../services/storageService';
 
 export const useChallengeSystem = () => {
   const [loading, setLoading] = useState(true);

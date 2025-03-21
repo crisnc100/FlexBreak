@@ -1,17 +1,18 @@
 import React, { createContext, useState, useContext, useCallback, useRef, useEffect } from 'react';
-import { useRoutineStorage } from '../hooks/useRoutineStorage';
+import { useRoutineStorage } from '../hooks/routines/useRoutineStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { measureAsyncOperation } from '../utils/performance';
 import { debounce } from '../utils/debounce';
+import { ProgressEntry } from '../types';
 
 interface RefreshContextType {
   isRefreshing: boolean;
   refreshApp: () => Promise<void>;
-  refreshProgress: () => Promise<void>;
-  refreshHome: () => Promise<void>;
-  refreshSettings: () => Promise<void>;
-  refreshFavorites: () => Promise<void>;
-  refreshRoutine: () => Promise<void>;
+  refreshProgress: () => Promise<ProgressEntry[]>;
+  refreshHome: () => Promise<ProgressEntry[]>;
+  refreshSettings: () => Promise<any>;
+  refreshFavorites: () => Promise<any[]>;
+  refreshRoutine: () => Promise<ProgressEntry[]>;
   debouncedRefreshProgress: () => Promise<void>;
   debouncedRefreshHome: () => Promise<void>;
 }
@@ -30,6 +31,16 @@ interface RefreshProviderProps {
   children: React.ReactNode;
 }
 
+// Define a proper type for the debounced functions
+type DebouncedFunction = (() => void) | null;
+interface DebouncedFunctions {
+  progress: DebouncedFunction;
+  home: DebouncedFunction;
+  settings: DebouncedFunction;
+  favorites: DebouncedFunction;
+  routine: DebouncedFunction;
+}
+
 export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { 
@@ -38,37 +49,14 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
     saveRoutineProgress 
   } = useRoutineStorage();
   
-  // Create debounced versions of refresh functions
-  const debouncedRefreshRef = useRef({
+  // Create debounced versions of refresh functions with proper typing
+  const debouncedRefreshRef = useRef<DebouncedFunctions>({
     progress: null,
     home: null,
     settings: null,
     favorites: null,
     routine: null
   });
-  
-  // Initialize debounced functions
-  useEffect(() => {
-    // Create debounced versions of all refresh functions
-    debouncedRefreshRef.current = {
-      progress: debounce(async () => await refreshProgress(), 500),
-      home: debounce(async () => await refreshHome(), 500),
-      settings: debounce(async () => await refreshSettings(), 500),
-      favorites: debounce(async () => await refreshFavorites(), 500),
-      routine: debounce(async () => await refreshRoutine(), 500)
-    };
-    
-    return () => {
-      // Clean up
-      debouncedRefreshRef.current = {
-        progress: null,
-        home: null,
-        settings: null,
-        favorites: null,
-        routine: null
-      };
-    };
-  }, []);
   
   // Force reload all data from storage with performance monitoring
   const forceReloadData = async () => {
@@ -111,41 +99,6 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
     
     console.log('In-memory caches cleared');
   };
-  
-  // Refresh the entire app with performance monitoring
-  const refreshApp = useCallback(async () => {
-    try {
-      if (isRefreshing) {
-        console.log('Refresh already in progress, skipping...');
-        return;
-      }
-      
-      setIsRefreshing(true);
-      console.log('Starting comprehensive app refresh...');
-      
-      await measureAsyncOperation('refreshApp', async () => {
-        // Clear any in-memory caches
-        clearCaches();
-        
-        // Force reload all data first
-        await forceReloadData();
-        
-        // Refresh all data sources in sequence for more reliability
-        await refreshProgress();
-        await refreshHome();
-        await refreshSettings();
-        await refreshFavorites();
-        await refreshRoutine();
-        
-        console.log('Comprehensive app refresh complete');
-        return Promise.resolve();
-      });
-    } catch (error) {
-      console.error('Error during comprehensive app refresh:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refreshProgress, refreshHome, refreshSettings, refreshFavorites, refreshRoutine]);
   
   // Refresh progress data with performance monitoring
   const refreshProgress = useCallback(async () => {
@@ -261,6 +214,41 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
     }
   }, [synchronizeProgressData, getRecentRoutines]);
   
+  // Refresh the entire app with performance monitoring - placed after other refresh functions
+  const refreshApp = useCallback(async () => {
+    try {
+      if (isRefreshing) {
+        console.log('Refresh already in progress, skipping...');
+        return;
+      }
+      
+      setIsRefreshing(true);
+      console.log('Starting comprehensive app refresh...');
+      
+      await measureAsyncOperation('refreshApp', async () => {
+        // Clear any in-memory caches
+        clearCaches();
+        
+        // Force reload all data first
+        await forceReloadData();
+        
+        // Refresh all data sources in sequence for more reliability
+        await refreshProgress();
+        await refreshHome();
+        await refreshSettings();
+        await refreshFavorites();
+        await refreshRoutine();
+        
+        console.log('Comprehensive app refresh complete');
+        return Promise.resolve();
+      });
+    } catch (error) {
+      console.error('Error during comprehensive app refresh:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshProgress, refreshHome, refreshSettings, refreshFavorites, refreshRoutine]);
+  
   // Expose debounced versions of refresh functions
   const debouncedRefreshProgress = useCallback(async () => {
     if (debouncedRefreshRef.current.progress) {
@@ -275,6 +263,29 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
       return Promise.resolve();
     }
   }, []);
+  
+  // Initialize debounced functions after all refresh functions are defined
+  useEffect(() => {
+    // Create debounced versions of all refresh functions
+    debouncedRefreshRef.current = {
+      progress: debounce(async () => await refreshProgress(), 500),
+      home: debounce(async () => await refreshHome(), 500),
+      settings: debounce(async () => await refreshSettings(), 500),
+      favorites: debounce(async () => await refreshFavorites(), 500),
+      routine: debounce(async () => await refreshRoutine(), 500)
+    };
+    
+    return () => {
+      // Clean up
+      debouncedRefreshRef.current = {
+        progress: null,
+        home: null,
+        settings: null,
+        favorites: null,
+        routine: null
+      };
+    };
+  }, [refreshProgress, refreshHome, refreshSettings, refreshFavorites, refreshRoutine]);
   
   const value = {
     isRefreshing,

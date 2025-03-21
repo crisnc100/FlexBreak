@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useGamification } from './useGamification';
-import { usePremium } from '../context/PremiumContext';
-import * as rewardManager from '../utils/progress/rewardManager';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ProgressEntry } from '../types';
-import * as xpManager from '../utils/progress/xpManager';
-import * as storageService from '../services/storageService';
+import { usePremium } from '../../context/PremiumContext';
+import * as rewardManager from '../../utils/progress/rewardManager';
+import * as storageService from '../../services/storageService';
 
 /**
  * Hook to check if features are accessible based on user level and premium status

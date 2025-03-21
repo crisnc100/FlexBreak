@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as xpBoostManager from '../../utils/progress/xpBoostManager';
-import { useFeatureAccess } from '../../hooks/useFeatureAccess';
+import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import { usePremium } from '../../context/PremiumContext';
 
 interface XpBoostCardProps {

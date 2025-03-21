@@ -1748,4 +1748,66 @@ async function getRoutinesCompletedThisMonth(): Promise<number> {
     const routineDate = new Date(routine.date);
     return routineDate >= startOfMonth;
   }).length;
-} 
+}
+
+/**
+ * Handle streak reset by disabling streak-related challenges
+ * This keeps the challenges but marks them as failed when the streak is broken
+ */
+export const handleStreakReset = async (): Promise<UserProgress> => {
+  console.log('Handling streak reset in challenges');
+  
+  try {
+    // Get current user progress
+    const userProgress = await storageService.getUserProgress();
+    let challengesUpdated = false;
+    
+    // Make sure activeChallenges exists and is an array
+    if (!userProgress.activeChallenges || !Array.isArray(userProgress.activeChallenges)) {
+      console.log('No active challenges found or activeChallenges is not an array');
+      // Initialize the array if it doesn't exist
+      userProgress.activeChallenges = [];
+      return userProgress;
+    }
+    
+    // Clone the challenges array
+    const updatedChallenges = [...userProgress.activeChallenges];
+    
+    // Find all streak-related active challenges
+    const streakChallenges = updatedChallenges.filter(challenge => 
+      challenge.type === 'streak' && 
+      challenge.status === 'active'
+    );
+    
+    console.log(`Found ${streakChallenges.length} streak-related active challenges`);
+    
+    // Mark streak challenges as failed
+    if (streakChallenges.length > 0) {
+      updatedChallenges.forEach(challenge => {
+        if (challenge.type === 'streak' && challenge.status === 'active') {
+          challenge.status = 'failed';
+          challenge.failureReason = 'Streak broken';
+          challengesUpdated = true;
+          console.log(`Marked challenge as failed: ${challenge.title}`);
+        }
+      });
+      
+      // Create updated progress object
+      const updatedProgress = {
+        ...userProgress,
+        activeChallenges: updatedChallenges
+      };
+      
+      // Save to storage
+      await storageService.saveUserProgress(updatedProgress);
+      console.log('Saved updated challenges with failed streak challenges');
+      
+      return updatedProgress;
+    }
+    
+    return userProgress;
+  } catch (error) {
+    console.error('Error handling streak reset for challenges:', error);
+    return await storageService.getUserProgress();
+  }
+}; 

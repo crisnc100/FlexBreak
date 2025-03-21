@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ProgressEntry, Challenge, Achievement, Reward } from '../utils/progress/types';
-import * as gamificationManager from '../utils/progress/gamificationManager';
-import * as storageService from '../services/storageService';
+import { ProgressEntry, Challenge, Achievement, Reward } from '../../utils/progress/types';
+import * as gamificationManager from '../../utils/progress/gamificationManager';
+import * as storageService from '../../services/storageService';
 
 /**
  * Hook for interacting with the gamification system

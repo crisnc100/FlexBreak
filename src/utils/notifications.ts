@@ -34,13 +34,13 @@ export const getReminderTime = storageService.getReminderTime;
 
 // Configure notifications
 export function configureNotifications(): void {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
   
   console.log('Notifications handler configured');
 }
@@ -50,12 +50,12 @@ export const requestNotificationsPermissions = async (): Promise<boolean> => {
   console.log('Requesting notification permissions...');
   
   try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
     console.log('Existing permission status:', existingStatus);
     
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
+  let finalStatus = existingStatus;
+  
+  if (existingStatus !== 'granted') {
       // Android requires extra step to get permission
       if (Platform.OS === 'android') {
         console.log('Setting up Android notification channel');
@@ -68,12 +68,12 @@ export const requestNotificationsPermissions = async (): Promise<boolean> => {
       }
 
       console.log('Requesting permission...');
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
       console.log('Permission request result:', status);
-    }
-    
-    return finalStatus === 'granted';
+  }
+  
+  return finalStatus === 'granted';
   } catch (error) {
     console.error('Error requesting permissions:', error);
     return false;
@@ -304,10 +304,6 @@ function parseTimeString(timeString: string): { hours: number; minutes: number }
  * @param dayId Day identifier (e.g., 'mon', 'tue')
  * @returns number (0-6)
  */
-function getDayNumber(dayId: string): number {
-  const days = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-  return days[dayId as keyof typeof days] || 0;
-}
 
 /**
  * Schedule reminder notifications based on settings
@@ -448,15 +444,15 @@ export async function scheduleTestNotification(delaySeconds: number = 5): Promis
     
     console.log(`Test notification will appear at: ${futureTime.toLocaleTimeString()}`);
     
-    const identifier = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'DeskStretch Test',
+  const identifier = await Notifications.scheduleNotificationAsync({
+    content: {
+        title: 'FlexBreak Test',
         body: 'This is a TEST notification. This confirms your notification system is working!',
         data: { type: 'test_only' },
         sound: true,
       },
       trigger: { 
-        type: 'timeInterval', 
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: delaySeconds,
       },
     });
@@ -536,7 +532,7 @@ export async function scheduleRealReminder(): Promise<void> {
     
     // Configure notification content
     const content = {
-      title: 'DeskStretch Reminder',
+      title: 'FlexBreak Reminder',
       body: settings.message,
       data: { type: 'scheduled_reminder' },
       sound: true,
@@ -550,7 +546,7 @@ export async function scheduleRealReminder(): Promise<void> {
     const identifier = await Notifications.scheduleNotificationAsync({
       content,
       trigger: { 
-        type: 'timeInterval',
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: secondsUntilTarget
       },
     });

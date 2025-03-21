@@ -80,7 +80,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
         { backgroundColor: isEnabled ? getIconColor() + '20' : theme.backgroundLight }
       ]}>
         <Ionicons 
-          name={getIconName()} 
+          name={getIconName() as any} 
           size={24} 
           color={getIconColor()} 
         />

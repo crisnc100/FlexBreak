@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BodyArea, Duration, ProgressEntry } from '../types';
+import { BodyArea, Duration, ProgressEntry } from '../../types';
 import { useRoutineStorage } from './useRoutineStorage';
 
 interface RoutineSuggestion {

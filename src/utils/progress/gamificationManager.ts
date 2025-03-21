@@ -85,6 +85,38 @@ export const processCompletedRoutine = async (
     // Make sure total routines count is accurate
     afterXP.statistics.totalRoutines = allRoutines.length;
     
+    // Enhanced area tracking - track which body areas have been stretched
+    const area = routine.area || 'unknown';
+    
+    // Initialize routinesByArea if needed
+    if (!afterXP.statistics.routinesByArea) {
+      afterXP.statistics.routinesByArea = {};
+    }
+    
+    // Add this area to unique areas if not already tracked
+    if (!afterXP.statistics.uniqueAreas) {
+      afterXP.statistics.uniqueAreas = [];
+    }
+    
+    if (!afterXP.statistics.uniqueAreas.includes(area)) {
+      console.log(`Adding new unique area: ${area}`);
+      afterXP.statistics.uniqueAreas.push(area);
+    }
+    
+    // Increment count for this area
+    afterXP.statistics.routinesByArea[area] = (afterXP.statistics.routinesByArea[area] || 0) + 1;
+    console.log(`Updated area count for ${area}: ${afterXP.statistics.routinesByArea[area]}`);
+    
+    // Accurately track total minutes
+    const duration = typeof routine.duration === 'string' 
+      ? parseInt(routine.duration, 10) 
+      : (typeof routine.duration === 'number' ? routine.duration : 0);
+      
+    if (!isNaN(duration)) {
+      afterXP.statistics.totalMinutes = (afterXP.statistics.totalMinutes || 0) + duration;
+      console.log(`Updated total minutes: ${afterXP.statistics.totalMinutes}`);
+    }
+    
     // Save the progress with updated statistics
     await storageService.saveUserProgress(afterXP);
     
@@ -341,4 +373,95 @@ export const getUserLevelInfo = async (): Promise<{
     xpToNextLevel,
     percentToNextLevel
   };
+};
+
+/**
+ * Force recalculation of statistics based on all available routines
+ * Useful for fixing achievement progress issues
+ * @returns Updated user progress with fresh statistics
+ */
+export const recalculateStatistics = async (): Promise<UserProgress> => {
+  console.log('Recalculating all statistics from routine history');
+  
+  try {
+    // Get current user progress
+    const userProgress = await storageService.getUserProgress();
+    
+    // Get all routines
+    const allRoutines = await storageService.getAllRoutines();
+    console.log(`Recalculating stats from ${allRoutines.length} total routines`);
+    
+    // Reset statistics tracking
+    const statistics = {
+      ...userProgress.statistics,
+      totalRoutines: allRoutines.length,
+      uniqueAreas: [] as string[],
+      routinesByArea: {} as Record<string, number>,
+      totalMinutes: 0
+    };
+    
+    // Calculate streak (don't modify existing to avoid breaking streaks)
+    const { calculateStreak } = require('../progressUtils');
+    const calculatedStreak = calculateStreak(allRoutines);
+    statistics.currentStreak = calculatedStreak;
+    
+    // If new streak is higher than best streak, update best streak
+    if (calculatedStreak > statistics.bestStreak) {
+      statistics.bestStreak = calculatedStreak;
+    }
+    
+    // Process all routines to get area stats and total minutes
+    allRoutines.forEach(routine => {
+      // Track area statistics
+      const area = routine.area || 'unknown';
+      
+      // Add to unique areas if not already there
+      if (!statistics.uniqueAreas.includes(area)) {
+        statistics.uniqueAreas.push(area);
+      }
+      
+      // Increment count for this area
+      statistics.routinesByArea[area] = (statistics.routinesByArea[area] || 0) + 1;
+      
+      // Add minutes
+      const duration = typeof routine.duration === 'string' 
+        ? parseInt(routine.duration, 10) 
+        : (typeof routine.duration === 'number' ? routine.duration : 0);
+        
+      if (!isNaN(duration)) {
+        statistics.totalMinutes += duration;
+      }
+    });
+    
+    // Log the recalculated statistics
+    console.log('Recalculated statistics:');
+    console.log(`- Total routines: ${statistics.totalRoutines}`);
+    console.log(`- Current streak: ${statistics.currentStreak}`);
+    console.log(`- Best streak: ${statistics.bestStreak}`);
+    console.log(`- Total minutes: ${statistics.totalMinutes}`);
+    console.log(`- Unique areas: ${statistics.uniqueAreas.join(', ')}`);
+    console.log('- Routines by area:');
+    Object.entries(statistics.routinesByArea).forEach(([area, count]) => {
+      console.log(`  - ${area}: ${count}`);
+    });
+    
+    // Create updated progress object
+    const updatedProgress = {
+      ...userProgress,
+      statistics
+    };
+    
+    // Save to storage
+    await storageService.saveUserProgress(updatedProgress);
+    console.log('Saved recalculated statistics');
+    
+    // Update achievements with new statistics
+    const achievementResult = await achievementManager.updateAchievements(updatedProgress);
+    console.log(`Updated achievements with recalculated statistics. Unlocked ${achievementResult.unlockedAchievements.length} achievements.`);
+    
+    return achievementResult.progress;
+  } catch (error) {
+    console.error('Error recalculating statistics:', error);
+    return await storageService.getUserProgress();
+  }
 }; 
