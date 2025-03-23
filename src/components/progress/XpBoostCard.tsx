@@ -1,237 +1,232 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as xpBoostManager from '../../utils/progress/xpBoostManager';
-import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
-import { usePremium } from '../../context/PremiumContext';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
 
 interface XpBoostCardProps {
-  onActivateBoost: () => void;
+  onActivate?: () => void;
 }
 
-const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivateBoost }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [boostActive, setBoostActive] = useState(false);
-  const [remainingTime, setRemainingTime] = useState<number>(0);
-  const [formattedTime, setFormattedTime] = useState('0h 0m');
-  const { canAccessFeature, meetsLevelRequirement, getRequiredLevel } = useFeatureAccess();
-  const { isPremium } = usePremium();
+const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
+  const { theme } = useTheme();
+  const [isActive, setIsActive] = useState(false);
+  const [formattedTime, setFormattedTime] = useState('');
+  const [availableBoosts, setAvailableBoosts] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [activating, setActivating] = useState(false);
+  const [message, setMessage] = useState('');
   
-  // Check if boost is active on mount
+  const refreshData = async () => {
+    try {
+      // Check XP boost status
+      const { isActive: active, data } = await xpBoostManager.checkXpBoostStatus();
+      setIsActive(active);
+      
+      // Get available boosts
+      const boosts = await xpBoostManager.getAvailableBoosts();
+      setAvailableBoosts(boosts);
+      
+      // If active, calculate and format remaining time
+      if (active) {
+        const timeMs = await xpBoostManager.getXpBoostRemainingTime();
+        setFormattedTime(xpBoostManager.formatRemainingTime(timeMs));
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error checking XP boost status', error);
+      setLoading(false);
+    }
+  };
+  
   useEffect(() => {
-    checkBoostStatus();
+    // Load initial data
+    refreshData();
     
-    // Set up interval to update remaining time
-    const interval = setInterval(() => {
-      if (boostActive) {
-        updateRemainingTime();
-      }
-    }, 60000); // Update every minute
+    // Set up timer to refresh remaining time every minute
+    const timer = isActive 
+      ? setInterval(async () => {
+          const timeMs = await xpBoostManager.getXpBoostRemainingTime();
+          setFormattedTime(xpBoostManager.formatRemainingTime(timeMs));
+          
+          // If boost just expired, refresh all data
+          if (timeMs <= 0) {
+            refreshData();
+          }
+        }, 60000) 
+      : null;
     
-    return () => clearInterval(interval);
-  }, [boostActive]);
+    // Clean up timer
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isActive]);
   
-  // Check boost status
-  const checkBoostStatus = async () => {
-    setIsLoading(true);
+  const handleActivate = async () => {
+    if (isActive || availableBoosts <= 0) return;
+    
+    setActivating(true);
+    setMessage('');
+    
     try {
-      const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
-      setBoostActive(isActive);
+      const result = await xpBoostManager.activateXpBoost();
       
-      if (isActive) {
-        updateRemainingTime();
+      if (result.success) {
+        // Refresh status after activation
+        setMessage(result.message);
+        await refreshData();
+        
+        // Call onActivate callback if provided
+        if (onActivate) onActivate();
+      } else {
+        // Display error message
+        setMessage(result.message);
       }
     } catch (error) {
-      console.error('Error checking XP boost status:', error);
+      console.error('Error activating XP boost', error);
+      setMessage('Failed to activate XP boost. Please try again.');
     } finally {
-      setIsLoading(false);
+      setActivating(false);
     }
   };
   
-  // Update remaining time
-  const updateRemainingTime = async () => {
-    try {
-      const timeMs = await xpBoostManager.getXpBoostRemainingTime();
-      setRemainingTime(timeMs);
-      setFormattedTime(xpBoostManager.formatRemainingTime(timeMs));
-      
-      // If boost just expired, update status
-      if (timeMs <= 0 && boostActive) {
-        setBoostActive(false);
-      }
-    } catch (error) {
-      console.error('Error updating remaining time:', error);
-    }
-  };
-  
-  // Handle activating a boost
-  const handleActivateBoost = async () => {
-    if (!canAccessFeature('xp_boost')) {
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      await xpBoostManager.activateXpBoost();
-      setBoostActive(true);
-      updateRemainingTime();
-      onActivateBoost();
-    } catch (error) {
-      console.error('Error activating XP boost:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Render locked state for non-premium users or users below required level
-  if (!isPremium || !meetsLevelRequirement('xp_boost')) {
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="flash" size={24} color="#BDBDBD" />
-        </View>
-        <View style={styles.contentContainer}>
-          <Text style={styles.title}>XP Boost</Text>
-          <Text style={styles.subtitle}>
-            {!isPremium 
-              ? 'Premium Feature' 
-              : `Unlocks at Level ${getRequiredLevel('xp_boost')}`}
+      <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+        <ActivityIndicator color={theme.accent} />
+      </View>
+    );
+  }
+  
+  return (
+    <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+      <View style={styles.headerRow}>
+        <Ionicons name="flash" size={24} color={theme.accent} />
+        <Text style={[styles.title, { color: theme.text }]}>XP Boost</Text>
+      </View>
+      
+      {isActive ? (
+        <View style={styles.content}>
+          <Text style={[styles.activeText, { color: theme.accent }]}>
+            2x XP Boost Active!
           </Text>
-        </View>
-        <View style={styles.lockedContainer}>
-          <Ionicons name="lock-closed" size={18} color="#BDBDBD" />
-        </View>
-      </View>
-    );
-  }
-  
-  // If still loading
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="flash" size={24} color="#FF9800" />
-        </View>
-        <View style={styles.contentContainer}>
-          <Text style={styles.title}>XP Boost</Text>
-          <Text style={styles.subtitle}>Loading boost status...</Text>
-        </View>
-        <ActivityIndicator size="small" color="#FF9800" />
-      </View>
-    );
-  }
-  
-  // Render active boost
-  if (boostActive) {
-    return (
-      <View style={[styles.container, styles.activeContainer]}>
-        <View style={[styles.iconContainer, styles.activeIconContainer]}>
-          <Ionicons name="flash" size={24} color="#FFF" />
-        </View>
-        <View style={styles.contentContainer}>
-          <Text style={styles.title}>2x XP Boost Active!</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.timeText, { color: theme.textSecondary }]}>
             Time remaining: {formattedTime}
           </Text>
+          <Text style={[styles.smallText, { color: theme.textSecondary }]}>
+            All XP earned is doubled while active
+          </Text>
         </View>
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>2x</Text>
+      ) : (
+        <View style={styles.content}>
+          <Text style={[styles.boostText, { color: theme.text }]}>
+            {availableBoosts > 0 
+              ? `You have ${availableBoosts} XP boost stack${availableBoosts !== 1 ? 's' : ''} available!` 
+              : 'No XP boosts available'}
+          </Text>
+          <Text style={[styles.descText, { color: theme.textSecondary }]}>
+            Each boost doubles all XP earned for 72 hours
+          </Text>
+          
+          {message ? (
+            <Text style={[styles.messageText, { 
+              color: message.includes('Error') || message.includes('Failed') ? 'red' : theme.accent 
+            }]}>
+              {message}
+            </Text>
+          ) : null}
+          
+          <TouchableOpacity
+            style={[
+              styles.activateButton,
+              { 
+                backgroundColor: availableBoosts > 0 ? theme.accent : theme.border,
+                opacity: availableBoosts > 0 ? 1 : 0.5
+              }
+            ]}
+            onPress={handleActivate}
+            disabled={activating || availableBoosts <= 0}
+          >
+            {activating ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {availableBoosts > 0 ? 'Activate Boost' : 'No Boosts Available'}
+              </Text>
+            )}
+          </TouchableOpacity>
         </View>
-      </View>
-    );
-  }
-  
-  // Render inactive boost (can be activated)
-  return (
-    <View style={styles.container}>
-      <View style={styles.iconContainer}>
-        <Ionicons name="flash" size={24} color="#FF9800" />
-      </View>
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>XP Boost</Text>
-        <Text style={styles.subtitle}>Double your XP for 24 hours</Text>
-      </View>
-      <TouchableOpacity 
-        style={styles.activateButton}
-        onPress={handleActivateBoost}
-      >
-        <Text style={styles.activateText}>Activate</Text>
-      </TouchableOpacity>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFF',
+  card: {
     borderRadius: 12,
     padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  activeContainer: {
-    backgroundColor: '#FFF9E6',
-    borderColor: '#FFD54F',
-    borderWidth: 1,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF8E1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  activeIconContainer: {
-    backgroundColor: '#FF9800',
-  },
-  contentContainer: {
-    flex: 1,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  activateButton: {
-    backgroundColor: '#FF9800',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  activateText: {
-    color: '#FFF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  statusContainer: {
-    backgroundColor: '#FF9800',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    justifyContent: 'center',
+  content: {
     alignItems: 'center',
   },
-  statusText: {
-    color: '#FFF',
+  activeText: {
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  boostText: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  timeText: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  descText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  smallText: {
     fontSize: 14,
   },
-  lockedContainer: {
-    padding: 8,
+  messageText: {
+    fontSize: 14,
+    marginVertical: 8,
+    textAlign: 'center',
   },
+  activateButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    marginTop: 8,
+    minWidth: 150,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  }
 });
 
 export default XpBoostCard; 

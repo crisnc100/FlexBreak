@@ -4,6 +4,7 @@ import * as gamificationManager from '../progress/gamificationManager';
 import * as achievementManager from '../progress/achievementManager';
 import * as challengeManager from '../progress/challengeManager';
 import * as xpManager from '../progress/xpManager';
+import { LEVELS } from '../progress/xpManager';
 
 /**
  * Comprehensive testing utility for the gamification system
@@ -482,27 +483,64 @@ export const resetAllUserProgress = async (): Promise<boolean> => {
 };
 
 /**
- * Directly add XP to the user
+ * Add XP directly to the user
  */
-export const addDirectXP = async (
-  amount: number,
-  source: string = 'testing',
-  details: string = 'Direct XP addition for testing'
-): Promise<{
-  newTotalXP: number;
-  newLevel: number;
+export const addDirectXP = async (amount: number): Promise<{ 
+  newTotalXP: number; 
+  newLevel: number; 
   levelUp: boolean;
+  previousLevel: number 
 }> => {
   const userProgress = await storageService.getUserProgress();
-  const oldLevel = userProgress.level;
+  const previousLevel = userProgress.level;
+  const oldXP = userProgress.xp;
   
-  // Add XP using the XP manager
-  const result = await xpManager.addXP(amount, source, details, userProgress);
+  // Add the XP
+  userProgress.xp += amount;
+  console.log(`Adding ${amount} XP. Old total: ${oldXP}, New total: ${userProgress.xp}`);
+  
+  // Check for level up
+  const oldLevel = userProgress.level;
+  const xpThresholds = LEVELS.map(level => level.xpRequired);
+  
+  // Find the new level based on total XP
+  let newLevel = 1;
+  for (let i = LEVELS.length - 1; i >= 0; i--) {
+    if (userProgress.xp >= LEVELS[i].xpRequired) {
+      newLevel = LEVELS[i].level;
+      break;
+    }
+  }
+  
+  // Determine if this was a level up
+  const levelUp = newLevel > oldLevel;
+  
+  if (levelUp) {
+    console.log(`🎉 LEVEL UP through testing! ${oldLevel} → ${newLevel}`);
+    userProgress.level = newLevel;
+    
+    // ADDED: Set special flag for level up testing
+    userProgress.testLevelUp = true;
+    userProgress.testPreviousLevel = oldLevel;
+  }
+  
+  // Calculate XP to next level
+  let xpToNextLevel = 0;
+  if (newLevel < LEVELS.length) {
+    xpToNextLevel = LEVELS[newLevel].xpRequired - userProgress.xp;
+  } else {
+    // If at max level, just set a default increment (e.g., 1000 XP to next level)
+    xpToNextLevel = 1000;
+  }
+  
+  // Save the updated progress
+  await storageService.saveUserProgress(userProgress);
   
   return {
-    newTotalXP: result.progress.totalXP,
-    newLevel: result.progress.level,
-    levelUp: result.progress.level > oldLevel
+    newTotalXP: userProgress.xp,
+    newLevel,
+    levelUp,
+    previousLevel
   };
 };
 

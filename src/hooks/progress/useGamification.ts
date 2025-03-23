@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { ProgressEntry, Challenge, Achievement, Reward } from '../../utils/progress/types';
 import * as gamificationManager from '../../utils/progress/gamificationManager';
 import * as storageService from '../../services/storageService';
+import { EventEmitter } from '../../utils/EventEmitter';
+
+// Create an event emitter to notify level-up events across the app
+export const gamificationEvents = new EventEmitter();
+export const LEVEL_UP_EVENT = 'level_up';
+export const REWARD_UNLOCKED_EVENT = 'reward_unlocked';
 
 /**
  * Hook for interacting with the gamification system
@@ -75,6 +81,17 @@ export function useGamification() {
       if (result.levelUp) {
         console.log('Level up detected in useGamification.processRoutine!');
         setLevel(result.newLevel);
+        
+        // Emit level up event to notify other components
+        gamificationEvents.emit(LEVEL_UP_EVENT, {
+          oldLevel: (result as any).previousLevel || level,
+          newLevel: result.newLevel
+        });
+        
+        // If rewards were unlocked, emit reward unlocked event
+        if (result.newlyUnlockedRewards && result.newlyUnlockedRewards.length > 0) {
+          gamificationEvents.emit(REWARD_UNLOCKED_EVENT, result.newlyUnlockedRewards);
+        }
       }
       
       // Set notifications for UI

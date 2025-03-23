@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState } from 'react-native';
+import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import HomeScreen from './src/screens/HomeScreen';
 import RoutineScreen from './src/screens/RoutineScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
@@ -15,55 +16,103 @@ import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { useState } from 'react';
 import * as notifications from './src/utils/notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
+
+// Configure notification behavior when app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+// Function to register for push notifications and get token
+async function registerForPushNotificationsAsync() {
+  try {
+    // For Expo Go, we can use the default projectId
+    let projectId = undefined;
+    
+    // Only use project ID if not in Expo Go
+    if (!Constants.appOwnership || Constants.appOwnership !== 'expo') {
+      projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    }
+    
+    console.log('Using projectId:', projectId || 'default Expo projectId');
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
+      console.log('Failed to get push token: Permission denied');
+      return;
+    }
+
+    // Get token (use default project ID in Expo Go)
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: projectId
+      });
+      
+      console.log('Push Token:', tokenData.data);
+      await AsyncStorage.setItem('pushToken', tokenData.data);
+      return tokenData.data;
+    } catch (tokenError) {
+      console.log('Error getting push token:', tokenError);
+      // For testing in Expo Go, we can still use local notifications
+      console.log('Will use local notifications for testing instead');
+    }
+  } catch (error) {
+    console.log('Error registering for notifications:', error);
+  }
+}
 
 // Main app wrapper
 function MainApp() {
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const { theme, isDark } = useTheme();
-  
-  // Set up background notification scheduling
+
   useEffect(() => {
     console.log('App started - configuring notifications');
-    
-    // Configure and init notifications
-    notifications.configureNotifications();
-    
-    // Call setupBackgroundScheduling to ensure reminders get scheduled
-    notifications.setupBackgroundScheduling();
-    
-    // Add listener for notification received/responded to
+
+    // Register for push notifications
+    registerForPushNotificationsAsync();
+
+    // Add listeners for notifications
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      // This is fired when a notification is received while the app is foregrounded
       console.log('Notification received while app is open:', notification);
     });
-    
-    // Setup notification response listener (when user taps on notification)
+
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('User tapped on notification:', response);
-      // Here you could navigate to a specific screen based on notification
+      // Optionally navigate to a screen here
     });
-    
-    // Listen for app state changes but only schedule on cold starts
+
+    // For testing - schedule a local notification in 5 seconds
+    if (__DEV__) {
+      scheduleTestNotification();
+    }
+
+    // Preserve your existing background scheduling logic (optional)
     let appJustStarted = true;
-    
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState === 'active') {
-        // Only check reminders when app is first opened or reopened after a long time
-        if (appJustStarted) {
-          console.log('App just started - scheduling reminders if needed');
-          notifications.setupBackgroundScheduling(); // Also call here when app returns to foreground
-          appJustStarted = false;
-        }
+      if (nextAppState === 'active' && appJustStarted) {
+        console.log('App just started - checking notifications');
+        appJustStarted = false;
       } else if (nextAppState === 'background') {
-        // App going to background, reset flag after a delay
         setTimeout(() => {
           appJustStarted = true;
-        }, 60000); // Reset after 1 minute in background
+        }, 60000); // Reset after 1 minute
       }
     });
-    
+
     // Cleanup
     return () => {
       subscription.remove();
@@ -71,6 +120,20 @@ function MainApp() {
       responseListener.remove();
     };
   }, []);
+  
+  // Add this function for testing
+  async function scheduleTestNotification() {
+    // Schedule a notification to appear 5 seconds after the app starts
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "DeskStretch Reminder 💪",
+        body: "Time to take a break and stretch!",
+        data: { screen: 'Routine' },
+      },
+      trigger: null, // null trigger means show immediately
+    });
+    console.log('Test notification scheduled to appear immediately');
+  }
   
   // Create custom navigation theme based on our app theme
   const navigationTheme = {

@@ -50,6 +50,8 @@ export interface Challenge {
   areaTarget?: string;
   data?: Record<string, any>; // For storing additional tracking information
   dateClaimed?: string; // Date when the challenge was claimed
+  dateCompleted?: string; // Date when the challenge was completed
+  failureReason?: string; // Reason why the challenge failed, if applicable
 }
 
 // Interface for challenge history records
@@ -153,6 +155,7 @@ export interface ChallengeClaimResult {
   message: string;
   progress: UserProgress;
   xpEarned: number;
+  xpReduction?: boolean; // Indicates if XP was reduced due to expiration
 }
 
 // Interface for XP summary items

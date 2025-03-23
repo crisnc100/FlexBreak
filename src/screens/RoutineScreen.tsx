@@ -11,7 +11,7 @@ import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../types';
 import ActiveRoutine from '../components/routine/ActiveRoutine';
 import CompletedRoutine from '../components/routine/CompletedRoutine';
 import RoutineDashboard from '../components/routine/RoutineDashboard';
-import XpNotificationManager from '../components/XpNotificationManager';
+import XpNotificationManager from '../components/notifications/XpNotificationManager';
 
 // Import our custom hooks
 import { useRoutineParams } from '../hooks/routines/useRoutineParams';
@@ -19,6 +19,11 @@ import { useRoutineStorage } from '../hooks/routines/useRoutineStorage';
 import { useRoutineSuggestions } from '../hooks/routines/useRoutineSuggestions';
 import { useGamification } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
+import { useChallengeSystem } from '../hooks/progress/useChallengeSystem';
+
+// Import XP boost manager
+import * as xpBoostManager from '../utils/progress/xpBoostManager';
+import * as storageService from '../services/storageService';
 
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
@@ -56,6 +61,9 @@ export default function RoutineScreen() {
     recentlyUnlockedRewards
   } = useGamification();
   
+  // Add useChallengeSystem hook to update challenge progress
+  const { updateChallengeProgress } = useChallengeSystem();
+  
   // Get premium status from context
   const { isPremium } = usePremium();
   
@@ -80,6 +88,9 @@ export default function RoutineScreen() {
   
   // Add state for level-up data
   const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
+  
+  // Add state for XP boost
+  const [isXpBoosted, setIsXpBoosted] = useState<boolean>(false);
   
   // Effect for initial load and param changes
   useEffect(() => {
@@ -129,6 +140,12 @@ export default function RoutineScreen() {
       await saveRoutineProgress(entry);
       console.log('Routine saved successfully');
       
+      // Check if XP boost is active
+      const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
+      const xpMultiplier = isXpBoostActive ? xpBoostData.multiplier : 1;
+      setIsXpBoosted(isXpBoostActive);
+      console.log('XP Boost active:', isXpBoostActive);
+      
       // Refresh theme access to check if user unlocked dark theme
       await refreshThemeAccess();
       console.log('Theme access refreshed after routine completion');
@@ -138,10 +155,19 @@ export default function RoutineScreen() {
         // Process the routine through the gamification system
         const result = await processRoutine(entry);
         
+        // CRITICAL FIX: Explicitly update challenge progress after routine completion
+        console.log('Explicitly updating challenge progress after routine completion');
+        updateChallengeProgress();
+        
         if (result && result.success) {
           // Create an XP breakdown array based on the actual XP earned
           const breakdownItems: Array<{ source: string; amount: number; description: string }> = [];
           let totalXpEarned = 0;
+          
+          // Check if XP boost is active
+          const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
+          const xpMultiplier = isXpBoostActive ? xpBoostData.multiplier : 1;
+          setIsXpBoosted(isXpBoostActive);
           
           // Check if this was the first routine of day (base XP > 0)
           const isFirstOfDay = result.xpEarned > 0;
@@ -153,16 +179,25 @@ export default function RoutineScreen() {
             else if (Number(routineDuration) <= 10) routineBaseXP = 60;
             else routineBaseXP = 90;
             
+            // Adjust for XP boost if active
+            let boostedBaseXP = routineBaseXP;
+            let routineDesc = `${routineDuration}-Minute Routine`;
+            
+            if (isXpBoostActive) {
+              boostedBaseXP = Math.floor(routineBaseXP * xpMultiplier);
+              routineDesc = `${routineDuration}-Minute Routine (2x XP Boost Applied)`;
+            }
+            
             // Add routine base XP
             breakdownItems.push({
               source: 'routine',
-              amount: routineBaseXP,
-              description: `${routineDuration}-Minute Routine`
+              amount: boostedBaseXP,
+              description: routineDesc
             });
-            totalXpEarned += routineBaseXP;
+            totalXpEarned += boostedBaseXP;
             
-            // If there's exactly 50 XP more than base, it's likely the first ever routine
-            if (result.xpEarned === routineBaseXP + 50) {
+            // If there's exactly 50 XP more than boosted base, it's likely the first ever routine
+            if (result.xpEarned === boostedBaseXP + 50) {
               breakdownItems.push({
                 source: 'first_ever',
                 amount: 50,
@@ -182,12 +217,21 @@ export default function RoutineScreen() {
           // Add achievement bonuses if any were unlocked - these always count even if not first of day
           if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
             result.unlockedAchievements.forEach(achievement => {
+              // Apply XP boost to achievement XP if active
+              let achievementXP = achievement.xp;
+              let achievementDesc = `Achievement: ${achievement.title}`;
+              
+              if (isXpBoostActive) {
+                achievementXP = Math.floor(achievement.xp * xpMultiplier);
+                achievementDesc = `Achievement: ${achievement.title} (2x XP Boost Applied)`;
+              }
+              
               breakdownItems.push({
                 source: 'achievement',
-                amount: achievement.xp,
-                description: `Achievement: ${achievement.title}`
+                amount: achievementXP,
+                description: achievementDesc
               });
-              totalXpEarned += achievement.xp;
+              totalXpEarned += achievementXP;
             });
           }
           
@@ -200,41 +244,152 @@ export default function RoutineScreen() {
           // Log results
           console.log(`Total XP earned: ${totalXpEarned}`);
           console.log('XP Breakdown:', breakdownItems);
+          console.log('XP Boost active:', isXpBoostActive, 'Multiplier:', xpMultiplier);
+          
+          // ===== SIMPLIFIED LEVEL-UP DETECTION =====
+          // Import needed functions to check XP thresholds
+          const { getUserProgress } = require('../services/storageService');
+          const { LEVELS } = require('../utils/progress/xpManager');
+          const userProgress = await getUserProgress();
+          
+          // Get XP values - handle both regular and testing property names
+          const previousXp = userProgress.xp !== undefined 
+            ? userProgress.xp - totalXpEarned 
+            : userProgress.totalXP !== undefined 
+              ? userProgress.totalXP - totalXpEarned 
+              : 0;
+              
+          const currentXp = userProgress.xp !== undefined 
+            ? userProgress.xp 
+            : userProgress.totalXP !== undefined 
+              ? userProgress.totalXP 
+              : 0;
+          
+          // Get level thresholds for detection
+          const xpThresholds = LEVELS.map(level => level.xpRequired);
+          const previousLevelThreshold = xpThresholds[userProgress.level - 1] || 0;
+          
+          // Log basic level detection info
+          console.log('Level detection - Current level:', userProgress.level);
+          console.log(`XP progress: ${previousXp} → ${currentXp}`);
+                    
+          // ===== LEVEL-UP DETECTION STRATEGIES =====
+          // Strategy 1: Direct flag from gamification system
+          const hasDirectLevelUpFlag = result.levelUp === true;
+          
+          // Strategy 2: Check if we crossed a level threshold with this routine's XP
+          const crossedThreshold = previousXp < previousLevelThreshold && currentXp >= previousLevelThreshold;
+          
+          // Strategy 3: Check for dark theme unlock (reliable indicator for level 2)
+          const justUnlockedDarkTheme = result.unlockedRewards && 
+                                       result.unlockedRewards.some(r => 
+                                         r.id === 'dark_theme' || 
+                                         (r.title && r.title.includes('Dark Theme')));
+          
+          // Strategy 4: Check for explicit level up message in result
+          const hasLevelUpMessage = JSON.stringify(result).includes('Level Up');
+          
+          // Strategy 5: Check for testing flag that might be set
+          const hasTestLevelUp = (userProgress as any).testLevelUp === true;
+          
+          // Reset the test flag if it exists to avoid persistence
+          if (hasTestLevelUp) {
+            console.log('🧪 Detected testing level-up flag - will reset after use');
+            try {
+              (userProgress as any).testLevelUp = false;
+              await storageService.saveUserProgress(userProgress);
+            } catch (err) {
+              console.log('Error resetting test level-up flag:', err);
+            }
+          }
+          
+          // Make the final decision based on all strategies
+          const hasLeveledUp = hasDirectLevelUpFlag || 
+                              crossedThreshold ||
+                              justUnlockedDarkTheme ||
+                              hasLevelUpMessage || 
+                              hasTestLevelUp ||
+                              // Special case for level 2
+                              (userProgress.level === 2 && previousXp < 250 && currentXp >= 250);
+          
+          console.log(`Level-up detected: ${hasLeveledUp}`);
+          
+          // Set previous and new level based on our detection
+          const previousLevel = hasLeveledUp ? userProgress.level - 1 : userProgress.level;
+          const newLevel = userProgress.level;
           
           // Extract level-up information if available
           let levelUpInfo: LevelUpData | null = null;
           
-          // Import storageService to get user progress
-          const { getUserProgress } = require('../services/storageService');
-          const userProgress = await getUserProgress();
-          console.log('Current user level from storage:', userProgress.level);
-          
-          // Check if we have a level-up condition - only if result.levelUp is strictly true
-          if (result.levelUp === true && result.newLevel > ((result as any).previousLevel || 0)) {
-            // Calculate oldLevel from the current user progress instead of using fixed values
-            const oldLevel = userProgress.level - 1; // The old level is one less than current
-            console.log(`🎉 Level Up! ${oldLevel} → ${userProgress.level}`);
-            console.log('Level up data detected, result content:', JSON.stringify(result, null, 2));
+          if (hasLeveledUp) {
+            console.log(`🎉 Level Up detected! ${previousLevel} → ${newLevel}`);
             
             // Create the levelUp object to pass to CompletedRoutine with accurate levels
             levelUpInfo = {
-              oldLevel: oldLevel,
-              newLevel: userProgress.level, // Use the current level from user progress
+              oldLevel: previousLevel,
+              newLevel: newLevel,
               rewards: []
             };
             
-            // Handle different property names for rewards in the result
-            const rewards = result.unlockedRewards || 
+            // Handle level-specific rewards
+            if (newLevel === 2) {
+              console.log('Adding Dark Theme reward for level 2');
+              levelUpInfo.rewards.push({
+                id: 'dark_theme',
+                name: 'Dark Theme',
+                description: 'Enable a sleek dark mode for comfortable evening stretching',
+                type: 'feature'
+              });
+            } else if (newLevel === 3) {
+              console.log('Adding Custom Reminders reward for level 3');
+              levelUpInfo.rewards.push({
+                id: 'custom_reminders',
+                name: 'Custom Reminders',
+                description: 'Set personalized reminders with custom messages',
+                type: 'feature'
+              });
+            } else if (newLevel === 4) {
+              console.log('Adding XP Boost reward for level 4');
+              levelUpInfo.rewards.push({
+                id: 'xp_boost',
+                name: 'XP Boost',
+                description: 'Get a 2x boost in XP for your daily streak',
+                type: 'feature'
+              });
+            } else if (newLevel === 5) {
+              console.log('Adding Custom Routines reward for level 5');
+              levelUpInfo.rewards.push({
+                id: 'custom_routines',
+                name: 'Custom Routines',
+                description: 'Create and save your own personalized stretching routines',
+                type: 'feature'
+              });
+            } else if (newLevel >= 6) {
+              console.log(`Adding reward for level ${newLevel}`);
+              levelUpInfo.rewards.push({
+                id: `level_${newLevel}_reward`,
+                name: `Level ${newLevel} Reward`,
+                description: `Special features unlocked at level ${newLevel}`,
+                type: 'feature'
+              });
+            }
+            
+            // Look for additional rewards from the result
+            const resultRewards = result.unlockedRewards || 
                            (result as any).newlyUnlockedRewards || 
                            [];
             
-            // Add unlocked rewards if any
-            if (rewards && rewards.length > 0) {
-              // Create properly typed rewards array
-              levelUpInfo.rewards = rewards.map(reward => {
+            // Add any missing rewards from the result
+            if (resultRewards && resultRewards.length > 0) {
+              for (const reward of resultRewards) {
+                // Skip if we already have a reward with this ID
+                if (levelUpInfo.rewards.some(r => r.id === reward.id)) {
+                  continue;
+                }
+                
                 // Extract reward details, providing defaults if properties don't exist
                 const rewardName = reward.title || reward.name || 'New Reward';
-                console.log(`Reward unlocked: ${rewardName} (Level ${userProgress.level})`);
+                console.log(`Reward unlocked: ${rewardName} (Level ${newLevel})`);
                 
                 // Ensure the type is one of the allowed values
                 let rewardType: 'feature' | 'item' | 'cosmetic' = 'feature';
@@ -244,119 +399,16 @@ export default function RoutineScreen() {
                   rewardType = 'feature';
                 }
                 
-                return {
+                levelUpInfo.rewards.push({
                   id: reward.id || `reward-${Date.now()}`,
                   name: rewardName,
-                  description: reward.description || `Unlocked at level ${userProgress.level}`,
+                  description: reward.description || `Unlocked at level ${newLevel}`,
                   type: rewardType
-                };
-              });
-            }
-            
-            // If we have a level up but no rewards, add appropriate level-based rewards
-            if (levelUpInfo.rewards.length === 0) {
-              // Add level-specific rewards
-              if (userProgress.level === 2) {
-                console.log('Adding Dark Theme reward for level 2');
-                levelUpInfo.rewards.push({
-                  id: 'dark_theme',
-                  name: 'Dark Theme',
-                  description: 'Enable a sleek dark mode for comfortable evening stretching',
-                  type: 'feature'
-                });
-              } else if (userProgress.level === 3) {
-                console.log('Adding Custom Reminders reward for level 3');
-                levelUpInfo.rewards.push({
-                  id: 'custom_reminders',
-                  name: 'Custom Reminders',
-                  description: 'Set personalized reminders with custom messages',
-                  type: 'feature'
-                });
-              } else if (userProgress.level === 4) {
-                console.log('Adding XP Boost reward for level 4');
-                levelUpInfo.rewards.push({
-                  id: 'xp_boost',
-                  name: 'XP Boost',
-                  description: 'Get a 2x boost in XP for your daily streak',
-                  type: 'feature'
-                });
-              } else if (userProgress.level === 5) {
-                console.log('Adding Custom Routines reward for level 5');
-                levelUpInfo.rewards.push({
-                  id: 'custom_routines',
-                  name: 'Custom Routines',
-                  description: 'Create and save your own personalized stretching routines',
-                  type: 'feature'
-                });
-              } else if (userProgress.level >= 6) {
-                console.log(`Adding reward for level ${userProgress.level}`);
-                levelUpInfo.rewards.push({
-                  id: `level_${userProgress.level}_reward`,
-                  name: `Level ${userProgress.level} Reward`,
-                  description: `Special features unlocked at level ${userProgress.level}`,
-                  type: 'feature'
                 });
               }
             }
-          } else if (userProgress.level >= 2) {
-            console.log('No level up detected in result. levelUp:', result.levelUp);
-            console.log('Current user level:', userProgress.level);
-            
-            // Check if we should show level-specific rewards
-            // This is useful for users who already leveled up but need to see their rewards
-            if (result.xpEarned > 0) {
-              console.log(`User is already at level ${userProgress.level}, checking if we should show level-specific rewards`);
-              
-              // Create level-up info with accurate current level
-              levelUpInfo = {
-                oldLevel: userProgress.level - 1,
-                newLevel: userProgress.level,
-                rewards: []
-              };
-              
-              // Add level-specific rewards based on user's current level
-              if (userProgress.level === 2) {
-                console.log('Adding Dark Theme reward for level 2');
-                levelUpInfo.rewards.push({
-                  id: 'dark_theme',
-                  name: 'Dark Theme',
-                  description: 'Enable a sleek dark mode for comfortable evening stretching',
-                  type: 'feature'
-                });
-              } else if (userProgress.level === 3) {
-                console.log('Adding Custom Reminders reward for level 3');
-                levelUpInfo.rewards.push({
-                  id: 'custom_reminders',
-                  name: 'Custom Reminders',
-                  description: 'Set personalized reminders with custom messages',
-                  type: 'feature'
-                });
-              } else if (userProgress.level === 4) {
-                console.log('Adding XP Boost reward for level 4');
-                levelUpInfo.rewards.push({
-                  id: 'xp_boost',
-                  name: 'XP Boost',
-                  description: 'Get a 2x boost in XP for your daily streak',
-                  type: 'feature'
-                });
-              } else if (userProgress.level === 5) {
-                console.log('Adding Custom Routines reward for level 5');
-                levelUpInfo.rewards.push({
-                  id: 'custom_routines',
-                  name: 'Custom Routines',
-                  description: 'Create and save your own personalized stretching routines',
-                  type: 'feature'
-                });
-              } else if (userProgress.level >= 6) {
-                console.log(`Adding reward for level ${userProgress.level}`);
-                levelUpInfo.rewards.push({
-                  id: `level_${userProgress.level}_reward`,
-                  name: `Level ${userProgress.level} Reward`,
-                  description: `Special features unlocked at level ${userProgress.level}`,
-                  type: 'feature'
-                });
-              }
-            }
+          } else {
+            console.log('No level up detected in this routine completion. Current level:', newLevel);
           }
           
           // Check if dark theme was unlocked and set it automatically
@@ -380,74 +432,13 @@ export default function RoutineScreen() {
           setLevelUpData(levelUpInfo);
           console.log('Level-up data being passed to CompletedRoutine:', JSON.stringify(levelUpInfo, null, 2));
           
-          // For testing: Force a level-up UI if none is detected but XP is earned
-          // This can be removed in production
-          if (!levelUpInfo && result.xpEarned > 0) {
-            console.log('XP earned but no level-up data, checking user progress for rewards...');
-            
-            try {
-              // We already have userProgress from above
-              console.log('Current user level:', userProgress.level);
-              
-              // If user is already at a level with rewards, show those rewards
-              if (userProgress.level >= 2) {
-                console.log(`User is at level ${userProgress.level}, creating level-up info with appropriate rewards`);
-                const mockLevelUpData: LevelUpData = {
-                  oldLevel: userProgress.level - 1,
-                  newLevel: userProgress.level,
-                  rewards: []
-                };
-                
-                // Add level-specific rewards based on user's current level
-                if (userProgress.level === 2) {
-                  mockLevelUpData.rewards.push({
-                    id: 'dark_theme',
-                    name: 'Dark Theme',
-                    description: 'Enable a sleek dark mode for comfortable evening stretching',
-                    type: 'feature'
-                  });
-                } else if (userProgress.level === 3) {
-                  mockLevelUpData.rewards.push({
-                    id: 'custom_reminders',
-                    name: 'Custom Reminders',
-                    description: 'Set personalized reminders with custom messages',
-                    type: 'feature'
-                  });
-                } else if (userProgress.level === 4) {
-                  mockLevelUpData.rewards.push({
-                    id: 'xp_boost',
-                    name: 'XP Boost',
-                    description: 'Get a 2x boost in XP for your daily streak',
-                    type: 'feature'
-                  });
-                } else if (userProgress.level === 5) {
-                  mockLevelUpData.rewards.push({
-                    id: 'custom_routines',
-                    name: 'Custom Routines',
-                    description: 'Create and save your own personalized stretching routines',
-                    type: 'feature'
-                  });
-                } else if (userProgress.level >= 6) {
-                  // For higher levels, use a generic format or add specific rewards as needed
-                  mockLevelUpData.rewards.push({
-                    id: `level_${userProgress.level}_reward`,
-                    name: `Level ${userProgress.level} Reward`,
-                    description: `Special features unlocked at level ${userProgress.level}`,
-                    type: 'feature'
-                  });
-                }
-                
-                setLevelUpData(mockLevelUpData);
-                console.log(`Created level-up data for level ${userProgress.level}:`, JSON.stringify(mockLevelUpData, null, 2));
-              }
-            } catch (error) {
-              console.error('Error checking user progress:', error);
-            }
-          }
-          
           // Check for completed challenges
           if (result.completedChallenges.length > 0) {
             console.log(`Completed ${result.completedChallenges.length} challenges!`);
+            // CRITICAL FIX: Log challenge details for debugging
+            result.completedChallenges.forEach((challenge, index) => {
+              console.log(`Challenge ${index + 1}: ${challenge.title} - ${challenge.description} (${challenge.progress}/${challenge.requirement})`);
+            });
           }
           
           // Check for unlocked achievements
@@ -484,10 +475,10 @@ export default function RoutineScreen() {
     }
   };
   
-  // Handle showing the dashboard
+  // FIXED: Reset level-up data when returning to dashboard
   const showDashboard = () => {
-    console.log('Showing dashboard');
     setScreenState('DASHBOARD');
+    setLevelUpData(null); // Reset level-up data when changing screens
   };
   
   // Handle smart pick modal
@@ -549,17 +540,11 @@ export default function RoutineScreen() {
     }
   };
 
-  // Handle creating a new routine
+  // FIXED: Reset level-up data when creating a new routine
   const handleCreateNewRoutine = () => {
-    console.log('Creating new routine, resetting state and navigating home');
-    
-    // Reset all routine parameters
     resetParams();
-    
-    // Reset screen state to dashboard for when we return
     setScreenState('DASHBOARD');
-    
-    // Navigate to home screen to create a new routine
+    setLevelUpData(null); // Reset level-up data when starting a new routine
     navigateToHome();
   };
 
@@ -594,6 +579,19 @@ export default function RoutineScreen() {
     } catch (error) {
       console.error('Error during routine screen refresh:', error);
     }
+  };
+  
+  // Handle skipping an exercise
+  const skipCurrentExercise = () => {
+    setLevelUpData(null); // Reset level-up data when skipping exercises
+    // ... existing code ...
+  };
+
+  // Handle discarding a routine
+  const discardRoutine = () => {
+    setScreenState('DASHBOARD');
+    setLevelUpData(null); // Reset level-up data when discarding a routine
+    navigateToHome();
   };
   
   // ============= RENDERING LOGIC =============
@@ -647,6 +645,9 @@ export default function RoutineScreen() {
   
   // Render completed routine
   if (screenState === 'COMPLETED') {
+    console.log('Rendering COMPLETED state with the following level-up data:', 
+      levelUpData ? JSON.stringify(levelUpData, null, 2) : 'null');
+    
     return (
       <SafeAreaView style={styles.container}>
         <CompletedRoutine 
@@ -656,6 +657,7 @@ export default function RoutineScreen() {
           xpEarned={routineXpEarned}
           xpBreakdown={xpBreakdown}
           levelUp={levelUpData}
+          isXpBoosted={isXpBoosted}
           onShowDashboard={showDashboard}
           onNavigateHome={handleCreateNewRoutine}
           onOpenSubscription={() => setSubscriptionModalVisible(true)}

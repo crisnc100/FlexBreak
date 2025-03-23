@@ -60,6 +60,7 @@ interface ThemeContextType {
   isDark: boolean;
   canUseDarkTheme: boolean;
   refreshThemeAccess: () => Promise<void>;
+  refreshTheme: () => void;
 }
 
 // Create the context
@@ -69,7 +70,8 @@ const ThemeContext = createContext<ThemeContextType>({
   setThemeType: () => {},
   isDark: false,
   canUseDarkTheme: false,
-  refreshThemeAccess: async () => {}
+  refreshThemeAccess: async () => {},
+  refreshTheme: () => {}
 });
 
 // Storage key for theme preference
@@ -245,14 +247,25 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await checkDarkThemeAccess();
   };
   
+  // Force theme refresh - this triggers re-renders throughout the app
+  const refreshTheme = () => {
+    console.log('Forcing theme refresh...');
+    // We set the theme to its current value to trigger component updates
+    const currentTheme = themeType;
+    setThemeType(currentTheme);
+    // Also refresh theme access
+    refreshThemeAccess();
+  };
+  
   return (
     <ThemeContext.Provider value={{ 
       theme: actualTheme, 
       themeType, 
       setThemeType: handleSetThemeType, 
-      isDark: isDark && canUseDarkTheme,
+      isDark, 
       canUseDarkTheme,
-      refreshThemeAccess
+      refreshThemeAccess,
+      refreshTheme
     }}>
       {children}
     </ThemeContext.Provider>

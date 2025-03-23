@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext';
-import { createThemedStyles } from '../utils/themeUtils';
+import { useTheme } from '../../context/ThemeContext';
+import { createThemedStyles } from '../../utils/themeUtils';
 
 interface XpNotificationProps {
   amount: number;

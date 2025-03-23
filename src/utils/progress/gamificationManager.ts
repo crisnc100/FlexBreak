@@ -126,11 +126,20 @@ export const processCompletedRoutine = async (
     // Create array of routines to update challenges with
     const routinesForChallenges = [routine];
     
-    // Update challenges (single routine)
+    // Handle expired challenges first
     const challengeResult = await challengeManager.handleExpiredChallenges();
     
-    // Get updated challenges after handling expirations
-    const updatedProgress = challengeResult;
+    // Get updated progress after handling expirations
+    let updatedProgress = challengeResult;
+    
+    // CRITICAL FIX: Process the new routine to update challenge progress
+    console.log('Updating challenge progress with newly completed routine');
+    const challengeUpdateResult = await challengeManager.processRoutineForChallenges(routine, updatedProgress);
+    updatedProgress = challengeUpdateResult.progress;
+    
+    // ADDITIONAL FIX: Force update daily challenges with routines to ensure consistency
+    console.log('Forcing update of daily challenges with all routines');
+    updatedProgress = await challengeManager.forceUpdateDailyChallengesWithRoutines();
     
     // Check and update rewards based on level
     const rewardResult = await rewardManager.updateRewards(updatedProgress);
@@ -140,6 +149,8 @@ export const processCompletedRoutine = async (
     
     // Get newly completed challenges (those that are completed but not claimed)
     const completedChallenges = await challengeManager.getClaimableChallenges();
+    
+    console.log(`Found ${completedChallenges.length} claimable challenges after routine completion`);
     
     // Return combined results
     return {

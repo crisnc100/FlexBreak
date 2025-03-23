@@ -90,27 +90,31 @@ export const claimChallenge = async (
     
     // Get today's date for daily challenge checks
     const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
     
-    // For daily challenges, check if any challenge of this category was already claimed today
+    // MODIFIED: Allow multiple challenge claims per day, but with restrictions by type
     if (challenge.category === 'daily') {
-      // Check if ANY daily challenge was already claimed today
-      const dailyChallengesClaimedToday = userProgress.xpHistory?.filter(entry => 
+      // CHANGED: Check if a challenge of the SAME TYPE was already claimed today
+      // This allows claiming different types of daily challenges (e.g., one routine_count and one time_of_day)
+      const similarChallengesClaimedToday = userProgress.xpHistory?.filter(entry => 
         entry.source === 'challenge' && 
         entry.timestamp.includes(today) &&
-        entry.details?.includes('daily_') // Match any daily challenge
+        entry.details?.includes(`daily_${challenge.type}`) // Match only challenges of the same type
       ).length || 0;
       
-      if (dailyChallengesClaimedToday > 0) {
-        console.log(`A daily challenge was already claimed today`);
+      // Only restrict if a similar challenge was already claimed today
+      if (similarChallengesClaimedToday > 0) {
+        const challengeTypeDisplay = challenge.type.replace('_', ' ');
+        console.log(`A daily challenge of type "${challengeTypeDisplay}" was already claimed today`);
         return {
           success: false,
-          message: 'You can only claim one daily challenge per day',
+          message: `You've already claimed a similar daily challenge today`,
           progress: userProgress,
           xpEarned: 0
         };
       }
       
-      // Check if there's at least one routine completed today
+      // Check if there's at least one routine completed today (required for all daily challenges)
       const routinesCompletedToday = await getRoutinesCompletedToday();
       if (routinesCompletedToday === 0) {
         console.log(`No routines completed today, cannot claim daily challenge`);
@@ -177,16 +181,98 @@ export const claimChallenge = async (
       };
     }
     
-    // Check if challenge is expired
-    const now = new Date();
-    if (new Date(challenge.endDate) < now) {
-      console.log(`Challenge "${challenge.title}" expired on ${challenge.endDate}`);
+    // UPDATED: Check if challenge is expired but still within grace period
+    const endDate = new Date(challenge.endDate);
+    const completedDate = challenge.dateCompleted ? new Date(challenge.dateCompleted) : null;
+    
+    // Calculate grace periods by category (in hours)
+    const gracePeriods = {
+      daily: 12, // 12 hours grace period for daily challenges
+      weekly: 48, // 2 days grace period for weekly challenges
+      monthly: 72, // 3 days grace period for monthly challenges
+      special: 48  // 2 days grace period for special challenges
+    };
+    
+    // Calculate if challenge is expired but within grace period
+    const isExpired = endDate < now;
+    const gracePeriodHours = gracePeriods[challenge.category as keyof typeof gracePeriods] || 24;
+    
+    // If the challenge is completed, check against completion date
+    // Otherwise, check against end date
+    const referenceDate = completedDate || endDate;
+    
+    // Calculate grace period end time (in milliseconds)
+    const gracePeriodMs = gracePeriodHours * 60 * 60 * 1000;
+    const isWithinGracePeriod = now.getTime() - referenceDate.getTime() <= gracePeriodMs;
+    
+    if (isExpired && !isWithinGracePeriod) {
+      console.log(`Challenge "${challenge.title}" expired on ${challenge.endDate} and grace period has passed`);
+      
+      // If it's a streak challenge, allow claiming with reduced XP
+      if (challenge.type === 'streak') {
+        const reducedXp = Math.floor(challenge.xp * 0.5); // 50% of original XP
+        console.log(`Streak challenge - allowing claim with reduced XP: ${reducedXp} (original: ${challenge.xp})`);
+        
+        // Mark with reduced XP
+        challenge.xp = reducedXp;
+        
+        // Add a note about the reduced XP
+        const xpReductionNote = `Note: XP reduced because the challenge expired.`;
+        return {
+          success: true,
+          message: `Claimed ${reducedXp} XP from "${challenge.title}". ${xpReductionNote}`,
+          progress: userProgress,
+          xpEarned: reducedXp,
+          xpReduction: true
+        };
+      }
+      
       return {
         success: false,
         message: 'Challenge expired and can no longer be claimed',
         progress: userProgress,
         xpEarned: 0
       };
+    } else if (isExpired) {
+      console.log(`Challenge "${challenge.title}" expired on ${challenge.endDate} but still within grace period of ${gracePeriodHours} hours`);
+      // Continue with claiming, but notify user of grace period
+    }
+    
+    // ADDED: Check for daily XP limit to prevent excessive XP farming
+    // Up to 3 challenges can be claimed per day with a maximum of 150 XP total
+    if (challenge.category === 'daily') {
+      const dailyXpFromChallenges = userProgress.xpHistory?.filter(entry => 
+        entry.source === 'challenge' && 
+        entry.timestamp.includes(today)
+      ).reduce((total, entry) => total + (entry.amount || 0), 0) || 0;
+      
+      const dailyChallengesClaimed = userProgress.xpHistory?.filter(entry => 
+        entry.source === 'challenge' && 
+        entry.timestamp.includes(today)
+      ).length || 0;
+      
+      console.log(`Daily challenge XP so far: ${dailyXpFromChallenges}, challenges claimed today: ${dailyChallengesClaimed}`);
+      
+      // If already claimed 3 challenges today or earned 150+ XP from challenges today
+      if (dailyChallengesClaimed >= 3) {
+        console.log(`Already claimed ${dailyChallengesClaimed} challenges today, daily limit reached`);
+        return {
+          success: false,
+          message: 'Daily challenge limit reached (max 3 per day)',
+          progress: userProgress,
+          xpEarned: 0
+        };
+      }
+      
+      if (dailyXpFromChallenges >= 150) {
+        console.log(`Already earned ${dailyXpFromChallenges} XP from challenges today, XP limit reached`);
+        return {
+          success: false,
+          message: 'Daily challenge XP limit reached (max 150 XP per day)',
+          progress: userProgress,
+          xpEarned: 0
+        };
+      }
     }
     
     // Mark as claimed
@@ -208,15 +294,16 @@ export const claimChallenge = async (
     const xpResult = await xpManager.addXP(
       challenge.xp,
       'challenge',
-      `Claimed: ${challenge.title} (${challengeId})`, // Include challenge ID in details for tracking
+      `Claimed: ${challenge.title} (${challenge.category}_${challenge.type}_${challengeId})`, // Include challenge type and category in details
       updatedProgress
     );
     
-    // Return the result
-    console.log(`Successfully claimed challenge "${challenge.title}"`);
+    // Return the result with grace period message if applicable
+    const graceMessage = isExpired ? ' (Claimed during grace period)' : '';
+    console.log(`Successfully claimed challenge "${challenge.title}"${graceMessage}`);
     return {
       success: true,
-      message: `Successfully claimed ${challenge.xp} XP from "${challenge.title}"`,
+      message: `Successfully claimed ${challenge.xp} XP from "${challenge.title}"${graceMessage}`,
       progress: xpResult.progress,
       xpEarned: challenge.xp
     };
@@ -578,8 +665,19 @@ export const handleExpiredChallenges = async (): Promise<UserProgress> => {
   let needNewMonthlies = true;
   let needNewSpecials = true;
   
+  // Define cool-down periods for expired challenges before they can be reset (in days)
+  const coolDownPeriods = {
+    daily: 1,     // 1 day cooldown for daily challenges
+    weekly: 3,     // 3 days cooldown for weekly challenges
+    monthly: 7,    // 7 days cooldown for monthly challenges
+    special: 3     // 3 days cooldown for special challenges
+  };
+  
+  // Track updated challenges
+  let updatedAny = false;
+  
   // Check for active challenges in each category
-  Object.values(challenges).forEach(challenge => {
+  Object.entries(challenges).forEach(([id, challenge]) => {
     const endDate = new Date(challenge.endDate);
     
     // Skip already claimed challenges
@@ -590,19 +688,196 @@ export const handleExpiredChallenges = async (): Promise<UserProgress> => {
     // Mark challenges as expired if end date is in the past
     if (endDate < now && !challenge.completed) {
       // For challenges with progress, mark them as expired
-      challenges[challenge.id] = {
+      challenges[id] = {
         ...challenge,
         status: CHALLENGE_STATUS.EXPIRED
       };
+      updatedAny = true;
+    }
+    
+    // Handle challenges that are completed but unclaimed and expired
+    if (endDate < now && challenge.completed && !challenge.claimed) {
+      const completionDate = challenge.dateCompleted ? new Date(challenge.dateCompleted) : endDate;
+      
+      // Calculate the grace period for this challenge category (from claimChallenge)
+      const gracePeriods = {
+        daily: 12, // 12 hours for daily
+        weekly: 48, // 2 days for weekly
+        monthly: 72, // 3 days for monthly
+        special: 48  // 2 days for special
+      };
+      
+      const gracePeriodHours = gracePeriods[challenge.category as keyof typeof gracePeriods] || 24;
+      const gracePeriodMs = gracePeriodHours * 60 * 60 * 1000;
+      
+      // Check if grace period has passed
+      if (now.getTime() - completionDate.getTime() > gracePeriodMs) {
+        console.log(`Challenge "${challenge.title}" (${id}) expired and grace period passed`);
+        
+        // For streak challenges, determine if we should preserve the completed status but mark expired
+        if (challenge.type === 'streak') {
+          challenges[id] = {
+            ...challenge,
+            status: CHALLENGE_STATUS.EXPIRED,
+            // Don't reset progress for streak challenges, just mark them as expired
+          };
+        } else {
+          // For non-streak challenges, mark as expired and add to history
+          challenges[id] = {
+            ...challenge,
+            status: CHALLENGE_STATUS.EXPIRED,
+            // Record in history that this was completed but not claimed
+            history: [...(challenge.history || []), {
+              completedDate: challenge.dateCompleted || endDate.toISOString(),
+              xpEarned: 0 // No XP earned since not claimed
+            }]
+          };
+        }
+        updatedAny = true;
+      }
+    }
+    
+    // Reset expired challenges that have been in cool-down long enough
+    if (challenge.status === CHALLENGE_STATUS.EXPIRED) {
+      // Calculate how long the challenge has been expired
+      const expiryDate = new Date(challenge.endDate);
+      const daysSinceExpiry = Math.floor((now.getTime() - expiryDate.getTime()) / (24 * 60 * 60 * 1000));
+      
+      const coolDownDays = coolDownPeriods[challenge.category as keyof typeof coolDownPeriods] || 1;
+      
+      // If it's been in cool-down long enough, reset it
+      if (daysSinceExpiry >= coolDownDays) {
+        console.log(`Resetting expired challenge "${challenge.title}" after ${daysSinceExpiry} days in cool-down`);
+        
+        // For streak challenges, create a fresh challenge with the same parameters
+        if (challenge.type === 'streak') {
+          // Calculate new dates for the challenge
+          const newStartDate = new Date(now);
+          let newEndDate;
+          
+          // Calculate end date based on category
+          switch (challenge.category) {
+            case 'daily':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 1);
+              break;
+            case 'weekly':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 7);
+              break;
+            case 'monthly':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 30);
+              break;
+            case 'special':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 14);
+              break;
+            default:
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 7);
+          }
+          
+          // Set to end of day
+          newEndDate.setHours(23, 59, 59, 999);
+          
+          // Create a fresh challenge
+          challenges[id] = {
+            ...challenge,
+            progress: 0,
+            completed: false,
+            startDate: newStartDate.toISOString(),
+            endDate: newEndDate.toISOString(),
+            status: CHALLENGE_STATUS.ACTIVE,
+            dateCompleted: undefined // Clear completion date
+          };
+          
+          console.log(`Reset streak challenge "${challenge.title}" with new end date ${newEndDate.toISOString()}`);
+        } 
+        // For non-streak challenges, just reset progress and dates
+        else {
+          // Calculate new dates for the challenge
+          const newStartDate = new Date(now);
+          let newEndDate;
+          
+          // Calculate end date based on category
+          switch (challenge.category) {
+            case 'daily':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 1);
+              break;
+            case 'weekly':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 7);
+              break;
+            case 'monthly':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 30);
+              break;
+            case 'special':
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 14);
+              break;
+            default:
+              newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newEndDate.getDate() + 7);
+          }
+          
+          // Set to end of day
+          newEndDate.setHours(23, 59, 59, 999);
+          
+          challenges[id] = {
+            ...challenge,
+            progress: 0,
+            completed: false,
+            startDate: newStartDate.toISOString(),
+            endDate: newEndDate.toISOString(),
+            status: CHALLENGE_STATUS.ACTIVE,
+            dateCompleted: undefined // Clear completion date
+          };
+          
+          console.log(`Reset challenge "${challenge.title}" with new end date ${newEndDate.toISOString()}`);
+        }
+        
+        updatedAny = true;
+        
+        // Since we're resetting this challenge, we don't need a new one of this category
+        switch (challenge.category) {
+          case 'daily':
+            needNewDailies = false;
+            break;
+          case 'weekly':
+            needNewWeeklies = false;
+            break;
+          case 'monthly':
+            needNewMonthlies = false;
+            break;
+          case 'special':
+            needNewSpecials = false;
+            break;
+        }
+      } else {
+        console.log(`Challenge "${challenge.title}" still in cool-down: ${daysSinceExpiry}/${coolDownDays} days`);
+      }
     }
     
     // Check if we have active challenges for each category
-    if (endDate > now) {
-      // This challenge is not expired
-      if (challenge.category === 'daily') needNewDailies = false;
-      else if (challenge.category === 'weekly') needNewWeeklies = false;
-      else if (challenge.category === 'monthly') needNewMonthlies = false;
-      else if (challenge.category === 'special') needNewSpecials = false;
+    if (challenge.status !== CHALLENGE_STATUS.EXPIRED && new Date(challenge.endDate) > now) {
+      // This challenge is active (not expired)
+      switch (challenge.category) {
+        case 'daily':
+          needNewDailies = false;
+          break;
+        case 'weekly':
+          needNewWeeklies = false;
+          break;
+        case 'monthly':
+          needNewMonthlies = false;
+          break;
+        case 'special':
+          needNewSpecials = false;
+          break;
+      }
     }
   });
   
@@ -611,7 +886,11 @@ export const handleExpiredChallenges = async (): Promise<UserProgress> => {
     ...userProgress,
     challenges
   };
-  await storageService.saveUserProgress(updatedProgress);
+  
+  if (updatedAny) {
+    console.log('Saving progress with updated challenge expirations');
+    await storageService.saveUserProgress(updatedProgress);
+  }
   
   // Generate new challenges as needed
   const startOfDay = new Date(now);
@@ -995,6 +1274,8 @@ export const processRoutineForChallenges = async (
       // Mark as in progress
       userProgress.challenges[challenge.id].progress = 1;
       userProgress.challenges[challenge.id].completed = true;
+      // Record completion date
+      userProgress.challenges[challenge.id].dateCompleted = new Date().toISOString();
       
       console.log(`Pre-processing: Force-marked daily challenge as completed: ${challenge.title}`);
       anyDailyForceUpdated = true;
@@ -1022,6 +1303,15 @@ export const processRoutineForChallenges = async (
   const updatedChallenges = getUpdatedChallenges(userProgress.challenges, updatedProgress.challenges);
   console.log('Updated challenges count:', updatedChallenges.length);
   
+  // Record completion dates for newly completed challenges
+  updatedChallenges.forEach(challenge => {
+    // If the challenge was just completed, record the completion date
+    if (challenge.completed && !userProgress.challenges[challenge.id].completed) {
+      console.log(`Recording completion date for challenge ${challenge.id}`);
+      updatedProgress.challenges[challenge.id].dateCompleted = new Date().toISOString();
+    }
+  });
+  
   // POST-PROCESSING: Check ALL challenge types and see if any need to be force-updated
   // This ensures that any challenges that should be progressing ARE progressing
   
@@ -1039,6 +1329,8 @@ export const processRoutineForChallenges = async (
         console.log(`Force-marking daily challenge as completed: ${challenge.title} (${challenge.id})`);
         updatedProgress.challenges[challenge.id].progress = 1;
         updatedProgress.challenges[challenge.id].completed = true;
+        // Record completion date
+        updatedProgress.challenges[challenge.id].dateCompleted = new Date().toISOString();
       }
     });
   }
@@ -1064,6 +1356,8 @@ export const processRoutineForChallenges = async (
       // Mark as completed if requirement met
       if (currentProgress + 1 >= challenge.requirement) {
         updatedProgress.challenges[challenge.id].completed = true;
+        // Record completion date
+        updatedProgress.challenges[challenge.id].dateCompleted = new Date().toISOString();
         console.log(`Weekly challenge now completed: ${challenge.title}`);
       }
       
@@ -1552,9 +1846,65 @@ export const forceUpdateDailyChallengesWithRoutines = async (): Promise<UserProg
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split('T')[0];
   
-  // Get actual completed routines count for today
-  const routinesCompletedToday = await getRoutinesCompletedToday();
+  // FIXED: Get ALL routines to calculate more metrics
+  const allRoutines = await storageService.getAllRoutines();
+  
+  // For daily challenges - today's routines
+  const todayRoutines = allRoutines.filter(routine => {
+    const routineDate = new Date(routine.date).toISOString().split('T')[0];
+    return routineDate === today;
+  });
+  const routinesCompletedToday = todayRoutines.length;
   console.log(`Routines completed today: ${routinesCompletedToday}`);
+  
+  // FIXED: Calculate total minutes for today
+  const totalMinutesToday = todayRoutines.reduce((total, routine) => 
+    total + (parseInt(routine.duration) || 0), 0);
+  console.log(`Total minutes today: ${totalMinutesToday}`);
+  
+  // FIXED: Calculate unique areas for today
+  const uniqueAreasToday = [...new Set(todayRoutines.map(r => r.area))];
+  console.log(`Unique areas today: ${uniqueAreasToday.length} (${uniqueAreasToday.join(', ')})`);
+  
+  // For weekly challenges - this week's routines  
+  const startOfWeek = new Date();
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Start of week (Sunday)
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  const weekRoutines = allRoutines.filter(routine => {
+    const routineDate = new Date(routine.date);
+    return routineDate >= startOfWeek;
+  });
+  const completedRoutinesThisWeek = weekRoutines.length;
+  
+  // FIXED: Calculate weekly minutes and areas
+  const totalMinutesThisWeek = weekRoutines.reduce((total, routine) => 
+    total + (parseInt(routine.duration) || 0), 0);
+  const uniqueAreasThisWeek = [...new Set(weekRoutines.map(r => r.area))];
+  
+  console.log(`Completed routines this week: ${completedRoutinesThisWeek}`);
+  console.log(`Total minutes this week: ${totalMinutesThisWeek}`);
+  console.log(`Unique areas this week: ${uniqueAreasThisWeek.length} (${uniqueAreasThisWeek.join(', ')})`);
+  
+  // For monthly challenges
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1); // First day of current month
+  startOfMonth.setHours(0, 0, 0, 0);
+  
+  const monthRoutines = allRoutines.filter(routine => {
+    const routineDate = new Date(routine.date);
+    return routineDate >= startOfMonth;
+  });
+  const completedRoutinesThisMonth = monthRoutines.length;
+  
+  // FIXED: Calculate monthly minutes and areas
+  const totalMinutesThisMonth = monthRoutines.reduce((total, routine) => 
+    total + (parseInt(routine.duration) || 0), 0);
+  const uniqueAreasThisMonth = [...new Set(monthRoutines.map(r => r.area))];
+  
+  console.log(`Completed routines this month: ${completedRoutinesThisMonth}`);
+  console.log(`Total minutes this month: ${totalMinutesThisMonth}`);
+  console.log(`Unique areas this month: ${uniqueAreasThisMonth.length} (${uniqueAreasThisMonth.join(', ')})`);
   
   // Find all daily routine challenges
   const dailyRoutineChallenges = Object.values(userProgress.challenges).filter(challenge => 
@@ -1566,21 +1916,59 @@ export const forceUpdateDailyChallengesWithRoutines = async (): Promise<UserProg
   
   console.log(`Found ${dailyRoutineChallenges.length} daily routine challenges`);
   
-  let updatedAny = false;
-  
   // Check for challenges already claimed today (to prevent duplicates)
   const challengesClaimedToday = userProgress.xpHistory?.filter(entry => 
     entry.source === 'challenge' && 
     entry.timestamp.includes(today)
   ) || [];
   
-  const claimedChallengeIds = challengesClaimedToday.map(entry => {
-    // Extract challenge ID from details like "Claimed: Daily Stretch (daily_any_123456)"
-    const match = entry.details?.match(/\((.*?)\)/);
-    return match ? match[1] : null;
+  // MODIFIED: Track both the challenge IDs and their types
+  const claimedChallengeInfo = challengesClaimedToday.map(entry => {
+    // Extract challenge ID from details like "Claimed: Daily Stretch (daily_routine_count_123456)"
+    const match = entry.details?.match(/\(([^)]+)\)/);
+    if (match) {
+      const parts = match[1].split('_');
+      // Format: category_type_id for new format 
+      // Old format might just have the ID, so handle both cases
+      if (parts.length >= 3) {
+        return {
+          id: parts.slice(2).join('_'), // Get the ID part
+          category: parts[0],
+          type: parts[1]
+        };
+      } else {
+        return { id: match[1], category: null, type: null };
+      }
+    }
+    return null;
   }).filter(Boolean);
   
+  // Extract just the IDs for backward compatibility
+  const claimedChallengeIds = claimedChallengeInfo.map(info => info.id);
+  
+  // Get types claimed today
+  const claimedChallengeTypes = claimedChallengeInfo
+    .filter(info => info.category === 'daily')
+    .map(info => info.type)
+    .filter(Boolean);
+  
   console.log(`Challenges already claimed today: ${claimedChallengeIds.length}`);
+  console.log(`Daily challenge types already claimed today: ${claimedChallengeTypes.join(', ')}`);
+  
+  // Count daily challenges claimed today for the limit
+  const dailyChallengesClaimed = claimedChallengeInfo.filter(info => 
+    info.category === 'daily'
+  ).length;
+  
+  // Calculate total XP from challenges claimed today
+  const dailyXpFromChallenges = challengesClaimedToday.reduce(
+    (total, entry) => total + (entry.amount || 0), 0
+  ) || 0;
+  
+  console.log(`Daily challenges claimed today: ${dailyChallengesClaimed}, total XP: ${dailyXpFromChallenges}`);
+  
+  // FIXED: Add the updatedAny variable declaration back
+  let updatedAny = false;
   
   // If any routines were completed today, ensure daily challenges reflect that progress
   if (routinesCompletedToday > 0) {
@@ -1591,9 +1979,27 @@ export const forceUpdateDailyChallengesWithRoutines = async (): Promise<UserProg
     dailyRoutineChallenges.forEach(challenge => {
       console.log(`Checking challenge: ${challenge.title} (${challenge.id})`);
       
-      // Skip if already claimed today (prevent duplicate claims)
+      // MODIFIED: Skip if this exact challenge was already claimed
       if (claimedChallengeIds.includes(challenge.id)) {
         console.log(`Challenge ${challenge.id} already claimed today, skipping`);
+        return;
+      }
+      
+      // ADDED: Skip if we've already claimed a challenge of this type today
+      if (claimedChallengeTypes.includes(challenge.type)) {
+        console.log(`A challenge of type "${challenge.type}" was already claimed today, skipping ${challenge.id}`);
+        return;
+      }
+      
+      // ADDED: Skip if we've hit the daily challenge limit
+      if (dailyChallengesClaimed >= 3) {
+        console.log(`Already claimed ${dailyChallengesClaimed} challenges today (limit: 3), skipping ${challenge.id}`);
+        return;
+      }
+      
+      // ADDED: Skip if we've hit the daily XP limit
+      if (dailyXpFromChallenges >= 150) {
+        console.log(`Already earned ${dailyXpFromChallenges} XP from challenges today (limit: 150), skipping ${challenge.id}`);
         return;
       }
       
@@ -1611,90 +2017,346 @@ export const forceUpdateDailyChallengesWithRoutines = async (): Promise<UserProg
       }
     });
     
+    // FIXED: Add support for total_minutes challenges
+    // Get daily minutes-based challenges
+    const dailyMinutesChallenges = Object.values(userProgress.challenges).filter(challenge => 
+      challenge.category === 'daily' && 
+      (challenge.type === 'total_minutes' || challenge.type === 'daily_minutes') &&
+      !challenge.claimed &&
+      new Date(challenge.endDate) > new Date() // Not expired
+    );
+    
+    console.log(`Found ${dailyMinutesChallenges.length} daily minutes-based challenges`);
+    
+    dailyMinutesChallenges.forEach(challenge => {
+      console.log(`Checking minutes challenge: ${challenge.title} (${challenge.id})`);
+      
+      // Apply the same checks as routine_count challenges
+      if (claimedChallengeIds.includes(challenge.id)) {
+        console.log(`Challenge ${challenge.id} already claimed today, skipping`);
+        return;
+      }
+      
+      if (claimedChallengeTypes.includes(challenge.type)) {
+        console.log(`A challenge of type "${challenge.type}" was already claimed today, skipping ${challenge.id}`);
+        return;
+      }
+      
+      if (dailyChallengesClaimed >= 3) {
+        console.log(`Already claimed ${dailyChallengesClaimed} challenges today (limit: 3), skipping ${challenge.id}`);
+        return;
+      }
+      
+      if (dailyXpFromChallenges >= 150) {
+        console.log(`Already earned ${dailyXpFromChallenges} XP from challenges today (limit: 150), skipping ${challenge.id}`);
+        return;
+      }
+      
+      // Update progress based on actual minutes
+      const newProgress = Math.min(totalMinutesToday, challenge.requirement);
+      if (newProgress !== challenge.progress) {
+        console.log(`Updating minutes challenge ${challenge.title} progress: ${challenge.progress} → ${newProgress}`);
+        userProgress.challenges[challenge.id].progress = newProgress;
+        updatedAny = true;
+      }
+      
+      // Mark as completed if requirement is met
+      if (newProgress >= challenge.requirement && !challenge.completed) {
+        console.log(`Minutes challenge ${challenge.title} now completed`);
+        userProgress.challenges[challenge.id].completed = true;
+        updatedAny = true;
+      }
+    });
+    
+    // FIXED: Add support for area_variety challenges
+    // Get daily area variety challenges
+    const dailyAreaChallenges = Object.values(userProgress.challenges).filter(challenge => 
+      challenge.category === 'daily' && 
+      challenge.type === 'area_variety' &&
+      !challenge.claimed &&
+      new Date(challenge.endDate) > new Date() // Not expired
+    );
+    
+    console.log(`Found ${dailyAreaChallenges.length} daily area variety challenges`);
+    
+    dailyAreaChallenges.forEach(challenge => {
+      console.log(`Checking area variety challenge: ${challenge.title} (${challenge.id})`);
+      
+      // Apply the same checks as other challenges
+      if (claimedChallengeIds.includes(challenge.id)) {
+        console.log(`Challenge ${challenge.id} already claimed today, skipping`);
+        return;
+      }
+      
+      if (claimedChallengeTypes.includes(challenge.type)) {
+        console.log(`A challenge of type "${challenge.type}" was already claimed today, skipping ${challenge.id}`);
+        return;
+      }
+      
+      if (dailyChallengesClaimed >= 3) {
+        console.log(`Already claimed ${dailyChallengesClaimed} challenges today (limit: 3), skipping ${challenge.id}`);
+        return;
+      }
+      
+      if (dailyXpFromChallenges >= 150) {
+        console.log(`Already earned ${dailyXpFromChallenges} XP from challenges today (limit: 150), skipping ${challenge.id}`);
+        return;
+      }
+      
+      // Update progress based on unique areas
+      const newProgress = Math.min(uniqueAreasToday.length, challenge.requirement);
+      if (newProgress !== challenge.progress) {
+        console.log(`Updating area variety challenge ${challenge.title} progress: ${challenge.progress} → ${newProgress}`);
+        userProgress.challenges[challenge.id].progress = newProgress;
+        updatedAny = true;
+      }
+      
+      // Mark as completed if requirement is met
+      if (newProgress >= challenge.requirement && !challenge.completed) {
+        console.log(`Area variety challenge ${challenge.title} now completed`);
+        userProgress.challenges[challenge.id].completed = true;
+        updatedAny = true;
+      }
+    });
+    
     // Check other challenges like area-specific and time-based challenges
     Object.values(userProgress.challenges).forEach(challenge => {
       if (challenge.category === 'daily' && 
           !challenge.claimed && 
           challenge.progress > 0 &&
           challenge.progress >= challenge.requirement &&
-          !challenge.completed &&
-          !claimedChallengeIds.includes(challenge.id)) {
+          !challenge.completed) {
+        
+        // MODIFIED: Add the same checks for type and limits here
+        // Skip if this exact challenge was already claimed
+        if (claimedChallengeIds.includes(challenge.id)) {
+          return;
+        }
+        
+        // Skip if we've already claimed a challenge of this type today
+        if (claimedChallengeTypes.includes(challenge.type)) {
+          console.log(`A challenge of type "${challenge.type}" was already claimed today, skipping ${challenge.id}`);
+          return;
+        }
+        
+        // Skip if we've hit the daily challenge limit
+        if (dailyChallengesClaimed >= 3) {
+          console.log(`Already claimed ${dailyChallengesClaimed} challenges today (limit: 3), skipping ${challenge.id}`);
+          return;
+        }
+        
+        // Skip if we've hit the daily XP limit
+        if (dailyXpFromChallenges >= 150) {
+          console.log(`Already earned ${dailyXpFromChallenges} XP from challenges today (limit: 150), skipping ${challenge.id}`);
+          return;
+        }
+        
         console.log(`Marking completed daily challenge ${challenge.title} as completed`);
         userProgress.challenges[challenge.id].completed = true;
         updatedAny = true;
       }
     });
-    
-    // Get accurate counts of completed routines for this week and month
-    const completedRoutinesThisWeek = await getRoutinesCompletedThisWeek();
-    const completedRoutinesThisMonth = await getRoutinesCompletedThisMonth();
-    
-    console.log(`Completed routines this week: ${completedRoutinesThisWeek}`);
-    console.log(`Completed routines this month: ${completedRoutinesThisMonth}`);
-    
-    // Update weekly routine count challenges with the ACTUAL count
-    const weeklyRoutineChallenges = Object.values(userProgress.challenges).filter(challenge => 
-      challenge.category === 'weekly' && 
-      challenge.type === 'routine_count' &&
-      !challenge.claimed &&
-      new Date(challenge.endDate) > new Date() // Not expired
-    );
-    
-    weeklyRoutineChallenges.forEach(challenge => {
-      console.log(`Updating weekly challenge ${challenge.title} progress`);
-      
-      // For routine_count challenges, update to actual count
-      if (challenge.type === 'routine_count') {
-        const newProgress = Math.min(completedRoutinesThisWeek, challenge.requirement);
-        if (newProgress !== challenge.progress) {
-          userProgress.challenges[challenge.id].progress = newProgress;
-          console.log(`Updated weekly challenge progress to ${newProgress}/${challenge.requirement}`);
-          updatedAny = true;
-        }
-        
-        if (newProgress >= challenge.requirement && !challenge.completed) {
-          console.log(`Weekly challenge ${challenge.title} now completed`);
-          userProgress.challenges[challenge.id].completed = true;
-          updatedAny = true;
-        }
-      }
-    });
-    
-    // Update monthly challenges with the ACTUAL count
-    const monthlyChallenges = Object.values(userProgress.challenges).filter(challenge => 
-      challenge.category === 'monthly' && 
-      challenge.type === 'routine_count' &&
-      !challenge.claimed &&
-      new Date(challenge.endDate) > new Date() // Not expired
-    );
-    
-    monthlyChallenges.forEach(challenge => {
-      console.log(`Updating monthly challenge ${challenge.title} progress`);
-      
-      // For routine_count challenges, update to actual count
-      if (challenge.type === 'routine_count') {
-        const newProgress = Math.min(completedRoutinesThisMonth, challenge.requirement);
-        if (newProgress !== challenge.progress) {
-          userProgress.challenges[challenge.id].progress = newProgress;
-          console.log(`Updated monthly challenge progress to ${newProgress}/${challenge.requirement}`);
-          updatedAny = true;
-        }
-        
-        if (newProgress >= challenge.requirement && !challenge.completed) {
-          console.log(`Monthly challenge ${challenge.title} now completed`);
-          userProgress.challenges[challenge.id].completed = true;
-          updatedAny = true;
-        }
-      }
-    });
   }
+  
+  // FIXED: Use the variables calculated earlier instead of recalculating
+  console.log(`Completed routines this week: ${completedRoutinesThisWeek}`);
+  console.log(`Completed routines this month: ${completedRoutinesThisMonth}`);
+  
+  // Update weekly routine count challenges with the ACTUAL count
+  const weeklyRoutineChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.category === 'weekly' && 
+    challenge.type === 'routine_count' &&
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  weeklyRoutineChallenges.forEach(challenge => {
+    console.log(`Updating weekly challenge ${challenge.title} progress`);
+    
+    // For routine_count challenges, update to actual count
+    if (challenge.type === 'routine_count') {
+      const newProgress = Math.min(completedRoutinesThisWeek, challenge.requirement);
+      if (newProgress !== challenge.progress) {
+        userProgress.challenges[challenge.id].progress = newProgress;
+        console.log(`Updated weekly challenge progress to ${newProgress}/${challenge.requirement}`);
+        updatedAny = true;
+      }
+      
+      if (newProgress >= challenge.requirement && !challenge.completed) {
+        console.log(`Weekly challenge ${challenge.title} now completed`);
+        userProgress.challenges[challenge.id].completed = true;
+        updatedAny = true;
+      }
+    }
+  });
+  
+  // FIXED: Add support for weekly minutes challenges
+  const weeklyMinutesChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.category === 'weekly' && 
+    (challenge.type === 'total_minutes' || challenge.type === 'weekly_minutes') &&
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  weeklyMinutesChallenges.forEach(challenge => {
+    console.log(`Updating weekly minutes challenge ${challenge.title} progress`);
+    
+    const newProgress = Math.min(totalMinutesThisWeek, challenge.requirement);
+    if (newProgress !== challenge.progress) {
+      userProgress.challenges[challenge.id].progress = newProgress;
+      console.log(`Updated weekly minutes challenge progress to ${newProgress}/${challenge.requirement}`);
+      updatedAny = true;
+    }
+    
+    if (newProgress >= challenge.requirement && !challenge.completed) {
+      console.log(`Weekly minutes challenge ${challenge.title} now completed`);
+      userProgress.challenges[challenge.id].completed = true;
+      updatedAny = true;
+    }
+  });
+  
+  // FIXED: Add support for weekly area variety challenges
+  const weeklyAreaChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.category === 'weekly' && 
+    challenge.type === 'area_variety' &&
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  weeklyAreaChallenges.forEach(challenge => {
+    console.log(`Updating weekly area variety challenge ${challenge.title} progress`);
+    
+    const newProgress = Math.min(uniqueAreasThisWeek.length, challenge.requirement);
+    if (newProgress !== challenge.progress) {
+      userProgress.challenges[challenge.id].progress = newProgress;
+      console.log(`Updated weekly area variety challenge progress to ${newProgress}/${challenge.requirement}`);
+      updatedAny = true;
+    }
+    
+    if (newProgress >= challenge.requirement && !challenge.completed) {
+      console.log(`Weekly area variety challenge ${challenge.title} now completed`);
+      userProgress.challenges[challenge.id].completed = true;
+      updatedAny = true;
+    }
+  });
+  
+  // Update monthly challenges with the ACTUAL count
+  const monthlyChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.category === 'monthly' && 
+    challenge.type === 'routine_count' &&
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  monthlyChallenges.forEach(challenge => {
+    console.log(`Updating monthly challenge ${challenge.title} progress`);
+    
+    // For routine_count challenges, update to actual count
+    if (challenge.type === 'routine_count') {
+      const newProgress = Math.min(completedRoutinesThisMonth, challenge.requirement);
+      if (newProgress !== challenge.progress) {
+        userProgress.challenges[challenge.id].progress = newProgress;
+        console.log(`Updated monthly challenge progress to ${newProgress}/${challenge.requirement}`);
+        updatedAny = true;
+      }
+      
+      if (newProgress >= challenge.requirement && !challenge.completed) {
+        console.log(`Monthly challenge ${challenge.title} now completed`);
+        userProgress.challenges[challenge.id].completed = true;
+        updatedAny = true;
+      }
+    }
+  });
+  
+  // FIXED: Add support for monthly minutes challenges
+  const monthlyMinutesChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.category === 'monthly' && 
+    (challenge.type === 'total_minutes' || challenge.type === 'monthly_minutes') &&
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  monthlyMinutesChallenges.forEach(challenge => {
+    console.log(`Updating monthly minutes challenge ${challenge.title} progress`);
+    
+    const newProgress = Math.min(totalMinutesThisMonth, challenge.requirement);
+    if (newProgress !== challenge.progress) {
+      userProgress.challenges[challenge.id].progress = newProgress;
+      console.log(`Updated monthly minutes challenge progress to ${newProgress}/${challenge.requirement}`);
+      updatedAny = true;
+    }
+    
+    if (newProgress >= challenge.requirement && !challenge.completed) {
+      console.log(`Monthly minutes challenge ${challenge.title} now completed`);
+      userProgress.challenges[challenge.id].completed = true;
+      updatedAny = true;
+    }
+  });
+  
+  // FIXED: Add support for monthly area variety challenges
+  const monthlyAreaChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.category === 'monthly' && 
+    challenge.type === 'area_variety' &&
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  monthlyAreaChallenges.forEach(challenge => {
+    console.log(`Updating monthly area variety challenge ${challenge.title} progress`);
+    
+    const newProgress = Math.min(uniqueAreasThisMonth.length, challenge.requirement);
+    if (newProgress !== challenge.progress) {
+      userProgress.challenges[challenge.id].progress = newProgress;
+      console.log(`Updated monthly area variety challenge progress to ${newProgress}/${challenge.requirement}`);
+      updatedAny = true;
+    }
+    
+    if (newProgress >= challenge.requirement && !challenge.completed) {
+      console.log(`Monthly area variety challenge ${challenge.title} now completed`);
+      userProgress.challenges[challenge.id].completed = true;
+      updatedAny = true;
+    }
+  });
+  
+  // FIXED: Update streak challenges based on current streak
+  // Get the current streak from user statistics
+  const currentStreak = userProgress.statistics.currentStreak;
+  console.log(`Current streak for streak challenges: ${currentStreak} days`);
+  
+  // Find all streak challenges
+  const streakChallenges = Object.values(userProgress.challenges).filter(challenge => 
+    challenge.type === 'streak' &&
+    !challenge.claimed &&
+    new Date(challenge.endDate) > new Date() // Not expired
+  );
+  
+  console.log(`Found ${streakChallenges.length} active streak challenges`);
+  
+  streakChallenges.forEach(challenge => {
+    console.log(`Updating streak challenge ${challenge.title} progress`);
+    
+    // Set progress to current streak (capped at requirement)
+    const newProgress = Math.min(currentStreak, challenge.requirement);
+    if (newProgress !== challenge.progress) {
+      userProgress.challenges[challenge.id].progress = newProgress;
+      console.log(`Updated streak challenge progress to ${newProgress}/${challenge.requirement}`);
+      updatedAny = true;
+    }
+    
+    // Mark as completed if streak meets requirement
+    if (newProgress >= challenge.requirement && !challenge.completed) {
+      console.log(`Streak challenge ${challenge.title} now completed`);
+      userProgress.challenges[challenge.id].completed = true;
+      updatedAny = true;
+    }
+  });
   
   // Save progress if any changes were made
   if (updatedAny) {
-    console.log('Saving updated progress after force-updating challenges');
+    console.log('Saving updated challenge progress');
     await storageService.saveUserProgress(userProgress);
   } else {
-    console.log('No changes made to challenges');
+    console.log('No challenge updates needed');
   }
   
   return userProgress;
@@ -1763,15 +2425,15 @@ export const handleStreakReset = async (): Promise<UserProgress> => {
     let challengesUpdated = false;
     
     // Make sure activeChallenges exists and is an array
-    if (!userProgress.activeChallenges || !Array.isArray(userProgress.activeChallenges)) {
+    if (!userProgress.challenges || !Array.isArray(userProgress.challenges)) {
       console.log('No active challenges found or activeChallenges is not an array');
       // Initialize the array if it doesn't exist
-      userProgress.activeChallenges = [];
+      userProgress.challenges = {};
       return userProgress;
     }
     
     // Clone the challenges array
-    const updatedChallenges = [...userProgress.activeChallenges];
+    const updatedChallenges = [...Object.values(userProgress.challenges)];
     
     // Find all streak-related active challenges
     const streakChallenges = updatedChallenges.filter(challenge => 

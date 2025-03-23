@@ -35,6 +35,8 @@ import {
   DaySelector
 } from '../components/home';
 import * as notifications from '../utils/notifications';
+import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT } from '../hooks/progress/useGamification';
+import * as rewardManager from '../utils/progress/rewardManager';
 
 const { height, width } = Dimensions.get('window');
 
@@ -61,7 +63,7 @@ export default function HomeScreen() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
-  const { canAccessFeature, meetsLevelRequirement, getRequiredLevel, getUserLevel } = useFeatureAccess();
+  const { canAccessFeature, meetsLevelRequirement, getRequiredLevel, getUserLevel, refreshAccess } = useFeatureAccess();
   const { theme, isDark } = useTheme();
 
   // Animated values for dropdowns
@@ -76,11 +78,6 @@ export default function HomeScreen() {
   // User level for custom reminders
   const [userLevel, setUserLevel] = useState(0);
 
-  // Initialize notifications system
-  useEffect(() => {
-    notifications.configureNotifications();
-  }, []);
-
   // Handle refresh
   const handleRefresh = async () => {
     console.log('Refreshing home screen...');
@@ -89,10 +86,55 @@ export default function HomeScreen() {
     const randomTip = tips[Math.floor(Math.random() * tips.length)];
     setDailyTip(randomTip);
 
+    // Check feature access again to update UI for newly unlocked features
+    const level = await getUserLevel();
+    setUserLevel(level);
+    
+    // Force refresh feature access state to immediately update UI for custom reminders
+    await refreshAccess(); // Explicitly refresh feature access state
+    const customRemindersAccess = await rewardManager.isRewardUnlocked('custom_reminders');
+    console.log('Custom reminders feature access refreshed:', customRemindersAccess);
+    
     // Refresh other home data
     await refreshHome();
   };
+  
+  // Create a ref to store the latest handleRefresh function
+  const handleRefreshRef = useRef(handleRefresh);
+  
+  // Update the ref when handleRefresh changes
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  }, [handleRefresh]);
 
+  // Listen for level-up and reward unlocked events
+  useEffect(() => {
+    const handleLevelUp = () => {
+      console.log('Level-up event received in HomeScreen, refreshing...');
+      handleRefreshRef.current();
+    };
+    
+    const handleRewardUnlocked = () => {
+      console.log('Reward unlocked event received in HomeScreen, refreshing...');
+      handleRefreshRef.current();
+    };
+    
+    // Add event listeners
+    gamificationEvents.on(LEVEL_UP_EVENT, handleLevelUp);
+    gamificationEvents.on(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
+    
+    // Clean up event listeners
+    return () => {
+      gamificationEvents.off(LEVEL_UP_EVENT, handleLevelUp);
+      gamificationEvents.off(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
+    };
+  }, []);
+  
+  // Initialize notifications system
+  useEffect(() => {
+    notifications.configureNotifications();
+  }, []);
+  
   // Load data
   useEffect(() => {
     console.log('HomeScreen: Starting data loading');

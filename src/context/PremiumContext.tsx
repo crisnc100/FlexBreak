@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { getIsPremium, saveIsPremium } from '../services/storageService';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { gamificationEvents } from '../hooks/progress/useGamification';
+import { PREMIUM_STATUS_CHANGED } from '../hooks/progress/useFeatureAccess';
 
 export type PremiumContextType = {
   isPremium: boolean;
@@ -62,6 +64,12 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await saveIsPremium(status);
       setIsPremium(status);
       console.log('Premium status updated globally:', status);
+      
+      // Emit event for premium status change
+      if (gamificationEvents) {
+        gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
+        console.log('Premium status changed event emitted from context');
+      }
     } catch (error) {
       console.error('Error saving premium status:', error);
     }

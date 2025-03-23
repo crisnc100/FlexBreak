@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Share
+  ScrollView,
+  Share,
+  Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -12,7 +14,7 @@ import { AppNavigationProp } from '../../types';
 import { BodyArea, Duration, RoutineParams } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
 import { saveFavoriteRoutine } from '../../services/storageService';
-import XpNotificationManager from '../XpNotificationManager';
+import XpNotificationManager from '../notifications/XpNotificationManager';
 import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +30,7 @@ export interface CompletedRoutineProps {
     newLevel: number;
     rewards?: Array<{ id: string; name: string; description: string; type: 'feature' | 'item' | 'cosmetic' }>;
   };
+  isXpBoosted?: boolean;
   onShowDashboard: () => void;
   onNavigateHome: () => void;
   onOpenSubscription: () => void;
@@ -40,6 +43,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   xpEarned = 0,
   xpBreakdown = [],
   levelUp,
+  isXpBoosted,
   onShowDashboard,
   onNavigateHome,
   onOpenSubscription
@@ -49,23 +53,29 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   const styles = themedStyles(theme);
   
   // Add debug logging for the levelUp prop
-  console.log('CompletedRoutine received levelUp prop:', levelUp ? JSON.stringify(levelUp, null, 2) : 'null');
+  console.log('CompletedRoutine received levelUp prop:', levelUp);
   console.log('CompletedRoutine isPremium:', isPremium);
   console.log('Theme status in CompletedRoutine - isDark:', isDark, 'canUseDarkTheme:', canUseDarkTheme, 'themeType:', themeType);
   
-  // Extra validation for the levelUp prop - should only show if we have a true level-up event
-  // NOTE: The user just completed a routine but already reached level 2 previously,
-  // so we need to show the level-up celebration if they're at level 2 now
-  const showLevelUp = levelUp && 
+  // Detect if XP boost is active by checking descriptions or the passed prop
+  const hasXpBoost = isXpBoosted || 
+    xpBreakdown.some(item => item.description.includes('XP Boost Applied') || item.description.includes('2x XP'));
+  
+  console.log('XP Boost active:', hasXpBoost);
+  
+  // FIX: Simplified level-up display logic
+  // If levelUp exists, oldLevel and newLevel are valid, and oldLevel < newLevel, show the level-up UI
+  const showLevelUp = !!levelUp && 
                      typeof levelUp === 'object' && 
-                     isPremium &&
-                     // Either show if there was a level change OR if user is at level 2 with Dark Theme reward
-                     (levelUp.oldLevel < levelUp.newLevel || 
-                      (levelUp.newLevel === 2 && levelUp.rewards && levelUp.rewards.some(r => r.id === 'dark_theme')));
+                     'oldLevel' in levelUp &&
+                     'newLevel' in levelUp &&
+                     Number.isFinite(levelUp.oldLevel) &&
+                     Number.isFinite(levelUp.newLevel) &&
+                     levelUp.oldLevel < levelUp.newLevel;
   
   // Dynamic level display - use actual current level values instead of fixed ones
-  const oldLevel = levelUp ? levelUp.oldLevel : 0;
-  const newLevel = levelUp ? levelUp.newLevel : 0;
+  const oldLevel = levelUp?.oldLevel ?? 0;
+  const newLevel = levelUp?.newLevel ?? 0;
   
   // Check if dark theme is unlocked but not activated
   const hasDarkThemeReward = levelUp?.rewards?.some(r => r.id === 'dark_theme');
@@ -73,18 +83,26 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   console.log('Will show level-up UI:', showLevelUp, 
               'isPremium:', isPremium, 
               'levelUp exists:', !!levelUp, 
-              levelUp ? `oldLevel: ${oldLevel}, newLevel: ${newLevel}` : '',
-              levelUp && levelUp.rewards ? `rewards: ${levelUp.rewards.length}` : '');
+              levelUp ? `oldLevel: ${levelUp.oldLevel}, newLevel: ${levelUp.newLevel}` : '',
+              levelUp?.rewards ? `rewards: ${levelUp.rewards.length}` : '');
   
   // Generate the routine to get the number of stretches
   const routine = generateRoutine(area, duration, 'beginner');
+  
+  // Debug logs for level-up UI rendering
+  console.log(`RENDER - showLevelUp: ${showLevelUp} oldLevel: ${oldLevel} newLevel: ${newLevel} levelUp obj: ${JSON.stringify(levelUp)}`);
+  
+  // Animation value for level-up animation
+  const scaleValue = useRef(new Animated.Value(1)).current;
   
   // Handle share
   const handleShare = async () => {
     try {
       // Include level up in share message if applicable
       const levelUpText = levelUp ? ` and leveled up to level ${newLevel}!` : '!';
-      const message = `I just completed a ${duration}-minute beginner ${area} stretching routine with DeskStretch! 💪 Earned ${xpEarned} XP${levelUpText}`;
+      // Add XP boost mention if active
+      const boostText = hasXpBoost ? ' (with 2x XP Boost!)' : '';
+      const message = `I just completed a ${duration}-minute beginner ${area} stretching routine with DeskStretch! 💪 Earned ${xpEarned} XP${boostText}${levelUpText}`;
       
       await Share.share({
         message,
@@ -240,7 +258,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                 </View>
               </View>
               
-              {levelUp.rewards && levelUp.rewards.length > 0 && (
+              {levelUp?.rewards && levelUp.rewards.length > 0 && (
                 <View style={styles.rewardsContainer}>
                   <Text style={styles.rewardsTitle}>Rewards Unlocked</Text>
                   {levelUp.rewards.map((reward, index) => {
@@ -263,15 +281,27 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         {xpBreakdown && xpBreakdown.length > 0 ? (
           <View style={[
             styles.xpBreakdownContainer,
-            showLevelUp && styles.xpBreakdownCompact
+            showLevelUp && styles.xpBreakdownCompact,
+            hasXpBoost && styles.xpBoostContainer
           ]}>
             <View style={styles.xpTotalRow}>
-              <Ionicons name="star" size={showLevelUp ? 20 : 24} color="#FF9800" />
+              {hasXpBoost && (
+                <View style={styles.xpBoostBadge}>
+                  <Ionicons name="flash" size={showLevelUp ? 14 : 16} color="#FFFFFF" />
+                  <Text style={styles.xpBoostBadgeText}>2x</Text>
+                </View>
+              )}
+              <Ionicons 
+                name={hasXpBoost ? "star" : "star"} 
+                size={showLevelUp ? 20 : 24} 
+                color={hasXpBoost ? "#FFC107" : "#FF9800"} 
+              />
               <Text style={[
                 styles.xpTotalText,
                 showLevelUp && {fontSize: 16}
               ]}>
                 <Text style={styles.xpValue}>{xpEarned}</Text> XP {xpEarned > 0 ? 'Earned' : 'Earned from Previous Stretch'}
+                {hasXpBoost && <Text style={styles.xpBoostText}> (2x Boost)</Text>}
               </Text>
             </View>
             
@@ -300,13 +330,25 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                     iconName = 'flag-outline';
                     break;
                 }
+                
+                // Check if this specific item has XP boost applied
+                const itemHasBoost = item.description.includes('XP Boost Applied') || 
+                                    item.description.includes('2x XP');
               
                 return (
                   <View key={`${item.source}-${index}`} style={styles.xpBreakdownItem}>
+                    {itemHasBoost && (
+                      <Ionicons 
+                        name="flash" 
+                        size={showLevelUp ? 12 : 14} 
+                        color="#FFC107" 
+                        style={styles.boostIcon} 
+                      />
+                    )}
                     <Ionicons 
                       name={iconName as any} 
                       size={showLevelUp ? 14 : 16} 
-                      color={item.amount > 0 ? "#FF9800" : theme.textSecondary} 
+                      color={item.amount > 0 ? (itemHasBoost ? "#FFC107" : "#FF9800") : theme.textSecondary} 
                     />
                     <Text style={[
                       styles.xpBreakdownText, 
@@ -328,14 +370,26 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
           // Simple XP display when no breakdown is available
           <View style={[
             styles.xpContainer,
-            showLevelUp && styles.xpContainerCompact
+            showLevelUp && styles.xpContainerCompact,
+            hasXpBoost && styles.xpBoostContainer
           ]}>
-            <Ionicons name="star" size={showLevelUp ? 20 : 24} color="#FF9800" />
+            {hasXpBoost && (
+              <View style={styles.xpBoostBadge}>
+                <Ionicons name="flash" size={12} color="#FFFFFF" />
+                <Text style={styles.xpBoostBadgeText}>2x</Text>
+              </View>
+            )}
+            <Ionicons 
+              name="star" 
+              size={showLevelUp ? 20 : 24} 
+              color={hasXpBoost ? "#FFC107" : "#FF9800"} 
+            />
             <Text style={[
               styles.xpText,
               showLevelUp && {fontSize: 14}
             ]}>
               <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
+              {hasXpBoost && <Text style={styles.xpBoostText}> (2x Boost)</Text>}
             </Text>
           </View>
         )}
@@ -571,6 +625,7 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     marginBottom: 24,
+    position: 'relative',
   },
   xpText: {
     fontSize: 16,
@@ -731,6 +786,38 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     fontSize: 12,
     color: theme.textSecondary,
     marginLeft: 6,
+  },
+  xpBoostContainer: {
+    borderWidth: 1,
+    borderColor: '#FFC107',
+    backgroundColor: `${theme.backgroundLight}`,
+  },
+  xpBoostText: {
+    fontWeight: 'bold',
+    color: '#FFC107',
+  },
+  xpBoostBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFC107',
+    borderRadius: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  xpBoostBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 10,
+    marginLeft: 2,
+  },
+  boostIcon: {
+    position: 'absolute',
+    top: 0,
+    right: -10,
   },
 }));
 

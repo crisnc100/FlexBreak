@@ -1,5 +1,6 @@
 import { Reward, UserProgress } from './types';
 import * as storageService from '../../services/storageService';
+import * as xpBoostManager from './xpBoostManager';
 
 /**
  * Core reward definitions
@@ -135,39 +136,57 @@ export const isRewardUnlocked = async (rewardId: string): Promise<boolean> => {
 export const updateRewards = async (
   userProgress: UserProgress
 ): Promise<{ updatedProgress: UserProgress; newlyUnlocked: Reward[] }> => {
+  console.log('Starting reward update process...');
+  
   // Get the user's current level
   const currentLevel = userProgress.level || 1;
+  console.log(`Current level: ${currentLevel}`);
   
-  // Create a copy of the user's rewards
-  let rewards = { ...userProgress.rewards };
-  
-  // Initialize rewards if needed
-  if (!rewards || Object.keys(rewards).length === 0) {
-    rewards = initializeRewards();
-  }
+  // Create a copy of the user's rewards or initialize if needed
+  let rewards = userProgress.rewards && Object.keys(userProgress.rewards).length > 0
+    ? { ...userProgress.rewards }
+    : initializeRewards();
   
   // Track newly unlocked rewards
   const newlyUnlocked: Reward[] = [];
   
   // Check each reward to see if it should be unlocked
-  for (const rewardId in rewards) {
+  for (const rewardId in CORE_REWARDS) {
+    // Ensure the reward exists in the user's rewards
+    if (!rewards[rewardId]) {
+      rewards[rewardId] = { ...CORE_REWARDS[rewardId] };
+    }
+    
     const reward = rewards[rewardId];
     
     // If reward is already unlocked, skip it
-    if (reward.unlocked) continue;
+    if (reward.unlocked) {
+      console.log(`Reward ${reward.title} is already unlocked`);
+      continue;
+    }
     
     // Check if the user's level is high enough to unlock this reward
     if (currentLevel >= reward.levelRequired) {
+      console.log(`Unlocking reward ${reward.title} for level ${currentLevel} (required: ${reward.levelRequired})`);
+      
       // Unlock the reward
       rewards[rewardId] = {
         ...reward,
         unlocked: true
       };
       
+      // Special case: Grant XP boost stacks when unlocking the xp_boost reward
+      if (rewardId === 'xp_boost') {
+        console.log('Unlocked XP Boost reward - adding 2 XP boost stacks (72 hours each)');
+        await xpBoostManager.addXpBoosts(2);
+      }
+      
       // Add to newly unlocked list
       newlyUnlocked.push(rewards[rewardId]);
       
       console.log(`Reward unlocked: ${reward.title} (Level ${reward.levelRequired})`);
+    } else {
+      console.log(`Reward ${reward.title} not unlocked - requires level ${reward.levelRequired}`);
     }
   }
   
@@ -177,9 +196,12 @@ export const updateRewards = async (
     rewards
   };
   
-  // Save updated progress
+  // Always save the progress to ensure rewards are properly initialized
+  await storageService.saveUserProgress(updatedProgress);
+  
+  console.log(`Reward update complete. Unlocked ${newlyUnlocked.length} new rewards.`);
   if (newlyUnlocked.length > 0) {
-    await storageService.saveUserProgress(updatedProgress);
+    console.log('Newly unlocked rewards:', newlyUnlocked.map(r => r.title).join(', '));
   }
   
   return { updatedProgress, newlyUnlocked };

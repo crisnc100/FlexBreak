@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Constants
 const XP_BOOST_STORAGE_KEY = '@xp_boost_data';
 const XP_BOOST_MULTIPLIER = 2;
-const XP_BOOST_DURATION_HOURS = 24; // 24 hours default duration
+const XP_BOOST_DURATION_HOURS = 72; // Updated to 72 hours (3 days)
 
 // Interface for XP Boost data
 interface XpBoostData {
@@ -12,6 +12,7 @@ interface XpBoostData {
   startTime: string | null;
   endTime: string | null;
   multiplier: number;
+  availableBoosts: number; // Track available boost stacks
 }
 
 // Default boost data
@@ -19,7 +20,8 @@ const DEFAULT_BOOST_DATA: XpBoostData = {
   active: false,
   startTime: null,
   endTime: null,
-  multiplier: XP_BOOST_MULTIPLIER
+  multiplier: XP_BOOST_MULTIPLIER,
+  availableBoosts: 0
 };
 
 /**
@@ -57,27 +59,84 @@ export const saveXpBoostData = async (data: XpBoostData): Promise<boolean> => {
 };
 
 /**
- * Activate an XP boost
- * @param durationHours Duration in hours (defaults to 24)
- * @param multiplier XP multiplier (defaults to 2)
+ * Get the number of available XP boost stacks
+ * @returns Number of available boost stacks
+ */
+export const getAvailableBoosts = async (): Promise<number> => {
+  const boostData = await getXpBoostData();
+  return boostData.availableBoosts;
+};
+
+/**
+ * Add XP boost stacks to the user's account
+ * @param count Number of boost stacks to add
  * @returns Updated boost data
+ */
+export const addXpBoosts = async (count: number): Promise<XpBoostData> => {
+  const boostData = await getXpBoostData();
+  
+  const updatedData = {
+    ...boostData,
+    availableBoosts: boostData.availableBoosts + count
+  };
+  
+  await saveXpBoostData(updatedData);
+  console.log(`Added ${count} XP boost stack(s). Total available: ${updatedData.availableBoosts}`);
+  
+  return updatedData;
+};
+
+/**
+ * Activate an XP boost
+ * @param durationHours Duration in hours (defaults to 72)
+ * @param multiplier XP multiplier (defaults to 2)
+ * @returns Result of activation attempt
  */
 export const activateXpBoost = async (
   durationHours = XP_BOOST_DURATION_HOURS,
   multiplier = XP_BOOST_MULTIPLIER
-): Promise<XpBoostData> => {
-  const startTime = new Date();
-  const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000); // Convert hours to milliseconds
+): Promise<{ success: boolean; data: XpBoostData; message: string }> => {
+  // Check if a boost is already active
+  const { isActive } = await checkXpBoostStatus();
+  if (isActive) {
+    return { 
+      success: false, 
+      data: await getXpBoostData(),
+      message: "An XP boost is already active."
+    };
+  }
   
-  const boostData: XpBoostData = {
+  // Check if user has available boosts
+  const boostData = await getXpBoostData();
+  if (boostData.availableBoosts <= 0) {
+    return { 
+      success: false, 
+      data: boostData,
+      message: "No XP boosts available."
+    };
+  }
+  
+  // Consume a boost stack
+  const startTime = new Date();
+  const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
+  
+  const updatedBoostData: XpBoostData = {
+    ...boostData,
     active: true,
     startTime: startTime.toISOString(),
     endTime: endTime.toISOString(),
-    multiplier
+    multiplier,
+    availableBoosts: boostData.availableBoosts - 1
   };
   
-  await saveXpBoostData(boostData);
-  return boostData;
+  await saveXpBoostData(updatedBoostData);
+  console.log(`XP Boost activated! ${multiplier}x XP for ${durationHours} hours. Remaining boosts: ${updatedBoostData.availableBoosts}`);
+  
+  return { 
+    success: true, 
+    data: updatedBoostData,
+    message: `XP Boost activated! You now earn ${multiplier}x XP for ${durationHours} hours.`
+  };
 };
 
 /**
@@ -85,12 +144,17 @@ export const activateXpBoost = async (
  * @returns Updated boost data
  */
 export const deactivateXpBoost = async (): Promise<XpBoostData> => {
-  const boostData: XpBoostData = {
-    ...DEFAULT_BOOST_DATA
+  const boostData = await getXpBoostData();
+  
+  const updatedData = {
+    ...boostData,
+    active: false,
+    startTime: null,
+    endTime: null
   };
   
-  await saveXpBoostData(boostData);
-  return boostData;
+  await saveXpBoostData(updatedData);
+  return updatedData;
 };
 
 /**

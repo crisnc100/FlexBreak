@@ -161,12 +161,25 @@ export const addXP = async (
   // Validate amount
   const validAmount = Math.max(0, Math.round(amount));
   
+  // Check if XP boost is active
+  const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
+  let boostedAmount = validAmount;
+  let boostedDetails = details;
+  
+  // Apply XP boost if active (to all XP sources)
+  if (isXpBoostActive) {
+    const multiplier = xpBoostData.multiplier;
+    boostedAmount = Math.floor(validAmount * multiplier);
+    boostedDetails = `${details} (${multiplier}x XP Boost Applied)`;
+    console.log(`XP Boost applied: ${validAmount} → ${boostedAmount} XP (${multiplier}x)`);
+  }
+  
   // Get current XP values
   const previousTotal = userProgress.totalXP || 0;
   const previousLevel = userProgress.level || 1;
   
   // Calculate new totals
-  const newTotal = previousTotal + validAmount;
+  const newTotal = previousTotal + boostedAmount;
   
   // Determine level based on XP thresholds
   let newLevel = 1;
@@ -190,10 +203,10 @@ export const addXP = async (
   // Create XP history entry
   const xpHistoryEntry: XpHistoryEntry = {
     id: `xp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-    amount: validAmount,
+    amount: boostedAmount,
     source,
     timestamp: new Date().toISOString(),
-    details,
+    details: boostedDetails,
     claimed: source !== 'challenge' // Only challenges need claiming
   };
   
@@ -235,7 +248,7 @@ export const addXP = async (
     console.log(`🎉 Level Up! ${previousLevel} → ${newLevel}`);
   }
   
-  console.log(`Added ${validAmount} XP from ${source}. Total: ${previousTotal} → ${newTotal}`);
+  console.log(`Added ${boostedAmount} XP from ${source}. Total: ${previousTotal} → ${newTotal}`);
   
   return {
     previousTotal,
@@ -243,7 +256,7 @@ export const addXP = async (
     previousLevel,
     newLevel,
     levelUp,
-    amount: validAmount,
+    amount: boostedAmount,
     progress: updatedProgress
   };
 };

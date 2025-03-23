@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useChallengeSystem } from '../../hooks/progress/useChallengeSystem';
 import { Challenge } from '../../utils/progress/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,9 +10,14 @@ import { useGamification } from '../../hooks/progress/useGamification';
 interface ChallengeListProps {
   isDark?: boolean;
   theme?: any;
+  onRefresh?: () => Promise<void>;
 }
 
-export const ChallengeList: React.FC<ChallengeListProps> = ({ isDark: propIsDark, theme: propTheme }) => {
+export const ChallengeList: React.FC<ChallengeListProps> = ({ 
+  isDark: propIsDark, 
+  theme: propTheme,
+  onRefresh: externalRefresh
+}) => {
   const { activeChallenges, loading, claimChallenge, refreshChallenges } = useChallengeSystem();
   const themeContext = useTheme();
   
@@ -23,6 +28,7 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({ isDark: propIsDark
   const { addXp } = useGamification();
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'special'>('daily');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Refresh challenges when component mounts to ensure accurate data
   useEffect(() => {
@@ -35,6 +41,25 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({ isDark: propIsDark
     console.log(`Tab changed to ${activeTab}, updating challenges`);
     refreshChallenges();
   }, [activeTab, refreshChallenges]);
+  
+  // CRITICAL FIX: Combined refresh function that uses both internal and external refresh
+  const handleRefresh = async () => {
+    console.log('Manual refresh of challenges triggered');
+    setIsRefreshing(true);
+    try {
+      // Use internal refresh first
+      await refreshChallenges();
+      
+      // Then use external refresh if provided
+      if (externalRefresh) {
+        await externalRefresh();
+      }
+    } catch (error) {
+      console.error('Error refreshing challenges:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Handle claiming a challenge
   const handleClaim = async (challenge: Challenge) => {
@@ -332,6 +357,16 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({ isDark: propIsDark
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.accent]}
+            tintColor={theme.accent}
+            titleColor={theme.text}
+            title="Refreshing challenges..."
+          />
+        }
       >
         {getActiveChallengesForTab().length > 0 ? (
           getActiveChallengesForTab().map(challenge => renderChallengeCard(challenge))

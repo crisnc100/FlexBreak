@@ -21,7 +21,7 @@ import { useChallengeUpdater } from '../hooks/progress/useChallengeUpdater';
 import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
 import useProgressSystem from '../hooks/progress/useProgressSystem';
 import { useChallengeSystem } from '../hooks/progress/useChallengeSystem';
-import XpNotificationManager from '../components/XpNotificationManager';
+import XpNotificationManager from '../components/notifications/XpNotificationManager';
 import { RefreshableScrollView } from '../components/common';
 import SubscriptionModal from '../components/SubscriptionModal';
 import {
@@ -128,7 +128,7 @@ export default function ProgressScreen({ navigation }) {
   const handleActivateXpBoost = useCallback(() => {
     Alert.alert(
       'XP Boost Activated!',
-      'Your XP Boost is now active. All XP earned in the next 24 hours will be doubled.',
+      'Your XP Boost is now active. All XP earned in the next 72 hours will be doubled.',
       [{ text: 'OK' }]
     );
     

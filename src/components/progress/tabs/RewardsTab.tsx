@@ -35,7 +35,7 @@ export const RewardsTab: React.FC<RewardsTabProps> = ({
   ) : (
     <View style={styles.container}>
       {/* Include XP Boost card at the top of rewards tab */}
-      <XpBoostCard onActivateBoost={handleActivateXpBoost} />
+      <XpBoostCard onActivate={handleActivateXpBoost} />
       
       {/* Existing rewards section */}
       <Rewards
@@ -49,8 +49,9 @@ export const RewardsTab: React.FC<RewardsTabProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     padding: 16,
-  }
+  },
 });
 
 export default RewardsTab; 

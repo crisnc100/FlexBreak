@@ -96,14 +96,21 @@ export const useChallengeSystem = () => {
   const updateChallengeProgress = useCallback(() => {
     console.log('Updating challenge progress after routine completion');
     
-    // Refresh gamification data
-    refreshData();
-    
-    // Also force-update challenges to ensure progress is tracked
-    challengeManager.forceUpdateDailyChallengesWithRoutines()
+    // IMPROVED: First sync challenge progress with completed routines
+    syncChallengeProgress()
+      .then(() => {
+        console.log('Challenge progress synced with routines');
+        
+        // Then refresh gamification data
+        refreshData();
+        
+        // Then force-update challenges to ensure progress is tracked
+        return challengeManager.forceUpdateDailyChallengesWithRoutines();
+      })
       .then(() => {
         console.log('Challenges updated after routine completion');
-        loadActiveChallenges();
+        // Finally reload active challenges to refresh the UI
+        return loadActiveChallenges();
       })
       .catch(error => {
         console.error('Error updating challenges after routine:', error);
@@ -153,29 +160,96 @@ export const useChallengeSystem = () => {
       
       console.log(`Routine counts - Today: ${todayRoutines.length}, Week: ${weekRoutines.length}, Month: ${monthRoutines.length}`);
       
+      // FIXED: Calculate total minutes for different time periods
+      // For today
+      const todayMinutes = todayRoutines.reduce((total, routine) => 
+        total + (parseInt(routine.duration) || 0), 0);
+        
+      // For week
+      const weekMinutes = weekRoutines.reduce((total, routine) => 
+        total + (parseInt(routine.duration) || 0), 0);
+        
+      // For month
+      const monthMinutes = monthRoutines.reduce((total, routine) => 
+        total + (parseInt(routine.duration) || 0), 0);
+      
+      console.log(`Total minutes - Today: ${todayMinutes}, Week: ${weekMinutes}, Month: ${monthMinutes}`);
+      
+      // FIXED: Calculate unique body areas
+      const uniqueAreasToday = [...new Set(todayRoutines.map(r => r.area))];
+      const uniqueAreasWeek = [...new Set(weekRoutines.map(r => r.area))];
+      const uniqueAreasMonth = [...new Set(monthRoutines.map(r => r.area))];
+      
+      console.log(`Unique areas - Today: ${uniqueAreasToday.length}, Week: ${uniqueAreasWeek.length}, Month: ${uniqueAreasMonth.length}`);
+      console.log(`Week areas: ${uniqueAreasWeek.join(', ')}`);
+      
       // Get current user progress
       const userProgress = await storageService.getUserProgress();
       let hasUpdates = false;
       
+      // IMPROVED: Log current challenge status before updates
+      console.log('Current challenges before update:');
+      Object.values(userProgress.challenges).forEach(challenge => {
+        if (!challenge.claimed) {
+          console.log(`${challenge.title}: ${challenge.progress}/${challenge.requirement} (${challenge.completed ? 'Completed' : 'In Progress'})`);
+        }
+      });
+      
       // Update daily routine challenges
       Object.values(userProgress.challenges).forEach(challenge => {
         if (challenge.category === 'daily' && 
-            challenge.type === 'routine_count' && 
             !challenge.claimed &&
             new Date(challenge.endDate) > now) {
           
-          const correctProgress = Math.min(todayRoutines.length, challenge.requirement);
-          if (challenge.progress !== correctProgress) {
-            console.log(`Fixing daily challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
-            userProgress.challenges[challenge.id].progress = correctProgress;
-            hasUpdates = true;
+          // Update routine count challenges
+          if (challenge.type === 'routine_count') {
+            const correctProgress = Math.min(todayRoutines.length, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing daily challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking daily challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
           }
           
-          // Mark as completed if progress meets requirement
-          if (correctProgress >= challenge.requirement && !challenge.completed) {
-            console.log(`Marking daily challenge "${challenge.title}" as completed`);
-            userProgress.challenges[challenge.id].completed = true;
-            hasUpdates = true;
+          // FIXED: Update total minutes challenges
+          if (challenge.type === 'total_minutes' || challenge.type === 'daily_minutes') {
+            const correctProgress = Math.min(todayMinutes, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing daily minutes challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking daily minutes challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
+          }
+          
+          // FIXED: Update area variety challenges
+          if (challenge.type === 'area_variety') {
+            const correctProgress = Math.min(uniqueAreasToday.length, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing daily area variety challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking daily area variety challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
           }
         }
       });
@@ -183,22 +257,58 @@ export const useChallengeSystem = () => {
       // Update weekly routine challenges
       Object.values(userProgress.challenges).forEach(challenge => {
         if (challenge.category === 'weekly' && 
-            challenge.type === 'routine_count' && 
             !challenge.claimed &&
             new Date(challenge.endDate) > now) {
           
-          const correctProgress = Math.min(weekRoutines.length, challenge.requirement);
-          if (challenge.progress !== correctProgress) {
-            console.log(`Fixing weekly challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
-            userProgress.challenges[challenge.id].progress = correctProgress;
-            hasUpdates = true;
+          // Update routine count challenges
+          if (challenge.type === 'routine_count') {
+            const correctProgress = Math.min(weekRoutines.length, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing weekly challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking weekly challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
           }
           
-          // Mark as completed if progress meets requirement
-          if (correctProgress >= challenge.requirement && !challenge.completed) {
-            console.log(`Marking weekly challenge "${challenge.title}" as completed`);
-            userProgress.challenges[challenge.id].completed = true;
-            hasUpdates = true;
+          // FIXED: Update total minutes challenges
+          if (challenge.type === 'total_minutes' || challenge.type === 'weekly_minutes') {
+            const correctProgress = Math.min(weekMinutes, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing weekly minutes challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking weekly minutes challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
+          }
+          
+          // FIXED: Update area variety challenges
+          if (challenge.type === 'area_variety') {
+            const correctProgress = Math.min(uniqueAreasWeek.length, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing weekly area variety challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress} (areas: ${uniqueAreasWeek.join(', ')})`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking weekly area variety challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
           }
         }
       });
@@ -206,30 +316,130 @@ export const useChallengeSystem = () => {
       // Update monthly routine challenges
       Object.values(userProgress.challenges).forEach(challenge => {
         if (challenge.category === 'monthly' && 
-            challenge.type === 'routine_count' && 
             !challenge.claimed &&
             new Date(challenge.endDate) > now) {
           
-          const correctProgress = Math.min(monthRoutines.length, challenge.requirement);
-          if (challenge.progress !== correctProgress) {
-            console.log(`Fixing monthly challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
-            userProgress.challenges[challenge.id].progress = correctProgress;
-            hasUpdates = true;
+          // Update routine count challenges
+          if (challenge.type === 'routine_count') {
+            const correctProgress = Math.min(monthRoutines.length, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing monthly challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking monthly challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
           }
           
-          // Mark as completed if progress meets requirement
-          if (correctProgress >= challenge.requirement && !challenge.completed) {
-            console.log(`Marking monthly challenge "${challenge.title}" as completed`);
-            userProgress.challenges[challenge.id].completed = true;
-            hasUpdates = true;
+          // FIXED: Update total minutes challenges 
+          if (challenge.type === 'total_minutes' || challenge.type === 'monthly_minutes') {
+            const correctProgress = Math.min(monthMinutes, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing monthly minutes challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking monthly minutes challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
+          }
+          
+          // FIXED: Update area variety challenges
+          if (challenge.type === 'area_variety') {
+            const correctProgress = Math.min(uniqueAreasMonth.length, challenge.requirement);
+            if (challenge.progress !== correctProgress) {
+              console.log(`Fixing monthly area variety challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
+              userProgress.challenges[challenge.id].progress = correctProgress;
+              hasUpdates = true;
+            }
+            
+            // Mark as completed if progress meets requirement
+            if (correctProgress >= challenge.requirement && !challenge.completed) {
+              console.log(`Marking monthly area variety challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            }
           }
         }
       });
+      
+      // IMPROVED: Check for challenges that should be completed based on specific conditions
+      // For example, "Complete a routine before noon" challenge
+      const beforeNoonChallenge = Object.values(userProgress.challenges).find(c => 
+        c.description.includes('before noon') && 
+        c.category === 'daily' && 
+        !c.claimed && 
+        new Date(c.endDate) > now
+      );
+      
+      if (beforeNoonChallenge) {
+        // Check if any of today's routines were completed before noon
+        const hasBeforeNoonRoutine = todayRoutines.some(routine => {
+          const routineTime = new Date(routine.date);
+          return routineTime.getHours() < 12;
+        });
+        
+        if (hasBeforeNoonRoutine && beforeNoonChallenge.progress !== 1) {
+          console.log(`Marking "before noon" challenge as completed`);
+          userProgress.challenges[beforeNoonChallenge.id].progress = 1;
+          userProgress.challenges[beforeNoonChallenge.id].completed = true;
+          hasUpdates = true;
+        }
+      }
+      
+      // FIXED: Update streak challenges
+      // Get all streak challenges
+      const streakChallenges = Object.values(userProgress.challenges).filter(challenge => 
+        challenge.type === 'streak' &&
+        !challenge.claimed &&
+        new Date(challenge.endDate) > now
+      );
+      
+      if (streakChallenges.length > 0) {
+        // Get the current streak from statistics
+        const currentStreak = userProgress.statistics.currentStreak;
+        console.log(`Current streak for streak challenges: ${currentStreak} days`);
+        
+        // Update each streak challenge
+        streakChallenges.forEach(challenge => {
+          const newProgress = Math.min(currentStreak, challenge.requirement);
+          
+          if (challenge.progress !== newProgress) {
+            console.log(`Updating streak challenge "${challenge.title}" progress: ${challenge.progress} → ${newProgress}`);
+            userProgress.challenges[challenge.id].progress = newProgress;
+            hasUpdates = true;
+          }
+          
+          // Mark as completed if streak meets requirement
+          if (newProgress >= challenge.requirement && !challenge.completed) {
+            console.log(`Marking streak challenge "${challenge.title}" as completed`);
+            userProgress.challenges[challenge.id].completed = true;
+            hasUpdates = true;
+          }
+        });
+      }
       
       // Save changes if any were made
       if (hasUpdates) {
         console.log('Saving updated challenge progress after synchronization');
         await storageService.saveUserProgress(userProgress);
+        
+        // IMPROVED: Log updated challenge status
+        console.log('Updated challenges after sync:');
+        Object.values(userProgress.challenges).forEach(challenge => {
+          if (!challenge.claimed) {
+            console.log(`${challenge.title}: ${challenge.progress}/${challenge.requirement} (${challenge.completed ? 'Completed' : 'In Progress'})`);
+          }
+        });
       } else {
         console.log('No challenge progress updates needed');
       }
