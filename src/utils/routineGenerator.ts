@@ -4,8 +4,86 @@ import { BodyArea, Duration, Stretch, StretchLevel } from '../types';
 export const generateRoutine = (
   area: BodyArea,
   duration: Duration,
-  level: StretchLevel
+  level: StretchLevel,
+  customStretches?: Stretch[]
 ): Stretch[] => {
+  // If custom stretches are provided, use them instead of generating a routine
+  if (customStretches && customStretches.length > 0) {
+    console.log(`[DEBUG] Using ${customStretches.length} custom stretches for routine`);
+    
+    // Convert duration to seconds
+    const durationMinutes = parseInt(duration, 10);
+    const totalSeconds = durationMinutes * 60;
+    
+    // Calculate total time of custom stretches
+    let totalCustomTime = 0;
+    const routineWithCustom: Stretch[] = [];
+    
+    // Add all custom stretches first
+    for (const stretch of customStretches) {
+      // Calculate stretch time (double for bilateral)
+      const stretchTime = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
+      totalCustomTime += stretchTime;
+      
+      // Create the stretch entry
+      const stretchEntry = {
+        ...stretch,
+        duration: stretchTime, // Set total duration (doubled for bilateral)
+        description: stretch.bilateral 
+          ? `${stretch.description.split('Hold')[0].trim()} Hold for ${stretch.duration} seconds per side.` 
+          : stretch.description // Keep original description for non-bilateral
+      };
+      
+      routineWithCustom.push(stretchEntry);
+    }
+    
+    // If custom stretches don't fill the duration, add complementary stretches
+    if (totalCustomTime < totalSeconds) {
+      console.log(`[DEBUG] Custom stretches only cover ${totalCustomTime}s of ${totalSeconds}s. Adding complementary stretches.`);
+      
+      // Filter by area and exclude already selected stretches
+      const selectedIds = customStretches.map(s => s.id);
+      let availableStretches = stretches.filter(stretch => 
+        !selectedIds.includes(stretch.id) && 
+        (stretch.tags.includes(area) || 
+         (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body')))
+      );
+      
+      // Shuffle available stretches
+      availableStretches = shuffleArray(availableStretches);
+      
+      // Add stretches until we fill the duration
+      let remainingTime = totalSeconds - totalCustomTime;
+      
+      for (const stretch of availableStretches) {
+        // Calculate stretch time (double for bilateral)
+        const stretchTime = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
+        
+        // Skip if adding this stretch exceeds total time
+        if (stretchTime > remainingTime) continue;
+        
+        // Create the stretch entry
+        const stretchEntry = {
+          ...stretch,
+          duration: stretchTime, // Set total duration (doubled for bilateral)
+          description: stretch.bilateral 
+            ? `${stretch.description.split('Hold')[0].trim()} Hold for ${stretch.duration} seconds per side.` 
+            : stretch.description // Keep original description for non-bilateral
+        };
+        
+        routineWithCustom.push(stretchEntry);
+        remainingTime -= stretchTime;
+        
+        // Break if we've filled the time
+        if (remainingTime <= 0) break;
+      }
+    }
+    
+    console.log(`[DEBUG] Final custom routine: ${routineWithCustom.length} stretches`);
+    return routineWithCustom;
+  }
+  
+  // Standard routine generation (no custom stretches)
   // Convert duration to seconds
   const durationMinutes = parseInt(duration, 10);
   const totalSeconds = durationMinutes * 60;

@@ -151,6 +151,25 @@ export const useChallengeSystem = () => {
         return routineDate >= startOfWeek;
       });
       
+      // Improved weekly minutes calculation with better logging
+      // For week
+      console.log(`Weekly minutes calculation details:`);
+      console.log(`Start of week: ${startOfWeek.toISOString()}`);
+      console.log(`Found ${weekRoutines.length} routines for this week`);
+      
+      // Log each weekly routine and its duration
+      weekRoutines.forEach(routine => {
+        console.log(`Weekly routine: ${routine.area || 'Unknown'}, date: ${routine.date}, duration: ${routine.duration || 0} minutes`);
+      });
+      
+      const weekMinutes = weekRoutines.reduce((total, routine) => {
+        const routineDuration = parseInt(routine.duration) || 0;
+        console.log(`Adding ${routineDuration} minutes for routine on ${new Date(routine.date).toLocaleDateString()}`);
+        return total + routineDuration;
+      }, 0);
+      
+      console.log(`Total weekly minutes calculated: ${weekMinutes}`);
+      
       // Count routines for this month
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const monthRoutines = allRoutines.filter(routine => {
@@ -163,10 +182,6 @@ export const useChallengeSystem = () => {
       // FIXED: Calculate total minutes for different time periods
       // For today
       const todayMinutes = todayRoutines.reduce((total, routine) => 
-        total + (parseInt(routine.duration) || 0), 0);
-        
-      // For week
-      const weekMinutes = weekRoutines.reduce((total, routine) => 
         total + (parseInt(routine.duration) || 0), 0);
         
       // For month
@@ -221,16 +236,23 @@ export const useChallengeSystem = () => {
           // FIXED: Update total minutes challenges
           if (challenge.type === 'total_minutes' || challenge.type === 'daily_minutes') {
             const correctProgress = Math.min(todayMinutes, challenge.requirement);
+            
+            // Update the progress
             if (challenge.progress !== correctProgress) {
               console.log(`Fixing daily minutes challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
               userProgress.challenges[challenge.id].progress = correctProgress;
               hasUpdates = true;
             }
             
-            // Mark as completed if progress meets requirement
+            // FIXED: Only mark as completed if progress exactly meets or exceeds requirement
             if (correctProgress >= challenge.requirement && !challenge.completed) {
               console.log(`Marking daily minutes challenge "${challenge.title}" as completed`);
               userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            } else if (correctProgress < challenge.requirement && challenge.completed) {
+              // If progress is now less than requirement but was previously marked completed, fix it
+              console.log(`Un-marking daily minutes challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = false;
               hasUpdates = true;
             }
           }
@@ -260,6 +282,11 @@ export const useChallengeSystem = () => {
             !challenge.claimed &&
             new Date(challenge.endDate) > now) {
           
+          // Special debugging for Time Investment challenge
+          if (challenge.title.includes('Time Investment') || challenge.description.includes('30 minutes')) {
+        
+          }
+          
           // Update routine count challenges
           if (challenge.type === 'routine_count') {
             const correctProgress = Math.min(weekRoutines.length, challenge.requirement);
@@ -279,18 +306,36 @@ export const useChallengeSystem = () => {
           
           // FIXED: Update total minutes challenges
           if (challenge.type === 'total_minutes' || challenge.type === 'weekly_minutes') {
+            // For time investment challenge, fix any incorrect progress
             const correctProgress = Math.min(weekMinutes, challenge.requirement);
+            
+            if (challenge.title.includes('Time Investment') || challenge.description.includes('30 minutes')) {
+              console.log(`Correcting "Time Investment" progress: ${challenge.progress} → ${correctProgress}`);
+            }
+            
+            // Update the progress
             if (challenge.progress !== correctProgress) {
               console.log(`Fixing weekly minutes challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
               userProgress.challenges[challenge.id].progress = correctProgress;
               hasUpdates = true;
             }
             
-            // Mark as completed if progress meets requirement
+            // FIXED: Only mark as completed if progress exactly meets or exceeds requirement
             if (correctProgress >= challenge.requirement && !challenge.completed) {
               console.log(`Marking weekly minutes challenge "${challenge.title}" as completed`);
               userProgress.challenges[challenge.id].completed = true;
               hasUpdates = true;
+            } else if (correctProgress < challenge.requirement && challenge.completed) {
+              // If progress is now less than requirement but was previously marked completed, fix it
+              console.log(`Un-marking weekly minutes challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = false;
+              hasUpdates = true;
+            }
+            
+            // Extra check for Time Investment challenge
+            if (challenge.title.includes('Time Investment') || challenge.description.includes('30 minutes')) {
+              console.log(`After update - Progress: ${userProgress.challenges[challenge.id].progress}/${challenge.requirement}`);
+              console.log(`After update - Completed: ${userProgress.challenges[challenge.id].completed}`);
             }
           }
           
@@ -339,16 +384,23 @@ export const useChallengeSystem = () => {
           // FIXED: Update total minutes challenges 
           if (challenge.type === 'total_minutes' || challenge.type === 'monthly_minutes') {
             const correctProgress = Math.min(monthMinutes, challenge.requirement);
+            
+            // Update the progress
             if (challenge.progress !== correctProgress) {
               console.log(`Fixing monthly minutes challenge "${challenge.title}" progress: ${challenge.progress} → ${correctProgress}`);
               userProgress.challenges[challenge.id].progress = correctProgress;
               hasUpdates = true;
             }
             
-            // Mark as completed if progress meets requirement
+            // FIXED: Only mark as completed if progress exactly meets or exceeds requirement
             if (correctProgress >= challenge.requirement && !challenge.completed) {
               console.log(`Marking monthly minutes challenge "${challenge.title}" as completed`);
               userProgress.challenges[challenge.id].completed = true;
+              hasUpdates = true;
+            } else if (correctProgress < challenge.requirement && challenge.completed) {
+              // If progress is now less than requirement but was previously marked completed, fix it
+              console.log(`Un-marking monthly minutes challenge "${challenge.title}" as completed`);
+              userProgress.challenges[challenge.id].completed = false;
               hasUpdates = true;
             }
           }

@@ -214,7 +214,10 @@ function MainApp() {
           />
           <Tab.Screen name="Routine" component={RoutineScreen} />
           <Tab.Screen name="Progress" component={ProgressScreen} />
-          <Tab.Screen name="Favorites" component={FavoritesScreen} />
+          <Tab.Screen 
+            name="Favorites" 
+            component={FavoritesScreen}
+          />
           
           {/* Enhanced Testing screen - only show in development */}
           {__DEV__ && (

@@ -681,4 +681,70 @@ export const clearAllData = async (): Promise<boolean> => {
     console.error('Error clearing app data:', e);
     return false;
   }
+};
+
+// ========== CUSTOM ROUTINES METHODS ==========
+
+/**
+ * Save a custom routine
+ * @param routine Custom routine to save
+ * @returns Success boolean
+ */
+export const saveCustomRoutine = async (routine: { 
+  name: string; 
+  area: BodyArea; 
+  duration: Duration;
+  customStretches?: { id: number }[];
+}): Promise<boolean> => {
+  try {
+    console.log('Saving custom routine:', routine);
+    
+    // Get existing custom routines
+    const customRoutines = await getCustomRoutines();
+    
+    // Add new custom routine
+    const newRoutine = {
+      ...routine,
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString()
+    };
+    
+    // Add to beginning of array
+    const updatedRoutines = [newRoutine, ...customRoutines];
+    
+    // Save to storage
+    return await setData(KEYS.CUSTOM.CUSTOM_ROUTINES, updatedRoutines);
+  } catch (error) {
+    console.error('Error saving custom routine:', error);
+    return false;
+  }
+};
+
+/**
+ * Get all custom routines
+ * @returns Array of custom routines
+ */
+export const getCustomRoutines = async (): Promise<any[]> => {
+  return getData<any[]>(KEYS.CUSTOM.CUSTOM_ROUTINES, []);
+};
+
+/**
+ * Delete a custom routine by ID
+ * @param routineId ID of routine to delete
+ * @returns Success boolean
+ */
+export const deleteCustomRoutine = async (routineId: string): Promise<boolean> => {
+  try {
+    // Get existing custom routines
+    const customRoutines = await getCustomRoutines();
+    
+    // Remove the routine with the specified ID
+    const updatedRoutines = customRoutines.filter(routine => routine.id !== routineId);
+    
+    // Save to storage
+    return await setData(KEYS.CUSTOM.CUSTOM_ROUTINES, updatedRoutines);
+  } catch (error) {
+    console.error('Error deleting custom routine:', error);
+    return false;
+  }
 }; 

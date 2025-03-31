@@ -9,12 +9,12 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Platform
+  Platform,
+  Easing
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration, Stretch, StretchLevel } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
-import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
 import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
@@ -23,6 +23,7 @@ export interface ActiveRoutineProps {
   area: BodyArea;
   duration: Duration;
   level: StretchLevel;
+  customStretches?: Stretch[];
   onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean) => Promise<void>;
   onNavigateHome: () => void;
 }
@@ -31,47 +32,75 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   area,
   duration,
   level,
+  customStretches,
   onComplete,
   onNavigateHome
 }) => {
   const { theme, isDark } = useTheme();
   
-  // Generate the routine
+  // State
   const [routine, setRoutine] = useState<Stretch[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
+  const [isDone, setIsDone] = useState(false);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(1)).current;
   
   // Get the current stretch
   const currentStretch = routine[currentIndex];
   
-  // Use our custom timer hook with a callback for when the timer completes
-  const { 
-    timeRemaining, 
-    isPaused, 
-    progressAnim, 
-    startTimer, 
-    pauseTimer, 
-    resumeTimer, 
-    resetTimer,
-    togglePause 
-  } = useRoutineTimer({
-    onComplete: () => {
-      // When the timer completes, move to the next stretch or complete the routine
-      if (currentIndex < routine.length - 1) {
-        handleNext();
-      } else {
-        handleComplete();
-      }
+  // Start or restart a timer
+  const startTimer = (duration: number) => {
+    // Clear existing timer
+    if (timerId) {
+      clearInterval(timerId);
     }
-  });
+    
+    // Set initial time
+    setTimeRemaining(duration);
+    
+    // Reset animation
+    progressAnim.setValue(1);
+    
+    // Start timer animation
+    Animated.timing(progressAnim, {
+      toValue: 0,
+      duration: duration * 1000,
+      useNativeDriver: false,
+      easing: Easing.linear
+    }).start();
+    
+    // Start timer
+    const id = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          // Time's up - go to next stretch
+          clearInterval(id);
+          handleNext();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    setTimerId(id);
+  };
+  
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerId) clearInterval(timerId);
+    };
+  }, [timerId]);
   
   // Generate the routine when the component mounts
   useEffect(() => {
     if (area && duration) {
       console.log(`Generating routine with level: ${level}`);
-      const generatedRoutine = generateRoutine(area, duration, level);
+      const generatedRoutine = generateRoutine(area, duration, level, customStretches);
       setRoutine(generatedRoutine);
       
       if (generatedRoutine.length > 0) {
@@ -79,7 +108,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         startTimer(generatedRoutine[0].duration);
       }
     }
-  }, [area, duration, level]);
+  }, [area, duration, level, customStretches]);
   
   // Handle skip to next stretch
   const handleNext = () => {
@@ -332,41 +361,21 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         
         <TouchableOpacity 
           style={styles.centerButton} 
-          onPress={togglePause}
+          onPress={handleNext}
         >
           <View style={[styles.centerButtonInner, { 
             backgroundColor: isDark ? theme.accent : '#4CAF50',
             shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
           }]}>
             <Ionicons 
-              name={isPaused ? "play" : "pause"} 
+              name="chevron-forward" 
               size={32} 
               color="#FFF" 
             />
           </View>
           <Text style={[styles.pauseText, { color: isDark ? theme.text : '#333' }]}>
-            {isPaused ? "Resume" : "Pause"}
+            {currentIndex < routine.length - 1 ? "Next" : "Finish"}
           </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[
-            styles.controlButton, 
-            styles.sideButton,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }
-          ]} 
-          onPress={handleNext}
-        >
-          <View style={styles.buttonContentWrapper}>
-            <Ionicons 
-              name="chevron-forward" 
-              size={28} 
-              color={isDark ? theme.text : "#333"} 
-            />
-            <Text style={[styles.controlText, { color: isDark ? theme.text : '#333' }]}>
-              {currentIndex < routine.length - 1 ? "Next" : "Finish"}
-            </Text>
-          </View>
         </TouchableOpacity>
       </View>
       

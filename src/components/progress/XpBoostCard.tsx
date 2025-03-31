@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as xpBoostManager from '../../utils/progress/xpBoostManager';
+import * as rewardManager from '../../utils/progress/rewardManager';
+import * as storageService from '../../services/storageService';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -16,9 +18,30 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [message, setMessage] = useState('');
+  const [isRewardUnlocked, setIsRewardUnlocked] = useState(false);
+  const [userLevel, setUserLevel] = useState(1);
+  const [wasValidated, setWasValidated] = useState(false);
   
   const refreshData = async () => {
     try {
+      // Get user progress to check level
+      const userProgress = await storageService.getUserProgress();
+      setUserLevel(userProgress.level || 1);
+      
+      // Check if XP boost reward is unlocked
+      const isUnlocked = await rewardManager.isRewardUnlocked('xp_boost');
+      setIsRewardUnlocked(isUnlocked);
+      
+      // Validate XP boost reward to ensure boosts are granted
+      if (isUnlocked && !wasValidated) {
+        const validationResult = await xpBoostManager.validateXpBoostReward();
+        setWasValidated(true);
+        
+        if (validationResult.boostsAdded > 0) {
+          setMessage(`${validationResult.boostsAdded} XP boosts were added to your account!`);
+        }
+      }
+      
       // Check XP boost status
       const { isActive: active, data } = await xpBoostManager.checkXpBoostStatus();
       setIsActive(active);
@@ -120,14 +143,33 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
         </View>
       ) : (
         <View style={styles.content}>
-          <Text style={[styles.boostText, { color: theme.text }]}>
-            {availableBoosts > 0 
-              ? `You have ${availableBoosts} XP boost stack${availableBoosts !== 1 ? 's' : ''} available!` 
-              : 'No XP boosts available'}
-          </Text>
-          <Text style={[styles.descText, { color: theme.textSecondary }]}>
-            Each boost doubles all XP earned for 72 hours
-          </Text>
+          {!isRewardUnlocked ? (
+            <>
+              <Text style={[styles.boostText, { color: theme.text }]}>
+                {userLevel < 4 
+                  ? `Unlock XP Boosts at level 4!` 
+                  : `XP Boost reward unlocked but not initialized`}
+              </Text>
+              <Text style={[styles.descText, { color: theme.textSecondary }]}>
+                {userLevel < 4 
+                  ? `You're level ${userLevel}. Keep going to unlock 2x XP boosts!` 
+                  : `Please restart the app to claim your XP boosts`}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.boostText, { color: theme.text }]}>
+                {availableBoosts > 0 
+                  ? `You have ${availableBoosts} XP boost stack${availableBoosts !== 1 ? 's' : ''} available!` 
+                  : 'No XP boosts available'}
+              </Text>
+              <Text style={[styles.descText, { color: theme.textSecondary }]}>
+                {availableBoosts > 0 
+                  ? `Each boost doubles all XP earned for 72 hours` 
+                  : `Complete more challenges to earn additional XP boosts!`}
+              </Text>
+            </>
+          )}
           
           {message ? (
             <Text style={[styles.messageText, { 

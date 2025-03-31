@@ -32,10 +32,12 @@ import {
   CustomReminderModal,
   OptionDropdown,
   TimePicker,
-  DaySelector
+  DaySelector,
+  LevelProgressCard,
+  CustomRoutineModal
 } from '../components/home';
 import * as notifications from '../utils/notifications';
-import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT } from '../hooks/progress/useGamification';
+import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
 import * as rewardManager from '../utils/progress/rewardManager';
 
 const { height, width } = Dimensions.get('window');
@@ -45,7 +47,7 @@ export default function HomeScreen() {
   const [area, setArea] = useState<BodyArea>('Hips & Legs');
   const [duration, setDuration] = useState<Duration>('5');
   const [level, setLevel] = useState<StretchLevel>('beginner');
-  const { isPremium } = usePremium();
+  const { isPremium, refreshPremiumStatus } = usePremium();
   const { isRefreshing, refreshHome } = useRefresh();
   
   // Reminder state
@@ -58,6 +60,7 @@ export default function HomeScreen() {
   // Modal visibility states
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [customReminderModalVisible, setCustomReminderModalVisible] = useState(false);
+  const [customRoutineModalVisible, setCustomRoutineModalVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [daySelectorVisible, setDaySelectorVisible] = useState(false);
   
@@ -119,14 +122,21 @@ export default function HomeScreen() {
       handleRefreshRef.current();
     };
     
+    const handleXpUpdate = (data: any) => {
+      console.log(`XP update event received in HomeScreen (${data.xpEarned} XP from ${data.source}), refreshing...`);
+      handleRefreshRef.current();
+    };
+    
     // Add event listeners
     gamificationEvents.on(LEVEL_UP_EVENT, handleLevelUp);
     gamificationEvents.on(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
+    gamificationEvents.on(XP_UPDATED_EVENT, handleXpUpdate);
     
     // Clean up event listeners
     return () => {
       gamificationEvents.off(LEVEL_UP_EVENT, handleLevelUp);
       gamificationEvents.off(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
+      gamificationEvents.off(XP_UPDATED_EVENT, handleXpUpdate);
     };
   }, []);
   
@@ -490,6 +500,33 @@ export default function HomeScreen() {
     }
   };
 
+  // Handle custom routines press
+  const handleCustomRoutinesPress = async () => {
+    // First refresh premium status and feature access
+    await refreshPremiumStatus();
+    await refreshAccess();
+    
+    if (!isPremium) {
+      showPremiumModal();
+      return;
+    }
+    
+    if (!canAccessFeature('custom_routines')) {
+      showPremiumOrLevelAlert('custom_routines');
+      return;
+    }
+    
+    setCustomRoutineModalVisible(true);
+  };
+  
+  // Handle starting a custom routine
+  const handleStartCustomRoutine = (params: RoutineParams) => {
+    handleStartStretching();
+    setTimeout(() => {
+      navigation.navigate('Routine', params);
+    }, 100);
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -518,6 +555,9 @@ export default function HomeScreen() {
         {/* Daily Tip */}
         <DailyTip tip={dailyTip.text} />
 
+        {/* Level Progress Card - shows for all users */}
+        <LevelProgressCard onOpenSubscription={() => setSubscriptionModalVisible(true)} />
+
         {/* Routine Picker */}
         <RoutinePicker
           area={area}
@@ -528,9 +568,7 @@ export default function HomeScreen() {
           onLevelPress={() => openDropdown('level')}
           onStartStretching={handleStartStretching}
           canAccessCustomRoutines={canAccessFeature('custom_routines')}
-          onCustomRoutinesPress={() => 
-            Alert.alert('Custom Routines', 'This feature will allow you to create and save your own personalized stretching routines.', [{ text: 'OK' }])
-          }
+          onCustomRoutinesPress={handleCustomRoutinesPress}
         />
 
         {/* Subscription Teaser */}
@@ -656,6 +694,13 @@ export default function HomeScreen() {
       <SubscriptionModal
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
+      />
+
+      {/* Custom Routine Modal */}
+      <CustomRoutineModal
+        visible={customRoutineModalVisible}
+        onClose={() => setCustomRoutineModalVisible(false)}
+        onStartRoutine={handleStartCustomRoutine}
       />
     </SafeAreaView>
   );

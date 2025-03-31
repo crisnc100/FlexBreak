@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BodyArea, Duration, RootStackParamList, StretchLevel } from '../../types';
+import { BodyArea, Duration, RootStackParamList, StretchLevel, Stretch } from '../../types';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 
 type RoutineScreenRouteProp = RouteProp<RootStackParamList, 'Routine'>;
@@ -8,11 +8,12 @@ interface UseRoutineParamsReturn {
   area: BodyArea | null;
   duration: Duration | null;
   level: StretchLevel | null;
+  customStretches?: Stretch[];
   hasParams: boolean;
-  setRoutineParams: (area: BodyArea, duration: Duration, level: StretchLevel) => void;
+  setRoutineParams: (area: BodyArea, duration: Duration, level: StretchLevel, customStretches?: Stretch[]) => void;
   resetParams: () => void;
   navigateToHome: () => void;
-  navigateToRoutine: (params: { area: BodyArea; duration: Duration; level: StretchLevel }) => void;
+  navigateToRoutine: (params: { area: BodyArea; duration: Duration; level?: StretchLevel; customStretches?: Stretch[] }) => void;
 }
 
 export function useRoutineParams(): UseRoutineParamsReturn {
@@ -22,6 +23,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   const [area, setArea] = useState<BodyArea | null>(null);
   const [duration, setDuration] = useState<Duration | null>(null);
   const [level, setLevel] = useState<StretchLevel | null>(null);
+  const [customStretches, setCustomStretches] = useState<Stretch[] | undefined>(undefined);
   const [hasParams, setHasParams] = useState(false);
 
   // Initialize from route params
@@ -31,6 +33,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
       setArea(route.params.area);
       setDuration(route.params.duration);
       setLevel(route.params.level || 'beginner');
+      setCustomStretches(route.params.customStretches);
       setHasParams(true);
     } else {
       console.log('No params in route, resetting hasParams');
@@ -39,11 +42,21 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   }, [route.params]);
 
   // Set routine parameters
-  const setRoutineParams = (newArea: BodyArea, newDuration: Duration, newLevel: StretchLevel = 'beginner') => {
+  const setRoutineParams = (
+    newArea: BodyArea, 
+    newDuration: Duration, 
+    newLevel: StretchLevel = 'beginner',
+    newCustomStretches?: Stretch[]
+  ) => {
     console.log('Setting routine params:', newArea, newDuration, newLevel);
+    if (newCustomStretches) {
+      console.log(`Setting ${newCustomStretches.length} custom stretches`);
+    }
+    
     setArea(newArea);
     setDuration(newDuration);
     setLevel(newLevel);
+    setCustomStretches(newCustomStretches);
     setHasParams(true);
     
     // Update navigation params to match state
@@ -51,7 +64,8 @@ export function useRoutineParams(): UseRoutineParamsReturn {
       navigation.setParams({
         area: newArea,
         duration: newDuration,
-        level: newLevel
+        level: newLevel,
+        customStretches: newCustomStretches
       });
     } catch (error) {
       console.error('Error setting navigation params:', error);
@@ -64,6 +78,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     setArea(null);
     setDuration(null);
     setLevel(null);
+    setCustomStretches(undefined);
     setHasParams(false);
     
     // Clear route params
@@ -88,7 +103,12 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   };
   
   // Navigate to routine screen with params
-  const navigateToRoutine = (params: { area: BodyArea; duration: Duration; level?: StretchLevel }) => {
+  const navigateToRoutine = (params: { 
+    area: BodyArea; 
+    duration: Duration; 
+    level?: StretchLevel;
+    customStretches?: Stretch[];
+  }) => {
     console.log('Navigating to routine screen with params:', params);
     
     // Navigate to the routine screen
@@ -106,6 +126,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     area,
     duration,
     level,
+    customStretches,
     hasParams,
     setRoutineParams,
     resetParams,

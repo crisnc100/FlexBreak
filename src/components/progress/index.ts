@@ -11,6 +11,7 @@ export { default as Rewards } from './Rewards';
 export { default as Challenges } from './Challenges';
 export { default as TabNavigation } from './TabNavigation';
 export { default as ProgressFooter } from './ProgressFooter';
+export { default as ProgressHeader } from './ProgressHeader';
 
 // Tab components
 export * from './tabs'; 

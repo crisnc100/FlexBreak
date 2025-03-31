@@ -87,6 +87,44 @@ export const addXpBoosts = async (count: number): Promise<XpBoostData> => {
 };
 
 /**
+ * Check if the XP boost reward is unlocked and ensure boosts are granted
+ * This helps recover if there was any issue during the reward unlocking process
+ * @returns Updated boost data
+ */
+export const validateXpBoostReward = async (): Promise<{ 
+  isUnlocked: boolean; 
+  boostsAdded: number; 
+  data: XpBoostData 
+}> => {
+  try {
+    // Get user progress to check if the XP boost reward is unlocked
+    const userProgress = await storageService.getUserProgress();
+    const xpBoostReward = userProgress.rewards?.xp_boost;
+    
+    // Get current boost data
+    const boostData = await getXpBoostData();
+    
+    // If the reward isn't unlocked, nothing to do
+    if (!xpBoostReward || !xpBoostReward.unlocked) {
+      return { isUnlocked: false, boostsAdded: 0, data: boostData };
+    }
+    
+    // If the reward is unlocked but there are no boosts available and none active,
+    // this might indicate the boosts weren't properly granted when unlocked
+    if (boostData.availableBoosts === 0 && !boostData.active) {
+      console.log('XP Boost reward is unlocked but no boosts available - adding 2 initial boosts');
+      const updatedData = await addXpBoosts(2);
+      return { isUnlocked: true, boostsAdded: 2, data: updatedData };
+    }
+    
+    return { isUnlocked: true, boostsAdded: 0, data: boostData };
+  } catch (error) {
+    console.error('Error validating XP boost reward:', error);
+    return { isUnlocked: false, boostsAdded: 0, data: await getXpBoostData() };
+  }
+};
+
+/**
  * Activate an XP boost
  * @param durationHours Duration in hours (defaults to 72)
  * @param multiplier XP multiplier (defaults to 2)
@@ -105,6 +143,9 @@ export const activateXpBoost = async (
       message: "An XP boost is already active."
     };
   }
+  
+  // Validate the XP boost reward before activating
+  await validateXpBoostReward();
   
   // Check if user has available boosts
   const boostData = await getXpBoostData();

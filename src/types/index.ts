@@ -24,6 +24,7 @@ export interface RoutineParams {
   area: BodyArea;
   duration: Duration;
   level?: StretchLevel;
+  customStretches?: Stretch[]; // Optional array of custom stretches for the routine
 }
 
 export interface ProgressEntry {
@@ -36,7 +37,9 @@ export interface ProgressEntry {
 
 export type RootStackParamList = {
   Home: undefined;
-  Routine: RoutineParams;
+  Routine: RoutineParams & {
+    customStretches?: Stretch[];
+  };
   Progress: undefined;
   Favorites: undefined;
   Testing: undefined;

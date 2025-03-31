@@ -5,7 +5,7 @@ import SubscriptionModal from '../components/SubscriptionModal';
 import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
-import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../types';
+import { BodyArea, Duration, ProgressEntry, StretchLevel, Stretch } from '../types';
 
 // Import our components
 import ActiveRoutine from '../components/routine/ActiveRoutine';
@@ -42,7 +42,7 @@ type LevelUpData = {
 
 export default function RoutineScreen() {
   // Use our custom hooks
-  const { area, duration, level, hasParams, navigateToHome, resetParams, navigateToRoutine } = useRoutineParams();
+  const { area, duration, level, customStretches, hasParams, navigateToHome, resetParams, navigateToRoutine } = useRoutineParams();
   const { 
     recentRoutines, 
     isLoading: isStorageLoading, 
@@ -681,16 +681,20 @@ export default function RoutineScreen() {
   }
   
   // Render active routine
-  if (screenState === 'ACTIVE') {
+  if (screenState === 'ACTIVE' && area && duration) {
     return (
       <SafeAreaView style={styles.container}>
         <XpNotificationManager />
         <ActiveRoutine 
-          area={area as BodyArea}
-          duration={duration as Duration}
-          level={level as StretchLevel}
+          area={area}
+          duration={duration}
+          level={level || 'intermediate'}
+          customStretches={customStretches}
           onComplete={handleRoutineComplete}
-          onNavigateHome={handleCreateNewRoutine}
+          onNavigateHome={() => {
+            resetParams();
+            navigateToHome();
+          }}
         />
         
         <SubscriptionModal 

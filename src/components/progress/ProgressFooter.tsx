@@ -20,29 +20,7 @@ export const ProgressFooter: React.FC<ProgressFooterProps> = ({
       <Text style={[styles.footerText, { color: isDark ? '#FFFFFF' : '#666' }]}>
         FlexBreak Premium • Level {progressSystemData?.level || 1} • {progressSystemData?.totalXP || 0} XP
       </Text>
-      
-      {/* Add testing buttons in development mode */}
-      {__DEV__ && onResetProgress && (
-        <View style={styles.devTools}>
-          <TouchableOpacity
-            style={styles.testingButton}
-            onPress={() => Alert.alert('Progress Testing', 'Select the Testing tab to access the testing tools.')}
-          >
-            <Text style={styles.testingButtonText}>
-              Progress Testing Available
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.testingButton, { backgroundColor: '#F44336', marginTop: 8 }]}
-            onPress={onResetProgress}
-          >
-            <Text style={styles.testingButtonText}>
-              Reset Progress Data
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+  
     </View>
   );
 };

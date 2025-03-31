@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification } from '../../hooks/progress/useGamification';
 import { LEVELS } from '../../utils/progress/xpManager';
 import { useTheme } from '../../context/ThemeContext';
+import { useLevelProgress } from '../../hooks/progress/useLevelProgress';
 // Simple date formatter function to replace date-fns
 const formatTimeAgo = (dateString: string): string => {
   try {
@@ -505,11 +506,19 @@ const Achievements: React.FC<AchievementsProps> = ({
     console.log(`Tapped achievement: ${achievement.title}`);
   };
   
+  // Use the useLevelProgress hook to get consistent level progress data
+  const { 
+    currentLevel, 
+    currentLevelData,
+    nextLevelData,
+    totalXP: calculatedTotalXP, 
+    xpProgress,
+    xpToNextLevel
+  } = useLevelProgress();
+  
   // Use merged values from both sources
   const totalRoutines = gamificationSummary?.statistics?.routinesCompleted || propsRoutines || 0;
   const currentStreak = gamificationSummary?.statistics?.currentStreak || propsStreak || 0;
-  const totalXP = gamificationSummary?.totalXP || propsTotalXP || 0;
-  const level = gamificationSummary?.level || propsLevel || 1;
   const totalMinutes = gamificationSummary?.statistics?.totalMinutes || propsMinutes || 0;
   
   if (isLoading) {
@@ -518,37 +527,6 @@ const Achievements: React.FC<AchievementsProps> = ({
         <Text>Loading achievements...</Text>
       </View>
     );
-  }
-  
-  // Calculate level progress
-  let xpProgress = 0;
-  let calculatedTotalXP = totalXP || 0;
-  
-  // Find current level data
-  const currentLevel = LEVELS.find(l => l.level === level) || LEVELS[0];
-  
-  // Find next level data
-  const nextLevel = LEVELS.find(l => l.level === level + 1);
-  
-  console.log(`Achievements component received: Level ${level}, XP: ${calculatedTotalXP}`);
-  
-  if (nextLevel) {
-    // Calculate progress to next level
-    const xpForCurrentLevel = currentLevel.xpRequired;
-    const xpForNextLevel = nextLevel.xpRequired;
-    const xpRangeForLevel = xpForNextLevel - xpForCurrentLevel;
-    const xpProgressInLevel = calculatedTotalXP - xpForCurrentLevel;
-    
-    // Calculate progress as a number between 0 and 1
-    xpProgress = Math.min(Math.max(xpProgressInLevel / xpRangeForLevel, 0), 1);
-    
-    // Ensure the progress bar updates when XP changes
-    console.log(`Level progress: ${xpProgressInLevel}/${xpRangeForLevel} = ${(xpProgress * 100).toFixed(1)}%`);
-    console.log(`Current XP: ${calculatedTotalXP}, Current Level: ${currentLevel.level}, Next Level: ${nextLevel.level} at ${nextLevel.xpRequired} XP`);
-  } else {
-    // At max level
-    xpProgress = 1;
-    console.log(`At max level ${currentLevel.level} with ${calculatedTotalXP} XP`);
   }
   
   return (
@@ -572,8 +550,8 @@ const Achievements: React.FC<AchievementsProps> = ({
       }]}>
         <View style={styles.levelHeader}>
           <View>
-            <Text style={[styles.levelTitle, { color: isDark ? theme.text : '#333' }]}>Level {currentLevel.level}</Text>
-            <Text style={[styles.levelSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>{currentLevel.title}</Text>
+            <Text style={[styles.levelTitle, { color: isDark ? theme.text : '#333' }]}>Level {currentLevel}</Text>
+            <Text style={[styles.levelSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>{currentLevelData?.title || ''}</Text>
           </View>
           <View style={[styles.xpContainer, { 
             backgroundColor: isDark ? 'rgba(255,249,196,0.2)' : '#FFF9C4',
@@ -593,12 +571,11 @@ const Achievements: React.FC<AchievementsProps> = ({
           />
         </View>
         
-        {nextLevel && (
+        {nextLevelData ? (
           <Text style={[styles.nextLevelText, { color: isDark ? theme.textSecondary : '#666' }]}>
-            {nextLevel.xpRequired - calculatedTotalXP} XP to Level {nextLevel.level}: {nextLevel.title}
+            {xpToNextLevel} XP to Level {nextLevelData.level}: {nextLevelData.title}
           </Text>
-        )}
-        {!nextLevel && (
+        ) : (
           <Text style={[styles.nextLevelText, { color: isDark ? theme.textSecondary : '#666' }]}>
             Maximum level reached! Congratulations!
           </Text>

@@ -63,6 +63,9 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   console.log('XP Boost active:', hasXpBoost);
   
+  // Calculate original (unboost) XP for display if boosted
+  const originalXpEarned = hasXpBoost ? Math.floor(xpEarned / 2) : xpEarned;
+  
   // FIX: Simplified level-up display logic
   // If levelUp exists, oldLevel and newLevel are valid, and oldLevel < newLevel, show the level-up UI
   const showLevelUp = !!levelUp && 
@@ -281,38 +284,18 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         {xpBreakdown && xpBreakdown.length > 0 ? (
           <View style={[
             styles.xpBreakdownContainer,
-            showLevelUp && styles.xpBreakdownCompact,
-            hasXpBoost && styles.xpBoostContainer
+            showLevelUp && styles.xpBreakdownCompact
           ]}>
-            <View style={styles.xpTotalRow}>
-              {hasXpBoost && (
-                <View style={styles.xpBoostBadge}>
-                  <Ionicons name="flash" size={showLevelUp ? 14 : 16} color="#FFFFFF" />
-                  <Text style={styles.xpBoostBadgeText}>2x</Text>
-                </View>
-              )}
-              <Ionicons 
-                name={hasXpBoost ? "star" : "star"} 
-                size={showLevelUp ? 20 : 24} 
-                color={hasXpBoost ? "#FFC107" : "#FF9800"} 
-              />
-              <Text style={[
-                styles.xpTotalText,
-                showLevelUp && {fontSize: 16}
-              ]}>
-                <Text style={styles.xpValue}>{xpEarned}</Text> XP {xpEarned > 0 ? 'Earned' : 'Earned from Previous Stretch'}
-                {hasXpBoost && <Text style={styles.xpBoostText}> (2x Boost)</Text>}
-              </Text>
-            </View>
+            {hasXpBoost && (
+              <View style={styles.xpBoostHeader}>
+                <Ionicons name="flash" size={16} color="#FFC107" />
+                <Text style={styles.xpBoostHeaderText}>2x XP Boost Active!</Text>
+              </View>
+            )}
             
-            <View style={styles.xpSeparator} />
-            
-            {/* If level-up is shown, only display non-zero XP items to save space */}
-            {xpBreakdown
-              .filter(item => !showLevelUp || item.amount > 0)
-              .map((item, index) => {
-                // Get appropriate icon based on source
+            {xpBreakdown.map((item, index) => {
                 let iconName = 'star-outline';
+                
                 switch (item.source) {
                   case 'routine':
                     iconName = 'fitness-outline';
@@ -338,12 +321,14 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                 return (
                   <View key={`${item.source}-${index}`} style={styles.xpBreakdownItem}>
                     {itemHasBoost && (
-                      <Ionicons 
-                        name="flash" 
-                        size={showLevelUp ? 12 : 14} 
-                        color="#FFC107" 
-                        style={styles.boostIcon} 
-                      />
+                      <View style={styles.boostBadgeSmall}>
+                        <Ionicons 
+                          name="flash" 
+                          size={showLevelUp ? 10 : 12} 
+                          color="#FFFFFF" 
+                        />
+                        <Text style={styles.boostBadgeTextSmall}>2x</Text>
+                      </View>
                     )}
                     <Ionicons 
                       name={iconName as any} 
@@ -356,11 +341,16 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
                       showLevelUp && {fontSize: 12}
                     ]}>
                       {item.amount > 0 ? (
-                        <Text style={styles.xpBreakdownValue}>+{item.amount} XP</Text>
+                        <Text>
+                          <Text style={[styles.xpBreakdownValue, itemHasBoost && styles.xpBoostValue]}>+{item.amount} XP</Text>
+                          {itemHasBoost && (
+                            <Text style={styles.originalXpText}> (was +{Math.floor(item.amount / 2)})</Text>
+                          )}
+                        </Text>
                       ) : (
                         <Text style={styles.xpBreakdownZero}>+0 XP</Text>
                       )}
-                      {" "}{item.description}
+                      {" "}{item.description.replace(' (2x XP Boost Applied)', '')}
                     </Text>
                   </View>
                 );
@@ -389,7 +379,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
               showLevelUp && {fontSize: 14}
             ]}>
               <Text style={styles.xpValue}>{xpEarned}</Text> XP Earned
-              {hasXpBoost && <Text style={styles.xpBoostText}> (2x Boost)</Text>}
+              {hasXpBoost && (
+                <Text>
+                  <Text style={styles.xpBoostText}> (2x Boost)</Text>
+                  <Text style={styles.originalXpText}> was {originalXpEarned}</Text>
+                </Text>
+              )}
             </Text>
           </View>
         )}
@@ -818,6 +813,47 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: -10,
+  },
+  xpBoostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+    width: '100%',
+  },
+  xpBoostHeaderText: {
+    color: '#FFC107',
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  xpBoostValue: {
+    color: '#FFC107',
+    fontWeight: 'bold',
+  },
+  originalXpText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    fontStyle: 'italic',
+  },
+  boostBadgeSmall: {
+    backgroundColor: '#FFC107',
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  boostBadgeTextSmall: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 8,
+    marginLeft: 1,
   },
 }));
 

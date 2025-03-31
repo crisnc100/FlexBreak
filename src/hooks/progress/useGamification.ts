@@ -8,6 +8,7 @@ import { EventEmitter } from '../../utils/EventEmitter';
 export const gamificationEvents = new EventEmitter();
 export const LEVEL_UP_EVENT = 'level_up';
 export const REWARD_UNLOCKED_EVENT = 'reward_unlocked';
+export const XP_UPDATED_EVENT = 'xp_updated';
 
 /**
  * Hook for interacting with the gamification system
@@ -76,6 +77,14 @@ export function useGamification() {
       // Update state with results
       if (result.xpEarned > 0) {
         setTotalXP(prev => prev + result.xpEarned);
+        
+        // Emit XP updated event
+        gamificationEvents.emit(XP_UPDATED_EVENT, {
+          previousXP: totalXP,
+          newXP: totalXP + result.xpEarned,
+          xpEarned: result.xpEarned,
+          source: 'routine'
+        });
       }
       
       if (result.levelUp) {
@@ -129,7 +138,7 @@ export function useGamification() {
     } finally {
       setIsLoading(false);
     }
-  }, [loadGamificationData, level]);
+  }, [loadGamificationData, level, totalXP]);
   
   // Claim a completed challenge
   const claimChallenge = useCallback(async (challengeId: string) => {
@@ -142,11 +151,25 @@ export function useGamification() {
         // Update XP
         if (result.xpEarned > 0) {
           setTotalXP(prev => prev + result.xpEarned);
+          
+          // Emit XP updated event
+          gamificationEvents.emit(XP_UPDATED_EVENT, {
+            previousXP: totalXP,
+            newXP: totalXP + result.xpEarned,
+            xpEarned: result.xpEarned,
+            source: 'challenge'
+          });
         }
         
         // Update level if needed
         if (result.levelUp) {
           setLevel(result.newLevel);
+          
+          // Emit level up event
+          gamificationEvents.emit(LEVEL_UP_EVENT, {
+            oldLevel: level,
+            newLevel: result.newLevel
+          });
         }
         
         // Refresh data
@@ -166,7 +189,7 @@ export function useGamification() {
     } finally {
       setIsLoading(false);
     }
-  }, [loadGamificationData, level]);
+  }, [loadGamificationData, level, totalXP]);
   
   // Check if a feature is unlocked
   const isFeatureUnlocked = useCallback(async (featureId: string): Promise<boolean> => {
@@ -236,6 +259,14 @@ export function useGamification() {
       // Update state with results
       if (amount > 0) {
         setTotalXP(prev => prev + amount);
+        
+        // Emit XP updated event
+        gamificationEvents.emit(XP_UPDATED_EVENT, {
+          previousXP: totalXP,
+          newXP: totalXP + amount,
+          xpEarned: amount,
+          source: source || 'manual'
+        });
       }
       
       // Check if level up occurred
@@ -244,6 +275,12 @@ export function useGamification() {
       
       if (levelUp) {
         setLevel(newLevelInfo.level);
+        
+        // Emit level up event
+        gamificationEvents.emit(LEVEL_UP_EVENT, {
+          oldLevel: level,
+          newLevel: newLevelInfo.level
+        });
       }
       
       // Refresh all data
@@ -266,7 +303,7 @@ export function useGamification() {
     } finally {
       setIsLoading(false);
     }
-  }, [loadGamificationData, level]);
+  }, [loadGamificationData, level, totalXP]);
   
   return {
     // State

@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useChallengeSystem } from '../../hooks/progress/useChallengeSystem';
 import { Challenge } from '../../utils/progress/types';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useGamification } from '../../hooks/progress/useGamification';
+import { useGamification, gamificationEvents, XP_UPDATED_EVENT } from '../../hooks/progress/useGamification';
+import * as xpBoostManager from '../../utils/progress/xpBoostManager';
 
 interface ChallengeListProps {
   isDark?: boolean;
@@ -29,11 +30,44 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'special'>('daily');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isXpBoostActive, setIsXpBoostActive] = useState(false);
+  const [xpBoostMultiplier, setXpBoostMultiplier] = useState(1);
+  
+  // Check for active XP boost
+  useEffect(() => {
+    const checkXpBoost = async () => {
+      try {
+        const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
+        setIsXpBoostActive(isActive);
+        setXpBoostMultiplier(isActive ? data.multiplier : 1);
+        console.log(`XP Boost status: ${isActive ? 'ACTIVE' : 'inactive'}, multiplier: ${isActive ? data.multiplier : 1}`);
+      } catch (error) {
+        console.error('Error checking XP boost status:', error);
+      }
+    };
+    
+    checkXpBoost();
+  }, []);
   
   // Refresh challenges when component mounts to ensure accurate data
   useEffect(() => {
     console.log('ChallengeList component mounted, refreshing data...');
-    refreshChallenges();
+    const refreshOnMount = async () => {
+      try {
+        console.log('Force refreshing challenges on mount to ensure accurate data');
+        await refreshChallenges();
+        console.log('Challenge refresh on mount completed');
+        
+        // Check XP boost status
+        const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
+        setIsXpBoostActive(isActive);
+        setXpBoostMultiplier(isActive ? data.multiplier : 1);
+      } catch (error) {
+        console.error('Error during initial challenge refresh:', error);
+      }
+    };
+    
+    refreshOnMount();
   }, [refreshChallenges]);
   
   // Refresh challenges when active tab changes to ensure data is current
@@ -49,6 +83,11 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
     try {
       // Use internal refresh first
       await refreshChallenges();
+      
+      // Check XP boost status
+      const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
+      setIsXpBoostActive(isActive);
+      setXpBoostMultiplier(isActive ? data.multiplier : 1);
       
       // Then use external refresh if provided
       if (externalRefresh) {
@@ -67,11 +106,40 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
     
     setClaimingId(challenge.id);
     try {
+      // First refresh challenges to make sure we have the latest data
+      console.log(`Refreshing challenges before claiming ${challenge.title}`);
+      await refreshChallenges();
+      
+      // Only proceed with claiming if the challenge meets requirements after refresh
+      const updatedChallenges = activeChallenges[challenge.category as 'daily' | 'weekly' | 'monthly' | 'special'] || [];
+      const updatedChallenge = updatedChallenges.find(c => c.id === challenge.id);
+      
+      if (!updatedChallenge) {
+        console.error('Challenge not found after refresh');
+        return;
+      }
+      
+      if (updatedChallenge.progress < updatedChallenge.requirement) {
+        console.error(`Cannot claim challenge "${challenge.title}" - progress (${updatedChallenge.progress}) is less than requirement (${updatedChallenge.requirement})`);
+        return;
+      }
+      
       const result = await claimChallenge(challenge.id);
       if (result.success) {
         // XP is already awarded by the challengeManager.claimChallenge function
         // No need to add XP again here
         console.log(`Successfully claimed ${challenge.title} challenge for ${result.xpEarned} XP`);
+        
+        // Emit XP update event to ensure all components update
+        gamificationEvents.emit(XP_UPDATED_EVENT, {
+          previousXP: 0, // We don't know the previous value here
+          newXP: 0, // We don't know the new value here
+          xpEarned: result.xpEarned,
+          source: 'challenge_claim'
+        });
+        
+        // Refresh the challenges list
+        refreshChallenges();
       } else {
         console.error('Failed to claim challenge:', result.message);
       }
@@ -112,14 +180,9 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
     const progress = Math.min(challenge.progress / challenge.requirement, 1);
     const isCompleted = challenge.completed;
     
-    // Special case for daily stretch challenge (routine_count with requirement=1)
+    // Define when a challenge is eligible for completion
     const isEligibleForCompletion = 
-      // Case 1: Daily stretch challenge with progress
-      (challenge.type === 'routine_count' && 
-       challenge.requirement === 1 && 
-       challenge.category === 'daily' && 
-       challenge.progress >= 1) ||
-      // Case 2: Any challenge that has met its requirement
+      // Only allow completion when progress meets or exceeds requirement
       (challenge.progress >= challenge.requirement);
                                    
     const isEffectivelyCompleted = isCompleted || isEligibleForCompletion;
@@ -128,6 +191,10 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
     const isClaimInProgress = claimingId === challenge.id;
     const isExpiring = challenge.expiryWarning;
     const timeRemaining = formatTimeRemaining(challenge.endDate);
+    
+    // Calculate boosted XP values if XP boost is active
+    const originalXP = challenge.xp;
+    const boostedXP = isXpBoostActive ? Math.round(originalXP * xpBoostMultiplier) : originalXP;
     
     // Determine if this is an "in progress" challenge
     const isInProgress = !isEffectivelyCompleted && !isClaimed && challenge.progress > 0;
@@ -146,6 +213,8 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
       - In Progress: ${isInProgress}
       - Claimed: ${isClaimed}
       - Claimable: ${isClaimable}
+      - XP boost active: ${isXpBoostActive}
+      - Original XP: ${originalXP}, Boosted XP: ${boostedXP}
     `);
 
     return (
@@ -167,6 +236,11 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
           isInProgress && {
             borderLeftWidth: 4,
             borderLeftColor: theme.accent
+          },
+          // Add gold border for XP boost on claimable challenges
+          isXpBoostActive && isClaimable && {
+            borderColor: '#FFC107',
+            borderWidth: 1
           }
         ]}
       >
@@ -175,9 +249,23 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
             {challenge.title}
             {isClaimable && <Text style={{color: theme.success}}> (Claim now!)</Text>}
           </Text>
-          <Text style={[styles.challengeXP, { color: theme.accent }]}>
-            {challenge.xp} XP
-          </Text>
+          <View style={styles.xpContainer}>
+            {isXpBoostActive && isClaimable && (
+              <View style={styles.xpBoostBadge}>
+                <Ionicons name="flash" size={10} color="#FFFFFF" />
+                <Text style={styles.xpBoostBadgeText}>2x</Text>
+              </View>
+            )}
+            <Text style={[
+              styles.challengeXP, 
+              { color: isXpBoostActive && isClaimable ? '#FFC107' : theme.accent }
+            ]}>
+              {isXpBoostActive && isClaimable ? boostedXP : originalXP} XP
+              {isXpBoostActive && isClaimable && (
+                <Text style={styles.originalXpText}> (was {originalXP})</Text>
+              )}
+            </Text>
+          </View>
         </View>
         
         <Text style={[styles.challengeDescription, { color: theme.textSecondary }]}>
@@ -248,9 +336,15 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
             style={[
               styles.claimButton, 
               { 
-                backgroundColor: theme.accent,
+                backgroundColor: challenge.progress >= challenge.requirement 
+                  ? (isXpBoostActive ? '#FFC107' : theme.accent) 
+                  : isDark ? '#555' : '#ccc',
                 // Add subtle glow effect in dark mode
-                shadowColor: isDark ? theme.accent : 'transparent',
+                shadowColor: isDark 
+                  ? (challenge.progress >= challenge.requirement 
+                    ? (isXpBoostActive ? '#FFC107' : theme.accent) 
+                    : 'transparent') 
+                  : 'transparent',
                 shadowOffset: { width: 0, height: 0 },
                 shadowOpacity: isDark ? 0.5 : 0,
                 shadowRadius: isDark ? 5 : 0,
@@ -258,12 +352,21 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
               }
             ]}
             onPress={() => handleClaim(challenge)}
-            disabled={isClaimInProgress}
+            disabled={isClaimInProgress || challenge.progress < challenge.requirement}
           >
             {isClaimInProgress ? (
               <ActivityIndicator size="small" color="#fff" />
+            ) : challenge.progress >= challenge.requirement ? (
+              <View style={styles.claimButtonContent}>
+                {isXpBoostActive && (
+                  <Ionicons name="flash" size={16} color="#FFFFFF" style={styles.claimButtonIcon} />
+                )}
+                <Text style={styles.claimButtonText}>
+                  Claim {isXpBoostActive ? '2x ' : ''}XP Reward
+                </Text>
+              </View>
             ) : (
-              <Text style={styles.claimButtonText}>Claim Reward</Text>
+              <Text style={styles.claimButtonText}>Not Complete</Text>
             )}
           </TouchableOpacity>
         )}
@@ -307,32 +410,40 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
 
     return (
       <View style={[styles.tabContainer, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE', borderBottomWidth: 1 }]}>
-        {tabs.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.tabButton,
-              activeTab === tab.key && { 
-                backgroundColor: theme.accent,
-                borderColor: theme.accent
-              },
-              activeTab !== tab.key && { 
-                backgroundColor: 'transparent',
-                borderColor: isDark ? 'rgba(255,255,255,0.2)' : theme.border
-              }
-            ]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text 
+        {isXpBoostActive && (
+          <View style={styles.boostIndicator}>
+            <Ionicons name="flash" size={14} color="#FFC107" />
+            <Text style={styles.boostText}>2x XP ACTIVE</Text>
+          </View>
+        )}
+        <View style={styles.tabButtons}>
+          {tabs.map(tab => (
+            <TouchableOpacity
+              key={tab.key}
               style={[
-                styles.tabText,
-                { color: activeTab === tab.key ? '#fff' : isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary }
+                styles.tabButton,
+                activeTab === tab.key && { 
+                  backgroundColor: isXpBoostActive ? '#FFC107' : theme.accent,
+                  borderColor: isXpBoostActive ? '#FFC107' : theme.accent
+                },
+                activeTab !== tab.key && { 
+                  backgroundColor: 'transparent',
+                  borderColor: isDark ? 'rgba(255,255,255,0.2)' : theme.border
+                }
               ]}
+              onPress={() => setActiveTab(tab.key)}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text 
+                style={[
+                  styles.tabText,
+                  { color: activeTab === tab.key ? '#fff' : isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary }
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
     );
   };
@@ -396,9 +507,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabContainer: {
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  tabButtons: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
   },
   tabButton: {
     flex: 1,
@@ -446,6 +560,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
+  xpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
   challengeXP: {
     fontSize: 16,
     fontWeight: '700',
@@ -482,6 +601,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  claimButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  claimButtonIcon: {
+    marginRight: 6,
+  },
   claimButtonText: {
     color: '#fff',
     fontWeight: '600',
@@ -517,5 +644,51 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     marginVertical: 16,
+  },
+  devButton: {
+    marginTop: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  devButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  loading: {
+    marginTop: 20,
+  },
+  xpBoostBadge: {
+    backgroundColor: '#FFC107',
+    borderRadius: 10,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  xpBoostBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 8,
+    marginLeft: 1,
+  },
+  originalXpText: {
+    fontSize: 12,
+    color: '#8A8A8A',
+    fontStyle: 'italic',
+  },
+  boostIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  boostText: {
+    color: '#FFC107',
+    fontWeight: 'bold',
+    fontSize: 12,
+    marginLeft: 4,
   },
 }); 

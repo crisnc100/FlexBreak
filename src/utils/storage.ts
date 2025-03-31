@@ -1,7 +1,7 @@
 
 
 // Import and re-export all functions from the new storageService
-import * as storageService from '../../../src/services/storageService';
+import * as storageService from '../services/storageService';
 
 // Re-export functions with the same names for backward compatibility
 export const saveIsPremium = storageService.saveIsPremium;
