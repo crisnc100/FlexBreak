@@ -9,7 +9,8 @@ import {
   Alert,
   Modal,
   SafeAreaView,
-  Switch
+  Switch,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -25,6 +26,15 @@ import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import StretchSelector from './StretchSelector';
 import stretches from '../../data/stretches';
 
+// Define a rest period type
+interface RestPeriod {
+  id: string;
+  name: string;
+  description: string;
+  duration: number;
+  isRest: true;
+}
+
 // Max number of custom routines a user can save
 const MAX_CUSTOM_ROUTINES = 10;
 
@@ -35,7 +45,7 @@ interface CustomRoutine {
   area: BodyArea;
   duration: Duration;
   timestamp: string;
-  customStretches?: { id: number }[];
+  customStretches?: { id: number | string; isRest?: boolean }[];
 }
 
 interface CustomRoutineModalProps {
@@ -61,7 +71,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   const [selectedDuration, setSelectedDuration] = useState<Duration>('5');
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [showStretchSelector, setShowStretchSelector] = useState(false);
-  const [selectedStretches, setSelectedStretches] = useState<Stretch[]>([]);
+  const [selectedStretches, setSelectedStretches] = useState<(Stretch | RestPeriod)[]>([]);
   const [useCustomStretches, setUseCustomStretches] = useState(false);
   
   // Body area options
@@ -76,6 +86,31 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     { value: '15', label: '15 minutes' }
   ];
 
+  // Rest period options
+  const restPeriods: RestPeriod[] = [
+    { 
+      id: 'rest-15', 
+      name: "15-Second Break", 
+      description: "A short break to transition to the next stretch position or take a quick breath.",
+      duration: 15,
+      isRest: true
+    },
+    { 
+      id: 'rest-30', 
+      name: "30-Second Break", 
+      description: "Take a moment to recover, breathe deeply, and prepare for the next stretch.",
+      duration: 30,
+      isRest: true
+    },
+    { 
+      id: 'rest-60', 
+      name: "1-Minute Break", 
+      description: "A longer break to fully recover, hydrate, and mentally prepare for the next part of your routine.",
+      duration: 60,
+      isRest: true
+    },
+  ];
+  
   // When area or duration changes, reset selected stretches
   useEffect(() => {
     setSelectedStretches([]);
@@ -135,6 +170,40 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
         return;
       }
       
+      // Validate minimum time requirements when using custom stretches
+      if (useCustomStretches && selectedStretches.length > 0) {
+        // Calculate total time
+        const totalTime = selectedStretches.reduce((total, stretch) => {
+          if ('isRest' in stretch) {
+            return total + stretch.duration;
+          }
+          return total + (stretch.bilateral ? stretch.duration * 2 : stretch.duration);
+        }, 0);
+        
+        // Convert to minutes for easier comparison
+        const totalMinutes = totalTime / 60;
+        const durationValue = parseInt(selectedDuration);
+        
+        // Set minimum required minutes based on selected duration
+        let minimumMinutes = 1.5;  // Default for 5-minute routines
+        
+        if (durationValue === 10) {
+          minimumMinutes = 6;
+        } else if (durationValue === 15) {
+          minimumMinutes = 11;
+        }
+        
+        // Check if total time meets minimum requirements
+        if (totalMinutes < minimumMinutes) {
+          Alert.alert(
+            'More Content Needed',
+            `For a ${durationValue}-minute routine, please add at least ${minimumMinutes} minutes of content. You currently have ${totalMinutes.toFixed(1)} minutes.`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
       const newRoutine: any = {
         name: routineName.trim(),
         area: selectedArea,
@@ -143,22 +212,12 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       
       // Add selected stretches if using custom stretches
       if (useCustomStretches && selectedStretches.length > 0) {
-        newRoutine.customStretches = selectedStretches.map(stretch => ({ id: stretch.id }));
-      }
-      
-      // If not enough stretches were selected, inform the user
-      if (useCustomStretches && selectedStretches.length > 0) {
-        const totalTime = selectedStretches.reduce((total, stretch) => 
-          total + (stretch.bilateral ? stretch.duration * 2 : stretch.duration), 0);
-        const targetTime = parseInt(selectedDuration) * 60;
-        
-        if (totalTime < targetTime) {
-          Alert.alert(
-            'Incomplete Routine',
-            `You've selected stretches that cover ${Math.floor(totalTime/60)} minutes of your ${selectedDuration} minute routine. We'll add suitable stretches to complete your routine when you start it.`,
-            [{ text: 'OK' }]
-          );
-        }
+        newRoutine.customStretches = selectedStretches.map(stretch => {
+          if ('isRest' in stretch) {
+            return { id: stretch.id, isRest: true };
+          }
+          return { id: stretch.id };
+        });
       }
       
       // Save to storage service
@@ -198,13 +257,47 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     // Add custom stretches if available
     if (routine.customStretches && routine.customStretches.length > 0) {
       const selectedStretchDetails = routine.customStretches.map(s => {
-        const stretchDetail = stretches.find(stretch => stretch.id === s.id);
-        return stretchDetail;
-      }).filter(Boolean) as Stretch[];
+        if (s.isRest) {
+          // Handle rest periods
+          const restPeriodId = s.id.toString();
+          // Find matching rest period from our predefined options
+          if (restPeriodId === 'rest-15') {
+            return { 
+              id: 'rest-15', 
+              name: "15-Second Break", 
+              description: "A short rest to reset between stretches",
+              duration: 15,
+              isRest: true
+            };
+          } else if (restPeriodId === 'rest-30') {
+            return { 
+              id: 'rest-30', 
+              name: "30-Second Break", 
+              description: "A medium rest between stretches",
+              duration: 30,
+              isRest: true
+            };
+          } else if (restPeriodId === 'rest-60') {
+            return { 
+              id: 'rest-60', 
+              name: "1-Minute Break", 
+              description: "A longer rest between stretches",
+              duration: 60,
+              isRest: true
+            };
+          }
+          return null;
+        } else {
+          // Handle regular stretches
+          const stretchDetail = stretches.find(stretch => stretch.id === s.id);
+          return stretchDetail;
+        }
+      }).filter(Boolean) as (Stretch | RestPeriod)[];
       
       params.customStretches = selectedStretchDetails;
       
-      console.log(`Starting routine with ${selectedStretchDetails.length} custom stretches`);
+      console.log(`Starting routine with ${selectedStretchDetails.length} items (including ${
+        selectedStretchDetails.filter(s => 'isRest' in s).length} rest periods)`);
     }
     
     onStartRoutine(params);
@@ -250,9 +343,30 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   };
   
   // Handle stretches selected
-  const handleStretchesSelected = (stretches: Stretch[]) => {
+  const handleStretchesSelected = (stretches: (Stretch | RestPeriod)[]) => {
     setSelectedStretches(stretches);
+    // Don't close the modal - let the user close it manually
+  };
+  
+  // Handle closing the stretch selector
+  const handleCloseStretchSelector = () => {
     setShowStretchSelector(false);
+  };
+  
+  // Get minimum time requirement based on duration
+  const getMinimumTimeRequirement = () => {
+    const durationValue = parseInt(selectedDuration);
+    
+    // Set minimum required minutes based on selected duration
+    let minimumMinutes = 1.5;  // Default for 5-minute routines
+    
+    if (durationValue === 10) {
+      minimumMinutes = 6;
+    } else if (durationValue === 15) {
+      minimumMinutes = 11;
+    }
+    
+    return minimumMinutes * 60; // Convert to seconds
   };
   
   // Format custom stretches info
@@ -261,54 +375,194 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       return 'No stretches selected yet';
     }
     
-    const totalTime = selectedStretches.reduce((total, stretch) => 
-      total + (stretch.bilateral ? stretch.duration * 2 : stretch.duration), 0);
+    // Calculate total time including rest periods
+    const totalTime = selectedStretches.reduce((total, stretch) => {
+      if ('isRest' in stretch) {
+        return total + stretch.duration;
+      }
+      return total + (stretch.bilateral ? stretch.duration * 2 : stretch.duration);
+    }, 0);
+    
     const targetTime = parseInt(selectedDuration) * 60;
+    const stretchCount = selectedStretches.filter(s => !('isRest' in s)).length;
+    const restCount = selectedStretches.filter(s => 'isRest' in s).length;
     
-    const coverage = Math.floor((totalTime / targetTime) * 100);
+    // Format time in minutes
+    const minutes = Math.floor(totalTime / 60);
+    const seconds = totalTime % 60;
+    const timeDisplay = seconds > 0 ? 
+      `${minutes}m ${seconds}s` : 
+      `${minutes}m`;
+      
+    // Get minimum time requirement
+    const minimumTimeRequired = getMinimumTimeRequirement();
     
-    return `${selectedStretches.length} stretches (${coverage}% of routine)`;
+    // Check if time meets minimum requirement
+    if (totalTime < minimumTimeRequired) {
+      const minMinutes = Math.floor(minimumTimeRequired / 60);
+      const minSeconds = minimumTimeRequired % 60;
+      const minTimeDisplay = minSeconds > 0 ? 
+        `${minMinutes}m ${minSeconds}s` : 
+        `${minMinutes}m`;
+        
+      return `${stretchCount} stretches, ${restCount} breaks (${timeDisplay}) - Minimum ${minTimeDisplay} required`;
+    }
+    
+    return `${stretchCount} stretches, ${restCount} breaks (${timeDisplay})`;
+  };
+  
+  // Check if current selection meets minimum requirement
+  const meetsMinimumRequirement = () => {
+    if (!useCustomStretches || selectedStretches.length === 0) {
+      return true; // No need to check if not using custom stretches
+    }
+    
+    // Calculate total time
+    const totalTime = selectedStretches.reduce((total, stretch) => {
+      if ('isRest' in stretch) {
+        return total + stretch.duration;
+      }
+      return total + (stretch.bilateral ? stretch.duration * 2 : stretch.duration);
+    }, 0);
+    
+    // Get minimum time requirement
+    const minimumTimeRequired = getMinimumTimeRequirement();
+    
+    return totalTime >= minimumTimeRequired;
+  };
+  
+  // Add a rest period to selected stretches
+  const addRestPeriod = (restPeriod: RestPeriod) => {
+    setSelectedStretches([...selectedStretches, restPeriod]);
+  };
+  
+  // Remove a stretch or rest period at specific index
+  const removeItem = (index: number) => {
+    const updatedStretches = [...selectedStretches];
+    updatedStretches.splice(index, 1);
+    setSelectedStretches(updatedStretches);
+  };
+  
+  // Move an item in the selected stretches array
+  const moveItem = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= selectedStretches.length) return;
+    
+    const updatedStretches = [...selectedStretches];
+    const item = updatedStretches[fromIndex];
+    updatedStretches.splice(fromIndex, 1);
+    updatedStretches.splice(toIndex, 0, item);
+    setSelectedStretches(updatedStretches);
   };
   
   // Render a routine item
-  const renderRoutineItem = ({ item }: { item: CustomRoutine }) => (
-    <View style={[
-      styles.routineItem,
-      { backgroundColor: isDark ? theme.backgroundLight : '#fff' }
-    ]}>
-      <View style={styles.routineInfo}>
-        <Text style={[
-          styles.routineName,
-          { color: theme.text }
-        ]}>
-          {item.name}
-        </Text>
-        <Text style={[
-          styles.routineDetails,
-          { color: theme.textSecondary }
-        ]}>
-          {item.area} • {item.duration} minutes
-          {item.customStretches && ` • ${item.customStretches.length} custom stretches`}
-        </Text>
-      </View>
-      
-      <View style={styles.routineActions}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => startCustomRoutine(item)}
-        >
-          <Ionicons name="play" size={18} color={theme.accent} />
-        </TouchableOpacity>
+  const renderRoutineItem = ({ item }: { item: CustomRoutine }) => {
+    // Calculate count of stretches and breaks
+    let stretchCount = 0;
+    let breakCount = 0;
+    
+    if (item.customStretches) {
+      stretchCount = item.customStretches.filter(s => !s.isRest).length;
+      breakCount = item.customStretches.filter(s => s.isRest).length;
+    }
+    
+    return (
+      <View style={[
+        styles.routineItem,
+        { backgroundColor: isDark ? theme.backgroundLight : '#fff' }
+      ]}>
+        <View style={styles.routineInfo}>
+          <Text style={[
+            styles.routineName,
+            { color: theme.text }
+          ]}>
+            {item.name}
+          </Text>
+          <Text style={[
+            styles.routineDetails,
+            { color: theme.textSecondary }
+          ]}>
+            {item.area} • {item.duration} minutes
+            {item.customStretches && ` • ${stretchCount} stretches${breakCount > 0 ? `, ${breakCount} breaks` : ''}`}
+          </Text>
+        </View>
         
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => deleteCustomRoutine(item.id)}
-        >
-          <Ionicons name="trash" size={18} color="#FF5252" />
-        </TouchableOpacity>
+        <View style={styles.routineActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => startCustomRoutine(item)}
+          >
+            <Ionicons name="play" size={18} color={theme.accent} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => deleteCustomRoutine(item.id)}
+          >
+            <Ionicons name="trash" size={18} color="#FF5252" />
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
+
+  // Render a selected item (stretch or rest period)
+  const renderSelectedItem = (item: Stretch | RestPeriod, index: number) => {
+    const isRest = 'isRest' in item;
+    
+    return (
+      <View 
+        key={`${item.id}-${index}`} 
+        style={[
+          styles.selectedItemRow, 
+          { backgroundColor: isDark ? theme.backgroundLight : '#f8f8f8' }
+        ]}
+      >
+        <View style={styles.selectedItemInfo}>
+          <View style={styles.itemIndexContainer}>
+            <Text style={[styles.itemIndexText, { color: theme.textSecondary }]}>
+              {index + 1}
+            </Text>
+          </View>
+          
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.selectedItemName, { color: theme.text }]}>
+              {item.name}
+            </Text>
+            <Text style={[styles.selectedItemDuration, { color: theme.textSecondary }]}>
+              {isRest ? `${item.duration}s rest` : `${item.duration}s${(item as Stretch).bilateral ? ' (both sides)' : ''}`}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.selectedItemActions}>
+          {index > 0 && (
+            <TouchableOpacity 
+              style={styles.itemActionButton} 
+              onPress={() => moveItem(index, index - 1)}
+            >
+              <Ionicons name="chevron-up" size={20} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
+          
+          {index < selectedStretches.length - 1 && (
+            <TouchableOpacity 
+              style={styles.itemActionButton} 
+              onPress={() => moveItem(index, index + 1)}
+            >
+              <Ionicons name="chevron-down" size={20} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity 
+            style={styles.itemActionButton} 
+            onPress={() => removeItem(index)}
+          >
+            <Ionicons name="close" size={20} color="#FF5252" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   // If hasAccess is null, we're still loading
   if (hasAccess === null) {
@@ -411,133 +665,214 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
               Create New Routine
             </Text>
             
-            <TextInput
-              style={[
-                styles.textInput,
-                { 
-                  color: theme.text,
-                  backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
-                  borderColor: theme.border
-                }
-              ]}
-              placeholder="Routine name"
-              placeholderTextColor={theme.textSecondary}
-              value={routineName}
-              onChangeText={setRoutineName}
-            />
-            
-            <Text style={[
-              styles.formLabel,
-              { color: theme.text }
-            ]}>
-              Area
-            </Text>
-            
-            <View style={styles.optionsGrid}>
-              {bodyAreas.map(area => (
-                <TouchableOpacity
-                  key={area}
-                  style={[
-                    styles.optionButton,
-                    { 
-                      backgroundColor: selectedArea === area 
-                        ? theme.accent 
-                        : isDark ? theme.backgroundLight : '#f5f5f5'
-                    }
-                  ]}
-                  onPress={() => setSelectedArea(area)}
-                >
-                  <Text style={[
-                    styles.optionText,
-                    { color: selectedArea === area ? '#fff' : theme.text }
-                  ]}>
-                    {area}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            <Text style={[
-              styles.formLabel,
-              { color: theme.text }
-            ]}>
-              Duration
-            </Text>
-            
-            <View style={styles.durationOptions}>
-              {durations.map(duration => (
-                <TouchableOpacity
-                  key={duration.value}
-                  style={[
-                    styles.durationButton,
-                    { 
-                      backgroundColor: selectedDuration === duration.value 
-                        ? theme.accent 
-                        : isDark ? theme.backgroundLight : '#f5f5f5'
-                    }
-                  ]}
-                  onPress={() => setSelectedDuration(duration.value)}
-                >
-                  <Text style={[
-                    styles.durationText,
-                    { color: selectedDuration === duration.value ? '#fff' : theme.text }
-                  ]}>
-                    {duration.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            <View style={styles.customStretchesOption}>
-              <View style={styles.switchLabelContainer}>
-                <Text style={[styles.switchLabel, { color: theme.text }]}>
-                  Choose specific stretches
-                </Text>
-                <Text style={[styles.switchSubLabel, { color: theme.textSecondary }]}>
-                  {useCustomStretches ? formatCustomStretchesInfo() : 'We\'ll pick the best stretches for you'}
-                </Text>
-              </View>
-              <Switch
-                value={useCustomStretches}
-                onValueChange={setUseCustomStretches}
-                trackColor={{ false: '#767577', true: theme.accent + '50' }}
-                thumbColor={useCustomStretches ? theme.accent : '#f4f3f4'}
-              />
-            </View>
-            
-            {useCustomStretches && (
-              <TouchableOpacity
+            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
+              <TextInput
                 style={[
-                  styles.selectStretchesButton,
+                  styles.textInput,
                   { 
+                    color: theme.text,
                     backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
                     borderColor: theme.border
                   }
                 ]}
-                onPress={openStretchSelector}
-              >
-                <Ionicons 
-                  name="fitness-outline" 
-                  size={20} 
-                  color={theme.accent}
-                  style={styles.selectStretchesIcon} 
+                placeholder="Routine name"
+                placeholderTextColor={theme.textSecondary}
+                value={routineName}
+                onChangeText={setRoutineName}
+              />
+              
+              <Text style={[
+                styles.formLabel,
+                { color: theme.text }
+              ]}>
+                Area
+              </Text>
+              
+              <View style={styles.optionsGrid}>
+                {bodyAreas.map(area => (
+                  <TouchableOpacity
+                    key={area}
+                    style={[
+                      styles.optionButton,
+                      { 
+                        backgroundColor: selectedArea === area 
+                          ? theme.accent 
+                          : isDark ? theme.backgroundLight : '#f5f5f5'
+                      }
+                    ]}
+                    onPress={() => setSelectedArea(area)}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      { color: selectedArea === area ? '#fff' : theme.text }
+                    ]}>
+                      {area}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <Text style={[
+                styles.formLabel,
+                { color: theme.text }
+              ]}>
+                Duration
+              </Text>
+              
+              <View style={styles.durationOptions}>
+                {durations.map(duration => (
+                  <TouchableOpacity
+                    key={duration.value}
+                    style={[
+                      styles.durationButton,
+                      { 
+                        backgroundColor: selectedDuration === duration.value 
+                          ? theme.accent 
+                          : isDark ? theme.backgroundLight : '#f5f5f5'
+                      }
+                    ]}
+                    onPress={() => setSelectedDuration(duration.value)}
+                  >
+                    <Text style={[
+                      styles.durationText,
+                      { color: selectedDuration === duration.value ? '#fff' : theme.text }
+                    ]}>
+                      {duration.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <View style={styles.customStretchesOption}>
+                <View style={styles.switchLabelContainer}>
+                  <Text style={[styles.switchLabel, { color: theme.text }]}>
+                    Choose specific stretches
+                  </Text>
+                  <Text style={[
+                    styles.switchSubLabel, 
+                    { 
+                      color: useCustomStretches && !meetsMinimumRequirement() 
+                        ? '#FF5252' 
+                        : theme.textSecondary 
+                    }
+                  ]}>
+                    {useCustomStretches ? formatCustomStretchesInfo() : 'We\'ll pick the best stretches for you'}
+                  </Text>
+                </View>
+                <Switch
+                  value={useCustomStretches}
+                  onValueChange={setUseCustomStretches}
+                  trackColor={{ false: '#767577', true: theme.accent + '50' }}
+                  thumbColor={useCustomStretches ? theme.accent : '#f4f3f4'}
                 />
-                <Text style={[styles.selectStretchesText, { color: theme.text }]}>
-                  {selectedStretches.length > 0 ? 'Edit selected stretches' : 'Select stretches'}
+              </View>
+              
+              {useCustomStretches && (
+                <>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Select Stretches</Text>
+                  </View>
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.selectStretchesButton,
+                      { 
+                        backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+                        borderColor: theme.border
+                      }
+                    ]}
+                    onPress={openStretchSelector}
+                  >
+                    <Ionicons 
+                      name="fitness-outline" 
+                      size={20} 
+                      color={theme.accent}
+                      style={styles.selectStretchesIcon} 
+                    />
+                    <Text style={[styles.selectStretchesText, { color: theme.text }]}>
+                      {selectedStretches.filter(s => !('isRest' in s)).length > 0 
+                        ? 'Edit selected stretches' 
+                        : 'Select stretches'
+                      }
+                    </Text>
+                    <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Add Rest Periods</Text>
+                  </View>
+                  
+                  <View style={styles.restPeriodsContainer}>
+                    {restPeriods.map((restPeriod) => (
+                      <TouchableOpacity
+                        key={restPeriod.id}
+                        style={[
+                          styles.restPeriodButton,
+                          { backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5' }
+                        ]}
+                        onPress={() => addRestPeriod(restPeriod)}
+                      >
+                        <View style={styles.restPeriodIconContainer}>
+                          <Ionicons name="time-outline" size={24} color={theme.accent} />
+                        </View>
+                        <View style={styles.restPeriodContent}>
+                          <Text style={[styles.restPeriodName, { color: theme.text }]}>
+                            {restPeriod.name}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.restPeriodDescription, { color: theme.textSecondary }]}
+                          >
+                            {restPeriod.description}
+                          </Text>
+                        </View>
+                        <Ionicons name="add-circle" size={24} color={theme.accent} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  {selectedStretches.length > 0 && (
+                    <>
+                      <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                          Your Routine Order
+                        </Text>
+                        <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                          Drag to reorder
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.selectedItemsContainer}>
+                        {selectedStretches.map((item, index) => (
+                          renderSelectedItem(item, index)
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </>
+              )}
+              
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  { 
+                    backgroundColor: (useCustomStretches && !meetsMinimumRequirement()) 
+                      ? '#CCCCCC' 
+                      : theme.accent,
+                    opacity: (useCustomStretches && !meetsMinimumRequirement()) ? 0.7 : 1
+                  }
+                ]}
+                onPress={saveCustomRoutine}
+                disabled={useCustomStretches && !meetsMinimumRequirement()}
+              >
+                <Text style={styles.saveButtonText}>
+                  {(useCustomStretches && !meetsMinimumRequirement())
+                    ? 'Add More Stretches First'
+                    : 'Save Routine'
+                  }
                 </Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
               </TouchableOpacity>
-            )}
-            
-            <TouchableOpacity
-              style={[
-                styles.saveButton,
-                { backgroundColor: theme.accent }
-              ]}
-              onPress={saveCustomRoutine}
-            >
-              <Text style={styles.saveButtonText}>Save Routine</Text>
-            </TouchableOpacity>
+            </ScrollView>
           </View>
         )}
         
@@ -559,13 +894,13 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
         
         {/* Routines List */}
         {customRoutines.length > 0 ? (
-          <FlatList
-            data={customRoutines}
-            renderItem={renderRoutineItem}
-            keyExtractor={item => item.id}
-            style={styles.routinesList}
-            contentContainerStyle={styles.listContent}
-          />
+          <View style={styles.routinesList}>
+            {customRoutines.map(item => (
+              <View key={item.id} style={styles.routineItemContainer}>
+                {renderRoutineItem({ item })}
+              </View>
+            ))}
+          </View>
         ) : (
           <View style={styles.emptyState}>
             <Ionicons 
@@ -609,7 +944,13 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         
-        {modalContent()}
+        <ScrollView 
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+        >
+          {modalContent()}
+        </ScrollView>
         
         {/* Stretch Selector Modal */}
         <Modal
@@ -623,7 +964,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
               duration={selectedDuration}
               selectedStretches={selectedStretches}
               onStretchesSelected={handleStretchesSelected}
-              onClose={() => setShowStretchSelector(false)}
+              onClose={handleCloseStretchSelector}
             />
           </SafeAreaView>
         </Modal>
@@ -675,10 +1016,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   routinesList: {
-    flex: 1,
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
-  listContent: {
-    padding: 16,
+  routineItemContainer: {
+    marginBottom: 12,
   },
   routineItem: {
     flexDirection: 'row',
@@ -739,6 +1081,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    maxHeight: '80%',
   },
   formTitle: {
     fontSize: 16,
@@ -794,6 +1137,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 20,
   },
   saveButtonText: {
     color: '#fff',
@@ -875,6 +1219,95 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 12,
     color: '#5D4037',
+    flex: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+  },
+  restPeriodsContainer: {
+    marginBottom: 16,
+  },
+  restPeriodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  restPeriodIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  restPeriodContent: {
+    flex: 1,
+  },
+  restPeriodName: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  restPeriodDescription: {
+    fontSize: 12,
+  },
+  selectedItemsContainer: {
+    marginBottom: 16,
+  },
+  selectedItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    justifyContent: 'space-between',
+  },
+  selectedItemInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  itemIndexContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  itemIndexText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  selectedItemName: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  selectedItemDuration: {
+    fontSize: 12,
+  },
+  selectedItemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  itemActionButton: {
+    padding: 6,
+  },
+  scrollContainer: {
     flex: 1,
   },
 });

@@ -316,6 +316,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 hideLabel="Hide"
                 theme={theme}
                 isDark={isDark}
+                isCustom={!!item.customStretches && item.customStretches.length > 0}
               />
             ))}
           </View>
@@ -370,6 +371,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 hideLabel="Hide"
                 theme={theme}
                 isDark={isDark}
+                isCustom={!!item.customStretches && item.customStretches.length > 0}
               />
             ))}
           </>

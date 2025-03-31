@@ -20,11 +20,19 @@ export interface Tip {
   text: string;
 }
 
+export interface RestPeriod {
+  id: string;
+  name: string;
+  description: string;
+  duration: number;
+  isRest: true;
+}
+
 export interface RoutineParams {
   area: BodyArea;
   duration: Duration;
   level?: StretchLevel;
-  customStretches?: Stretch[]; // Optional array of custom stretches for the routine
+  customStretches?: (Stretch | RestPeriod)[]; // Optional array of custom stretches for the routine
 }
 
 export interface ProgressEntry {
@@ -33,6 +41,7 @@ export interface ProgressEntry {
   duration: Duration;
   stretchCount?: number; // Number of stretches in the routine
   hidden?: boolean; // Optional property to mark if a routine is hidden from view but still counted in stats
+  customStretches?: { id: number | string; isRest?: boolean }[]; // Optional array of custom stretches IDs
 }
 
 export type RootStackParamList = {

@@ -166,12 +166,16 @@ export const addXP = async (
   let boostedAmount = validAmount;
   let boostedDetails = details;
   
-  // Apply XP boost if active (to all XP sources)
-  if (isXpBoostActive) {
+  // Only apply XP boost if active AND not already applied (check if details already mentions boost)
+  const boostAlreadyApplied = details.includes('XP Boost Applied') || details.includes('2x XP');
+  
+  if (isXpBoostActive && !boostAlreadyApplied) {
     const multiplier = xpBoostData.multiplier;
     boostedAmount = Math.floor(validAmount * multiplier);
     boostedDetails = `${details} (${multiplier}x XP Boost Applied)`;
     console.log(`XP Boost applied: ${validAmount} → ${boostedAmount} XP (${multiplier}x)`);
+  } else if (boostAlreadyApplied) {
+    console.log(`XP Boost already applied, not boosting again: ${validAmount} XP`);
   }
   
   // Get current XP values

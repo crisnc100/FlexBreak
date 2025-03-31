@@ -13,7 +13,7 @@ import {
   Easing
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BodyArea, Duration, Stretch, StretchLevel } from '../../types';
+import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -23,7 +23,7 @@ export interface ActiveRoutineProps {
   area: BodyArea;
   duration: Duration;
   level: StretchLevel;
-  customStretches?: Stretch[];
+  customStretches?: (Stretch | RestPeriod)[];
   onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean) => Promise<void>;
   onNavigateHome: () => void;
 }
@@ -39,7 +39,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const { theme, isDark } = useTheme();
   
   // State
-  const [routine, setRoutine] = useState<Stretch[]>([]);
+  const [routine, setRoutine] = useState<(Stretch | RestPeriod)[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
@@ -187,9 +187,11 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Handle save and exit
   const handleSaveAndExit = () => {
     // Save progress
-    const stretchCount = routine.length;
+    const stretchCount = routine.filter(item => !('isRest' in item)).length;
     // Check if any stretch is an advanced stretch
-    const hasAdvancedStretch = routine.some(stretch => stretch.level === 'advanced');
+    const hasAdvancedStretch = routine.some(item => 
+      !('isRest' in item) && (item as Stretch).level === 'advanced'
+    );
     
     onComplete(area, duration, stretchCount, hasAdvancedStretch);
     Alert.alert('Progress Saved', 'Your routine has been saved to your progress');
@@ -199,11 +201,76 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Handle routine completion
   const handleComplete = () => {
     // Call the onComplete callback
-    const stretchCount = routine.length;
+    const stretchCount = routine.filter(item => !('isRest' in item)).length;
     // Check if any stretch is an advanced stretch
-    const hasAdvancedStretch = routine.some(stretch => stretch.level === 'advanced');
+    const hasAdvancedStretch = routine.some(item => 
+      !('isRest' in item) && (item as Stretch).level === 'advanced'
+    );
     
     onComplete(area, duration, stretchCount, hasAdvancedStretch);
+  };
+  
+  // Render the current stretch or rest period
+  const renderCurrentItem = () => {
+    if (!currentStretch) return null;
+
+    const isRest = 'isRest' in currentStretch;
+
+    return (
+      <Animated.View 
+        style={[styles.stretchContainer, { 
+          opacity: fadeAnim,
+          backgroundColor: isDark ? theme.background : '#FFF'
+        }]}
+      >
+        {isRest ? (
+          <View style={styles.restContainer}>
+            <Ionicons name="time-outline" size={60} color={isDark ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.restTitle, { color: isDark ? theme.text : '#333' }]}>
+              {currentStretch.name}
+            </Text>
+            <Text style={[styles.restDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
+              {currentStretch.description}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text style={[styles.stretchName, { color: isDark ? theme.text : '#333' }]}>
+              {currentStretch.name}
+            </Text>
+            
+            {currentStretch.bilateral && (
+              <View style={[styles.bilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+                <Ionicons name="swap-horizontal" size={16} color="#FFF" />
+                <Text style={styles.bilateralText}>Both Sides</Text>
+              </View>
+            )}
+            
+            <View style={[styles.imageContainer, { 
+              backgroundColor: isDark ? theme.cardBackground : '#FFF',
+              shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+            }]}>
+              {currentStretch.image && (
+                <Image 
+                  source={currentStretch.image} 
+                  style={styles.stretchImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+            
+            <ScrollView style={[styles.descriptionContainer, { 
+              backgroundColor: isDark ? theme.cardBackground : '#FFF',
+              borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0'
+            }]}>
+              <Text style={[styles.descriptionText, { color: isDark ? theme.text : '#333' }]}>
+                {currentStretch.description}
+              </Text>
+            </ScrollView>
+          </>
+        )}
+      </Animated.View>
+    );
   };
   
   // If routine is not loaded yet, show loading
@@ -264,62 +331,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       </View>
       
       {/* Main content */}
-      <Animated.View 
-        style={[styles.stretchContainer, { 
-          opacity: fadeAnim,
-          backgroundColor: isDark ? theme.background : '#FFF'
-        }]}
-      >
-        <Text style={[styles.stretchName, { color: isDark ? theme.text : '#333' }]}>
-          {currentStretch.name}
-        </Text>
-        
-        {currentStretch.bilateral && (
-          <View style={[styles.bilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
-            <Ionicons name="swap-horizontal" size={16} color="#FFF" />
-            <Text style={styles.bilateralText}>Both Sides</Text>
-          </View>
-        )}
-        
-        <View style={[styles.imageContainer, { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFF',
-          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
-        }]}>
-          {currentStretch.image && (
-            <Image 
-              source={currentStretch.image} 
-              style={styles.stretchImage}
-              resizeMode="contain"
-            />
-          )}
-        </View>
-        
-        <ScrollView style={[styles.descriptionContainer, { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFF',
-          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
-        }]}>
-          <Text style={[styles.descriptionText, { color: isDark ? theme.text : '#333' }]}>
-            {currentStretch.description}
-          </Text>
-          
-          {currentStretch.bilateral && (
-            <View style={[styles.bilateralInstructions, { 
-              backgroundColor: isDark ? 'rgba(76, 175, 80, 0.2)' : '#E8F5E9'
-            }]}>
-              <Ionicons 
-                name="information-circle-outline" 
-                size={20} 
-                color={isDark ? theme.accent : "#4CAF50"} 
-              />
-              <Text style={[styles.bilateralInstructionsText, { 
-                color: isDark ? theme.accent : '#2E7D32'
-              }]}>
-                This stretch should be performed on both sides. The timer will count down for the total time.
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      </Animated.View>
+      {renderCurrentItem()}
       
       {/* Improved Controls */}
       <View style={[styles.controlsContainer, { 
@@ -605,6 +617,24 @@ const styles = StyleSheet.create({
   overallProgressFill: {
     height: '100%',
     backgroundColor: '#FF9800',
+  },
+  restContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  restTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  restDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
   },
 });
 

@@ -13,6 +13,7 @@ interface RoutineItemProps {
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
   favorite?: boolean; // Whether the routine is favorited
+  isCustom?: boolean; // Whether this is a custom routine
 }
 
 // Helper function to format dates in a more readable format
@@ -43,7 +44,8 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
   hideLabel = 'Delete', // Default to "Delete" for backward compatibility
   theme: propTheme,
   isDark: propIsDark,
-  favorite = false
+  favorite = false,
+  isCustom = false
 }) => {
   // Use theme from props if provided, otherwise use theme context
   // This allows the component to work both when used standalone and when included in RoutineDashboard
@@ -53,6 +55,19 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
 
   // Get the formatted date
   const formattedDate = formatDate(item.date);
+
+  // Calculate stretches and breaks if there are customStretches
+  let stretchesInfo = '';
+  if (item.customStretches) {
+    const stretchCount = item.customStretches.filter(s => !s.isRest).length;
+    const breakCount = item.customStretches.filter(s => s.isRest).length;
+    
+    if (stretchCount > 0 && breakCount > 0) {
+      stretchesInfo = `${stretchCount} stretches, ${breakCount} breaks`;
+    } else if (stretchCount > 0) {
+      stretchesInfo = `${stretchCount} stretches`;
+    }
+  }
 
   // Render the right swipe actions (hide/delete)
   const renderRightActions = () => (
@@ -117,14 +132,24 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
             ]}>
               {item.area}
             </Text>
-            {favorite && (
-              <Ionicons 
-                name="star" 
-                size={16} 
-                color="#FFD700" 
-                style={styles.favoriteIcon}
-              />
-            )}
+            <View style={styles.indicatorContainer}>
+              {favorite && (
+                <Ionicons 
+                  name="star" 
+                  size={16} 
+                  color="#FFD700" 
+                  style={styles.favoriteIcon}
+                />
+              )}
+              {isCustom && (
+                <Ionicons 
+                  name="create-outline" 
+                  size={16} 
+                  color={isDark ? theme.accent : "#4CAF50"}
+                  style={styles.customIcon}
+                />
+              )}
+            </View>
           </View>
           <View style={styles.detailsRow}>
             <View style={styles.detailItem}>
@@ -153,6 +178,21 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
                 {formattedDate}
               </Text>
             </View>
+            {stretchesInfo && (
+              <View style={styles.detailItem}>
+                <Ionicons 
+                  name="fitness-outline" 
+                  size={14} 
+                  color={isDark ? theme.textSecondary : '#666'} 
+                />
+                <Text style={[
+                  styles.routineDetail, 
+                  { color: isDark ? theme.textSecondary : '#666' }
+                ]}>
+                  {stretchesInfo}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         <Ionicons 
@@ -192,6 +232,7 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   routineArea: {
     fontSize: 16,
@@ -199,7 +240,14 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
   },
+  indicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   favoriteIcon: {
+    marginLeft: 6,
+  },
+  customIcon: {
     marginLeft: 6,
   },
   detailsRow: {
