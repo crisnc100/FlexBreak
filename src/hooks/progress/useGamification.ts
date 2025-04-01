@@ -144,6 +144,12 @@ export function useGamification() {
   const claimChallenge = useCallback(async (challengeId: string) => {
     setIsLoading(true);
     try {
+      // Get the challenge information first to include it in notifications
+      const userProgress = await storageService.getUserProgress();
+      const challenge = userProgress.challenges[challengeId];
+      const challengeTitle = challenge?.title || 'Unknown Challenge';
+      const oldLevel = level; // Store current level to detect level-up
+      
       // Claim the challenge
       const result = await gamificationManager.claimChallenge(challengeId);
       
@@ -152,12 +158,13 @@ export function useGamification() {
         if (result.xpEarned > 0) {
           setTotalXP(prev => prev + result.xpEarned);
           
-          // Emit XP updated event
+          // Emit XP updated event with challenge details
           gamificationEvents.emit(XP_UPDATED_EVENT, {
             previousXP: totalXP,
             newXP: totalXP + result.xpEarned,
             xpEarned: result.xpEarned,
-            source: 'challenge'
+            source: 'challenge',
+            details: `From ${challengeTitle} challenge`
           });
         }
         
@@ -165,11 +172,18 @@ export function useGamification() {
         if (result.levelUp) {
           setLevel(result.newLevel);
           
-          // Emit level up event
+          // Emit level up event with detailed challenge source information
           gamificationEvents.emit(LEVEL_UP_EVENT, {
-            oldLevel: level,
-            newLevel: result.newLevel
+            oldLevel: oldLevel,
+            newLevel: result.newLevel,
+            source: 'challenge',
+            details: `From claiming ${challengeTitle} challenge`,
+            challengeId: challengeId,
+            challengeTitle: challengeTitle,
+            xpEarned: result.xpEarned
           });
+          
+          console.log(`Level up triggered by challenge ${challengeTitle} - Level ${oldLevel} to ${result.newLevel}`);
         }
         
         // Refresh data
@@ -260,12 +274,13 @@ export function useGamification() {
       if (amount > 0) {
         setTotalXP(prev => prev + amount);
         
-        // Emit XP updated event
+        // Emit XP updated event with improved details
         gamificationEvents.emit(XP_UPDATED_EVENT, {
           previousXP: totalXP,
           newXP: totalXP + amount,
           xpEarned: amount,
-          source: source || 'manual'
+          source: source || 'manual',
+          details: details || `From ${source || 'manual action'}`
         });
       }
       
@@ -276,10 +291,11 @@ export function useGamification() {
       if (levelUp) {
         setLevel(newLevelInfo.level);
         
-        // Emit level up event
+        // Emit level up event with source information
         gamificationEvents.emit(LEVEL_UP_EVENT, {
           oldLevel: level,
-          newLevel: newLevelInfo.level
+          newLevel: newLevelInfo.level,
+          source: source || 'manual' // Include the source of the XP that caused the level up
         });
       }
       

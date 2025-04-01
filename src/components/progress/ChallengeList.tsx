@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useChallengeSystem } from '../../hooks/progress/useChallengeSystem';
 import { Challenge } from '../../utils/progress/types';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification, gamificationEvents, XP_UPDATED_EVENT } from '../../hooks/progress/useGamification';
 import * as xpBoostManager from '../../utils/progress/xpBoostManager';
+import { RefreshableScrollView } from '../common';
+import { useRefresh } from '../../context/RefreshContext';
 
 interface ChallengeListProps {
   isDark?: boolean;
@@ -14,13 +16,25 @@ interface ChallengeListProps {
   onRefresh?: () => Promise<void>;
 }
 
-export const ChallengeList: React.FC<ChallengeListProps> = ({ 
+// Helper function to debounce function calls
+const debounce = (func: Function, delay: number) => {
+  let timeoutId: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      func(...args);
+    }, delay);
+  };
+};
+
+export const ChallengeList: React.FC<ChallengeListProps> = React.memo(({ 
   isDark: propIsDark, 
   theme: propTheme,
   onRefresh: externalRefresh
 }) => {
-  const { activeChallenges, loading, claimChallenge, refreshChallenges } = useChallengeSystem();
+  const { activeChallenges, loading, claimChallenge, refreshChallenges, preloadChallengesForTab } = useChallengeSystem();
   const themeContext = useTheme();
+  const { isRefreshing: globalRefreshing, refreshProgress } = useRefresh();
   
   // Use props if provided, otherwise use the context values
   const theme = propTheme || themeContext.theme;
@@ -30,24 +44,26 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly' | 'special'>('daily');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isManualTabChange, setIsManualTabChange] = useState(false);
   const [isXpBoostActive, setIsXpBoostActive] = useState(false);
   const [xpBoostMultiplier, setXpBoostMultiplier] = useState(1);
   
-  // Check for active XP boost
-  useEffect(() => {
-    const checkXpBoost = async () => {
-      try {
-        const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
-        setIsXpBoostActive(isActive);
-        setXpBoostMultiplier(isActive ? data.multiplier : 1);
-        console.log(`XP Boost status: ${isActive ? 'ACTIVE' : 'inactive'}, multiplier: ${isActive ? data.multiplier : 1}`);
-      } catch (error) {
-        console.error('Error checking XP boost status:', error);
-      }
-    };
-    
-    checkXpBoost();
+  // Memoize the check XP boost function
+  const checkXpBoost = useCallback(async () => {
+    try {
+      const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
+      setIsXpBoostActive(isActive);
+      setXpBoostMultiplier(isActive ? data.multiplier : 1);
+      console.log(`XP Boost status: ${isActive ? 'ACTIVE' : 'inactive'}, multiplier: ${isActive ? data.multiplier : 1}`);
+    } catch (error) {
+      console.error('Error checking XP boost status:', error);
+    }
   }, []);
+  
+  // Check for active XP boost - only on mount
+  useEffect(() => {
+    checkXpBoost();
+  }, [checkXpBoost]);
   
   // Refresh challenges when component mounts to ensure accurate data
   useEffect(() => {
@@ -59,25 +75,46 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
         console.log('Challenge refresh on mount completed');
         
         // Check XP boost status
-        const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
-        setIsXpBoostActive(isActive);
-        setXpBoostMultiplier(isActive ? data.multiplier : 1);
+        await checkXpBoost();
       } catch (error) {
         console.error('Error during initial challenge refresh:', error);
       }
     };
     
     refreshOnMount();
-  }, [refreshChallenges]);
+  }, [refreshChallenges, checkXpBoost]);
+  
+  // Debounced tab change handler to avoid spam refreshes
+  const debouncedRefreshOnTabChange = useCallback(
+    debounce(async (newTab: 'daily' | 'weekly' | 'monthly' | 'special') => {
+      console.log(`Tab changed to ${newTab}, updating challenges`);
+      // Don't set refreshing state for tab changes
+      try {
+        // Use category-specific refresh to avoid loading all data
+        await refreshChallenges(newTab);
+      } catch (error) {
+        console.error('Error refreshing after tab change:', error);
+      } finally {
+        setIsManualTabChange(false);
+      }
+    }, 300),
+    [refreshChallenges]
+  );
   
   // Refresh challenges when active tab changes to ensure data is current
   useEffect(() => {
-    console.log(`Tab changed to ${activeTab}, updating challenges`);
-    refreshChallenges();
-  }, [activeTab, refreshChallenges]);
+    // Only refresh if we're not currently refreshing and it's a genuine tab change
+    if (!isRefreshing && !loading) {
+      setIsManualTabChange(true);
+      // Use the category-specific refresh to avoid updating all tabs
+      debouncedRefreshOnTabChange(activeTab);
+    }
+  }, [activeTab, debouncedRefreshOnTabChange, isRefreshing, loading]);
   
   // CRITICAL FIX: Combined refresh function that uses both internal and external refresh
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing || isManualTabChange) return; // Prevent double refreshes
+    
     console.log('Manual refresh of challenges triggered');
     setIsRefreshing(true);
     try {
@@ -85,9 +122,7 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
       await refreshChallenges();
       
       // Check XP boost status
-      const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
-      setIsXpBoostActive(isActive);
-      setXpBoostMultiplier(isActive ? data.multiplier : 1);
+      await checkXpBoost();
       
       // Then use external refresh if provided
       if (externalRefresh) {
@@ -98,10 +133,10 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [refreshChallenges, checkXpBoost, externalRefresh, isRefreshing, isManualTabChange]);
 
   // Handle claiming a challenge
-  const handleClaim = async (challenge: Challenge) => {
+  const handleClaim = useCallback(async (challenge: Challenge) => {
     if (claimingId) return; // Prevent multiple claims at once
     
     setClaimingId(challenge.id);
@@ -130,12 +165,13 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
         // No need to add XP again here
         console.log(`Successfully claimed ${challenge.title} challenge for ${result.xpEarned} XP`);
         
-        // Emit XP update event to ensure all components update
+        // Emit XP update event with more user-friendly source and details
         gamificationEvents.emit(XP_UPDATED_EVENT, {
           previousXP: 0, // We don't know the previous value here
           newXP: 0, // We don't know the new value here
           xpEarned: result.xpEarned,
-          source: 'challenge_claim'
+          source: 'challenge',
+          details: `From ${challenge.title} challenge`
         });
         
         // Refresh the challenges list
@@ -148,10 +184,10 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
     } finally {
       setClaimingId(null);
     }
-  };
+  }, [claimingId, refreshChallenges, activeChallenges, claimChallenge]);
 
   // Format time remaining for challenge expiration
-  const formatTimeRemaining = (endDateStr: string) => {
+  const formatTimeRemaining = useCallback((endDateStr: string) => {
     const endDate = new Date(endDateStr);
     const now = new Date();
     
@@ -173,49 +209,139 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       return `${minutes}m left`;
     }
-  };
+  }, []);
 
-  // Render a challenge card
-  const renderChallengeCard = (challenge: Challenge) => {
+  // Memoize the tab change handler to maintain referential equality
+  const handleTabChange = useCallback((tab: 'daily' | 'weekly' | 'monthly' | 'special') => {
+    // Only change tab if it's different from current
+    if (tab !== activeTab) {
+      // First set the active tab to update UI immediately
+      setActiveTab(tab);
+      // Then preload the data for this tab in the background
+      preloadChallengesForTab(tab);
+      // The actual data refresh is handled by the effect that watches activeTab
+    }
+  }, [activeTab, preloadChallengesForTab]);
+
+  // Memoize the challenge cards to prevent unnecessary rerenders
+  // Only update when activeChallenges, activeTab, or relevant states change
+  // This is a key optimization point
+  const currentTabChallenges = useMemo(() => {
+    return activeChallenges[activeTab] || [];
+  }, [activeChallenges, activeTab]);
+
+  // Memoize the function that renders a challenge card
+  const renderChallengeCard = useCallback((challenge: Challenge) => {
     const progress = Math.min(challenge.progress / challenge.requirement, 1);
     const isCompleted = challenge.completed;
+    const now = new Date();
+    
+    // Calculate if the challenge is within its valid timeframe
+    const startDate = new Date(challenge.startDate);
+    const endDate = new Date(challenge.endDate);
+    const isWithinTimeframe = now >= startDate && now <= endDate;
+    
+    // For weekly challenges, check if they started this week and calculate current week's progress
+    const isWeeklyChallenge = challenge.category === 'weekly';
+    const startOfWeek = new Date();
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Get Sunday
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    // For weekly challenges, we need to ensure we're only counting progress from this week
+    const isCurrentWeekChallenge = isWeeklyChallenge ? startDate >= startOfWeek : true;
+    
+    // Weekly challenges should only show completion based on current week's progress
+    const effectiveProgress = isWeeklyChallenge 
+      ? (isCurrentWeekChallenge ? challenge.progress : 0) 
+      : challenge.progress;
+    
+    // Debug logging for weekly challenges
+    if (isWeeklyChallenge && challenge.title.includes('Weekly Dedication')) {
+      console.log(`Weekly Dedication Challenge Debug:
+        Title: ${challenge.title}
+        Raw Progress: ${challenge.progress}
+        Effective Progress: ${effectiveProgress}
+        Requirement: ${challenge.requirement}
+        Start Date: ${startDate.toISOString()}
+        Start of Week: ${startOfWeek.toISOString()}
+        Is Current Week: ${isCurrentWeekChallenge}
+        Is Within Timeframe: ${isWithinTimeframe}
+      `);
+    }
     
     // Define when a challenge is eligible for completion
     const isEligibleForCompletion = 
-      // Only allow completion when progress meets or exceeds requirement
-      (challenge.progress >= challenge.requirement);
-                                   
-    const isEffectivelyCompleted = isCompleted || isEligibleForCompletion;
+      effectiveProgress >= challenge.requirement && 
+      isWithinTimeframe &&
+      (!isWeeklyChallenge || (isWeeklyChallenge && isCurrentWeekChallenge));
+    
+    // For weekly challenges, ensure we're not showing completion based on last week's progress
+    const isEffectivelyCompleted = isWeeklyChallenge 
+      ? (isEligibleForCompletion && isCurrentWeekChallenge)
+      : (isCompleted || isEligibleForCompletion);
+    
     const isClaimed = challenge.claimed;
     const isClaimable = isEffectivelyCompleted && !isClaimed;
+    
+    // Debug logging for completion states
+    if (isWeeklyChallenge && challenge.title.includes('Weekly Dedication')) {
+      console.log(`Weekly Dedication Completion States:
+        Is Eligible: ${isEligibleForCompletion}
+        Is Effectively Completed: ${isEffectivelyCompleted}
+        Is Claimable: ${isClaimable}
+        Is Claimed: ${isClaimed}
+      `);
+    }
+    
     const isClaimInProgress = claimingId === challenge.id;
     const isExpiring = challenge.expiryWarning;
-    const timeRemaining = formatTimeRemaining(challenge.endDate);
     
+    // Calculate redemption period for completed challenges
+    let timeRemaining = '';
+    let isRedemptionExpiring = false;
+    
+    if (isEffectivelyCompleted && !isClaimed) {
+      const completedDate = challenge.dateCompleted 
+        ? new Date(challenge.dateCompleted)
+        : new Date(); // Use current time if just completed
+      
+      const redemptionHours = {
+        daily: 12,     // 12 hours to redeem
+        weekly: 72,    // 3 days to redeem
+        monthly: 168,  // 7 days to redeem
+        special: 168   // 7 days to redeem
+      }[challenge.category];
+      
+      const redemptionEndTime = new Date(completedDate.getTime() + (redemptionHours * 60 * 60 * 1000));
+      const timeToRedeem = redemptionEndTime.getTime() - now.getTime();
+      const hoursToRedeem = Math.max(0, Math.ceil(timeToRedeem / (1000 * 60 * 60)));
+      
+      if (hoursToRedeem > 0) {
+        timeRemaining = hoursToRedeem > 24 
+          ? `${Math.floor(hoursToRedeem / 24)}d ${hoursToRedeem % 24}h to claim`
+          : `${hoursToRedeem}h to claim`;
+        isRedemptionExpiring = hoursToRedeem <= 4; // Warning when less than 4 hours left
+      } else {
+        timeRemaining = 'Redemption period expired';
+      }
+    } else if (!isEffectivelyCompleted) {
+      timeRemaining = formatTimeRemaining(challenge.endDate);
+    }
+    
+    // Determine if this is an "in progress" challenge
+    const isInProgress = !isEffectivelyCompleted && !isClaimed && effectiveProgress > 0;
+    
+    // Calculate percentage for display based on effective progress
+    const progressPercentage = Math.round((effectiveProgress / challenge.requirement) * 100);
+
     // Calculate boosted XP values if XP boost is active
     const originalXP = challenge.xp;
     const boostedXP = isXpBoostActive ? Math.round(originalXP * xpBoostMultiplier) : originalXP;
-    
-    // Determine if this is an "in progress" challenge
-    const isInProgress = !isEffectivelyCompleted && !isClaimed && challenge.progress > 0;
-    
-    // Calculate percentage for display
-    const progressPercentage = Math.round(progress * 100);
 
-    // For debugging
-    console.log(`Rendering challenge ${challenge.id}: 
-      - Title: ${challenge.title}
-      - Type: ${challenge.type} (${challenge.category})
-      - Progress: ${challenge.progress}/${challenge.requirement} (${progressPercentage}%)
-      - Completed: ${isCompleted}
-      - Eligible for completion: ${isEligibleForCompletion}
-      - Effectively completed: ${isEffectivelyCompleted}
-      - In Progress: ${isInProgress}
-      - Claimed: ${isClaimed}
-      - Claimable: ${isClaimable}
-      - XP boost active: ${isXpBoostActive}
-      - Original XP: ${originalXP}, Boosted XP: ${boostedXP}
-    `);
+    // Reduce debug logging frequency to improve performance
+    if (Math.random() < 0.1) { // Only log ~10% of challenges to reduce console spam
+      console.log(`Rendering challenge ${challenge.id}: Title: ${challenge.title}`);
+    }
 
     return (
       <View 
@@ -226,8 +352,14 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
             backgroundColor: theme.cardBackground,
             shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
           },
-          isExpiring && styles.expiringCard,
-          // Highlight claimable challenges
+          // Style for expiring challenges
+          isExpiring && !isEffectivelyCompleted && styles.expiringCard,
+          // Style for redemption expiring
+          isRedemptionExpiring && isEffectivelyCompleted && !isClaimed && {
+            borderLeftWidth: 4,
+            borderLeftColor: '#FF9800' // Warning orange
+          },
+          // Style for claimable challenges
           isClaimable && { 
             borderLeftWidth: 4,
             borderLeftColor: theme.success 
@@ -247,7 +379,7 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
         <View style={styles.challengeHeader}>
           <Text style={[styles.challengeTitle, { color: theme.text }]}>
             {challenge.title}
-            {isClaimable && <Text style={{color: theme.success}}> (Claim now!)</Text>}
+            {isClaimable && isEffectivelyCompleted && <Text style={{color: theme.success}}> (Claim now!)</Text>}
           </Text>
           <View style={styles.xpContainer}>
             {isXpBoostActive && isClaimable && (
@@ -275,9 +407,11 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
         {/* Time remaining indicator */}
         <Text style={[
           styles.timeRemaining, 
-          { color: isExpiring ? theme.error : theme.textSecondary }
+          { 
+            color: (isExpiring || isRedemptionExpiring) ? theme.error : theme.textSecondary 
+          }
         ]}>
-          {isExpiring ? '⚠️ ' : ''}
+          {(isExpiring || isRedemptionExpiring) ? '⚠️ ' : ''}
           {timeRemaining}
         </Text>
         
@@ -296,10 +430,10 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
               colors={
                 isEffectivelyCompleted 
                   ? isDark 
-                    ? ['#2E7D32', '#4CAF50'] // Darker success gradient for dark mode
+                    ? ['#2E7D32', '#4CAF50'] 
                     : [theme.success, theme.successLight] 
                   : isDark 
-                    ? ['#1976D2', '#42A5F5'] // Darker accent gradient for dark mode
+                    ? ['#1976D2', '#42A5F5'] 
                     : [theme.accent, theme.accentLight]
               }
               start={{ x: 0, y: 0 }}
@@ -307,8 +441,7 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
               style={[
                 styles.progressFill,
                 { 
-                  width: `${progress * 100}%`,
-                  // Add subtle glow in dark mode
+                  width: `${(effectiveProgress / challenge.requirement) * 100}%`,
                   shadowColor: isDark ? (isEffectivelyCompleted ? '#4CAF50' : '#2196F3') : 'transparent',
                   shadowOffset: { width: 0, height: 0 },
                   shadowOpacity: isDark ? 0.5 : 0,
@@ -327,36 +460,26 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
                   : theme.textSecondary
             }
           ]}>
-            {challenge.progress}/{challenge.requirement} ({progressPercentage}%)
+            {effectiveProgress}/{challenge.requirement} ({progressPercentage}%)
           </Text>
         </View>
         
-        {isClaimable && (
+        {isClaimable && isEffectivelyCompleted && (
           <TouchableOpacity 
             style={[
               styles.claimButton, 
               { 
-                backgroundColor: challenge.progress >= challenge.requirement 
-                  ? (isXpBoostActive ? '#FFC107' : theme.accent) 
-                  : isDark ? '#555' : '#ccc',
-                // Add subtle glow effect in dark mode
-                shadowColor: isDark 
-                  ? (challenge.progress >= challenge.requirement 
-                    ? (isXpBoostActive ? '#FFC107' : theme.accent) 
-                    : 'transparent') 
-                  : 'transparent',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: isDark ? 0.5 : 0,
-                shadowRadius: isDark ? 5 : 0,
-                elevation: isDark ? 4 : 2
+                backgroundColor: isEffectivelyCompleted 
+                  ? (isXpBoostActive ? '#FFC107' : theme.success) 
+                  : isDark ? '#555' : '#ccc'
               }
             ]}
             onPress={() => handleClaim(challenge)}
-            disabled={isClaimInProgress || challenge.progress < challenge.requirement}
+            disabled={isClaimInProgress || !isEffectivelyCompleted}
           >
             {isClaimInProgress ? (
               <ActivityIndicator size="small" color="#fff" />
-            ) : challenge.progress >= challenge.requirement ? (
+            ) : (
               <View style={styles.claimButtonContent}>
                 {isXpBoostActive && (
                   <Ionicons name="flash" size={16} color="#FFFFFF" style={styles.claimButtonIcon} />
@@ -365,8 +488,6 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
                   Claim {isXpBoostActive ? '2x ' : ''}XP Reward
                 </Text>
               </View>
-            ) : (
-              <Text style={styles.claimButtonText}>Not Complete</Text>
             )}
           </TouchableOpacity>
         )}
@@ -387,7 +508,7 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
           </View>
         )}
         
-        {!isEffectivelyCompleted && !isClaimed && challenge.progress === 0 && (
+        {!isEffectivelyCompleted && !isClaimed && effectiveProgress === 0 && (
           <View style={styles.inProgressContainer}>
             <MaterialCommunityIcons name="timer-outline" size={20} color={theme.textSecondary} />
             <Text style={[styles.inProgressText, { color: theme.textSecondary }]}>
@@ -397,10 +518,10 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
         )}
       </View>
     );
-  };
+  }, [theme, isDark, isXpBoostActive, xpBoostMultiplier, claimingId, formatTimeRemaining, handleClaim]);
 
-  // Render tab buttons
-  const renderTabButtons = () => {
+  // Render tab buttons - memoized to prevent unnecessary re-renders
+  const tabButtons = useMemo(() => {
     const tabs: Array<{ key: 'daily' | 'weekly' | 'monthly' | 'special', label: string }> = [
       { key: 'daily', label: 'Daily' },
       { key: 'weekly', label: 'Weekly' },
@@ -431,7 +552,7 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
                   borderColor: isDark ? 'rgba(255,255,255,0.2)' : theme.border
                 }
               ]}
-              onPress={() => setActiveTab(tab.key)}
+              onPress={() => handleTabChange(tab.key)}
             >
               <Text 
                 style={[
@@ -446,14 +567,32 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
         </View>
       </View>
     );
-  };
+  }, [activeTab, handleTabChange, isDark, isXpBoostActive, theme]);
 
-  // Get challenges for the active tab
-  const getActiveChallengesForTab = () => {
-    return activeChallenges[activeTab] || [];
-  };
+  // Calculate effective refresh state
+  const effectiveRefreshing = isRefreshing || globalRefreshing || (isManualTabChange && loading);
 
-  if (loading) {
+  // Create memoized content
+  const challengeContent = useMemo(() => {
+    if (currentTabChallenges.length > 0) {
+      return currentTabChallenges.map(renderChallengeCard);
+    } else {
+      return (
+        <View style={[styles.emptyContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9F9F9' }]}>
+          <MaterialCommunityIcons 
+            name="trophy-outline" 
+            size={50} 
+            color={isDark ? 'rgba(255,255,255,0.3)' : theme.textSecondary} 
+          />
+          <Text style={[styles.emptyText, { color: isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary }]}>
+            No active {activeTab} challenges
+          </Text>
+        </View>
+      );
+    }
+  }, [currentTabChallenges, renderChallengeCard, isDark, theme, activeTab]);
+
+  if (loading && !isManualTabChange) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: isDark ? theme.background : '#FAFAFA' }]}>
         <ActivityIndicator size="large" color={theme.accent} />
@@ -463,40 +602,21 @@ export const ChallengeList: React.FC<ChallengeListProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? theme.background : '#FAFAFA' }]}>
-      {renderTabButtons()}
+      {tabButtons}
       
-      <ScrollView 
+      <RefreshableScrollView 
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            colors={[theme.accent]}
-            tintColor={theme.accent}
-            titleColor={theme.text}
-            title="Refreshing challenges..."
-          />
-        }
+        refreshing={effectiveRefreshing}
+        onRefresh={handleRefresh}
+        refreshColor={[theme.accent]}
+        showRefreshingFeedback={false}
       >
-        {getActiveChallengesForTab().length > 0 ? (
-          getActiveChallengesForTab().map(challenge => renderChallengeCard(challenge))
-        ) : (
-          <View style={[styles.emptyContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9F9F9' }]}>
-            <MaterialCommunityIcons 
-              name="trophy-outline" 
-              size={50} 
-              color={isDark ? 'rgba(255,255,255,0.3)' : theme.textSecondary} 
-            />
-            <Text style={[styles.emptyText, { color: isDark ? 'rgba(255,255,255,0.7)' : theme.textSecondary }]}>
-              No active {activeTab} challenges
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+        {challengeContent}
+      </RefreshableScrollView>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

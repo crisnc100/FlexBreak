@@ -123,8 +123,6 @@ export const processCompletedRoutine = async (
     // Now update achievements with the properly updated statistics
     const achievementResult = await achievementManager.updateAchievements(afterXP);
     
-    // Create array of routines to update challenges with
-    const routinesForChallenges = [routine];
     
     // Handle expired challenges first
     const challengeResult = await challengeManager.handleExpiredChallenges();
@@ -133,12 +131,10 @@ export const processCompletedRoutine = async (
     let updatedProgress = challengeResult;
     
     // CRITICAL FIX: Process the new routine to update challenge progress
-    console.log('Updating challenge progress with newly completed routine');
     const challengeUpdateResult = await challengeManager.processRoutineForChallenges(routine, updatedProgress);
     updatedProgress = challengeUpdateResult.progress;
     
     // ADDITIONAL FIX: Force update daily challenges with routines to ensure consistency
-    console.log('Forcing update of daily challenges with all routines');
     updatedProgress = await challengeManager.forceUpdateDailyChallengesWithRoutines();
     
     // Check and update rewards based on level

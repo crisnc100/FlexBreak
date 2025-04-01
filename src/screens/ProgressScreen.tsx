@@ -208,13 +208,13 @@ export default function ProgressScreen({ navigation }) {
     }, [progressSystemData, refreshProgressWrapper, updateChallengesWithRoutines, allProgressData])
   );
   
-  // Only show empty state if there's truly no data (not even hidden routines)
-  if (progressData.length === 0 && !hasHiddenRoutinesOnly) {
-    // Show premium lock for non-premium users instead of empty state
-    if (!isPremium) {
-      return (
-        <View style={styles.container}>
-          <XpNotificationManager />
+  // Render actual content based on conditions
+  const renderContent = () => {
+    // Only show empty state if there's truly no data (not even hidden routines)
+    if (progressData.length === 0 && !hasHiddenRoutinesOnly) {
+      // Show premium lock for non-premium users instead of empty state
+      if (!isPremium) {
+        return (
           <PremiumLock
             onOpenSubscription={handleUpgradeToPremium}
             subscriptionModalVisible={subscriptionModalVisible}
@@ -222,25 +222,22 @@ export default function ProgressScreen({ navigation }) {
             totalXP={progressSystemData?.totalXP || 0}
             level={progressSystemData?.level || 1}
           />
-        </View>
+        );
+      }
+          
+      // Show empty state only for premium users with no routines
+      return (
+        <EmptyState
+          isLoading={isLoading && isPremium}
+          onStartRoutine={() => navigation.navigate('Home')}
+          allRoutinesHidden={false}
+        />
       );
     }
-        
-    // Show empty state only for premium users with no routines
-    return (
-      <EmptyState
-        isLoading={isLoading && isPremium}
-        onStartRoutine={() => navigation.navigate('Home')}
-        allRoutinesHidden={false}
-      />
-    );
-  }
 
-  // Always check if user is premium before showing the main progress screen
-  if (!isPremium) {
-    return (
-      <View style={styles.container}>
-        <XpNotificationManager />
+    // Always check if user is premium before showing the main progress screen
+    if (!isPremium) {
+      return (
         <PremiumLock
           onOpenSubscription={handleUpgradeToPremium}
           subscriptionModalVisible={subscriptionModalVisible}
@@ -248,86 +245,95 @@ export default function ProgressScreen({ navigation }) {
           totalXP={progressSystemData?.totalXP || 0}
           level={progressSystemData?.level || 1}
         />
-      </View>
-    );
-  }
+      );
+    }
 
-  // Render loading state if data is still loading
-  if (isProgressSystemLoading) {
+    // Render loading state if data is still loading
+    if (isProgressSystemLoading) {
+      return (
+        <View style={[styles.container, styles.loadingContainer]}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>
+            Loading progress data...
+          </Text>
+        </View>
+      );
+    }
+
+    // Render main content
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>
-          Loading progress data...
-        </Text>
-      </View>
+      <>
+        {/* Tab navigation */}
+        <TabNavigation
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
+        
+        {/* Tab content with animation */}
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          <RefreshableScrollView 
+            onRefresh={handleRefresh}
+            refreshing={isRefreshing || isProgressSystemLoading}
+            showRefreshingFeedback={true}
+          >
+            {/* Render the active tab */}
+            {activeTab === 'stats' && (
+              <StatsTab
+                hasHiddenRoutinesOnly={hasHiddenRoutinesOnly}
+                stats={stats}
+                orderedDayNames={orderedDayNames}
+                mostActiveDay={mostActiveDay}
+                isPremium={isPremium}
+                canAccessFeature={canAccessFeature}
+                theme={theme}
+                isDark={isDark}
+              />
+            )}
+            
+            {activeTab === 'achievements' && (
+              <AchievementsTab
+                stats={stats}
+                progressSystemData={progressSystemData}
+              />
+            )}
+            
+            {activeTab === 'challenges' && (
+              <ChallengesTab
+                isPremium={isPremium}
+                handleUpgradeToPremium={handleUpgradeToPremium}
+              />
+            )}
+            
+            {activeTab === 'rewards' && (
+              <RewardsTab
+                isPremium={isPremium}
+                progressSystemData={progressSystemData}
+                handleUpgradeToPremium={handleUpgradeToPremium}
+                handleActivateXpBoost={handleActivateXpBoost}
+                subscriptionModalVisible={subscriptionModalVisible}
+                onCloseSubscription={handleSubscriptionComplete}
+              />
+            )}
+            
+            <ProgressFooter
+              progressSystemData={progressSystemData}
+              isDark={isDark}
+              onResetProgress={handleResetProgress}
+            />
+          </RefreshableScrollView>
+        </Animated.View>
+      </>
     );
-  }
+  };
 
-  // Render main content
+  // Return the main container with a single XpNotificationManager
   return (
     <View style={styles.container}>
+      {/* Only include XpNotificationManager once at the root level */}
       <XpNotificationManager />
       
-      {/* Tab navigation */}
-      <TabNavigation
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-      />
-      
-      {/* Tab content with animation */}
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <RefreshableScrollView 
-          onRefresh={handleRefresh}
-          refreshing={isRefreshing || isProgressSystemLoading}
-          showRefreshingFeedback={true}
-        >
-          {/* Render the active tab */}
-          {activeTab === 'stats' && (
-            <StatsTab
-              hasHiddenRoutinesOnly={hasHiddenRoutinesOnly}
-              stats={stats}
-              orderedDayNames={orderedDayNames}
-              mostActiveDay={mostActiveDay}
-              isPremium={isPremium}
-              canAccessFeature={canAccessFeature}
-              theme={theme}
-              isDark={isDark}
-            />
-          )}
-          
-          {activeTab === 'achievements' && (
-            <AchievementsTab
-              stats={stats}
-              progressSystemData={progressSystemData}
-            />
-          )}
-          
-          {activeTab === 'challenges' && (
-            <ChallengesTab
-              isPremium={isPremium}
-              handleUpgradeToPremium={handleUpgradeToPremium}
-            />
-          )}
-          
-          {activeTab === 'rewards' && (
-            <RewardsTab
-              isPremium={isPremium}
-              progressSystemData={progressSystemData}
-              handleUpgradeToPremium={handleUpgradeToPremium}
-              handleActivateXpBoost={handleActivateXpBoost}
-              subscriptionModalVisible={subscriptionModalVisible}
-              onCloseSubscription={handleSubscriptionComplete}
-            />
-          )}
-          
-          <ProgressFooter
-            progressSystemData={progressSystemData}
-            isDark={isDark}
-            onResetProgress={handleResetProgress}
-          />
-        </RefreshableScrollView>
-      </Animated.View>
+      {/* Render the content based on conditions */}
+      {renderContent()}
       
       {/* Subscription Modal - always available */}
       <SubscriptionModal

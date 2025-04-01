@@ -45,7 +45,7 @@ const XpNotification: React.FC<XpNotificationProps> = ({
     return () => clearTimeout(timer);
   }, []);
   
-  // Get icon based on source
+  // Get icon and formatted source text based on source
   const getIcon = () => {
     switch (source) {
       case 'routine':
@@ -53,6 +53,7 @@ const XpNotification: React.FC<XpNotificationProps> = ({
       case 'achievement':
         return 'trophy-outline';
       case 'challenge':
+      case 'challenge_claim':
         return 'flag-outline';
       case 'streak':
         return 'flame-outline';
@@ -60,6 +61,29 @@ const XpNotification: React.FC<XpNotificationProps> = ({
         return 'star-outline';
       default:
         return 'add-circle-outline';
+    }
+  };
+
+  // Use description if provided, otherwise format a nice message based on source
+  const getFormattedMessage = () => {
+    if (description) {
+      return description;
+    }
+    
+    switch (source) {
+      case 'routine':
+        return 'From completing a routine';
+      case 'achievement':
+        return 'From unlocking an achievement';
+      case 'challenge':
+      case 'challenge_claim':
+        return 'From completing a challenge';
+      case 'streak':
+        return 'From maintaining your streak';
+      case 'first_routine':
+        return 'From your first routine today';
+      default:
+        return `From ${source}`;
     }
   };
   
@@ -85,7 +109,7 @@ const XpNotification: React.FC<XpNotificationProps> = ({
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.title}>+{amount} XP</Text>
-        <Text style={styles.description}>{description}</Text>
+        <Text style={styles.description}>{getFormattedMessage()}</Text>
       </View>
     </Animated.View>
   );

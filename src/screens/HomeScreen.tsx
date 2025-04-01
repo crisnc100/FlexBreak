@@ -592,15 +592,7 @@ export default function HomeScreen() {
           currentLevel={userLevel}
         />
 
-        {/* Test Notification Button (for development/testing) */}
-        {__DEV__ && (
-          <TouchableOpacity
-            style={[styles.testButton, { backgroundColor: theme.accent }]}
-            onPress={handleTestNotification}
-          >
-            <Text style={styles.testButtonText}>Test Notifications (Development Only)</Text>
-          </TouchableOpacity>
-        )}
+        
       </RefreshableScrollView>
 
       {/* Time Picker Modal */}
