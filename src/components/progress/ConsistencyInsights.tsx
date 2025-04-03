@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { getConsistencyPercentage } from '../../utils/progressUtils';
+import { getConsistencyPercentage } from '../../utils/progress/modules/progressTracker';
 import { useTheme } from '../../context/ThemeContext';
 
 interface ConsistencyInsightsProps {

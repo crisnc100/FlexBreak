@@ -14,20 +14,14 @@ export * from './types';
 // Re-export selectively to avoid duplications
 import { 
   processCompletedRoutine,
-  getGamificationSummary,
-  getUserLevelInfo,
   initializeUserProgress
-} from './gamificationManager';
+} from './gameEngine';
 export {
   processCompletedRoutine,
-  getGamificationSummary,
-  getUserLevelInfo,
   initializeUserProgress
 };
-export * from './achievementManager';
-export * from './challengeManager';
-export * from './rewardManager';
-export * from './xpManager';
+export * from './modules/rewardManager';
+export * from './modules/challengeManager';
 
 // Import and re-export from storageService for accessing user data
 import * as storageService from '../../services/storageService';
@@ -42,32 +36,10 @@ console.warn(
 
 // XP system stubs
 export const xp = {
-  calculateXPForRoutine: async (routine: any) => {
-    console.warn('Deprecated: Use useGamification().processRoutine() instead');
-    return { xp: 0, breakdown: {} };
-  },
-  addXP: async (amount: number, source: string, details: string) => {
-    console.warn('Deprecated: Use useGamification().processRoutine() instead');
-    return { newTotal: 0, levelUp: false, newLevel: 1 };
-  },
-  getNextLevelXP: (level: number) => {
-    console.warn('Deprecated: Use useGamification().gamificationSummary instead');
-    return 100;
-  },
-  getLevelProgress: async () => {
-    console.warn('Deprecated: Use useGamification().gamificationSummary instead');
-    const progress = await storageService.getUserProgress();
-    return { 
-      level: progress.level || 1, 
-      xp: progress.totalXP || 0, 
-      nextLevelXP: 100, 
-      percentage: 0 
-    };
-  },
   getLevelData: (level: number) => {
     console.warn('Deprecated: Use useGamification().gamificationSummary instead');
-    // Import LEVELS from xpManager
-    const { LEVELS } = require('./xpManager');
+    // Import LEVELS from constants
+    const { LEVELS } = require('./constants');
     // Find the appropriate level data or use a default
     if (level <= LEVELS.length) {
       return { 
@@ -175,23 +147,3 @@ export const types = {
   // Use a simple object instead of trying to use the actual type
   UserProgress: {} as any
 };
-
-// Export constants for backward compatibility
-export const constants = {
-  INITIAL_USER_PROGRESS: {
-    totalXP: 0,
-    level: 1,
-    achievements: {},
-    challenges: {},
-    rewards: {},
-    statistics: {
-      totalRoutines: 0,
-      currentStreak: 0,
-      bestStreak: 0,
-      uniqueAreas: [],
-      routinesByArea: {},
-      lastUpdated: new Date().toISOString()
-    },
-    lastUpdated: new Date().toISOString()
-  }
-}; 

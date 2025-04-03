@@ -5,7 +5,7 @@ import { saveIsPremium } from '../services/storageService';
 import { usePremium } from '../context/PremiumContext';
 import { useFeatureAccess, PREMIUM_STATUS_CHANGED } from '../hooks/progress/useFeatureAccess';
 import { useGamification } from '../hooks/progress/useGamification';
-import * as rewardManager from '../utils/progress/rewardManager';
+import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
 import { gamificationEvents, REWARD_UNLOCKED_EVENT } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';

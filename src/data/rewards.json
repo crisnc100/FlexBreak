@@ -1,0 +1,74 @@
+[
+    {
+      "id": "dark_theme",
+      "title": "Dark Theme",
+      "description": "Enable a sleek dark mode for comfortable evening stretching",
+      "icon": "moon",
+      "unlocked": false,
+      "levelRequired": 2,
+      "type": "app_feature"
+    },
+    {
+      "id": "custom_reminders",
+      "title": "Custom Reminders",
+      "description": "Set personalized reminders with custom messages",
+      "icon": "notifications",
+      "unlocked": false,
+      "levelRequired": 3,
+      "type": "app_feature"
+    },
+    {
+      "id": "xp_boost",
+      "title": "XP Boost",
+      "description": "Get a 2x boost in XP for your daily streak",
+      "icon": "flash",
+      "unlocked": false,
+      "levelRequired": 4,
+      "type": "app_feature"
+    },
+    {
+      "id": "custom_routines",
+      "title": "Custom Routines",
+      "description": "Create and save your own personalized stretching routines",
+      "icon": "create",
+      "unlocked": false,
+      "levelRequired": 5,
+      "type": "app_feature"
+    },
+    {
+      "id": "streak_freezes",
+      "title": "Streak Freezes",
+      "description": "Miss a day, keep your streak—perfect for busy schedules",
+      "icon": "snow",
+      "unlocked": false,
+      "levelRequired": 6,
+      "type": "app_feature"
+    },
+    {
+      "id": "premium_stretches",
+      "title": "Premium Stretches",
+      "description": "Access to 15+ premium stretching exercises",
+      "icon": "fitness",
+      "unlocked": false,
+      "levelRequired": 7,
+      "type": "app_feature"
+    },
+    {
+      "id": "desk_break_boost",
+      "title": "Desk Break Boost",
+      "description": "Stretch in quick 15-sec bursts—3 fast routines!",
+      "icon": "desktop",
+      "unlocked": false,
+      "levelRequired": 8,
+      "type": "app_feature"
+    },
+    {
+      "id": "focus_area_mastery",
+      "title": "Focus Area Mastery",
+      "description": "Get ultimate focus badges for your favorite areas",
+      "icon": "star",
+      "unlocked": false,
+      "levelRequired": 9,
+      "type": "app_feature"
+    }
+  ]

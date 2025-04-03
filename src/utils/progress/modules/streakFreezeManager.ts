@@ -1,4 +1,3 @@
-import * as storageService from '../../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STREAK_FREEZE_STORAGE_KEY = '@streak_freezes';

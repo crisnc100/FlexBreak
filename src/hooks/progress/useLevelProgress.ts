@@ -1,8 +1,8 @@
 import { useMemo, useCallback, useEffect } from 'react';
 import { useGamification } from './useGamification';
-import * as xpManager from '../../utils/progress/xpManager';
 import { Level } from '../../utils/progress/types';
-import * as gamificationManager from '../../utils/progress/gamificationManager';
+import * as gamificationManager from '../../utils/progress/gameEngine';
+import { LEVELS } from '../../utils/progress/constants';
 
 /**
  * Return type for the useLevelProgress hook
@@ -27,8 +27,8 @@ export function useLevelProgress(): LevelProgressInfo {
   
   const progressInfo = useMemo(() => {
     // Get the level data for the current and next levels
-    const currentLevelData = xpManager.LEVELS.find(l => l.level === level) || xpManager.LEVELS[0];
-    const nextLevelData = xpManager.LEVELS.find(l => l.level === level + 1) || null;
+    const currentLevelData = LEVELS.find(l => l.level === level) || LEVELS[0];
+    const nextLevelData = LEVELS.find(l => l.level === level + 1) || null;
     
     // Calculate the percent progress using the same logic throughout the app
     let xpProgress = 0;

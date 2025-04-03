@@ -18,6 +18,7 @@ import XpNotificationManager from '../notifications/XpNotificationManager';
 import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRefresh } from '../../context/RefreshContext';
 
 export interface CompletedRoutineProps {
   area: BodyArea;
@@ -50,6 +51,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
 }) => {
   const navigation = useNavigation<AppNavigationProp>();
   const { theme, isDark, themeType, setThemeType, canUseDarkTheme } = useTheme();
+  const { triggerRefresh } = useRefresh();
   const styles = themedStyles(theme);
   
   // Add debug logging for the levelUp prop
@@ -57,14 +59,46 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   console.log('CompletedRoutine isPremium:', isPremium);
   console.log('Theme status in CompletedRoutine - isDark:', isDark, 'canUseDarkTheme:', canUseDarkTheme, 'themeType:', themeType);
   
+  // Trigger a refresh of progress data when component mounts
+  useEffect(() => {
+    // Force refresh the progress data when routine completes
+    console.log('CompletedRoutine mounted - triggering data refresh');
+    triggerRefresh();
+  }, []);
+  
   // Detect if XP boost is active by checking descriptions or the passed prop
   const hasXpBoost = isXpBoosted || 
     xpBreakdown.some(item => item.description.includes('XP Boost Applied') || item.description.includes('2x XP'));
   
   console.log('XP Boost active:', hasXpBoost);
   
+  // Add a special check for welcome bonus in the breakdown
+  const hasWelcomeBonus = xpBreakdown.some(item => 
+    item.source === 'first_ever' || 
+    item.description.includes('Welcome Bonus') || 
+    item.description.includes('First Ever Stretch')
+  );
+  
+  // Log the breakdown for debugging
+  console.log('XP Breakdown in CompletedRoutine:', xpBreakdown);
+  console.log('Detected welcome bonus:', hasWelcomeBonus);
+  
+  // Add more detailed welcome bonus logging
+  if (hasWelcomeBonus) {
+    console.log('=========== WELCOME BONUS DETECTED ===========');
+    const welcomeBonusItem = xpBreakdown.find(item => 
+      item.source === 'first_ever' || 
+      item.description.includes('Welcome Bonus') || 
+      item.description.includes('First Ever Stretch')
+    );
+    console.log('Welcome bonus details:', welcomeBonusItem);
+    console.log('Full XP breakdown:', xpBreakdown);
+  } else {
+    console.log('=========== NO WELCOME BONUS FOUND ===========');
+    console.log('Full XP breakdown:', xpBreakdown);
+  }
+  
   // Calculate original (unboost) XP for display if boosted
-  // FIXED: More accurate calculation that handles precise multipliers
   let originalXpEarned = xpEarned;
   if (hasXpBoost) {
     // Default to dividing by 2 (standard boost), but check the descriptions for other multipliers
@@ -286,6 +320,9 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   // Update the share handler to include simulated level-up
   const handleShare = async () => {
     try {
+      // Ensure progress data is refreshed before sharing
+      triggerRefresh();
+      
       // Include level up in share message if applicable
       const levelUpText = showLevelUp ? 
         ` and leveled up to level ${newLevel}!` : 
@@ -317,6 +354,9 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     }
     
     try {
+      // Ensure progress data is refreshed
+      triggerRefresh();
+      
       // Create a routine params object
       const routineParams: RoutineParams = {
         area: area,
@@ -341,6 +381,9 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
       return;
     }
     
+    // Ensure progress data is refreshed
+    triggerRefresh();
+    
     // Show dashboard first to reset state
     onShowDashboard();
     
@@ -364,6 +407,8 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   // Handle new routine button
   const handleNewRoutine = () => {
+    // Ensure progress data is refreshed before returning home
+    triggerRefresh();
     
     // Show dashboard first to reset state
     onShowDashboard();
@@ -413,7 +458,11 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
           showAnyLevelUp && styles.completedContainerWithLevelUp
         ]} 
         activeOpacity={1}
-        onPress={onShowDashboard}
+        onPress={() => {
+          // Ensure progress data is refreshed when continuing
+          triggerRefresh();
+          onShowDashboard();
+        }}
       >
         <Ionicons name="checkmark-circle" size={showAnyLevelUp ? 60 : 80} color={theme.success} />
         <Text style={styles.completedTitle}>Routine Complete!</Text>

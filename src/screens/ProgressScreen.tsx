@@ -4,23 +4,20 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
-  Animated
+  Animated,
+  ActivityIndicator
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePremium } from '../context/PremiumContext';
 import { useTheme } from '../context/ThemeContext';
-import { getMostActiveDay, getOrderedDayNames } from '../utils/progressUtils';
+import { getMostActiveDay, getOrderedDayNames } from '../utils/progress/modules/progressTracker';
 import * as storageService from '../services/storageService';
-import * as gamificationManager from '../utils/progress/gamificationManager';
 import { useProgressTabManagement } from '../hooks/progress/useProgressTabManagement';
 import { useProgressData } from '../hooks/progress/useProgressData';
 import { useStreakChecker } from '../hooks/progress/useStreakChecker';
-import { useChallengeUpdater } from '../hooks/progress/useChallengeUpdater';
 import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
-import useProgressSystem from '../hooks/progress/useProgressSystem';
-import { useChallengeSystem } from '../hooks/progress/useChallengeSystem';
+import { useGamification } from '../hooks/progress/useGamification';
 import XpNotificationManager from '../components/notifications/XpNotificationManager';
 import { RefreshableScrollView } from '../components/common';
 import SubscriptionModal from '../components/SubscriptionModal';
@@ -50,14 +47,9 @@ export default function ProgressScreen({ navigation }) {
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   
   // Use custom tab management hook
-  const { activeTab, fadeAnim, handleTabChange } = useProgressTabManagement((tab) => {
-    // This callback runs when the tab changes
-    if (tab === 'challenges' && !isProgressSystemLoading) {
-      refreshChallenges();
-    }
-  });
+  const { activeTab, fadeAnim, handleTabChange } = useProgressTabManagement();
   
-  // Use progress data hook
+  // Use progress data hook for stats
   const { 
     stats, 
     progressData, 
@@ -65,52 +57,23 @@ export default function ProgressScreen({ navigation }) {
     hasHiddenRoutinesOnly,
     isLoading,
     isRefreshing,
-    handleRefresh,
-    calculateStats
+    handleRefresh
   } = useProgressData();
   
-  // Use the progress system hook for XP tracking
-  const {
-    userProgress: progressSystemData,
-    isLoading: isProgressSystemLoading,
-    processRoutine,
-    updateUserAchievements,
-    refreshUserProgress,
-    updateChallengesWithRoutines,
-    claimChallengeReward
-  } = useProgressSystem();
+  // Use the centralized gamification hook for everything
+  const { 
+    refreshData, 
+    isLoading: isGamificationLoading,
+    gamificationSummary,
+    level,
+    totalXP
+  } = useGamification();
   
-  // Use the challenge system hook
-  const { refreshChallenges } = useChallengeSystem();
-  
-  // Has updated challenges flag to avoid infinite loops
-  const hasUpdatedChallenges = useRef(false);
+  // Has updated flag to avoid infinite loops
+  const hasUpdated = useRef(false);
 
-  // Create wrapper functions with void return types for the hooks
-  const refreshProgressWrapper = useCallback(async () => {
-    await refreshUserProgress();
-  }, [refreshUserProgress]);
-  
-  const getAllRoutinesWrapper = useCallback(async () => {
-    return allProgressData;
-  }, [allProgressData]);
-
-  // Use streak checker hook
-  useStreakChecker(
-    stats.currentStreak,
-    progressData.length,
-    refreshProgressWrapper,
-    refreshChallenges
-  );
-  
-  // Use challenge updater hook
-  useChallengeUpdater(
-    activeTab,
-    isProgressSystemLoading,
-    getAllRoutinesWrapper,
-    updateChallengesWithRoutines,
-    refreshProgressWrapper
-  );
+  // Use streak checker hook (already updated to use centralized system)
+  useStreakChecker();
   
   // Memoize derived data
   const orderedDayNames = useMemo(() => getOrderedDayNames(DAY_NAMES), []);
@@ -172,40 +135,32 @@ export default function ProgressScreen({ navigation }) {
     handleRefresh();
   }, [handleRefresh]);
   
-  // Force statistics recalculation on mount
+  // Force data refresh on mount - simplified to reduce duplicate refreshes
   useFocusEffect(
     React.useCallback(() => {
       const loadData = async () => {
         try {
-          // Force statistics recalculation to fix area achievements
-          console.log('Force recalculating all statistics to update area-related achievements');
-          try {
-            await gamificationManager.recalculateStatistics();
-          } catch (error) {
-            console.error('Error recalculating statistics:', error);
-          }
+          console.log('ProgressScreen: Screen focused, refreshing all data');
           
-          // Force refresh user progress
-          await refreshProgressWrapper();
+          // Update hasUpdated ref before the refresh to prevent multiple refreshes
+          hasUpdated.current = true;
           
-          // Update challenges with routines
-          if (progressSystemData && !hasUpdatedChallenges.current) {
-            console.log('Updating challenges with routines (first time only)');
-            await updateChallengesWithRoutines(allProgressData);
-            hasUpdatedChallenges.current = true;
-          }
+          // Refresh all data - this will update both progress stats and gamification data
+          await handleRefresh();
+          
+          console.log('ProgressScreen: Data refresh completed');
         } catch (error) {
-          console.error('Error loading data:', error);
+          console.error('Error loading data in ProgressScreen:', error);
         }
       };
       
+      // Always refresh data when screen comes into focus
       loadData();
       
       return () => {
-        // Cleanup function
         console.log('Progress screen lost focus');
       };
-    }, [progressSystemData, refreshProgressWrapper, updateChallengesWithRoutines, allProgressData])
+    }, [handleRefresh])
   );
   
   // Render actual content based on conditions
@@ -219,8 +174,8 @@ export default function ProgressScreen({ navigation }) {
             onOpenSubscription={handleUpgradeToPremium}
             subscriptionModalVisible={subscriptionModalVisible}
             onCloseSubscription={() => setSubscriptionModalVisible(false)}
-            totalXP={progressSystemData?.totalXP || 0}
-            level={progressSystemData?.level || 1}
+            totalXP={totalXP || 0}
+            level={level || 1}
           />
         );
       }
@@ -242,14 +197,14 @@ export default function ProgressScreen({ navigation }) {
           onOpenSubscription={handleUpgradeToPremium}
           subscriptionModalVisible={subscriptionModalVisible}
           onCloseSubscription={() => setSubscriptionModalVisible(false)}
-          totalXP={progressSystemData?.totalXP || 0}
-          level={progressSystemData?.level || 1}
+          totalXP={totalXP || 0}
+          level={level || 1}
         />
       );
     }
 
     // Render loading state if data is still loading
-    if (isProgressSystemLoading) {
+    if (isGamificationLoading) {
       return (
         <View style={[styles.container, styles.loadingContainer]}>
           <ActivityIndicator size="large" color="#4CAF50" />
@@ -273,8 +228,9 @@ export default function ProgressScreen({ navigation }) {
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           <RefreshableScrollView 
             onRefresh={handleRefresh}
-            refreshing={isRefreshing || isProgressSystemLoading}
+            refreshing={isRefreshing || isGamificationLoading}
             showRefreshingFeedback={true}
+            minimumRefreshTime={800}
           >
             {/* Render the active tab */}
             {activeTab === 'stats' && (
@@ -293,7 +249,7 @@ export default function ProgressScreen({ navigation }) {
             {activeTab === 'achievements' && (
               <AchievementsTab
                 stats={stats}
-                progressSystemData={progressSystemData}
+                progressSystemData={gamificationSummary}
               />
             )}
             
@@ -307,7 +263,7 @@ export default function ProgressScreen({ navigation }) {
             {activeTab === 'rewards' && (
               <RewardsTab
                 isPremium={isPremium}
-                progressSystemData={progressSystemData}
+                progressSystemData={gamificationSummary}
                 handleUpgradeToPremium={handleUpgradeToPremium}
                 handleActivateXpBoost={handleActivateXpBoost}
                 subscriptionModalVisible={subscriptionModalVisible}
@@ -316,7 +272,7 @@ export default function ProgressScreen({ navigation }) {
             )}
             
             <ProgressFooter
-              progressSystemData={progressSystemData}
+              progressSystemData={gamificationSummary}
               isDark={isDark}
               onResetProgress={handleResetProgress}
             />

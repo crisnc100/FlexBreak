@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import { getWeeklyActivityDateRange } from '../../utils/progressUtils';
+import { getWeeklyActivityDateRange } from '../../utils/progress/modules/progressTracker';
 import { useTheme } from '../../context/ThemeContext';
 
 interface WeeklyActivityProps {

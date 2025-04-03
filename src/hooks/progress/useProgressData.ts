@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ProgressEntry } from '../../types';
 import { useRoutineStorage } from '../routines/useRoutineStorage';
 import { useRefresh } from '../../context/RefreshContext';
+import { useGamification } from './useGamification';
 import {
   calculateStreak,
   calculateWeeklyActivity,
   calculateDayOfWeekActivity,
   calculateActiveDays
-} from '../../utils/progressUtils';
+} from '../../utils/progress/modules/progressTracker';
+import * as storageService from '../../services/storageService';
 
 // Define progress stats interface
 export interface ProgressStats {
@@ -25,8 +27,10 @@ export interface ProgressStats {
  * Custom hook to manage progress data loading and calculation
  */
 export function useProgressData() {
-  const { recentRoutines, getAllRoutines, isLoading, hasSynchronized, synchronizeProgressData } = useRoutineStorage();
+  const { recentRoutines, getAllRoutines, isLoading: isRoutinesLoading, synchronizeProgressData } = useRoutineStorage();
   const { isRefreshing, refreshProgress } = useRefresh();
+  const { refreshData: refreshGamificationData } = useGamification();
+  const [isLoading, setIsLoading] = useState(true);
   
   const [progressData, setProgressData] = useState<ProgressEntry[]>([]);
   const [allProgressData, setAllProgressData] = useState<ProgressEntry[]>([]);
@@ -45,7 +49,7 @@ export function useProgressData() {
   const hasHiddenRoutinesOnly = allProgressData.length > 0 && progressData.length === 0;
 
   // Calculate all stats from progress data
-  const calculateStats = (data: ProgressEntry[]) => {
+  const calculateStats = useCallback((data: ProgressEntry[]) => {
     if (!data || data.length === 0) {
       console.log('No data to calculate stats from');
       return;
@@ -117,53 +121,91 @@ export function useProgressData() {
       totalMinutes,
       areaBreakdown
     });
-  };
+  }, []);
 
-  // Handle refresh
-  const handleRefresh = async () => {
-    console.log('Refreshing progress data...');
-    await refreshProgress();
+  // Handle refresh - this now ensures both progress and gamification data are refreshed
+  const handleRefresh = useCallback(async () => {
+    console.log('Refreshing progress and gamification data...');
+    setIsLoading(true);
     
     try {
-      // Get all routines for both premium and free users
+      // First synchronize all data between storage locations
+      await synchronizeProgressData();
+      
+      // Then refresh the context
+      await refreshProgress();
+      
+      // Refresh gamification data
+      await refreshGamificationData();
+      
+      // Get all routines - this should now be consistent across all data sources
       const allRoutines = await getAllRoutines();
       console.log('Refreshed all routines:', allRoutines.length);
+      
+      // Update state
       setAllProgressData(allRoutines);
+      setProgressData(allRoutines.filter(r => !r.hidden));
       
       // Calculate stats
       calculateStats(allRoutines);
     } catch (error) {
-      console.error('Error refreshing all routines:', error);
+      console.error('Error refreshing all routines and gamification data:', error);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [refreshProgress, refreshGamificationData, getAllRoutines, synchronizeProgressData, calculateStats]);
 
-  // Update visible routines for display
+  // Initial data load - now with better coordination
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true);
       try {
+        // First make sure all data is synchronized
+        await storageService.synchronizeProgressData();
+        
+        // Load all routines
         const allRoutines = await getAllRoutines();
         
         if (allRoutines && allRoutines.length > 0) {
           console.log('Loaded routines for stats calculation:', allRoutines.length);
           setAllProgressData(allRoutines);
+          setProgressData(allRoutines.filter(r => !r.hidden));
           
           // Calculate stats
           calculateStats(allRoutines);
+        } else {
+          console.log('No routines found for stats calculation');
+          setAllProgressData([]);
+          setProgressData([]);
+          
+          // Reset stats to default values
+          setStats({
+            totalRoutines: 0,
+            totalMinutes: 0,
+            currentStreak: 0,
+            areaBreakdown: {},
+            weeklyActivity: Array(7).fill(0),
+            dayOfWeekBreakdown: Array(7).fill(0),
+            activeRoutineDays: 0,
+            isTodayComplete: false
+          });
         }
       } catch (error) {
         console.error('Error loading progress data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     
     loadData();
-  }, []);
+  }, [calculateStats, getAllRoutines]);
 
   return { 
     stats, 
     progressData, 
     allProgressData,
     hasHiddenRoutinesOnly,
-    isLoading,
+    isLoading: isLoading || isRoutinesLoading || isRefreshing,
     isRefreshing,
     handleRefresh,
     calculateStats

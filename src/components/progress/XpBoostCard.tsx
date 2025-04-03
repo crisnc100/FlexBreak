@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import * as xpBoostManager from '../../utils/progress/xpBoostManager';
-import * as rewardManager from '../../utils/progress/rewardManager';
+import * as xpBoostManager from '../../utils/progress/modules/xpBoostManager';
+import * as rewardManager from '../../utils/progress/modules/rewardManager';
 import * as storageService from '../../services/storageService';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';

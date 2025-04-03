@@ -33,25 +33,35 @@ export interface Challenge {
   title: string;
   description: string;
   type: string;
+  category: string;
   requirement: number;
+  requirementData?: {
+    area?: string;
+    time?: string;
+    [key: string]: any;
+  };
   progress: number;
   xp: number;
   completed: boolean;
   claimed: boolean;
   startDate: string;
   endDate: string;
-  category: string;
-  status?: CHALLENGE_STATUS; // Current challenge status
+  dateCompleted?: string;
+  dateClaimed?: string;
+  expiryDate?: string;
+  expiryWarning?: boolean;
+  status: CHALLENGE_STATUS;
   lastResetDate?: string; // When challenge was last reset
   history?: ChallengeHistory[]; // Record of previous completions
-  expiryWarning?: boolean; // Indicates challenge is about to expire
   timeRange?: { start: number; end: number };
   area?: string;
   areaTarget?: string;
   data?: Record<string, any>; // For storing additional tracking information
-  dateClaimed?: string; // Date when the challenge was claimed
-  dateCompleted?: string; // Date when the challenge was completed
   failureReason?: string; // Reason why the challenge failed, if applicable
+  lastUpdated: string;
+  lastDailyChallengeCheck?: string; // Added for challenge management
+  xpHistory?: XpHistoryEntry[];  // Optional for backward compatibility
+  hasReceivedWelcomeBonus?: boolean; // Flag to track if user has received the first-time welcome bonus
 }
 
 // Interface for challenge history records
@@ -122,7 +132,9 @@ export interface UserProgress {
     totalMinutes?: number;  // Make this optional for backward compatibility
   };
   lastUpdated: string;
+  lastDailyChallengeCheck?: string; // Added for challenge management
   xpHistory?: XpHistoryEntry[];  // Optional for backward compatibility
+  hasReceivedWelcomeBonus?: boolean; // Flag to track if user has received the first-time welcome bonus
 }
 
 // Interface for progress update result

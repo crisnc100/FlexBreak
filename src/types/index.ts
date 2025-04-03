@@ -11,8 +11,8 @@ export interface Stretch {
   duration: number; // seconds
   tags: BodyArea[];
   level: StretchLevel;
-  image: any; // image require
-  bilateral?: boolean; // Whether the stretch needs to be performed on both sides
+  image: any;
+  bilateral?: boolean;
 }
 
 export interface Tip {
@@ -32,26 +32,111 @@ export interface RoutineParams {
   area: BodyArea;
   duration: Duration;
   level?: StretchLevel;
-  customStretches?: (Stretch | RestPeriod)[]; // Optional array of custom stretches for the routine
+  customStretches?: (Stretch | RestPeriod)[];
 }
 
 export interface ProgressEntry {
   date: string;
   area: BodyArea;
   duration: Duration;
-  stretchCount?: number; // Number of stretches in the routine
-  hidden?: boolean; // Optional property to mark if a routine is hidden from view but still counted in stats
-  customStretches?: { id: number | string; isRest?: boolean }[]; // Optional array of custom stretches IDs
+  stretchCount?: number;
+  hidden?: boolean;
+  customStretches?: { id: number | string; isRest?: boolean }[];
+}
+
+// Gamification Types
+export interface UserProgress {
+  totalXP: number;
+  level: number;
+  statistics: {
+    totalRoutines: number;
+    currentStreak: number;
+    bestStreak: number;
+    uniqueAreas: string[];
+    totalMinutes: number;
+    routinesByArea: Record<string, number>;
+    lastUpdated?: string;
+  };
+  challenges: Record<string, Challenge>;
+  achievements: Record<string, Achievement>;
+  rewards: Record<string, Reward>;
+  lastDailyChallengeCheck?: string;
+  lastUpdated: string;
+  xpHistory?: Array<{
+    id: string;
+    amount: number;
+    source: string;
+    timestamp: string;
+    details?: string;
+    claimed: boolean;
+  }>;
+}
+
+export interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  requirement: number;
+  xp: number;
+  progress: number;
+  completed: boolean;
+  claimed: boolean;
+  startDate: string;
+  endDate: string;
+  category: string;
+  gracePeriodEnds?: string;
+  status?: 'active' | 'completed' | 'claimed' | 'expired';
+  lastResetDate?: string;
+  history?: Array<{completedDate: string; claimedDate?: string; xpEarned: number}>;
+  expiryWarning?: boolean;
+  timeRange?: { start: number; end: number };
+  area?: string;
+  areaTarget?: string;
+  data?: Record<string, any>;
+  dateClaimed?: string;
+  dateCompleted?: string;
+  failureReason?: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  requirement: number;
+  xp: number;
+  progress: number;
+  completed: boolean;
+  icon: string;
+  category: string;
+  uiCategory?: string;
+  area?: string;
+  dateCompleted?: string;
+}
+
+export interface Reward {
+  id: string;
+  title: string;
+  description: string;
+  levelRequired: number;
+  type: string;
+  unlocked: boolean;
+  icon: string;
+}
+
+export interface Level {
+  level: number;
+  xpRequired: number;
+  title: string;
 }
 
 export type RootStackParamList = {
   Home: undefined;
-  Routine: RoutineParams & {
-    customStretches?: Stretch[];
-  };
+  Routine: RoutineParams & { customStretches?: Stretch[] };
   Progress: undefined;
   Favorites: undefined;
   Testing: undefined;
 };
 
-export type AppNavigationProp = NavigationProp<RootStackParamList>; 
+export type AppNavigationProp = NavigationProp<RootStackParamList>;

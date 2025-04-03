@@ -1,4 +1,4 @@
-import * as storageService from '../../services/storageService';
+import * as storageService from '../../../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Constants

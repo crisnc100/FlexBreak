@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 import { ProgressEntry, RoutineParams, BodyArea, Duration } from '../types';
 import { UserProgress } from '../utils/progress/types';
 import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
-import { measureAsyncOperation } from '../utils/performance';
 
 // ========== STORAGE KEYS ==========
 export const KEYS = {
@@ -209,39 +208,50 @@ export const resetUserProgress = async (): Promise<UserProgress> => {
 };
 
 /**
- * Migrates old user progress format to new format if needed
- * @param progress The user progress data to migrate
- * @returns The migrated user progress data
+ * Migrate user progress to the latest format if needed
+ * @param progress The user progress to migrate
+ * @returns The migrated user progress
  */
-const migrateUserProgress = (progress: any): UserProgress => {
-  // Check if the progress has the old 'stats' property instead of 'statistics'
-  if (progress.stats && !progress.statistics) {
-    console.log('Migrating user progress from old format to new format');
-    
-    // Create a new progress object with the 'statistics' property
-    const migratedProgress = {
-      ...progress,
-      statistics: progress.stats,
+const migrateUserProgress = (progress: UserProgress): UserProgress => {
+  const migratedProgress = { ...progress };
+  
+  // Ensure statistics object exists
+  if (!migratedProgress.statistics) {
+    migratedProgress.statistics = {
+      totalRoutines: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      uniqueAreas: [],
+      totalMinutes: 0,
+      routinesByArea: {},
+      lastUpdated: new Date().toISOString()
     };
-    
-    // Remove the old 'stats' property
-    delete migratedProgress.stats;
-    
-    return migratedProgress;
   }
   
-  // Ensure the progress has totalXP and level properties
-  if (progress.totalXP === undefined) {
-    console.log('Adding missing totalXP property to user progress');
-    progress.totalXP = 0;
+  // Ensure routinesByArea exists
+  if (!migratedProgress.statistics.routinesByArea) {
+    migratedProgress.statistics.routinesByArea = {};
   }
   
-  if (progress.level === undefined) {
-    console.log('Adding missing level property to user progress');
-    progress.level = 1;
+  // Ensure totalMinutes exists
+  if (migratedProgress.statistics.totalMinutes === undefined) {
+    migratedProgress.statistics.totalMinutes = 0;
   }
   
-  return progress;
+  // IMPORTANT: For existing users with routines, set the welcome bonus flag
+  // This prevents users from getting a duplicate welcome bonus
+  if (!migratedProgress.hasReceivedWelcomeBonus) {
+    // If the user has any XP or completed routines, they should have the flag set to true
+    if (migratedProgress.totalXP > 0 || migratedProgress.statistics.totalRoutines > 0) {
+      console.log('Setting hasReceivedWelcomeBonus flag for existing user with XP or routines');
+      migratedProgress.hasReceivedWelcomeBonus = true;
+    } else {
+      // New user, initialize the flag to false
+      migratedProgress.hasReceivedWelcomeBonus = false;
+    }
+  }
+  
+  return migratedProgress;
 };
 
 // ========== ROUTINE METHODS ==========
@@ -540,6 +550,8 @@ export const getDashboardFlag = async (): Promise<boolean> => {
  */
 export const synchronizeProgressData = async (): Promise<boolean> => {
   try {
+    console.log('Starting progress data synchronization...');
+    
     // Get data from all storage locations
     const recentRoutinesData = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_HISTORY, []);
     const progressData = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
@@ -553,57 +565,75 @@ export const synchronizeProgressData = async (): Promise<boolean> => {
     // Create a merged set of unique entries based on date
     const mergedEntries: { [key: string]: ProgressEntry } = {};
     
-    // Add entries from visible routines
-    recentRoutinesData.forEach((entry: ProgressEntry) => {
-      if (entry.date) {
-        mergedEntries[entry.date] = entry;
-      }
-    });
+    // We'll process data in the following order to ensure precedence:
+    // 1. Progress data (source of truth)
+    // 2. Hidden routines (to maintain hidden status)
+    // 3. Recent visible routines
     
-    // Add entries from progress
+    // First add entries from progress data (core source of truth)
     progressData.forEach((entry: ProgressEntry) => {
       if (entry.date) {
         mergedEntries[entry.date] = entry;
       }
     });
     
-    // Add entries from hidden routines
+    // Then add entries from hidden routines (to maintain hidden status)
     hiddenRoutinesData.forEach((entry: ProgressEntry) => {
       if (entry.date) {
-        // Preserve the hidden flag
         if (!mergedEntries[entry.date]) {
+          // If the entry doesn't exist in merged entries, add it
           mergedEntries[entry.date] = entry;
         } else {
-          // If entry exists but isn't marked as hidden, update it
+          // If it exists, ensure hidden flag is preserved
           mergedEntries[entry.date] = {
             ...mergedEntries[entry.date],
-            hidden: entry.hidden || false
+            hidden: true
+          };
+        }
+      }
+    });
+    
+    // Finally add entries from visible routines (but don't overwrite hidden status)
+    recentRoutinesData.forEach((entry: ProgressEntry) => {
+      if (entry.date) {
+        if (!mergedEntries[entry.date]) {
+          // If entry doesn't exist, add it
+          mergedEntries[entry.date] = entry;
+        } else if (!mergedEntries[entry.date].hidden) {
+          // If entry exists but isn't marked as hidden, update it
+          // This preserves hidden status if it was set in hiddenRoutinesData
+          mergedEntries[entry.date] = {
+            ...entry,
+            hidden: mergedEntries[entry.date].hidden || false
           };
         }
       }
     });
     
     // Convert back to arrays
-    const mergedRecentRoutines = Object.values(mergedEntries);
+    const mergedRoutines = Object.values(mergedEntries);
     
     // Sort by date (newest first)
-    mergedRecentRoutines.sort((a, b) => 
+    mergedRoutines.sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     
     // Split into visible and hidden routines
-    const visibleRoutines = mergedRecentRoutines.filter(routine => !routine.hidden);
-    const hiddenRoutines = mergedRecentRoutines.filter(routine => routine.hidden);
+    const visibleRoutines = mergedRoutines.filter(routine => !routine.hidden);
+    const hiddenRoutines = mergedRoutines.filter(routine => routine.hidden);
     
     // Save synchronized data back to storage
     await setData(KEYS.PROGRESS.PROGRESS_HISTORY, visibleRoutines);
     await setData(KEYS.PROGRESS.HIDDEN_ROUTINES, hiddenRoutines);
     
-    // Save ALL routines (both visible and hidden) to progress for statistics
-    await setData(KEYS.PROGRESS.PROGRESS_ENTRIES, mergedRecentRoutines);
+    // Save ALL routines (both visible and hidden) to progress entries for statistics
+    await setData(KEYS.PROGRESS.PROGRESS_ENTRIES, mergedRoutines);
+    
+    // Update timestamp of synchronization
+    await setData(KEYS.UI.SYNC_TIMESTAMP, new Date().toISOString());
     
     console.log('Progress data synchronized successfully:');
-    console.log('- Total entries:', mergedRecentRoutines.length);
+    console.log('- Total entries:', mergedRoutines.length);
     console.log('- Visible entries:', visibleRoutines.length);
     console.log('- Hidden entries:', hiddenRoutines.length);
     
@@ -648,6 +678,8 @@ export const exportUserProgress = (progress: UserProgress): void => {
  */
 export const clearAllData = async (): Promise<boolean> => {
   try {
+    console.log('Starting to clear all app data...');
+    
     // Get all known keys from our KEYS object
     const knownKeys = [
       ...Object.values(KEYS.USER),
@@ -657,6 +689,17 @@ export const clearAllData = async (): Promise<boolean> => {
       ...Object.values(KEYS.UI),
       ...Object.values(KEYS.CUSTOM)
     ];
+    
+    // Explicitly add routine data keys to ensure they get cleared
+    knownKeys.push(
+      '@user_routines', 
+      '@all_routines', 
+      '@visible_routines',
+      '@user_progress',
+      '@gamification',
+      '@achievements',
+      '@challenges'
+    );
     
     // Get all keys from AsyncStorage
     try {
@@ -669,12 +712,23 @@ export const clearAllData = async (): Promise<boolean> => {
       // Clear all keys
       await AsyncStorage.multiRemove(uniqueKeys);
       console.log('All app data cleared successfully. Cleared keys:', uniqueKeys);
+      
+      // Additional check - verify data has been cleared
+      const routines = await getAllRoutines();
+      const progress = await getUserProgress();
+      
+      console.log('After clearing - routines length:', routines?.length || 0);
+      console.log('After clearing - progress XP:', progress?.totalXP || 0);
     } catch (innerError) {
       // If getAllKeys fails, fall back to our predefined list
       console.warn('Error getting all keys, falling back to predefined list:', innerError);
       await AsyncStorage.multiRemove(knownKeys);
       console.log('Cleared predefined keys:', knownKeys);
     }
+    
+    // Re-initialize user progress with defaults
+    await initializeUserProgressIfEmpty();
+    console.log('Re-initialized user progress with defaults');
     
     return true;
   } catch (e) {
@@ -747,4 +801,29 @@ export const deleteCustomRoutine = async (routineId: string): Promise<boolean> =
     console.error('Error deleting custom routine:', error);
     return false;
   }
+};
+
+/**
+ * Initializes user progress data if it doesn't exist
+ * @returns The initialized or existing user progress
+ */
+export const initializeUserProgressIfEmpty = async (): Promise<UserProgress> => {
+  try {
+    const progress = await getUserProgress();
+    
+    // If progress is empty or has no totalXP property, initialize it
+    if (!progress || progress.totalXP === undefined) {
+      console.log('User progress is empty, initializing with defaults');
+      const defaultProgress = INITIAL_USER_PROGRESS;
+      await saveUserProgress(defaultProgress);
+      return defaultProgress;
+    }
+    
+    return progress;
+  } catch (error) {
+    console.error('Error initializing user progress:', error);
+    // Return default progress if there was an error
+    return INITIAL_USER_PROGRESS;
+  }
 }; 
+

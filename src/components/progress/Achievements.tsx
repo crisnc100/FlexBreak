@@ -2,8 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useGamification } from '../../hooks/progress/useGamification';
-import { LEVELS } from '../../utils/progress/xpManager';
+import { useGamification, gamificationEvents, XP_UPDATED_EVENT, LEVEL_UP_EVENT } from '../../hooks/progress/useGamification';
 import { useTheme } from '../../context/ThemeContext';
 import { useLevelProgress } from '../../hooks/progress/useLevelProgress';
 // Simple date formatter function to replace date-fns
@@ -436,6 +435,27 @@ const Achievements: React.FC<AchievementsProps> = ({
   useEffect(() => {
     console.log('Achievements component mounted, refreshing data...');
     refreshData();
+    
+    // Set up event listeners for XP updates and level ups
+    const handleXpUpdate = (data: any) => {
+      console.log('Achievements: XP update detected, refreshing data...', data);
+      refreshData();
+    };
+    
+    const handleLevelUp = (data: any) => {
+      console.log('Achievements: Level up detected, refreshing data...', data);
+      refreshData();
+    };
+    
+    // Add event listeners
+    gamificationEvents.on(XP_UPDATED_EVENT, handleXpUpdate);
+    gamificationEvents.on(LEVEL_UP_EVENT, handleLevelUp);
+    
+    // Clean up on unmount
+    return () => {
+      gamificationEvents.off(XP_UPDATED_EVENT, handleXpUpdate);
+      gamificationEvents.off(LEVEL_UP_EVENT, handleLevelUp);
+    };
   }, [refreshData]);
   
   // Setup local values using either gamification data or props (for backward compatibility)

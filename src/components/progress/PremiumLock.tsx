@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SubscriptionModal from '../SubscriptionModal';
+import { useGamification, gamificationEvents, XP_UPDATED_EVENT } from '../../hooks/progress/useGamification';
 
 interface PremiumLockProps {
   onOpenSubscription: () => void;
@@ -15,15 +16,47 @@ const PremiumLock: React.FC<PremiumLockProps> = ({
   onOpenSubscription,
   subscriptionModalVisible,
   onCloseSubscription,
-  totalXP = 0,
-  level = 1
+  totalXP: propsTotalXP,
+  level: propsLevel
 }) => {
+  // Use the gamification hook to get live data
+  const { totalXP: hookTotalXP, level: hookLevel, refreshData } = useGamification();
+  
+  // Use hook values if available, otherwise fallback to props (for backward compatibility)
+  const totalXP = hookTotalXP || propsTotalXP || 0;
+  const level = hookLevel || propsLevel || 1;
+  
+  // Listen for XP update events to refresh data
+  useEffect(() => {
+    console.log('Setting up XP update listener in PremiumLock');
+    
+    // Refresh data on mount
+    refreshData();
+    
+    // Handle XP update events
+    const handleXpUpdate = (data: any) => {
+      console.log('PremiumLock: XP update detected', data);
+      refreshData();
+    };
+    
+    // Register the event listener
+    gamificationEvents.on(XP_UPDATED_EVENT, handleXpUpdate);
+    
+    // Clean up
+    return () => {
+      gamificationEvents.off(XP_UPDATED_EVENT, handleXpUpdate);
+    };
+  }, [refreshData]);
+
+  // Format XP with commas for better readability
+  const formattedXP = totalXP.toLocaleString();
+
   return (
     <View style={styles.premiumContainer}>
       {/* XP Badge */}
       <View style={styles.xpContainer}>
         <View style={styles.xpBadge}>
-          <Text style={styles.xpValue}>{totalXP}</Text>
+          <Text style={styles.xpValue}>{formattedXP}</Text>
           <Text style={styles.xpLabel}>XP</Text>
         </View>
         <View style={styles.levelBadge}>
@@ -34,7 +67,7 @@ const PremiumLock: React.FC<PremiumLockProps> = ({
       <Ionicons name="trophy" size={80} color="#FFD700" style={styles.trophyIcon} />
       <Text style={styles.premiumTitle}>Unlock Your Full Potential!</Text>
       <Text style={styles.premiumSubtitle}>
-        You've earned {totalXP} XP so far. Upgrade to Premium to track your progress and unlock exclusive features!
+        You've earned {formattedXP} XP so far. Upgrade to Premium to track your progress and unlock exclusive features!
       </Text>
       
       <View style={styles.premiumFeatures}>

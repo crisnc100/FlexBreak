@@ -7,6 +7,8 @@ import { ProgressEntry } from '../types';
 
 interface RefreshContextType {
   isRefreshing: boolean;
+  refreshTimestamp: number;
+  triggerRefresh: () => void;
   refreshApp: () => Promise<void>;
   refreshProgress: () => Promise<ProgressEntry[]>;
   refreshHome: () => Promise<ProgressEntry[]>;
@@ -43,10 +45,12 @@ interface DebouncedFunctions {
 
 export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshTimestamp, setRefreshTimestamp] = useState(Date.now());
   const { 
     synchronizeProgressData, 
     getRecentRoutines, 
-    saveRoutineProgress 
+    saveRoutineProgress,
+    getAllRoutines
   } = useRoutineStorage();
   
   // Create debounced versions of refresh functions with proper typing
@@ -105,13 +109,14 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
     try {
       console.log('Refreshing progress data...');
       setIsRefreshing(true);
+      setRefreshTimestamp(Date.now());
       
       return await measureAsyncOperation('refreshProgress', async () => {
         // First, force a synchronization of storage data only, without reprocessing
         await synchronizeProgressData();
         
         // Then get the latest data without triggering gamification processing
-        const routines = await getRecentRoutines();
+        const routines = await getAllRoutines();
         console.log('Progress refresh complete with', routines.length, 'routines');
         
         // Note: We're purposely not updating challenges/achievements here
@@ -126,7 +131,7 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
     } finally {
       setIsRefreshing(false);
     }
-  }, [synchronizeProgressData, getRecentRoutines]);
+  }, [synchronizeProgressData, getAllRoutines]);
   
   // Refresh home screen data
   const refreshHome = useCallback(async () => {
@@ -287,8 +292,17 @@ export const RefreshProvider: React.FC<RefreshProviderProps> = ({ children }) =>
     };
   }, [refreshProgress, refreshHome, refreshSettings, refreshFavorites, refreshRoutine]);
   
+  // Simple trigger to notify components that data might have changed
+  // without actually refreshing the data
+  const triggerRefresh = () => {
+    console.log('Refresh triggered (notification only)');
+    setRefreshTimestamp(Date.now());
+  };
+  
   const value = {
     isRefreshing,
+    refreshTimestamp,
+    triggerRefresh,
     refreshApp,
     refreshProgress,
     refreshHome,

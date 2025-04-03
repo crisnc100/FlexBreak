@@ -38,7 +38,7 @@ import {
 } from '../components/home';
 import * as notifications from '../utils/notifications';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
-import * as rewardManager from '../utils/progress/rewardManager';
+import * as rewardManager from '../utils/progress/modules/rewardManager';
 
 const { height, width } = Dimensions.get('window');
 

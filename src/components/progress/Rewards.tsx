@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as rewardManager from '../../utils/progress/rewardManager';
+import * as rewardManager from '../../utils/progress/modules/rewardManager';
 import { Reward } from '../../utils/progress/types';
 import RewardCard from './RewardCard';
 import { useTheme } from '../../context/ThemeContext';

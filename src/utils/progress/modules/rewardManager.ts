@@ -1,91 +1,22 @@
-import { Reward, UserProgress } from './types';
-import * as storageService from '../../services/storageService';
+import { Reward, UserProgress } from '../types';
+import * as storageService from '../../../services/storageService';
 import * as xpBoostManager from './xpBoostManager';
+import CORE_REWARDS from '../../../data/rewards.json';
 
 /**
  * Core reward definitions
  */
-const CORE_REWARDS = {
-  dark_theme: {
-    id: 'dark_theme',
-    title: 'Dark Theme',
-    description: 'Enable a sleek dark mode for comfortable evening stretching',
-    icon: 'moon',
-    unlocked: false,
-    levelRequired: 2,
-    type: 'app_feature'
-  },
-  custom_reminders: {
-    id: 'custom_reminders',
-    title: 'Custom Reminders',
-    description: 'Set personalized reminders with custom messages',
-    icon: 'notifications',
-    unlocked: false,
-    levelRequired: 3,
-    type: 'app_feature'
-  },
-  xp_boost: {
-    id: 'xp_boost',
-    title: 'XP Boost',
-    description: 'Get a 2x boost in XP for your daily streak',
-    icon: 'flash',
-    unlocked: false,
-    levelRequired: 4,
-    type: 'app_feature'
-  },
-  custom_routines: {
-    id: 'custom_routines',
-    title: 'Custom Routines',
-    description: 'Create and save your own personalized stretching routines',
-    icon: 'create',
-    unlocked: false,
-    levelRequired: 5,
-    type: 'app_feature'
-  },
-  streak_freezes: {
-    id: 'streak_freezes',
-    title: 'Streak Freezes',
-    description: 'Miss a day, keep your streak—perfect for busy schedules',
-    icon: 'snow',
-    unlocked: false,
-    levelRequired: 6,
-    type: 'app_feature'
-  },
-  premium_stretches: {
-    id: 'premium_stretches',
-    title: 'Premium Stretches',
-    description: 'Access to 15+ premium stretching exercises',
-    icon: 'fitness',
-    unlocked: false,
-    levelRequired: 7,
-    type: 'app_feature'
-  },
-  desk_break_boost: {
-    id: 'desk_break_boost',
-    title: 'Desk Break Boost',
-    description: 'Stretch in quick 15-sec bursts—3 fast routines!',
-    icon: 'desktop',
-    unlocked: false,
-    levelRequired: 8,
-    type: 'app_feature'
-  },
-  focus_area_mastery: {
-    id: 'focus_area_mastery',
-    title: 'Focus Area Mastery',
-    description: 'Get ultimate focus badges for your favorite areas',
-    icon: 'star',
-    unlocked: false,
-    levelRequired: 9,
-    type: 'app_feature'
-  }
-};
+
 
 /**
  * Initialize rewards for a new user
  * @returns Initial rewards object
  */
 export const initializeRewards = (): Record<string, Reward> => {
-  return { ...CORE_REWARDS };
+  // Convert array to object with id as keys
+  return Object.fromEntries(
+    CORE_REWARDS.map(reward => [reward.id, reward])
+  );
 };
 
 /**
@@ -137,73 +68,73 @@ export const updateRewards = async (
   userProgress: UserProgress
 ): Promise<{ updatedProgress: UserProgress; newlyUnlocked: Reward[] }> => {
   console.log('Starting reward update process...');
-  
+
   // Get the user's current level
   const currentLevel = userProgress.level || 1;
   console.log(`Current level: ${currentLevel}`);
-  
+
   // Create a copy of the user's rewards or initialize if needed
   let rewards = userProgress.rewards && Object.keys(userProgress.rewards).length > 0
     ? { ...userProgress.rewards }
     : initializeRewards();
-  
+
   // Track newly unlocked rewards
   const newlyUnlocked: Reward[] = [];
-  
+
   // Check each reward to see if it should be unlocked
   for (const rewardId in CORE_REWARDS) {
     // Ensure the reward exists in the user's rewards
     if (!rewards[rewardId]) {
       rewards[rewardId] = { ...CORE_REWARDS[rewardId] };
     }
-    
+
     const reward = rewards[rewardId];
-    
+
     // If reward is already unlocked, skip it
     if (reward.unlocked) {
       console.log(`Reward ${reward.title} is already unlocked`);
       continue;
     }
-    
+
     // Check if the user's level is high enough to unlock this reward
     if (currentLevel >= reward.levelRequired) {
       console.log(`Unlocking reward ${reward.title} for level ${currentLevel} (required: ${reward.levelRequired})`);
-      
+
       // Unlock the reward
       rewards[rewardId] = {
         ...reward,
         unlocked: true
       };
-      
+
       // Special case: Grant XP boost stacks when unlocking the xp_boost reward
       if (rewardId === 'xp_boost') {
         console.log('Unlocked XP Boost reward - adding 2 XP boost stacks (72 hours each)');
         await xpBoostManager.addXpBoosts(2);
       }
-      
+
       // Add to newly unlocked list
       newlyUnlocked.push(rewards[rewardId]);
-      
+
       console.log(`Reward unlocked: ${reward.title} (Level ${reward.levelRequired})`);
     } else {
       console.log(`Reward ${reward.title} not unlocked - requires level ${reward.levelRequired}`);
     }
   }
-  
+
   // Update progress with updated rewards
   const updatedProgress = {
     ...userProgress,
     rewards
   };
-  
+
   // Always save the progress to ensure rewards are properly initialized
   await storageService.saveUserProgress(updatedProgress);
-  
+
   console.log(`Reward update complete. Unlocked ${newlyUnlocked.length} new rewards.`);
   if (newlyUnlocked.length > 0) {
     console.log('Newly unlocked rewards:', newlyUnlocked.map(r => r.title).join(', '));
   }
-  
+
   return { updatedProgress, newlyUnlocked };
 };
 
@@ -218,7 +149,7 @@ export const unlockReward = async (
   try {
     const userProgress = await storageService.getUserProgress();
     const rewards = { ...userProgress.rewards };
-    
+
     // Check if reward exists
     if (!rewards[rewardId]) {
       return {
@@ -227,7 +158,7 @@ export const unlockReward = async (
         progress: userProgress
       };
     }
-    
+
     // Check if already unlocked
     if (rewards[rewardId].unlocked) {
       return {
@@ -236,22 +167,22 @@ export const unlockReward = async (
         progress: userProgress
       };
     }
-    
+
     // Unlock the reward
     rewards[rewardId] = {
       ...rewards[rewardId],
       unlocked: true
     };
-    
+
     // Update progress
     const updatedProgress = {
       ...userProgress,
       rewards
     };
-    
+
     // Save updated progress
     await storageService.saveUserProgress(updatedProgress);
-    
+
     return {
       success: true,
       message: `Reward '${rewards[rewardId].title}' manually unlocked`,

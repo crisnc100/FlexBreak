@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useGamification, gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT } from './useGamification';
 import { usePremium } from '../../context/PremiumContext';
-import * as rewardManager from '../../utils/progress/rewardManager';
+import * as rewardManager from '../../utils/progress/modules/rewardManager';
 import * as storageService from '../../services/storageService';
 
 // Custom event for premium status change

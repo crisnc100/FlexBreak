@@ -1,4 +1,4 @@
-import { ProgressEntry } from '../types';
+import { ProgressEntry } from '../../../types';
 
 /**
  * Calculate the user's current streak based on consecutive days of activity

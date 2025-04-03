@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as streakFreezeManager from '../../utils/progress/streakFreezeManager';
+import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
 import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import { usePremium } from '../../context/PremiumContext';
 

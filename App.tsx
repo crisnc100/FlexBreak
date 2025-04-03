@@ -8,14 +8,12 @@ import Constants from 'expo-constants';
 import HomeScreen from './src/screens/HomeScreen';
 import RoutineScreen from './src/screens/RoutineScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
-import EnhancedProgressTestingScreen from './src/screens/EnhancedProgressTestingScreen';
 import FavoritesScreen from './src/screens/FavoritesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import { PremiumProvider } from './src/context/PremiumContext';
 import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { useState } from 'react';
-import * as notifications from './src/utils/notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
@@ -219,17 +217,6 @@ function MainApp() {
             component={FavoritesScreen}
           />
           
-          {/* Enhanced Testing screen - only show in development */}
-          {__DEV__ && (
-            <Tab.Screen 
-              name="Testing" 
-              component={EnhancedProgressTestingScreen}
-              options={{
-                tabBarLabel: 'Testing',
-                title: 'Enhanced Testing'
-              }}
-            />
-          )}
         </Tab.Navigator>
         
         {/* Settings Modal */}

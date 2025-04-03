@@ -22,7 +22,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useChallengeSystem } from '../hooks/progress/useChallengeSystem';
 
 // Import XP boost manager
-import * as xpBoostManager from '../utils/progress/xpBoostManager';
+import * as xpBoostManager from '../utils/progress/modules/xpBoostManager';
 import * as storageService from '../services/storageService';
 
 // Define the possible screens in the routine flow
@@ -160,103 +160,95 @@ export default function RoutineScreen() {
         updateChallengeProgress();
         
         if (result && result.success) {
-          // Create an XP breakdown array based on the actual XP earned
-          const breakdownItems: Array<{ source: string; amount: number; description: string }> = [];
-          let totalXpEarned = 0;
-          
           // Check if XP boost is active
           const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
           const xpMultiplier = isXpBoostActive ? xpBoostData.multiplier : 1;
           setIsXpBoosted(isXpBoostActive);
           
-          // Check if this was the first routine of day (base XP > 0)
-          const isFirstOfDay = result.xpEarned > 0;
-          
-          if (isFirstOfDay) {
-            // Determine base routine XP (only if this is first routine of day)
-            let routineBaseXP = 0;
-            if (Number(routineDuration) <= 5) routineBaseXP = 30;
-            else if (Number(routineDuration) <= 10) routineBaseXP = 60;
-            else routineBaseXP = 90;
+          // Use breakdown from the result if available
+          if (result.xpBreakdown && Array.isArray(result.xpBreakdown) && result.xpBreakdown.length > 0) {
+            console.log('Using XP breakdown from result:', result.xpBreakdown);
+            setXpBreakdown(result.xpBreakdown);
             
-            // Adjust for XP boost if active
-            let boostedBaseXP = routineBaseXP;
-            let routineDesc = `${routineDuration}-Minute Routine`;
-            
-            if (isXpBoostActive) {
-              boostedBaseXP = Math.floor(routineBaseXP * xpMultiplier);
-              routineDesc = `${routineDuration}-Minute Routine (2x XP Boost Applied)`;
-            }
-            
-            // Add routine base XP
-            breakdownItems.push({
-              source: 'routine',
-              amount: boostedBaseXP,
-              description: routineDesc
-            });
-            totalXpEarned += boostedBaseXP;
-            
-            // If there's exactly 50 XP more than boosted base, it's likely the first ever routine
-            if (result.xpEarned === boostedBaseXP + 50) {
-              breakdownItems.push({
-                source: 'first_ever',
-                amount: 50,
-                description: 'Welcome Bonus: First Ever Stretch!'
-              });
-              totalXpEarned += 50;
-            }
+            // Calculate total XP from breakdown
+            const totalXpEarned = result.xpBreakdown.reduce((sum, item) => sum + item.amount, 0);
+            setRoutineXpEarned(totalXpEarned);
           } else {
-            // If no base XP earned, add a note explaining why
-            breakdownItems.push({
-              source: 'routine',
-              amount: 0,
-              description: 'Not the first routine today (XP already earned today)'
-            });
-          }
-          
-          // Add achievement bonuses if any were unlocked - these always count even if not first of day
-          if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
-            result.unlockedAchievements.forEach(achievement => {
-              // Apply XP boost to achievement XP if active
-              let achievementXP = achievement.xp;
-              let achievementDesc = `Achievement: ${achievement.title}`;
+            // Fallback to manual calculation if breakdown not available
+            console.log('No XP breakdown in result, creating manually');
+            // Create an XP breakdown array based on the actual XP earned
+            const breakdownItems: Array<{ source: string; amount: number; description: string }> = [];
+            let totalXpEarned = 0;
+            
+            // Check if this was the first routine of day (base XP > 0)
+            const isFirstOfDay = result.xpEarned > 0;
+            
+            if (isFirstOfDay) {
+              // Determine base routine XP (only if this is first routine of day)
+              let routineBaseXP = 0;
+              if (Number(routineDuration) <= 5) routineBaseXP = 30;
+              else if (Number(routineDuration) <= 10) routineBaseXP = 60;
+              else routineBaseXP = 90;
+              
+              // Adjust for XP boost if active
+              let boostedBaseXP = routineBaseXP;
+              let routineDesc = `${routineDuration}-Minute Routine`;
               
               if (isXpBoostActive) {
-                achievementXP = Math.floor(achievement.xp * xpMultiplier);
-                achievementDesc = `Achievement: ${achievement.title} (2x XP Boost Applied)`;
+                boostedBaseXP = Math.floor(routineBaseXP * xpMultiplier);
+                routineDesc = `${routineDuration}-Minute Routine (2x XP Boost Applied)`;
               }
               
+              // Add routine base XP
               breakdownItems.push({
-                source: 'achievement',
-                amount: achievementXP,
-                description: achievementDesc
+                source: 'routine',
+                amount: boostedBaseXP,
+                description: routineDesc
               });
-              totalXpEarned += achievementXP;
-            });
+              totalXpEarned += boostedBaseXP;
+              
+              // If there's exactly 50 XP more than boosted base, it's likely the first ever routine
+              if (result.xpEarned === boostedBaseXP + 50) {
+                breakdownItems.push({
+                  source: 'first_ever',
+                  amount: 50,
+                  description: 'Welcome Bonus: First Ever Stretch!'
+                });
+                totalXpEarned += 50;
+              }
+            } else {
+              // If no base XP earned, add a note explaining why
+              breakdownItems.push({
+                source: 'routine',
+                amount: 0,
+                description: 'Not the first routine today (XP already earned today)'
+              });
+            }
+            
+            // Set the total XP earned - this should be the actual total from all sources
+            setRoutineXpEarned(totalXpEarned);
+            
+            // Set the breakdown
+            setXpBreakdown(breakdownItems);
           }
           
-          // Set the total XP earned - this should be the actual total from all sources
-          setRoutineXpEarned(totalXpEarned);
-          
-          // Set the breakdown
-          setXpBreakdown(breakdownItems);
-          
           // Log results
-          console.log(`Total XP earned: ${totalXpEarned}`);
-          console.log('XP Breakdown:', breakdownItems);
+          console.log(`Total XP earned: ${xpBreakdown.reduce((sum, item) => sum + item.amount, 0)}`);
+          console.log('XP Breakdown:', xpBreakdown);
           console.log('XP Boost active:', isXpBoostActive, 'Multiplier:', xpMultiplier);
           
           // ===== SIMPLIFIED LEVEL-UP DETECTION =====
           // Import needed functions to check XP thresholds
           const { getUserProgress } = require('../services/storageService');
-          const { LEVELS } = require('../utils/progress/xpManager');
+          const { LEVELS } = require('../utils/progress/constants');
           const userProgress = await getUserProgress();
           
           // Get XP values - handle both regular and testing property names
+          const earnedXp = xpBreakdown.reduce((sum, item) => sum + item.amount, 0);
           const previousXp = userProgress.xp !== undefined 
-            ? userProgress.xp - totalXpEarned 
+            ? userProgress.xp - earnedXp 
             : userProgress.totalXP !== undefined 
-              ? userProgress.totalXP - totalXpEarned 
+              ? userProgress.totalXP - earnedXp 
               : 0;
               
           const currentXp = userProgress.xp !== undefined 
@@ -281,8 +273,8 @@ export default function RoutineScreen() {
           const crossedThreshold = previousXp < previousLevelThreshold && currentXp >= previousLevelThreshold;
           
           // Strategy 3: Check for dark theme unlock (reliable indicator for level 2)
-          const justUnlockedDarkTheme = result.unlockedRewards && 
-                                       result.unlockedRewards.some(r => 
+          const justUnlockedDarkTheme = result.newlyUnlockedRewards && 
+                                       result.newlyUnlockedRewards.some(r => 
                                          r.id === 'dark_theme' || 
                                          (r.title && r.title.includes('Dark Theme')));
           
@@ -375,9 +367,7 @@ export default function RoutineScreen() {
             }
             
             // Look for additional rewards from the result
-            const resultRewards = result.unlockedRewards || 
-                           (result as any).newlyUnlockedRewards || 
-                           [];
+            const resultRewards = result.newlyUnlockedRewards || [];
             
             // Add any missing rewards from the result
             if (resultRewards && resultRewards.length > 0) {
@@ -388,7 +378,7 @@ export default function RoutineScreen() {
                 }
                 
                 // Extract reward details, providing defaults if properties don't exist
-                const rewardName = reward.title || reward.name || 'New Reward';
+                const rewardName = reward.title || (reward as any).name || 'New Reward';
                 console.log(`Reward unlocked: ${rewardName} (Level ${newLevel})`);
                 
                 // Ensure the type is one of the allowed values
@@ -447,8 +437,8 @@ export default function RoutineScreen() {
           }
           
           // Check for unlocked rewards
-          if (result.unlockedRewards.length > 0) {
-            console.log(`Unlocked ${result.unlockedRewards.length} rewards!`);
+          if (result.newlyUnlockedRewards.length > 0) {
+            console.log(`Unlocked ${result.newlyUnlockedRewards.length} rewards!`);
           }
         } else {
           // If processing failed, set a default XP
