@@ -3,19 +3,22 @@ import * as storageService from '../../../services/storageService';
 import * as xpBoostManager from './xpBoostManager';
 import CORE_REWARDS from '../../../data/rewards.json';
 
-/**
- * Core reward definitions
- */
+// Extend the Reward interface to include additional properties for management
+interface ExtendedReward extends Reward {
+  uses?: number;
+  lastRefill?: string | null;
+  initialUses?: number;
+  unlockLevel?: number;
+}
 
-
 /**
- * Initialize rewards for a new user
- * @returns Initial rewards object
+ * Initialize the core rewards structure for a new user
+ * @returns Initialized rewards object
  */
-export const initializeRewards = (): Record<string, Reward> => {
+export const initializeRewards = (coreRewards = CORE_REWARDS): Record<string, Reward> => {
   // Convert array to object with id as keys
   return Object.fromEntries(
-    CORE_REWARDS.map(reward => [reward.id, reward])
+    coreRewards.map(reward => [reward.id, { ...reward, unlocked: false }])
   );
 };
 
@@ -25,7 +28,34 @@ export const initializeRewards = (): Record<string, Reward> => {
  */
 export const getAllRewards = async (): Promise<Reward[]> => {
   const userProgress = await storageService.getUserProgress();
-  return Object.values(userProgress.rewards || {});
+  
+  // If no rewards in user progress, initialize from core rewards
+  if (!userProgress.rewards || Object.keys(userProgress.rewards).length === 0) {
+    return CORE_REWARDS.map(reward => ({
+      ...reward,
+      unlocked: userProgress.level >= reward.levelRequired
+    }));
+  }
+  
+  // Create a map of all rewards from user progress
+  const rewardsMap = { ...userProgress.rewards };
+  
+  // Ensure all core rewards are included by checking against CORE_REWARDS
+  CORE_REWARDS.forEach(coreReward => {
+    if (!rewardsMap[coreReward.id]) {
+      // Add missing reward
+      rewardsMap[coreReward.id] = {
+        ...coreReward,
+        unlocked: userProgress.level >= coreReward.levelRequired
+      };
+    }
+  });
+  
+  // Convert rewards map to array
+  const allRewards = Object.values(rewardsMap);
+  
+  // Sort rewards by level required
+  return allRewards.sort((a, b) => a.levelRequired - b.levelRequired);
 };
 
 /**
@@ -60,82 +90,154 @@ export const isRewardUnlocked = async (rewardId: string): Promise<boolean> => {
 };
 
 /**
- * Update rewards based on user level
- * @param userProgress Current user progress
- * @returns Updated progress with newly unlocked rewards
+ * Check if rewards should be unlocked based on user level and other conditions
  */
-export const updateRewards = async (
-  userProgress: UserProgress
-): Promise<{ updatedProgress: UserProgress; newlyUnlocked: Reward[] }> => {
-  console.log('Starting reward update process...');
-
-  // Get the user's current level
-  const currentLevel = userProgress.level || 1;
-  console.log(`Current level: ${currentLevel}`);
-
-  // Create a copy of the user's rewards or initialize if needed
-  let rewards = userProgress.rewards && Object.keys(userProgress.rewards).length > 0
-    ? { ...userProgress.rewards }
-    : initializeRewards();
-
-  // Track newly unlocked rewards
-  const newlyUnlocked: Reward[] = [];
-
-  // Check each reward to see if it should be unlocked
-  for (const rewardId in CORE_REWARDS) {
-    // Ensure the reward exists in the user's rewards
-    if (!rewards[rewardId]) {
-      rewards[rewardId] = { ...CORE_REWARDS[rewardId] };
-    }
-
-    const reward = rewards[rewardId];
-
-    // If reward is already unlocked, skip it
-    if (reward.unlocked) {
-      console.log(`Reward ${reward.title} is already unlocked`);
-      continue;
-    }
-
-    // Check if the user's level is high enough to unlock this reward
-    if (currentLevel >= reward.levelRequired) {
-      console.log(`Unlocking reward ${reward.title} for level ${currentLevel} (required: ${reward.levelRequired})`);
-
-      // Unlock the reward
-      rewards[rewardId] = {
-        ...reward,
-        unlocked: true
-      };
-
-      // Special case: Grant XP boost stacks when unlocking the xp_boost reward
-      if (rewardId === 'xp_boost') {
-        console.log('Unlocked XP Boost reward - adding 2 XP boost stacks (72 hours each)');
-        await xpBoostManager.addXpBoosts(2);
+export const updateRewards = async (userProgress: UserProgress) => {
+  const updatedProgress = { ...userProgress };
+  let changed = false;
+  
+  // Initialize rewards if they don't exist
+  if (!updatedProgress.rewards) {
+    updatedProgress.rewards = {};
+    changed = true;
+  }
+  
+  // Special handling for dark theme - ensure it's always unlocked at level 2 or above
+  if (updatedProgress.level >= 2) {
+    if (!updatedProgress.rewards['dark_theme']) {
+      // If dark theme reward doesn't exist yet, create it
+      const darkThemeReward = CORE_REWARDS.find(r => r.id === 'dark_theme');
+      if (darkThemeReward) {
+        updatedProgress.rewards['dark_theme'] = {
+          ...darkThemeReward,
+          unlocked: true
+        };
+        console.log(`Auto-unlocking dark theme reward at level ${updatedProgress.level}`);
+        changed = true;
       }
-
-      // Add to newly unlocked list
-      newlyUnlocked.push(rewards[rewardId]);
-
-      console.log(`Reward unlocked: ${reward.title} (Level ${reward.levelRequired})`);
-    } else {
-      console.log(`Reward ${reward.title} not unlocked - requires level ${reward.levelRequired}`);
+    } else if (!updatedProgress.rewards['dark_theme'].unlocked) {
+      // If it exists but isn't unlocked, unlock it
+      updatedProgress.rewards['dark_theme'].unlocked = true;
+      console.log(`Unlocking existing dark theme reward at level ${updatedProgress.level}`);
+      changed = true;
     }
   }
-
-  // Update progress with updated rewards
-  const updatedProgress = {
-    ...userProgress,
-    rewards
-  };
-
-  // Always save the progress to ensure rewards are properly initialized
-  await storageService.saveUserProgress(updatedProgress);
-
-  console.log(`Reward update complete. Unlocked ${newlyUnlocked.length} new rewards.`);
-  if (newlyUnlocked.length > 0) {
-    console.log('Newly unlocked rewards:', newlyUnlocked.map(r => r.title).join(', '));
+  
+  // Check each reward to see if it should be unlocked
+  CORE_REWARDS.forEach((rewardInfo: any) => {
+    // Skip if reward ID is 'dark_theme' since we already handled it specially
+    if (rewardInfo.id === 'dark_theme') {
+      return;
+    }
+    
+    // Skip already unlocked rewards
+    if (updatedProgress.rewards[rewardInfo.id]?.unlocked) {
+      return;
+    }
+    
+    // Check if level requirement is met
+    const levelRequirement = rewardInfo.levelRequired || 0;
+    
+    if (updatedProgress.level >= levelRequirement) {
+      console.log(`Unlocking reward ${rewardInfo.id} at level ${updatedProgress.level}`);
+      
+      // Initialize reward if needed
+      if (!updatedProgress.rewards[rewardInfo.id]) {
+        updatedProgress.rewards[rewardInfo.id] = {
+          id: rewardInfo.id,
+          title: rewardInfo.title,
+          description: rewardInfo.description,
+          icon: rewardInfo.icon,
+          unlocked: false,
+          levelRequired: levelRequirement,
+          type: rewardInfo.type
+        };
+      }
+      
+      // Unlock the reward
+      updatedProgress.rewards[rewardInfo.id].unlocked = true;
+      
+      // Add extended properties
+      const extendedReward = updatedProgress.rewards[rewardInfo.id] as ExtendedReward;
+      
+      // Grant initial uses if specified
+      if (rewardInfo.initialUses && rewardInfo.initialUses > 0) {
+        extendedReward.uses = rewardInfo.initialUses;
+        extendedReward.lastRefill = new Date().toISOString();
+      }
+      
+      changed = true;
+    }
+  });
+  
+  // Save changes if needed
+  if (changed) {
+    await storageService.saveUserProgress(updatedProgress);
+    console.log('Saved updated user rewards');
   }
+  
+  return updatedProgress;
+};
 
-  return { updatedProgress, newlyUnlocked };
+/**
+ * Get all rewards available to the user
+ */
+export const getAvailableRewards = async () => {
+  const userProgress = await storageService.getUserProgress();
+  
+  if (!userProgress.rewards) {
+    return [];
+  }
+  
+  const availableRewards = Object.entries(userProgress.rewards)
+    .filter(([_, rewardData]) => rewardData.unlocked)
+    .map(([rewardId, rewardData]) => {
+      const extendedReward = rewardData as ExtendedReward;
+      const rewardInfo = CORE_REWARDS[rewardId] as ExtendedReward;
+      
+      return {
+        id: rewardId,
+        name: rewardData.title,
+        description: rewardData.description,
+        iconName: rewardData.icon,
+        uses: extendedReward.uses || 0,
+        unlocked: rewardData.unlocked,
+        lastRefill: extendedReward.lastRefill || null
+      };
+    });
+  
+  return availableRewards;
+};
+
+/**
+ * Use a reward if available
+ */
+export const useReward = async (rewardId: string): Promise<boolean> => {
+  const userProgress = await storageService.getUserProgress();
+  
+  // Check if reward exists and is unlocked
+  if (!userProgress.rewards || !userProgress.rewards[rewardId]?.unlocked) {
+    console.log(`Reward ${rewardId} is not available`);
+    return false;
+  }
+  
+  // Cast to extended reward type
+  const extendedReward = userProgress.rewards[rewardId] as ExtendedReward;
+  
+  // Check if reward has uses left
+  if (!extendedReward.uses || extendedReward.uses <= 0) {
+    console.log(`No uses left for reward ${rewardId}`);
+    return false;
+  }
+  
+  // Consume one use
+  extendedReward.uses -= 1;
+  console.log(`Used reward ${rewardId}, ${extendedReward.uses} uses remaining`);
+  
+  // Save updated progress
+  await storageService.saveUserProgress(userProgress);
+  
+  return true;
 };
 
 /**

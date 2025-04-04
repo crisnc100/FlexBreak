@@ -1,14 +1,33 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { saveIsPremium } from '../services/storageService';
 import { usePremium } from '../context/PremiumContext';
 import { useFeatureAccess, PREMIUM_STATUS_CHANGED } from '../hooks/progress/useFeatureAccess';
 import { useGamification } from '../hooks/progress/useGamification';
-import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
 import { gamificationEvents, REWARD_UNLOCKED_EVENT } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
+import CORE_REWARDS from '../data/rewards.json';
+
+/**
+ * Helper function to initialize rewards from rewards.json
+ */
+const createInitialRewards = () => {
+  // Convert array to object with id as keys
+  return Object.fromEntries(
+    CORE_REWARDS.map(reward => [
+      reward.id, 
+      { 
+        ...reward, 
+        unlocked: false,
+        // Add uses property for rewards that should have them
+        ...(reward.id === 'xp_boost' ? { initialUses: 2 } : {}),
+        ...(reward.id === 'streak_freezes' ? { initialUses: 1 } : {})
+      }
+    ])
+  );
+};
 
 interface SubscriptionModalProps {
   visible: boolean;
@@ -29,21 +48,27 @@ export default function SubscriptionModal({ visible, onClose, onSubscribe }: Sub
       
       // First, get current user progress
       const currentProgress = await storageService.getUserProgress();
-      console.log(`Current user level: ${currentProgress.level}`);
+      console.log(`Current user level: ${currentProgress?.level || 1}`);
       
       // Initialize rewards if they don't exist
-      if (!currentProgress.rewards || Object.keys(currentProgress.rewards).length === 0) {
-        currentProgress.rewards = rewardManager.initializeRewards();
-        await storageService.saveUserProgress({
-          ...currentProgress,
-          rewards: rewardManager.initializeRewards()
-        });
+      if (!currentProgress || !currentProgress.rewards || Object.keys(currentProgress.rewards).length === 0) {
+        // Create initial rewards using our helper function
+        const initialRewards = createInitialRewards();
+          
+        const updatedProgress = {
+          ...(currentProgress || storageService.INITIAL_STATE.USER_PROGRESS),
+          rewards: initialRewards
+        };
+        await storageService.saveUserProgress(updatedProgress);
       }
       
       // Manually unlock dark theme if level is sufficient
-      if (currentProgress.level >= 2) {
+      if (currentProgress && currentProgress.level && currentProgress.level >= 2) {
         if (currentProgress.rewards?.dark_theme && !currentProgress.rewards.dark_theme.unlocked) {
-          await rewardManager.unlockReward('dark_theme');
+          // Update dark theme property directly
+          const updatedProgress = { ...currentProgress };
+          updatedProgress.rewards.dark_theme.unlocked = true;
+          await storageService.saveUserProgress(updatedProgress);
           console.log('Dark theme manually unlocked due to sufficient level');
         }
       }
@@ -57,57 +82,21 @@ export default function SubscriptionModal({ visible, onClose, onSubscribe }: Sub
       console.log('Premium status changed event emitted');
       
       // Force update rewards based on current level
-      const { updatedProgress, newlyUnlocked } = await rewardManager.updateRewards(currentProgress);
-      console.log(`Updating rewards for level ${updatedProgress.level}, unlocked ${newlyUnlocked.length} rewards`);
+      const userProgress = await storageService.getUserProgress();
       
-      // Save the updated progress
-      await storageService.saveUserProgress(updatedProgress);
+      // Update UI
+      if (refreshPremiumStatus) await refreshPremiumStatus();
+      if (refreshAccess) refreshAccess();
+      if (refreshData) refreshData();
+      if (refreshTheme) refreshTheme();
       
-      // Allow context updates to propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Refresh premium status
-      await refreshPremiumStatus();
-      
-      // Emit reward unlocked event if any rewards were unlocked
-      if (newlyUnlocked.length > 0) {
-        gamificationEvents.emit(REWARD_UNLOCKED_EVENT, newlyUnlocked);
-        console.log('Unlocked rewards:', newlyUnlocked.map(r => r.title).join(', '));
-      }
-      
-      // Refresh feature access to reflect newly unlocked features
-      await refreshAccess();
-      
-      // Refresh theme context
-      refreshTheme();
-      
-      // Refresh gamification data to ensure everything is in sync
-      await refreshData();
-      
-      // Make sure settings are applied immediately
-      await rewardManager.isRewardUnlocked('dark_theme').then(isUnlocked => {
-        console.log('Dark theme status after unlock process:', isUnlocked ? 'UNLOCKED' : 'LOCKED');
-      });
-      
-      // Allow state changes to take effect
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Call the onSubscribe callback if provided (for backward compatibility)
-      if (onSubscribe) {
-        onSubscribe();
-      }
-      
+      // Close the modal
+      if (onSubscribe) onSubscribe();
       onClose();
       
-      // Show what features were unlocked in the success message
-      if (newlyUnlocked.length > 0) {
-        alert(`Subscription successful! You now have premium access.\n\nUnlocked features:\n${newlyUnlocked.map(r => `- ${r.title}`).join('\n')}`);
-      } else {
-        alert('Subscription successful! You now have premium access.');
-      }
     } catch (error) {
       console.error('Error during subscription:', error);
-      alert('There was an error processing your subscription. Please try again.');
+      alert(`There was an error processing your subscription. Please try again.\nError during subscription: ${error}`);
     }
   };
 
@@ -136,25 +125,39 @@ export default function SubscriptionModal({ visible, onClose, onSubscribe }: Sub
               <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
               <Text style={styles.benefitText}>Track your progress</Text>
             </View>
+            
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.benefitText}>Set daily reminders</Text>
+              <Text style={styles.benefitText}>Unlock custom routines</Text>
             </View>
+            
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.benefitText}>Save favorite stretches</Text>
+              <Text style={styles.benefitText}>Dark mode</Text>
+            </View>
+            
+            <View style={styles.benefitItem}>
+              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+              <Text style={styles.benefitText}>XP Boost & Streak protection</Text>
+            </View>
+            
+            <View style={styles.benefitItem}>
+              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+              <Text style={styles.benefitText}>Premium stretches & features</Text>
             </View>
           </View>
           
-          <Text style={styles.priceText}>$4.99/month</Text>
-          
           <TouchableOpacity style={styles.subscribeButton} onPress={handleSubscribe}>
-            <Text style={styles.subscribeButtonText}>Subscribe Now</Text>
+            <Text style={styles.subscribeText}>Subscribe Now</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.restoreLink} onPress={handleRestore}>
-            <Text style={styles.restoreLinkText}>Restore Purchase</Text>
+          <TouchableOpacity style={styles.restoreButton} onPress={handleRestore}>
+            <Text style={styles.restoreText}>Restore Purchase</Text>
           </TouchableOpacity>
+          
+          <Text style={styles.disclaimer}>
+            Premium features unlock as you level up. Subscribe once to unlock them permanently.
+          </Text>
         </View>
       </View>
     </Modal>
@@ -170,61 +173,62 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
     padding: 24,
     alignItems: 'center',
   },
   closeButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 10,
+    right: 10,
   },
   modalHeader: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 16,
     color: '#333',
-    marginBottom: 24,
   },
   benefitsList: {
     width: '100%',
-    marginBottom: 24,
+    marginVertical: 16,
   },
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   benefitText: {
-    fontSize: 14,
+    marginLeft: 8,
+    fontSize: 16,
     color: '#333',
-    marginLeft: 12,
-  },
-  priceText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 24,
   },
   subscribeButton: {
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
-    width: '100%',
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    marginTop: 16,
     alignItems: 'center',
-    marginBottom: 16,
+    width: '100%',
   },
-  subscribeButtonText: {
+  subscribeText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  restoreLink: {
+  restoreButton: {
+    marginTop: 16,
     padding: 8,
   },
-  restoreLinkText: {
+  restoreText: {
     fontSize: 12,
     color: '#666',
+  },
+  disclaimer: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 16,
+    textAlign: 'center',
   },
 }); 

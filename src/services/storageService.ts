@@ -825,5 +825,28 @@ export const initializeUserProgressIfEmpty = async (): Promise<UserProgress> => 
     // Return default progress if there was an error
     return INITIAL_USER_PROGRESS;
   }
+};
+
+/**
+ * Clear all saved routines but maintain other user data
+ * @returns Success boolean
+ */
+export const clearRoutines = async (): Promise<boolean> => {
+  try {
+    console.log('Clearing all routines from storage...');
+    
+    // Clear routine data from storage
+    await setData(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
+    await setData(KEYS.PROGRESS.PROGRESS_HISTORY, []);
+    
+    // Verify the routines were cleared
+    const routines = await getAllRoutines();
+    console.log('After clearing - routines length:', routines?.length || 0);
+    
+    return true;
+  } catch (error) {
+    console.error('Error clearing routines:', error);
+    return false;
+  }
 }; 
 

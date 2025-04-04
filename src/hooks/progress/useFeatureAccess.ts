@@ -109,26 +109,6 @@ export function useFeatureAccess() {
     };
   }, [loadFeatureAccess]);
   
-  // Function to check if a feature is accessible
-  const canAccessFeature = useCallback((featureId: string): boolean => {
-    if (!isPremium) return false;
-    
-    switch (featureId) {
-      case 'dark_theme':
-        return features.darkTheme;
-      case 'custom_reminders':
-        return features.customReminders;
-      case 'xp_boost':
-        return features.xpBoost;
-      case 'custom_routines':
-        return features.customRoutines;
-      case 'streak_freezes':
-        return features.streakFreezes;
-      default:
-        return false;
-    }
-  }, [features, isPremium]);
-  
   // Function to get the required level for a feature
   const getRequiredLevel = useCallback((featureId: string): number => {
     switch (featureId) {
@@ -152,6 +132,38 @@ export function useFeatureAccess() {
     const requiredLevel = getRequiredLevel(featureId);
     return level >= requiredLevel;
   }, [level, getRequiredLevel]);
+  
+  // Function to check if a feature is accessible
+  const canAccessFeature = useCallback((featureId: string): boolean => {
+    if (!isPremium) return false;
+    
+    switch (featureId) {
+      case 'dark_theme':
+        // Dark theme is accessible if:
+        // 1. The reward is specifically unlocked in the rewards system
+        // 2. OR the user has reached level 2 or higher
+        const hasDarkThemeReward = features.darkTheme;
+        const hasRequiredLevel = meetsLevelRequirement('dark_theme');
+        
+        console.log(`Dark theme access check - Has reward: ${hasDarkThemeReward}, Meets level req: ${hasRequiredLevel}`);
+        return hasDarkThemeReward || hasRequiredLevel;
+        
+      case 'custom_reminders':
+        return features.customReminders || meetsLevelRequirement('custom_reminders');
+        
+      case 'xp_boost':
+        return features.xpBoost || meetsLevelRequirement('xp_boost');
+        
+      case 'custom_routines':
+        return features.customRoutines || meetsLevelRequirement('custom_routines');
+        
+      case 'streak_freezes':
+        return features.streakFreezes || meetsLevelRequirement('streak_freezes');
+        
+      default:
+        return false;
+    }
+  }, [features, isPremium, meetsLevelRequirement]);
   
   /**
    * Get the current user's level

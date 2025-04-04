@@ -3,6 +3,8 @@ import { getIsPremium, saveIsPremium } from '../services/storageService';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { gamificationEvents } from '../hooks/progress/useGamification';
 import { PREMIUM_STATUS_CHANGED } from '../hooks/progress/useFeatureAccess';
+import * as rewardManager from '../utils/progress/modules/rewardManager';
+import * as storageService from '../services/storageService';
 
 export type PremiumContextType = {
   isPremium: boolean;
@@ -57,6 +59,60 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Add a new function to refresh rewards when premium status changes
+  const updateRewardsAfterPremiumChange = async (isPremium: boolean) => {
+    if (isPremium) {
+      try {
+        // Get current user progress
+        const userProgress = await storageService.getUserProgress();
+        console.log(`Updating rewards after premium change. User level: ${userProgress.level}`);
+        
+        // Force update rewards based on current level
+        await rewardManager.updateRewards(userProgress);
+        
+        // Explicitly check dark theme eligibility
+        if (userProgress.level >= 2) {
+          console.log(`User is level ${userProgress.level}, ensuring dark theme is unlocked`);
+          if (!userProgress.rewards?.dark_theme?.unlocked) {
+            const newProgress = { ...userProgress };
+            
+            // Make sure rewards and dark theme objects exist
+            if (!newProgress.rewards) newProgress.rewards = {};
+            if (!newProgress.rewards.dark_theme) {
+              // Find the dark theme reward in CORE_REWARDS
+              const darkThemeReward = await rewardManager.getAllRewards()
+                .then(rewards => rewards.find(r => r.id === 'dark_theme'));
+                
+              if (darkThemeReward) {
+                newProgress.rewards.dark_theme = darkThemeReward;
+              } else {
+                // Fallback if not found
+                newProgress.rewards.dark_theme = {
+                  id: 'dark_theme',
+                  title: 'Dark Theme',
+                  description: 'Switch to a dark theme to reduce eye strain',
+                  icon: 'moon-outline',
+                  levelRequired: 2,
+                  unlocked: true,
+                  type: 'theme'
+                };
+              }
+            }
+            
+            // Ensure it's unlocked
+            newProgress.rewards.dark_theme.unlocked = true;
+            
+            // Save the changes
+            await storageService.saveUserProgress(newProgress);
+            console.log('Dark theme manually unlocked after premium status change');
+          }
+        }
+      } catch (error) {
+        console.error('Error updating rewards after premium change:', error);
+      }
+    }
+  };
+
   // Function to update premium status
   const setPremiumStatus = async (status: boolean): Promise<void> => {
     try {
@@ -70,6 +126,9 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
         gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
         console.log('Premium status changed event emitted from context');
       }
+
+      // Update rewards after premium status changes
+      await updateRewardsAfterPremiumChange(status);
     } catch (error) {
       console.error('Error saving premium status:', error);
     }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PremiumContext } from './PremiumContext';
@@ -52,22 +52,24 @@ const darkTheme: ThemeColors = {
   error: '#E57373'
 };
 
-// Theme context interface
-interface ThemeContextType {
+// Update the ThemeContextType to include a safe toggle method
+export type ThemeContextType = {
   theme: ThemeColors;
   themeType: ThemeType;
   setThemeType: (type: ThemeType) => void;
+  toggleTheme: () => void; // Add this safe toggle method
   isDark: boolean;
   canUseDarkTheme: boolean;
   refreshThemeAccess: () => Promise<void>;
   refreshTheme: () => void;
-}
+};
 
-// Create the context
+// Update the context creation with the new toggle method
 const ThemeContext = createContext<ThemeContextType>({
   theme: lightTheme,
   themeType: 'system',
   setThemeType: () => {},
+  toggleTheme: () => {}, // Add default implementation
   isDark: false,
   canUseDarkTheme: false,
   refreshThemeAccess: async () => {},
@@ -121,22 +123,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Check if user can access dark theme based on premium status and level
   const checkDarkThemeAccess = async () => {
     try {
+      // Get user progress to check level and rewards
+      const userProgress = await storageService.getUserProgress();
+      console.log(`Saved user progress: Level ${userProgress.level}, XP: ${userProgress.totalXP}`);
+      
       // Default to false
       let hasAccess = false;
       
-      // If user is premium, check their level
-      if (isPremium) {
-        const userProgress = await storageService.getUserProgress();
-        
-        // Level 2+ unlocks dark theme
-        if (userProgress.level >= 2) {
-          hasAccess = true;
-        }
-        
-        // Also check if the dark_theme reward is unlocked
-        if (userProgress.rewards && userProgress.rewards.dark_theme) {
-          hasAccess = userProgress.rewards.dark_theme.unlocked;
-        }
+      // Check if user is at least level 2
+      if (userProgress.level >= 2) {
+        hasAccess = true;
+        console.log('User meets level requirement (level 2+) for dark theme');
+      }
+      
+      // Also check if the dark_theme reward is explicitly unlocked
+      if (userProgress.rewards && userProgress.rewards.dark_theme) {
+        hasAccess = hasAccess || userProgress.rewards.dark_theme.unlocked;
+        console.log(`Dark theme reward unlocked? ${userProgress.rewards.dark_theme.unlocked}`);
       }
       
       console.log('Dark theme access check:', hasAccess ? 'GRANTED' : 'DENIED');
@@ -144,6 +147,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       // If user can't use dark theme but currently has it set, revert to light
       if (!hasAccess && themeType === 'dark') {
+        console.log('User lost dark theme access, reverting to light theme');
         await saveThemePreference('light');
         setThemeType('light');
       }
@@ -152,8 +156,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const now = Date.now();
       await AsyncStorage.setItem(LAST_THEME_CHECK_KEY, now.toString());
       setLastThemeCheck(now);
+      
+      return hasAccess;
     } catch (error) {
       console.error('Error checking dark theme access:', error);
+      return false;
     }
   };
   
@@ -212,14 +219,78 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Enhanced setThemeType that also persists the preference
   const handleSetThemeType = (type: ThemeType) => {
-    // If trying to set dark theme but don't have access, don't change
+    // If trying to set dark theme but don't have access, show alert and return
     if (type === 'dark' && !canUseDarkTheme) {
+      console.log('Attempted to set dark theme but user lacks permission');
+      
+      
       return;
     }
     
-    setThemeType(type);
-    saveThemePreference(type);
+    // Log theme change - do this BEFORE changing state to avoid stale state issues
+    const previousType = themeType;
+    console.log(`Theme changing from ${previousType} to ${type}`);
+    
+    // Check if this is a toggle to/from dark mode
+    if ((previousType === 'dark' && type !== 'dark') || 
+        (previousType !== 'dark' && type === 'dark')) {
+      console.log('Dark theme toggled');
+    }
+    
+    // Save preference first before updating state
+    try {
+      saveThemePreference(type);
+      // Now update the state
+      setThemeType(type);
+      
+      // No success alerts - we don't want to interrupt the user flow
+    } catch (error) {
+      console.error('Error updating theme:', error);
+      // Only show alert on error
+      setTimeout(() => {
+        try {
+          const alert = global.Alert || require('react-native').Alert;
+          if (alert && alert.alert) {
+            alert.alert(
+              'Theme Error',
+              'There was a problem changing the theme. Please try again.',
+              [{ text: 'OK' }]
+            );
+          }
+        } catch (e) {
+          console.log('Could not show theme error alert:', e);
+        }
+      }, 0);
+    }
   };
+  
+  // Add safe toggle method that doesn't rely on reading state directly in handlers
+  const toggleTheme = useCallback(() => {
+    console.log('THEME TOGGLE - DIRECT SWITCH');
+    
+    try {
+      // Skip all complex handling and directly switch
+      if (themeType === 'dark') {
+        // Directly set light theme without any alerts
+        setThemeType('light');
+        saveThemePreference('light');
+        console.log('Changed theme: DARK → LIGHT');
+      } else {
+        // Check permission first
+        if (!canUseDarkTheme) {
+          console.log('Cannot set dark theme - permission denied');
+          return;
+        }
+        
+        // Directly set dark theme without any alerts
+        setThemeType('dark');
+        saveThemePreference('dark');
+        console.log('Changed theme: LIGHT → DARK');
+      }
+    } catch (error) {
+      console.error('Error during direct theme toggle:', error);
+    }
+  }, [themeType, canUseDarkTheme]);
   
   // Determine if we're using dark mode
   const isDark = themeType === 'dark' || (themeType === 'system' && systemColorScheme === 'dark');
@@ -261,7 +332,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ThemeContext.Provider value={{ 
       theme: actualTheme, 
       themeType, 
-      setThemeType: handleSetThemeType, 
+      setThemeType: handleSetThemeType,
+      toggleTheme, // Add the toggle function to the context value 
       isDark, 
       canUseDarkTheme,
       refreshThemeAccess,

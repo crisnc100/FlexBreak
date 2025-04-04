@@ -16,25 +16,52 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   
   // Check if reward is dark theme and it's unlocked (to show active state)
   const isDarkThemeReward = reward.id === 'dark_theme';
+  const isDarkThemeActive = isDarkThemeReward && isDark;
   
   // Get icon color based on reward type
   const getIconColor = () => {
-    if (isDarkThemeReward) return isDark ? '#BB86FC' : '#673AB7';
-    if (reward.id === 'custom_reminders') return '#2196F3';
-    if (reward.id === 'xp_boost') return '#FF9800';
-    if (reward.id === 'custom_routines') return '#4CAF50';
-    if (reward.id === 'streak_freezes') return '#00BCD4';
-    return '#673AB7'; // Default for other rewards
+    switch (reward.id) {
+      case 'dark_theme':
+        return isDark ? '#BB86FC' : '#673AB7'; // Purple - brighter in dark mode
+      case 'custom_reminders':
+        return '#2196F3'; // Blue
+      case 'xp_boost':
+        return '#FF9800'; // Orange
+      case 'custom_routines':
+        return '#4CAF50'; // Green
+      case 'streak_freezes':
+        return '#00BCD4'; // Cyan
+      case 'premium_stretches':
+        return '#F44336'; // Red
+      case 'desk_break_boost':
+        return '#009688'; // Teal
+      case 'focus_area_mastery':
+        return '#FFC107'; // Amber
+      default:
+        return '#673AB7'; // Default purple
+    }
   };
   
   // Get icon name based on reward type
   const getIconName = () => {
-    if (isDarkThemeReward) return isDark ? 'moon' : 'moon-outline';
-    if (reward.id === 'custom_reminders') return reward.unlocked ? 'notifications' : 'notifications-outline';
-    if (reward.id === 'xp_boost') return reward.unlocked ? 'flash' : 'flash-outline';
-    if (reward.id === 'custom_routines') return reward.unlocked ? 'create' : 'create-outline';
-    if (reward.id === 'streak_freezes') return reward.unlocked ? 'snow' : 'snow-outline';
-    return reward.icon || 'star-outline';
+    // For dark theme, show filled icon when active, outline when inactive but unlocked
+    if (isDarkThemeReward) {
+      if (isDark) return 'moon'; // Dark theme is active
+      return reward.unlocked ? 'moon-outline' : 'lock-closed-outline';
+    }
+    
+    // Base icon from the reward data
+    let iconName = reward.icon || 'star';
+    
+    // Add outline suffix if not unlocked
+    if (!reward.unlocked) {
+      // If icon already has -outline, don't add it again
+      if (!iconName.includes('-outline')) {
+        iconName = `${iconName}-outline`;
+      }
+    }
+    
+    return iconName;
   };
   
   // Get reward status text
@@ -51,12 +78,26 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
     return '#757575';
   };
   
-  // Determine if reward is enabled
-  const isEnabled = reward.unlocked && isPremium;
+  // Get badge text for active toggleable features
+  const getBadgeText = () => {
+    if (isDarkThemeReward) {
+      if (isDark) return 'Active';
+      if (reward.unlocked || userLevel >= reward.levelRequired) return 'Tap to Enable';
+      return null;
+    }
+    if (reward.id === 'xp_boost' && reward.unlocked) return '2x XP';
+    return null;
+  };
   
-  // Special handling for dark theme reward
+  // Determine if reward is enabled
+  const isEnabled = isPremium && (reward.unlocked || (isDarkThemeReward && userLevel >= reward.levelRequired));
+  
+  // Direct handler for reward press - no unnecessary alerts
   const handleRewardPress = () => {
+    // Only call handler if reward is enabled
     if (isEnabled) {
+      // Just directly call parent handler - no alert, no message
+      console.log(`DIRECTLY calling parent handler for reward: ${reward.id}`);
       onPress();
     }
   };
@@ -67,13 +108,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
         styles.container, 
         { 
           backgroundColor: theme.cardBackground,
-          borderColor: isEnabled ? theme.accent + '40' : theme.border,
+          borderColor: isEnabled ? (isDarkThemeReward && isDark ? '#BB86FC' : theme.accent + '40') : theme.border,
           opacity: isEnabled ? 1 : 0.8
         },
         isDarkThemeReward && isDark && styles.activeContainer
       ]}
       onPress={handleRewardPress}
-      disabled={!isEnabled}
+      activeOpacity={0.4}
     >
       <View style={[
         styles.iconContainer, 
@@ -87,11 +128,23 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       </View>
       
       <View style={styles.contentContainer}>
-        <Text style={[styles.title, { color: theme.text }]}>
-          {reward.title}
-          {isDarkThemeReward && isDark && ' (Active)'}
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: theme.text }]}>
+            {reward.title}
+          </Text>
+          
+          {getBadgeText() && (
+            <View style={[styles.activeBadge, { backgroundColor: getIconColor() + '20' }]}>
+              <Text style={[styles.activeBadgeText, { color: getIconColor() }]}>
+                {getBadgeText()}
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        <Text style={[styles.description, { color: theme.textSecondary }]}>
+          {reward.description}
         </Text>
-        <Text style={[styles.description, { color: theme.textSecondary }]}>{reward.description}</Text>
         
         <View style={[styles.statusContainer, { backgroundColor: getStatusColor() + '20' }]}>
           <Text style={[styles.statusText, { color: getStatusColor() }]}>
@@ -152,10 +205,24 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   title: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+  },
+  activeBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  activeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   description: {
     fontSize: 14,

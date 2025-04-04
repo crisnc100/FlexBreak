@@ -89,15 +89,17 @@ export default function ProgressScreen({ navigation }) {
   
   // Handle XP Boost activation
   const handleActivateXpBoost = useCallback(() => {
+    // Update a simple notification on activation - the XpBoostCard component
+    // handles the actual activation and displays detailed status
     Alert.alert(
       'XP Boost Activated!',
-      'Your XP Boost is now active. All XP earned in the next 72 hours will be doubled.',
-      [{ text: 'OK' }]
+      'All XP earned is now doubled for the next 72 hours. Complete more routines to maximize your boost!',
+      [{ text: 'Awesome!' }]
     );
     
-    // Refresh progress data to reflect changes
-    handleRefresh();
-  }, [handleRefresh]);
+    // Refresh gamification data after boost activation
+    refreshData();
+  }, [refreshData]);
   
   // Reset user progress (DEV only)
   const handleResetProgress = useCallback(async () => {

@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as xpBoostManager from '../../utils/progress/modules/xpBoostManager';
-import * as rewardManager from '../../utils/progress/modules/rewardManager';
 import * as storageService from '../../services/storageService';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+
+// Create a fallback rewardManager if the module is not available
+const mockRewardManager = {
+  isRewardUnlocked: async (rewardId: string): Promise<boolean> => {
+    console.log('Using mock rewardManager.isRewardUnlocked', rewardId);
+    const userProgress = await storageService.getUserProgress();
+    const reward = userProgress.rewards && userProgress.rewards[rewardId];
+    return reward ? reward.unlocked : false;
+  }
+};
+
+// Try to import the actual rewardManager, use mock as fallback
+let rewardManager: typeof mockRewardManager;
+try {
+  // Dynamic import for rewardManager
+  rewardManager = require('../../utils/progress/modules/rewardManager');
+} catch (e) {
+  console.warn('Could not import rewardManager, using mock instead', e);
+  rewardManager = mockRewardManager;
+}
 
 interface XpBoostCardProps {
   onActivate?: () => void;
@@ -34,11 +53,13 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
       
       // Validate XP boost reward to ensure boosts are granted
       if (isUnlocked && !wasValidated) {
-        const validationResult = await xpBoostManager.validateXpBoostReward();
-        setWasValidated(true);
-        
-        if (validationResult.boostsAdded > 0) {
-          setMessage(`${validationResult.boostsAdded} XP boosts were added to your account!`);
+        if (typeof xpBoostManager.validateXpBoostReward === 'function') {
+          const validationResult = await xpBoostManager.validateXpBoostReward();
+          setWasValidated(true);
+          
+          if (validationResult.boostsAdded > 0) {
+            setMessage(`${validationResult.boostsAdded} XP boosts were added to your account!`);
+          }
         }
       }
       
@@ -47,19 +68,27 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
       setIsActive(active);
       
       // Get available boosts
-      const boosts = await xpBoostManager.getAvailableBoosts();
-      setAvailableBoosts(boosts);
+      if (typeof xpBoostManager.getAvailableBoosts === 'function') {
+        const boosts = await xpBoostManager.getAvailableBoosts();
+        setAvailableBoosts(boosts);
+      } else {
+        console.warn('getAvailableBoosts function not available');
+        setAvailableBoosts(0);
+      }
       
       // If active, calculate and format remaining time
       if (active) {
-        const timeMs = await xpBoostManager.getXpBoostRemainingTime();
-        setFormattedTime(xpBoostManager.formatRemainingTime(timeMs));
+        if (typeof xpBoostManager.getRemainingXpBoostTime === 'function') {
+          const timeMs = await xpBoostManager.getRemainingXpBoostTime();
+          setFormattedTime(xpBoostManager.formatRemainingTime(timeMs));
+        }
       }
       
       setLoading(false);
     } catch (error) {
       console.error('Error checking XP boost status', error);
       setLoading(false);
+      setMessage('Error loading XP boost data. Please try again.');
     }
   };
   
@@ -70,12 +99,14 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
     // Set up timer to refresh remaining time every minute
     const timer = isActive 
       ? setInterval(async () => {
-          const timeMs = await xpBoostManager.getXpBoostRemainingTime();
-          setFormattedTime(xpBoostManager.formatRemainingTime(timeMs));
-          
-          // If boost just expired, refresh all data
-          if (timeMs <= 0) {
-            refreshData();
+          if (typeof xpBoostManager.getRemainingXpBoostTime === 'function') {
+            const timeMs = await xpBoostManager.getRemainingXpBoostTime();
+            setFormattedTime(xpBoostManager.formatRemainingTime(timeMs));
+            
+            // If boost just expired, refresh all data
+            if (timeMs <= 0) {
+              refreshData();
+            }
           }
         }, 60000) 
       : null;

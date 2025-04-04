@@ -5,6 +5,7 @@
 
 import { ProgressEntry } from '../../../../types';
 import * as storageService from '../../../../services/storageService';
+import { Challenge } from '../../types';
 
 interface CacheEntry<T> {
   data: T | null;
@@ -17,6 +18,15 @@ let routineCache: CacheEntry<ProgressEntry[]> = {
   data: null,
   timestamp: 0,
   ttl: 60 * 1000 // 1 minute TTL by default
+};
+
+// Cache for challenges by category
+const challengeCache: Record<string, CacheEntry<Challenge[]>> = {
+  daily: { data: null, timestamp: 0, ttl: 30 * 1000 }, // 30 seconds TTL
+  weekly: { data: null, timestamp: 0, ttl: 60 * 1000 }, // 1 minute TTL
+  monthly: { data: null, timestamp: 0, ttl: 120 * 1000 }, // 2 minutes TTL
+  special: { data: null, timestamp: 0, ttl: 120 * 1000 }, // 2 minutes TTL
+  claimable: { data: null, timestamp: 0, ttl: 20 * 1000 } // 20 seconds TTL (should be fresh)
 };
 
 // Cache for level calculations
@@ -57,6 +67,64 @@ export const getCachedRoutines = async (forceRefresh: boolean = false): Promise<
 };
 
 /**
+ * Get cached challenges by category
+ */
+export const getCachedChallenges = (category: string, forceRefresh: boolean = false): Challenge[] | null => {
+  const now = Date.now();
+  const cache = challengeCache[category];
+  
+  // Return cached data if valid and not forcing refresh
+  if (!forceRefresh && 
+      cache && 
+      cache.data && 
+      cache.timestamp > 0 && 
+      now - cache.timestamp < cache.ttl) {
+    console.log(`Using cached ${category} challenges data`);
+    return cache.data;
+  }
+  
+  return null;
+};
+
+/**
+ * Store challenges in cache by category
+ */
+export const setCachedChallenges = (category: string, challenges: Challenge[]): void => {
+  if (!challengeCache[category]) {
+    challengeCache[category] = {
+      data: null,
+      timestamp: 0,
+      ttl: 60 * 1000 // Default 1 minute TTL
+    };
+  }
+  
+  console.log(`Caching ${challenges.length} ${category} challenges`);
+  
+  challengeCache[category].data = challenges;
+  challengeCache[category].timestamp = Date.now();
+};
+
+/**
+ * Invalidate challenge cache for a specific category or all categories
+ */
+export const invalidateChallengeCache = (category?: string): void => {
+  if (category) {
+    if (challengeCache[category]) {
+      console.log(`Invalidating ${category} challenge cache`);
+      challengeCache[category].timestamp = 0;
+      challengeCache[category].data = null;
+    }
+  } else {
+    // Invalidate all challenge categories
+    console.log('Invalidating all challenge caches');
+    Object.keys(challengeCache).forEach(key => {
+      challengeCache[key].timestamp = 0;
+      challengeCache[key].data = null;
+    });
+  }
+};
+
+/**
  * Invalidate routine cache when new data is added
  */
 export const invalidateRoutineCache = (): void => {
@@ -89,4 +157,18 @@ export const setLevelCache = (
   }
 ): void => {
   levelCache[xp] = data;
+};
+
+/**
+ * Invalidate all types of caches
+ */
+export const invalidateAllCaches = (): void => {
+  // Clear challenge caches for all categories
+  const categories = ['daily', 'weekly', 'monthly', 'special', 'claimable'];
+  categories.forEach(category => invalidateChallengeCache(category));
+  
+  // Clear routine cache
+  invalidateRoutineCache();
+  
+  console.log('All caches invalidated');
 }; 

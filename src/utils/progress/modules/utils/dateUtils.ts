@@ -34,6 +34,27 @@ export const isToday = (date: Date | string): boolean => {
 };
 
 /**
+ * Calculate days between two dates
+ */
+export const daysBetween = (date1: Date | string, date2: Date | string): number => {
+  const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
+  const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
+  
+  // Reset hours to ensure we're comparing just days
+  const start = new Date(d1);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(d2);
+  end.setHours(0, 0, 0, 0);
+  
+  // Calculate the time difference in milliseconds
+  const timeDiff = Math.abs(end.getTime() - start.getTime());
+  
+  // Convert milliseconds to days
+  return Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+};
+
+/**
  * Calculate time difference in milliseconds
  */
 export const diffInMs = (date1: Date | string, date2: Date | string): number => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { PremiumLockSimple } from '../PremiumLockSimple';
 import { useRefresh } from '../../../context/RefreshContext';
@@ -10,6 +10,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { CHALLENGE_LIMITS } from '../../../utils/progress/constants';
+import * as cacheUtils from '../../../utils/progress/modules/utils/cacheUtils';
 
 interface ChallengesTabProps {
   isPremium: boolean;
@@ -53,27 +54,109 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
   // Track last refresh time to avoid excessive refreshes
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   
+  // Local state for challenges to avoid UI jumps
+  const [localChallenges, setLocalChallenges] = useState<Record<string, Challenge[]>>(activeChallenges);
+  const [localClaimable, setLocalClaimable] = useState<Challenge[]>(claimableChallenges || []);
+  const [isLocalLoading, setIsLocalLoading] = useState<boolean>(true);
+  
+  // Initialize local challenges from cache on first render
+  useEffect(() => {
+    const initializeFromCache = async () => {
+      setIsLocalLoading(true);
+      
+      // Try to get challenges from cache first for each category
+      const cachedChallenges: Record<string, Challenge[]> = {
+        daily: cacheUtils.getCachedChallenges('daily') || [],
+        weekly: cacheUtils.getCachedChallenges('weekly') || [],
+        monthly: cacheUtils.getCachedChallenges('monthly') || [],
+        special: cacheUtils.getCachedChallenges('special') || [],
+      };
+      
+      // Try to get claimable challenges from cache
+      const cachedClaimable = cacheUtils.getCachedChallenges('claimable') || [];
+      
+      // If we have cached data, use it immediately to avoid UI jumps
+      if (Object.values(cachedChallenges).some(arr => arr.length > 0) || cachedClaimable.length > 0) {
+        setLocalChallenges(cachedChallenges);
+        setLocalClaimable(cachedClaimable);
+      }
+      
+      // Then load the actual data
+      refreshChallenges();
+      setIsLocalLoading(false);
+    };
+    
+    initializeFromCache();
+  }, []);
+  
+  // Update local state when gamification data changes
+  useEffect(() => {
+    if (!challengesLoading) {
+      setLocalChallenges(activeChallenges);
+      setLocalClaimable(claimableChallenges || []);
+    }
+  }, [activeChallenges, claimableChallenges, challengesLoading]);
+  
   // Initial data load
   useEffect(() => {
     console.log('Initial data load for challenges');
     refreshChallenges();
   }, [refreshChallenges]);
   
-  // Refresh when the tab comes into focus
+  // Refresh when the tab comes into focus with a delay to avoid excessive refreshes
   useFocusEffect(
     useCallback(() => {
-      console.log('ChallengesTab came into focus, refreshing data');
-      refreshChallenges();
+      console.log('ChallengesTab came into focus');
+      
+      // Check if we need to refresh (if last refresh was more than 30 seconds ago)
+      const now = Date.now();
+      if (now - lastRefresh > 30000) {
+        console.log('Refreshing challenges data after focus');
+        refreshChallenges();
+        setLastRefresh(now);
+      } else {
+        console.log('Skipping refresh, last refresh was recent');
+      }
+      
       return () => {
         // Cleanup if needed
       };
-    }, [refreshChallenges])
+    }, [refreshChallenges, lastRefresh])
   );
   
-  // Check and force-refresh challenges whenever the active tab changes
+  // Check and refresh challenges only when the active tab changes with optimizations
   useEffect(() => {
     console.log(`Active tab changed to: ${activeTab}`);
-    refreshChallenges();
+    
+    // Use cached data for the tab if available
+    const now = Date.now();
+    let skipRefresh = false;
+    
+    if (activeTab === 'claimable') {
+      const cachedClaimable = cacheUtils.getCachedChallenges('claimable');
+      if (cachedClaimable !== null) {
+        console.log('Using cached claimable challenges');
+        setLocalClaimable(cachedClaimable);
+        skipRefresh = true;
+      }
+    } else {
+      const cachedChallenges = cacheUtils.getCachedChallenges(activeTab);
+      if (cachedChallenges !== null) {
+        console.log(`Using cached ${activeTab} challenges`);
+        // Only update the active tab data to avoid UI jumps in other tabs
+        setLocalChallenges(prev => ({
+          ...prev,
+          [activeTab]: cachedChallenges
+        }));
+        skipRefresh = true;
+      }
+    }
+    
+    // Refresh only if we don't have cached data or it's been more than 30 seconds
+    if (!skipRefresh || now - lastRefresh > 30000) {
+      refreshChallenges();
+      setLastRefresh(now);
+    }
   }, [activeTab, refreshChallenges]);
   
   // Listen for global refresh triggers
@@ -85,17 +168,31 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
     }
   }, [refreshTimestamp, lastRefresh, refreshChallenges]);
   
-  // Create a refresh handler
+  // Create a refresh handler with debouncing to prevent excessive refreshes
   const handleRefresh = useCallback(async () => {
-    console.log('Manual refresh triggered');
-    setLastRefresh(Date.now());
-    await refreshChallenges();
-  }, [refreshChallenges]);
+    const now = Date.now();
+    if (now - lastRefresh > 2000) { // Minimum 2 seconds between refreshes
+      console.log('Manual refresh triggered');
+      setLastRefresh(now);
+      await refreshChallenges();
+    } else {
+      console.log('Skipping refresh, too soon after last refresh');
+    }
+  }, [refreshChallenges, lastRefresh]);
   
   // Handle when a challenge is successfully claimed
   const handleClaimSuccess = useCallback(() => {
     console.log('Challenge successfully claimed, refreshing');
     setLastRefresh(Date.now());
+    
+    // Invalidate caches
+    cacheUtils.invalidateChallengeCache('claimable');
+    TABS.forEach(tab => {
+      if (tab.key !== 'claimable') {
+        cacheUtils.invalidateChallengeCache(tab.key);
+      }
+    });
+    
     refreshChallenges();
     
     // Switch back to the original tab after claiming
@@ -106,17 +203,21 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
   }, [refreshChallenges, activeTab]);
   
   // Count total active challenges
-  const totalActiveChallenges = Object.values(activeChallenges).reduce(
-    (sum, challenges) => sum + challenges.length, 
-    0
-  );
+  const totalActiveChallenges = useMemo(() => {
+    return Object.values(localChallenges).reduce(
+      (sum, challenges) => sum + challenges.length, 
+      0
+    );
+  }, [localChallenges]);
   
   // Count claimable challenges
-  const claimableCount = claimableChallenges?.length || 0;
+  const claimableCount = useMemo(() => {
+    return localClaimable?.length || 0;
+  }, [localClaimable]);
   
   // Auto-switch to claimable tab if there are claimable challenges
   useEffect(() => {
-    if (claimableCount > 0 && !challengesLoading && activeTab !== 'claimable') {
+    if (claimableCount > 0 && !isLocalLoading && activeTab !== 'claimable') {
       // Don't automatically switch to claimable tab if user is actively using the tab system
       // This could be annoying if it happens during interaction
       const lastInteractionTime = Date.now() - lastRefresh;
@@ -127,30 +228,32 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
         setActiveTab('claimable');
       }
     }
-  }, [claimableCount, challengesLoading, activeTab, lastRefresh]);
+  }, [claimableCount, isLocalLoading, activeTab, lastRefresh]);
   
   // Log challenge counts for debugging
   useEffect(() => {
     console.log(`Challenge counts - Active: ${totalActiveChallenges}, Claimable: ${claimableCount}`);
-    console.log('Claimable challenges:', claimableChallenges);
-  }, [totalActiveChallenges, claimableCount, claimableChallenges]);
+  }, [totalActiveChallenges, claimableCount]);
   
   // Render content for the active tab
   const renderActiveTabContent = () => {
+    // Show loading indicator if challenges are loading and we don't have cached data
+    const showLoading = isLocalLoading || (challengesLoading && 
+      (activeTab === 'claimable' ? localClaimable.length === 0 : localChallenges[activeTab]?.length === 0));
+    
+    if (showLoading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={theme.accent} />
+          <Text style={[styles.emptyText, { color: theme.text }]}>Loading challenges...</Text>
+        </View>
+      );
+    }
+    
     // Special handling for claimable tab
     if (activeTab === 'claimable') {
-      // Show loading indicator if challenges are loading
-      if (challengesLoading) {
-        return (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={theme.accent} />
-            <Text style={[styles.emptyText, { color: theme.text }]}>Loading challenges...</Text>
-          </View>
-        );
-      }
-      
       // Show empty state if no claimable challenges
-      if (claimableChallenges.length === 0) {
+      if (localClaimable.length === 0) {
         return (
           <View style={styles.centerContainer}>
             <MaterialCommunityIcons 
@@ -170,8 +273,9 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
         <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          {claimableChallenges.map(challenge => (
+          {localClaimable.map(challenge => (
             <ChallengeItem
               key={challenge.id}
               challenge={challenge}
@@ -183,26 +287,16 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
     }
     
     // Normal tab rendering for category tabs
-    const challenges = activeChallenges[activeTab] || [];
+    const challenges = localChallenges[activeTab] || [];
     
     console.log(`Rendering ${challenges.length} challenges for ${activeTab} tab`);
-    
-    // Show loading indicator if challenges are loading
-    if (challengesLoading) {
-      return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.accent} />
-          <Text style={[styles.emptyText, { color: theme.text }]}>Loading challenges...</Text>
-        </View>
-      );
-    }
     
     // Show empty state if no challenges
     if (challenges.length === 0) {
       const currentTabTitle = TABS.find(tab => tab.key === activeTab)?.title || '';
       
       // Check if there are completed challenges in this category (to explain why there aren't new ones)
-      const claimableInCategory = claimableChallenges.filter(c => c.category === activeTab).length;
+      const claimableInCategory = localClaimable.filter(c => c.category === activeTab).length;
       
       return (
         <View style={styles.centerContainer}>
@@ -234,6 +328,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
         {challenges.map(challenge => (
           <ChallengeItem
@@ -262,7 +357,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
     if (tabKey === 'claimable') {
       count = claimableCount;
     } else {
-      count = activeChallenges[tabKey]?.length || 0;
+      count = localChallenges[tabKey]?.length || 0;
     }
     
     if (count === 0) return null;
@@ -459,6 +554,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   claimNowButton: {
+    marginTop: 16,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -480,8 +576,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     marginLeft: 8,
-    lineHeight: 16,
-  },
+    color: '#666',
+  }
 });
 
 export default ChallengesTab; 

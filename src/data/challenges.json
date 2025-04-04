@@ -96,12 +96,12 @@
   ],
   "monthly": [
     {
-      "id": "monthly_streak",
-      "title": "Consistency Champion",
-      "description": "Maintain a 7-day streak",
-      "type": "streak",
-      "requirement": 7,
-      "xp": 200,
+      "id": "monthly_variety",
+      "title": "Variety Champion",
+      "description": "Stretch 8 different body areas this month",
+      "type": "area_variety",
+      "requirement": 8,
+      "xp": 225,
       "category": "monthly"
     },
     {

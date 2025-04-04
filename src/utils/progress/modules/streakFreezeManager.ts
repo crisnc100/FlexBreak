@@ -1,184 +1,118 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { UserProgress } from '../types';
+import * as storageService from '../../../services/storageService';
+import * as dateUtils from './utils/dateUtils';
 
-const STREAK_FREEZE_STORAGE_KEY = '@streak_freezes';
-const MAX_STREAK_FREEZES = 3;
-
-/**
- * Interface for streak freeze data
- */
-interface StreakFreezeData {
-  available: number;
-  used: number;
-  lastGranted: string | null;
-  history: StreakFreezeUsage[];
-}
+const STREAK_FREEZE_REWARD_ID = 'streak_freezes';
+const WEEKLY_STREAK_FREEZE_AMOUNT = 1;
 
 /**
- * Interface for streak freeze usage entry
+ * Check if a streak freeze is available and can be used
  */
-interface StreakFreezeUsage {
-  date: string;
-  streakLength: number;
-}
-
-/**
- * Default streak freeze data
- */
-const DEFAULT_STREAK_FREEZE_DATA: StreakFreezeData = {
-  available: 0,
-  used: 0,
-  lastGranted: null,
-  history: []
-};
-
-/**
- * Get streak freeze data from storage
- * @returns Streak freeze data
- */
-export const getStreakFreezeData = async (): Promise<StreakFreezeData> => {
-  try {
-    const data = await AsyncStorage.getItem(STREAK_FREEZE_STORAGE_KEY);
-    if (data) {
-      return JSON.parse(data);
-    }
-    // Initialize with default data if none exists
-    await AsyncStorage.setItem(
-      STREAK_FREEZE_STORAGE_KEY,
-      JSON.stringify(DEFAULT_STREAK_FREEZE_DATA)
-    );
-    return DEFAULT_STREAK_FREEZE_DATA;
-  } catch (error) {
-    console.error('Error getting streak freeze data:', error);
-    return DEFAULT_STREAK_FREEZE_DATA;
-  }
-};
-
-/**
- * Save streak freeze data to storage
- * @param data Streak freeze data to save
- * @returns Success status
- */
-export const saveStreakFreezeData = async (data: StreakFreezeData): Promise<boolean> => {
-  try {
-    await AsyncStorage.setItem(
-      STREAK_FREEZE_STORAGE_KEY,
-      JSON.stringify(data)
-    );
-    return true;
-  } catch (error) {
-    console.error('Error saving streak freeze data:', error);
+export const isStreakFreezeAvailable = async (): Promise<boolean> => {
+  const userProgress = await storageService.getUserProgress();
+  
+  // Check if reward exists and is unlocked
+  if (
+    !userProgress.rewards || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID] || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID].unlocked
+  ) {
     return false;
   }
+  
+  // Check if user has streak freezes available
+  const freezes = (userProgress.rewards[STREAK_FREEZE_REWARD_ID] as any).uses || 0;
+  return freezes > 0;
 };
 
 /**
- * Grant a streak freeze to the user (called weekly)
- * @returns Updated streak freeze data
+ * Use a streak freeze to prevent streak loss
  */
-export const grantStreakFreeze = async (): Promise<StreakFreezeData> => {
-  const data = await getStreakFreezeData();
+export const useStreakFreeze = async (): Promise<boolean> => {
+  const userProgress = await storageService.getUserProgress();
   
-  // Check if we're already at the maximum
-  if (data.available >= MAX_STREAK_FREEZES) {
-    return data;
+  // Check if reward exists and is unlocked
+  if (
+    !userProgress.rewards || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID] || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID].unlocked
+  ) {
+    console.log('Streak freeze reward not available');
+    return false;
   }
   
-  // Grant a new streak freeze
-  const updatedData: StreakFreezeData = {
-    ...data,
-    available: data.available + 1,
-    lastGranted: new Date().toISOString()
-  };
+  const freezeReward = userProgress.rewards[STREAK_FREEZE_REWARD_ID] as any;
   
-  await saveStreakFreezeData(updatedData);
-  return updatedData;
+  // Check if user has streak freezes available
+  if (!freezeReward.uses || freezeReward.uses <= 0) {
+    console.log('No streak freezes available');
+    return false;
+  }
+  
+  // Consume one streak freeze
+  freezeReward.uses -= 1;
+  console.log(`Used streak freeze. ${freezeReward.uses} remaining.`);
+  
+  // Mark the last updated to today to maintain streak
+  userProgress.statistics.lastUpdated = new Date().toISOString();
+  
+  // Save updated progress
+  await storageService.saveUserProgress(userProgress);
+  
+  return true;
 };
 
 /**
- * Check and grant a weekly streak freeze if needed
- * @returns Updated streak freeze data
+ * Grant a streak freeze to the user
  */
-export const checkAndGrantWeeklyStreakFreeze = async (): Promise<StreakFreezeData> => {
-  const data = await getStreakFreezeData();
+export const grantStreakFreeze = async (amount: number = 1): Promise<boolean> => {
+  const userProgress = await storageService.getUserProgress();
   
-  // If already at max, no need to check
-  if (data.available >= MAX_STREAK_FREEZES) {
-    return data;
+  // Check if reward exists and is unlocked
+  if (
+    !userProgress.rewards || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID] || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID].unlocked
+  ) {
+    console.log('Streak freeze reward not available');
+    return false;
   }
   
-  // Check if one week has passed since the last granted freeze
-  if (data.lastGranted) {
-    const lastGranted = new Date(data.lastGranted);
-    const now = new Date();
-    const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
-    
-    if (now.getTime() - lastGranted.getTime() >= oneWeekInMs) {
-      // One week has passed, grant a new streak freeze
-      return await grantStreakFreeze();
-    }
-  } else {
-    // No freezes granted yet, grant the first one
-    return await grantStreakFreeze();
-  }
+  const freezeReward = userProgress.rewards[STREAK_FREEZE_REWARD_ID] as any;
   
-  return data;
+  // Add streak freezes
+  freezeReward.uses = (freezeReward.uses || 0) + amount;
+  freezeReward.lastRefill = new Date().toISOString();
+  
+  console.log(`Granted ${amount} streak freeze(s). Now has ${freezeReward.uses} total.`);
+  
+  // Save updated progress
+  await storageService.saveUserProgress(userProgress);
+  
+  return true;
 };
 
 /**
- * Use a streak freeze to preserve a streak
- * @param currentStreak Current streak length
- * @returns Success status and updated streak freeze data
+ * Check and grant weekly streak freeze if eligible
  */
-export const useStreakFreeze = async (
-  currentStreak: number
-): Promise<{ success: boolean; data: StreakFreezeData }> => {
-  const data = await getStreakFreezeData();
+export const checkAndGrantWeeklyStreakFreeze = async (): Promise<void> => {
+  const userProgress = await storageService.getUserProgress();
   
-  // Check if any freezes are available
-  if (data.available <= 0) {
-    return { success: false, data };
+  // Check if reward exists and is unlocked
+  if (
+    !userProgress.rewards || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID] || 
+    !userProgress.rewards[STREAK_FREEZE_REWARD_ID].unlocked
+  ) {
+    return;
   }
   
-  // Use a streak freeze
-  const updatedData: StreakFreezeData = {
-    ...data,
-    available: data.available - 1,
-    used: data.used + 1,
-    history: [
-      ...data.history,
-      {
-        date: new Date().toISOString(),
-        streakLength: currentStreak
-      }
-    ]
-  };
+  const freezeReward = userProgress.rewards[STREAK_FREEZE_REWARD_ID] as any;
   
-  await saveStreakFreezeData(updatedData);
-  return { success: true, data: updatedData };
-};
-
-/**
- * Check if a streak freeze should be auto-applied
- * (This would be called during the routine completion flow)
- * @param currentStreak Current streak length
- * @param missedYesterday Whether the user missed yesterday
- * @returns Whether a streak freeze was applied and updated data
- */
-export const checkAndAutoUseStreakFreeze = async (
-  currentStreak: number,
-  missedYesterday: boolean
-): Promise<{ applied: boolean; data: StreakFreezeData }> => {
-  // Only apply if streak is broken
-  if (!missedYesterday) {
-    return { applied: false, data: await getStreakFreezeData() };
+  // Check if it's been a week since last refill
+  const lastRefill = freezeReward.lastRefill ? new Date(freezeReward.lastRefill) : null;
+  
+  if (!lastRefill || dateUtils.daysBetween(lastRefill, new Date()) >= 7) {
+    await grantStreakFreeze(WEEKLY_STREAK_FREEZE_AMOUNT);
   }
-  
-  // Only apply if streak is significant (3+ days)
-  if (currentStreak < 3) {
-    return { applied: false, data: await getStreakFreezeData() };
-  }
-  
-  // Try to use a streak freeze
-  const { success, data } = await useStreakFreeze(currentStreak);
-  return { applied: success, data };
 }; 

@@ -19,7 +19,6 @@ import { useRoutineStorage } from '../hooks/routines/useRoutineStorage';
 import { useRoutineSuggestions } from '../hooks/routines/useRoutineSuggestions';
 import { useGamification } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
-import { useChallengeSystem } from '../hooks/progress/useChallengeSystem';
 
 // Import XP boost manager
 import * as xpBoostManager from '../utils/progress/modules/xpBoostManager';
@@ -58,11 +57,9 @@ export default function RoutineScreen() {
     isLoading: isGamificationLoading,
     recentlyUnlockedAchievements,
     recentlyCompletedChallenges,
-    recentlyUnlockedRewards
+    recentlyUnlockedRewards,
+    refreshChallenges
   } = useGamification();
-  
-  // Add useChallengeSystem hook to update challenge progress
-  const { updateChallengeProgress } = useChallengeSystem();
   
   // Get premium status from context
   const { isPremium } = usePremium();
@@ -157,7 +154,7 @@ export default function RoutineScreen() {
         
         // CRITICAL FIX: Explicitly update challenge progress after routine completion
         console.log('Explicitly updating challenge progress after routine completion');
-        updateChallengeProgress();
+        refreshChallenges();
         
         if (result && result.success) {
           // Check if XP boost is active

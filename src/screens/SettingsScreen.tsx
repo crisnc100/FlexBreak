@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { clearAllData } from '../services/storageService';
@@ -10,11 +10,16 @@ import { usePremium } from '../context/PremiumContext';
 import ThemePreview from '../components/ThemePreview';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { ThemedText, ThemedCard } from '../components/common';
+import GamificationSimulator, { runSimulations } from '../utils/progress/testing';
+import { Toast } from 'react-native-toast-notifications';
 
 const { width } = Dimensions.get('window');
 
 interface SettingsScreenProps {
-  navigation: { goBack: () => void };
+  navigation: {
+    goBack: () => void;
+    navigate?: (screen: string, params?: any) => void;
+  };
   onClose?: () => void;
 }
 
@@ -57,10 +62,16 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const [diagnosticsModalVisible, setDiagnosticsModalVisible] = useState(false);
   const [themePreviewModalVisible, setThemePreviewModalVisible] = useState(false);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
-  const { theme, themeType, setThemeType, isDark, canUseDarkTheme } = useTheme();
+  const { theme, themeType, setThemeType, toggleTheme, isDark, canUseDarkTheme } = useTheme();
   const { isPremium } = usePremium();
   const { isLoading, level } = useGamification();
   const { canAccessFeature, getRequiredLevel, meetsLevelRequirement } = useFeatureAccess();
+  const [showTestingSection, setShowTestingSection] = useState(false);
+  const [isRunningSimulation, setIsRunningSimulation] = useState(false);
+  const [testResults, setTestResults] = useState<string[]>([]);
+  const { rewardManager } = usePremium();
+  const { currentProgress } = useGamification();
+  const hasSeenDarkModeUnlock = useRef(false);
   
   const handleGoBack = () => {
     if (onClose) {
@@ -103,17 +114,46 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
 
   
   // Handle theme type selection
-  const handleThemeTypeSelection = (type: 'light' | 'dark' | 'system') => {
-    if (type === 'dark' && !canAccessFeature('dark_theme')) {
-      Alert.alert(
-        'Premium Feature',
-        `Dark Theme is a premium feature that unlocks at level ${getRequiredLevel('dark_theme')}. Upgrade to premium and reach the required level to enable this feature.`,
-        [{ text: 'OK' }]
-      );
+  const handleThemeTypeSelection = (type: ThemeType) => {
+    if (type === 'dark') {
+      if (!canUseDarkTheme) {
+        // If user doesn't have access to dark theme, show appropriate message
+        if (!isPremium) {
+          Alert.alert(
+            'Premium Feature',
+            'Dark theme requires a premium subscription. Unlock all premium features to access dark theme.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Upgrade', style: 'default', onPress: () => onUpgradeToPremium?.() }
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Dark Theme Locked',
+            'Dark theme is unlocked at level 2. Keep stretching to unlock it!',
+            [{ text: 'OK' }]
+          );
+        }
+        return;
+      }
+      
+      // For dark theme toggle, use the safe toggle method if switching to dark
+      if (themeType !== 'dark') {
+        console.log('Settings screen: Toggling from light to dark theme');
+        toggleTheme();
+        return;
+      }
+    } else if (themeType === 'dark' && type === 'light') {
+      // If switching from dark to light, also use toggleTheme
+      console.log('Settings screen: Toggling from dark to light theme');
+      toggleTheme();
+      return;
+    } else if (type === 'system') {
+      // For system theme, use regular setThemeType
+      console.log(`Settings screen: Setting theme to system`);
+      setThemeType('system');
       return;
     }
-    
-    setThemeType(type);
   };
 
   // Function to render the progress to the next level for premium users
@@ -176,6 +216,120 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     );
   };
   
+  // Add a function to run simulations
+  const handleRunSimulations = async () => {
+    setIsRunningSimulation(true);
+    setTestResults([]);
+    
+    try {
+      // Capture console.log messages
+      const originalConsoleLog = console.log;
+      const logs: string[] = [];
+      
+      console.log = (...args) => {
+        // Call the original console.log
+        originalConsoleLog(...args);
+        
+        // Store the log
+        const log = args.map(arg => 
+          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+        ).join(' ');
+        
+        logs.push(log);
+        setTestResults(prev => [...prev, log]);
+      };
+      
+      // Run the simulations
+      await runSimulations();
+      
+      // Restore console.log
+      console.log = originalConsoleLog;
+    } catch (error) {
+      console.error('Error running simulations:', error);
+      setTestResults(prev => [...prev, `ERROR: ${error.message}`]);
+    } finally {
+      setIsRunningSimulation(false);
+    }
+  };
+
+  // Add a function to run a single test
+  const handleRunSingleTest = async (testType: string) => {
+    setIsRunningSimulation(true);
+    setTestResults([]);
+    
+    try {
+      // Capture console.log messages
+      const originalConsoleLog = console.log;
+      const logs: string[] = [];
+      
+      console.log = (...args) => {
+        // Call the original console.log
+        originalConsoleLog(...args);
+        
+        // Store the log
+        const log = args.map(arg => 
+          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+        ).join(' ');
+        
+        logs.push(log);
+        setTestResults(prev => [...prev, log]);
+      };
+      
+      // Create a simulator instance
+      const simulator = new GamificationSimulator();
+      await simulator.initialize(true);
+      
+      try {
+        // Run the selected test
+        switch (testType) {
+          case 'routine':
+            await simulator.simulateRoutine({
+              duration: 5,
+              area: 'Neck',
+              time: { hours: 10, minutes: 30 }
+            });
+            break;
+            
+          case 'streak':
+            await simulator.simulateStreak(3, {
+              routinesPerDay: 1,
+              claimAllChallenges: true
+            });
+            break;
+            
+          case 'daily':
+            await simulator.simulateDailyCycle({
+              routineCount: 2,
+              claimAllChallenges: true
+            });
+            break;
+            
+          case 'weekly':
+            // Simulate a week with one routine per day
+            for (let i = 0; i < 7; i++) {
+              await simulator.simulateDailyCycle({
+                skipToNextDay: i > 0,
+                routineCount: 1,
+                claimAllChallenges: true
+              });
+            }
+            break;
+        }
+      } finally {
+        // Always clean up the simulator
+        simulator.cleanup();
+      }
+      
+      // Restore console.log
+      console.log = originalConsoleLog;
+    } catch (error) {
+      console.error('Error running test:', error);
+      setTestResults(prev => [...prev, `ERROR: ${error.message}`]);
+    } finally {
+      setIsRunningSimulation(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
@@ -226,7 +380,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           {/* Theme options */}
           {canAccessFeature('dark_theme') && (
             <View style={styles.themeOptions}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.themeOption, 
                   themeType === 'light' && styles.themeOptionSelected,
@@ -245,7 +399,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 )}
               </TouchableOpacity>
               
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.themeOption, 
                   themeType === 'dark' && styles.themeOptionSelected,
@@ -254,7 +408,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 onPress={() => handleThemeTypeSelection('dark')}
               >
                 <View style={[styles.themeIconContainer, {backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
-                  <Ionicons name="moon" size={22} color="#BB86FC" />
+                  <Ionicons name="moon" size={22} color={isDark ? "#BB86FC" : "#673AB7"} />
                 </View>
                 <Text style={[styles.themeOptionText, {color: theme.text}]}>Dark</Text>
                 {themeType === 'dark' && (
@@ -264,7 +418,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 )}
               </TouchableOpacity>
               
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.themeOption, 
                   themeType === 'system' && styles.themeOptionSelected,
@@ -413,6 +567,52 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             </TouchableOpacity>
           </View>
         )}
+        
+        {/* Add testing section at the end of the ScrollView */}
+        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
+          <TouchableOpacity 
+            style={styles.sectionHeader}
+            onPress={() => setShowTestingSection(!showTestingSection)}
+          >
+            <Text style={[styles.sectionTitle, {color: theme.text}]}>Testing & Development</Text>
+            <Text style={[styles.sectionToggle, {color: theme.textSecondary}]}>{showTestingSection ? '▼' : '►'}</Text>
+          </TouchableOpacity>
+          
+          {showTestingSection && (
+            <View style={styles.testingContainer}>
+              <Text style={[styles.sectionDescription, {color: theme.textSecondary}]}>
+                Gamification System Testing Tools
+              </Text>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.simulationButton,
+                  {backgroundColor: theme.accent}
+                ]}
+                onPress={() => navigation.navigate('TestSimulation')}
+              >
+                <Ionicons name="time-outline" size={20} color="#FFF" style={styles.simulationButtonIcon} />
+                <Text style={styles.simulationButtonText}>Open Simulation Tool</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.bobSimulatorButton,
+                  {backgroundColor: '#4CAF50', marginTop: 12}
+                ]}
+                onPress={() => navigation.navigate('BobSimulator')}
+              >
+                <Ionicons name="person-outline" size={20} color="#FFF" style={styles.simulationButtonIcon} />
+                <Text style={styles.simulationButtonText}>Bob's Day-by-Day Simulator</Text>
+              </TouchableOpacity>
+              
+              <Text style={[styles.simulationDescription, {color: theme.textSecondary}]}>
+                Easily simulate day-by-day progression through the gamification system to test
+                level advancement, challenge completion, and reward unlocking.
+              </Text>
+            </View>
+          )}
+        </View>
         
         {/* Version info at bottom */}
         <View style={styles.footer}>
@@ -599,8 +799,8 @@ const styles = StyleSheet.create({
   themeOptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingBottom: 12,
+    padding: 16,
+    paddingTop: 0,
   },
   themeOption: {
     backgroundColor: '#F5F5F5',
@@ -734,6 +934,69 @@ const styles = StyleSheet.create({
   premiumUpsellButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  sectionToggle: {
+    fontSize: 14,
+  },
+  testingContainer: {
+    padding: 16,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  simulationButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  bobSimulatorButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  simulationButtonIcon: {
+    marginRight: 8,
+  },
+  simulationButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  simulationDescription: {
+    marginBottom: 16,
+  },
+  lockIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 8,
+    padding: 2,
+  },
+  lockedFeatureText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  themeTipContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 12,
+  },
+  themeTip: {
+    fontSize: 12,
+    marginLeft: 4,
+    flex: 1,
   },
 });
 

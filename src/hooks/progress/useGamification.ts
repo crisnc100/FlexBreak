@@ -45,6 +45,7 @@ export const gamificationEvents = new EventEmitter();
 export const LEVEL_UP_EVENT = 'level_up';
 export const REWARD_UNLOCKED_EVENT = 'reward_unlocked';
 export const XP_UPDATED_EVENT = 'xp_updated';
+export const CHALLENGE_COMPLETED_EVENT = 'challenge_completed';
 
 /**
  * Hook for interacting with the gamification system
@@ -168,7 +169,7 @@ export function useGamification() {
       const beforeAchievements = achievementManager.getAchievementsSummary(beforeProgress);
       
       // Process through the gamification system
-      const { userProgress, xpBreakdown } = await gamificationManager.processCompletedRoutine(routine);
+      const { userProgress, xpBreakdown, completedChallenges } = await gamificationManager.processCompletedRoutine(routine);
       
       // Update achievements after processing routine
       achievementManager.updateAchievements(userProgress);
@@ -185,6 +186,18 @@ export function useGamification() {
         after => !beforeAchievements.completed.find(before => before.id === after.id)
       );
       
+      // Check for newly unlocked rewards due to level up
+      const newlyUnlockedRewards: Reward[] = [];
+      if (levelUp) {
+        // Get rewards that were unlocked due to the level up
+        const rewards = Object.values(userProgress.rewards || {});
+        newlyUnlockedRewards.push(
+          ...rewards.filter(r => r.unlocked && r.levelRequired <= levelInfo.level && r.levelRequired > prevLevel)
+        );
+      }
+      
+      console.log(`processRoutine results: XP: ${levelInfo.totalXP - totalXP}, Level: ${prevLevel}->${levelInfo.level}, Achievements: ${unlockedAchievements.length}, Challenges: ${completedChallenges.length}, Rewards: ${newlyUnlockedRewards.length}`);
+      
       // Create proper result object
       const result: RoutineProcessResult = {
         success: true,
@@ -192,8 +205,8 @@ export function useGamification() {
         levelUp,
         newLevel: levelInfo.level,
         unlockedAchievements,
-        completedChallenges: [], // We'll need to determine these
-        newlyUnlockedRewards: [], // We'll need to determine these
+        completedChallenges: completedChallenges || [], // Use the newly completed challenges from the game engine
+        newlyUnlockedRewards,
         xpBreakdown: xpBreakdown || []
       };
       
@@ -226,9 +239,15 @@ export function useGamification() {
         }
       }
       
+      // If challenges were completed, emit challenge completed event
+      if (completedChallenges && completedChallenges.length > 0) {
+        console.log(`Emitting CHALLENGE_COMPLETED_EVENT for ${completedChallenges.length} challenges`);
+        gamificationEvents.emit(CHALLENGE_COMPLETED_EVENT, completedChallenges);
+      }
+      
       // Set notifications for UI
       setRecentlyUnlockedAchievements(unlockedAchievements);
-      setRecentlyCompletedChallenges(result.completedChallenges);
+      setRecentlyCompletedChallenges(completedChallenges || []);
       setRecentlyUnlockedRewards(result.newlyUnlockedRewards);
       
       // Refresh all data
