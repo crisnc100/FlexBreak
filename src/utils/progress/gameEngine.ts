@@ -232,10 +232,13 @@ export const getUserLevelInfo = async () => {
   const userProgress = await storageService.getUserProgress();
   const { level, xpForCurrentLevel, xpForNextLevel, progress } = calculateLevel(userProgress.totalXP);
   
+  // Calculate the actual XP needed to reach next level (the difference between user's current XP and next level requirement)
+  const xpNeededToNextLevel = xpForNextLevel - userProgress.totalXP;
+  
   return {
     level,
     totalXP: userProgress.totalXP,
-    xpToNextLevel: xpForNextLevel === Infinity ? null : xpForNextLevel - xpForCurrentLevel,
+    xpToNextLevel: xpForNextLevel === Infinity ? null : xpNeededToNextLevel,
     percentToNextLevel: Math.round(progress * 100)
   };
 };
@@ -279,11 +282,14 @@ export const getGamificationSummary = async () => {
   
   const achievements = achievementManager.getAchievementsSummary(userProgress);
   
+  // Calculate the actual XP needed to reach next level
+  const xpNeededToNextLevel = xpForNextLevel - userProgress.totalXP;
+  
   return {
     user: {
       level,
       totalXP: userProgress.totalXP,
-      xpToNextLevel: xpForNextLevel === Infinity ? null : xpForNextLevel - xpForCurrentLevel,
+      xpToNextLevel: xpForNextLevel === Infinity ? null : xpNeededToNextLevel,
       percentToNextLevel: Math.round(progress * 100)
     },
     statistics: userProgress.statistics,

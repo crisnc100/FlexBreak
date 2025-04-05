@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel } from '../types';
+import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel, Stretch } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { tw } from '../utils/tw';
@@ -236,7 +236,7 @@ export default function HomeScreen() {
 
   // Start stretching routine
   const handleStartStretching = () => {
-    const routineParams: RoutineParams = {
+    const routineParams: RoutineParams & { customStretches?: Stretch[] } = {
       area,
       duration,
       level
@@ -521,9 +521,14 @@ export default function HomeScreen() {
   
   // Handle starting a custom routine
   const handleStartCustomRoutine = (params: RoutineParams) => {
+    const routineParamsWithType: RoutineParams & { customStretches?: Stretch[] } = {
+      ...params,
+      customStretches: params.customStretches as Stretch[]
+    };
+    
     handleStartStretching();
     setTimeout(() => {
-      navigation.navigate('Routine', params);
+      navigation.navigate('Routine', routineParamsWithType);
     }, 100);
   };
 
@@ -552,12 +557,6 @@ export default function HomeScreen() {
         {/* Header */}
         <HomeHeader />
 
-        {/* Daily Tip */}
-        <DailyTip tip={dailyTip.text} />
-
-        {/* Level Progress Card - shows for all users */}
-        <LevelProgressCard onOpenSubscription={() => setSubscriptionModalVisible(true)} />
-
         {/* Routine Picker */}
         <RoutinePicker
           area={area}
@@ -571,8 +570,14 @@ export default function HomeScreen() {
           onCustomRoutinesPress={handleCustomRoutinesPress}
         />
 
-        {/* Subscription Teaser */}
-        <SubscriptionTeaser onPremiumPress={showPremiumModal} />
+        {/* Daily Tip */}
+        <DailyTip tip={dailyTip.text} />
+
+        {/* Level Progress Card - shows for all users */}
+        <LevelProgressCard onOpenSubscription={() => setSubscriptionModalVisible(true)} />
+
+        {/* Subscription Teaser - only show for non-premium users */}
+        {!isPremium && <SubscriptionTeaser onPremiumPress={showPremiumModal} />}
 
         {/* Reminder Section */}
         <ReminderSection

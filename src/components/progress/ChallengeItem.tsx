@@ -6,6 +6,7 @@ import { Challenge, CHALLENGE_STATUS } from '../../utils/progress/types';
 import { useGamification } from '../../hooks/progress/useGamification';
 import * as Haptics from 'expo-haptics';
 import { Animated } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ChallengeItemProps {
   challenge: Challenge;
@@ -15,6 +16,7 @@ interface ChallengeItemProps {
 
 const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess, style }) => {
   const { claimChallenge, getTimeRemainingForChallenge, formatTimeRemaining } = useGamification();
+  const { theme, isDark } = useTheme();
   const [isClaiming, setIsClaiming] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [opacity] = useState(new Animated.Value(1));
@@ -189,46 +191,68 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
   };
   
   return (
-    <Animated.View style={[styles.container, style, { opacity }]}>
+    <Animated.View style={[
+      styles.container, 
+      { 
+        backgroundColor: isDark ? theme.cardBackground : '#FFF',
+        shadowColor: isDark ? 'rgba(0,0,0,0.8)' : '#000',
+      },
+      style, 
+      { opacity }
+    ]}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
           {getStatusIcon()}
-          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{challenge.title}</Text>
+          <Text style={[styles.title, { color: isDark ? theme.text : '#333' }]} numberOfLines={1} ellipsizeMode="tail">{challenge.title}</Text>
         </View>
         
         {!challenge.completed && (
-          <View style={[styles.deadlineTag]}>
+          <View style={[
+            styles.deadlineTag,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }
+          ]}>
             <MaterialCommunityIcons 
               name="calendar"
               size={14} 
-              color="#757575"
+              color={isDark ? theme.textSecondary : "#757575"}
             />
-            <Text style={styles.deadlineText}>
+            <Text style={[styles.deadlineText, { color: isDark ? theme.textSecondary : "#757575" }]}>
               {formatEndDate()}
             </Text>
           </View>
         )}
         
         {challenge.status === CHALLENGE_STATUS.COMPLETED && !challenge.claimed && (
-          <View style={[styles.expiryTag, isExpiring && styles.expiryTagWarning]}>
+          <View style={[
+            styles.expiryTag, 
+            isExpiring && styles.expiryTagWarning,
+            { backgroundColor: isDark ? (isExpiring ? 'rgba(244,67,54,0.2)' : 'rgba(255,255,255,0.1)') : (isExpiring ? '#FFEBEE' : '#F5F5F5') }
+          ]}>
             <MaterialCommunityIcons 
               name={isExpiring ? "alarm" : "timer-outline"} 
               size={14} 
-              color={isExpiring ? "#F44336" : "#757575"} 
+              color={isExpiring ? "#F44336" : (isDark ? theme.textSecondary : "#757575")} 
             />
-            <Text style={[styles.expiryText, isExpiring && styles.expiryTextWarning]}>
+            <Text style={[
+              styles.expiryText, 
+              isExpiring && styles.expiryTextWarning,
+              { color: isExpiring ? "#F44336" : (isDark ? theme.textSecondary : "#757575") }
+            ]}>
               {timeRemaining}
             </Text>
           </View>
         )}
       </View>
       
-      <Text style={styles.description}>{challenge.description}</Text>
+      <Text style={[styles.description, { color: isDark ? theme.textSecondary : '#666' }]}>{challenge.description}</Text>
       
       <View style={styles.progressContainer}>
-        <View style={styles.progressBarBackground}>
+        <View style={[styles.progressBarBackground, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }]}>
           <LinearGradient
-            colors={challenge.completed ? ['#4CAF50', '#8BC34A'] : ['#2196F3', '#03A9F4']}
+            colors={challenge.completed ? 
+              (isDark ? ['#388E3C', '#7CB342'] : ['#4CAF50', '#8BC34A']) : 
+              (isDark ? ['#1565C0', '#2196F3'] : ['#2196F3', '#03A9F4'])
+            }
             start={[0, 0]}
             end={[1, 0]}
             style={[
@@ -237,17 +261,29 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
             ]}
           />
         </View>
-        <Text style={styles.progressText}>
+        <Text style={[
+          styles.progressText,
+          { color: isDark ? theme.textSecondary : '#757575' }
+        ]}>
           {getProgressDescription()}
         </Text>
       </View>
       
       <View style={styles.footer}>
         <View style={styles.leftFooter}>
-          <View style={styles.xpContainer}>
-            <Text style={styles.xpText}>+{challenge.xp} XP</Text>
+          <View style={[
+            styles.xpContainer,
+            { backgroundColor: isDark ? 'rgba(227,242,253,0.2)' : '#E3F2FD' }
+          ]}>
+            <Text style={[
+              styles.xpText,
+              { color: isDark ? '#82B1FF' : '#1976D2' }
+            ]}>+{challenge.xp} XP</Text>
           </View>
-          <Text style={styles.categoryText}>{getTimeType()}</Text>
+          <Text style={[
+            styles.categoryText,
+            { color: isDark ? theme.textSecondary : '#757575' }
+          ]}>{getTimeType()}</Text>
         </View>
         
         {challenge.status === CHALLENGE_STATUS.COMPLETED && !challenge.claimed && (
@@ -268,14 +304,20 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         )}
         
         {challenge.status === CHALLENGE_STATUS.CLAIMED && (
-          <View style={styles.claimedTag}>
+          <View style={[
+            styles.claimedTag,
+            { backgroundColor: isDark ? 'rgba(232,245,233,0.2)' : '#E8F5E9' }
+          ]}>
             <MaterialCommunityIcons name="check" size={16} color="#4CAF50" />
             <Text style={styles.claimedText}>Claimed</Text>
           </View>
         )}
         
         {challenge.status === CHALLENGE_STATUS.EXPIRED && (
-          <View style={styles.expiredTag}>
+          <View style={[
+            styles.expiredTag,
+            { backgroundColor: isDark ? 'rgba(255,235,238,0.2)' : '#FFEBEE' }
+          ]}>
             <MaterialCommunityIcons name="timer-off" size={16} color="#F44336" />
             <Text style={styles.expiredText}>Expired</Text>
           </View>
@@ -283,13 +325,29 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
       </View>
       
       {challenge.status === CHALLENGE_STATUS.COMPLETED && !challenge.claimed && (
-        <View style={[styles.claimWarning, isExpiring && styles.claimWarningUrgent]}>
+        <View style={[
+          styles.claimWarning, 
+          isExpiring && styles.claimWarningUrgent,
+          { 
+            backgroundColor: isDark 
+              ? (isExpiring ? 'rgba(255,235,238,0.2)' : 'rgba(227,242,253,0.2)')
+              : (isExpiring ? '#FFEBEE' : '#E3F2FD')
+          }
+        ]}>
           <MaterialCommunityIcons 
             name={isExpiring ? "alert-circle" : "information"} 
             size={16} 
-            color={isExpiring ? "#F44336" : "#2196F3"} 
+            color={isExpiring ? "#F44336" : (isDark ? '#82B1FF' : "#2196F3")} 
           />
-          <Text style={[styles.claimWarningText, isExpiring && styles.claimWarningTextUrgent]}>
+          <Text style={[
+            styles.claimWarningText, 
+            isExpiring && styles.claimWarningTextUrgent,
+            { 
+              color: isExpiring 
+                ? "#F44336" 
+                : (isDark ? '#82B1FF' : "#2196F3")
+            }
+          ]}>
             {formatClaimDeadline()}
           </Text>
         </View>

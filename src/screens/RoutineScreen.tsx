@@ -37,6 +37,13 @@ type LevelUpData = {
     description: string;
     type: 'feature' | 'item' | 'cosmetic';
   }>;
+  unlockedAchievements?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    xp: number;
+    icon?: string;
+  }>;
 };
 
 export default function RoutineScreen() {
@@ -317,7 +324,8 @@ export default function RoutineScreen() {
             levelUpInfo = {
               oldLevel: previousLevel,
               newLevel: newLevel,
-              rewards: []
+              rewards: [],
+              unlockedAchievements: []
             };
             
             // Handle level-specific rewards
@@ -394,6 +402,53 @@ export default function RoutineScreen() {
                 });
               }
             }
+            
+            // Check for unlocked achievements
+            if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
+              console.log(`Unlocked ${result.unlockedAchievements.length} achievements!`);
+              
+              // Add the unlocked achievements to the levelUpInfo
+              levelUpInfo.unlockedAchievements = result.unlockedAchievements.map(achievement => ({
+                id: achievement.id,
+                title: achievement.title,
+                description: achievement.description,
+                xp: achievement.xp || 0,
+                icon: achievement.icon
+              }));
+              
+              // Log the achievements for debugging
+              console.log('Achievements to show in CompletedRoutine:', 
+                JSON.stringify(levelUpInfo.unlockedAchievements, null, 2));
+              
+              // Add achievement XP to the breakdown if not already included
+              const existingAchievementEntries = xpBreakdown.filter(item => 
+                item.source === 'achievement' || 
+                result.unlockedAchievements.some(a => item.description.includes(a.title))
+              );
+              
+              if (existingAchievementEntries.length === 0) {
+                console.log('Adding unlocked achievements to XP breakdown manually');
+                
+                // Create new breakdown entries for the achievements
+                const achievementXpEntries = result.unlockedAchievements.map(achievement => ({
+                  source: 'achievement',
+                  amount: achievement.xp || 0,
+                  description: `Achievement Unlocked: ${achievement.title}`
+                }));
+                
+                // Add these to the existing breakdown
+                if (achievementXpEntries.length > 0) {
+                  setXpBreakdown(prevBreakdown => [...prevBreakdown, ...achievementXpEntries]);
+                  
+                  // Update total XP earned
+                  const additionalXp = achievementXpEntries.reduce((sum, item) => sum + item.amount, 0);
+                  setRoutineXpEarned(prevXp => prevXp + additionalXp);
+                  
+                  console.log(`Added ${achievementXpEntries.length} achievement entries to XP breakdown`);
+                  console.log('New breakdown entries:', achievementXpEntries);
+                }
+              }
+            }
           } else {
             console.log('No level up detected in this routine completion. Current level:', newLevel);
           }
@@ -426,11 +481,6 @@ export default function RoutineScreen() {
             result.completedChallenges.forEach((challenge, index) => {
               console.log(`Challenge ${index + 1}: ${challenge.title} - ${challenge.description} (${challenge.progress}/${challenge.requirement})`);
             });
-          }
-          
-          // Check for unlocked achievements
-          if (result.unlockedAchievements.length > 0) {
-            console.log(`Unlocked ${result.unlockedAchievements.length} achievements!`);
           }
           
           // Check for unlocked rewards

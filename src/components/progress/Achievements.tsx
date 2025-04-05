@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification, gamificationEvents, XP_UPDATED_EVENT, LEVEL_UP_EVENT } from '../../hooks/progress/useGamification';
 import { useTheme } from '../../context/ThemeContext';
 import { useLevelProgress } from '../../hooks/progress/useLevelProgress';
+import { useStreakChecker } from '../../hooks/progress/useStreakChecker';
 // Simple date formatter function to replace date-fns
 const formatTimeAgo = (dateString: string): string => {
   try {
@@ -415,6 +416,9 @@ const Achievements: React.FC<AchievementsProps> = ({
 }) => {
   // Use gamification hook
   const { gamificationSummary, isLoading, refreshData } = useGamification();
+  
+  // Use streak checker to ensure streak achievements are reset when needed
+  useStreakChecker();
   
   // Local state for UI
   const [unlockedAchievements, setUnlockedAchievements] = useState<any[]>([]);

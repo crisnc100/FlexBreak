@@ -5,6 +5,8 @@
 import { useEffect } from 'react';
 import { useGamification } from './useGamification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserProgress, saveUserProgress } from '../../services/storageService';
+import { resetStreakAchievements } from '../../utils/progress/modules/achievementManager';
 
 /**
  * Custom hook to check streak status and update related achievements
@@ -38,7 +40,20 @@ export function useStreakChecker() {
         // If more than 1 day has passed, streak is broken
         if (daysDiff > 1) {
           console.log('Streak broken! Resetting streak challenges...');
+          
+          // First use the gamification hook's method
           await handleStreakReset();
+          
+          // Then also directly reset achievements in storage
+          const userProgress = await getUserProgress();
+          if (userProgress) {
+            const resetCount = resetStreakAchievements(userProgress);
+            console.log(`Reset ${resetCount} streak achievements directly in storage`);
+            
+            if (resetCount > 0) {
+              await saveUserProgress(userProgress);
+            }
+          }
         }
         
         // Update last session date

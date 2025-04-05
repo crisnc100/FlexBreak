@@ -243,7 +243,10 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
     
     if (showLoading) {
       return (
-        <View style={styles.centerContainer}>
+        <View style={[
+          styles.centerContainer,
+          { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
+        ]}>
           <ActivityIndicator size="large" color={theme.accent} />
           <Text style={[styles.emptyText, { color: theme.text }]}>Loading challenges...</Text>
         </View>
@@ -255,7 +258,10 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
       // Show empty state if no claimable challenges
       if (localClaimable.length === 0) {
         return (
-          <View style={styles.centerContainer}>
+          <View style={[
+            styles.centerContainer,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
+          ]}>
             <MaterialCommunityIcons 
               name="trophy-outline"
               size={48} 
@@ -299,7 +305,10 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
       const claimableInCategory = localClaimable.filter(c => c.category === activeTab).length;
       
       return (
-        <View style={styles.centerContainer}>
+        <View style={[
+          styles.centerContainer,
+          { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
+        ]}>
           <MaterialCommunityIcons 
             name="calendar-check"
             size={48} 
@@ -316,7 +325,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
               style={[styles.claimNowButton, { backgroundColor: theme.accent }]}
               onPress={() => setActiveTab('claimable')}
             >
-              <Text style={styles.claimNowButtonText}>View Claimable Challenges</Text>
+              <Text style={[styles.claimNowButtonText, { color: '#FFFFFF' }]}>View Claimable Challenges</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -385,13 +394,23 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
               minimumRefreshTime={800}
             >
               {/* Custom Tab Bar */}
-              <View style={[styles.tabBar, { backgroundColor: theme.cardBackground }]}>
+              <View style={[
+                styles.tabBar, 
+                { 
+                  backgroundColor: theme.cardBackground,
+                  borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0',
+                  borderBottomWidth: 1
+                }
+              ]}>
                 {TABS.map((tab) => (
                   <TouchableOpacity
                     key={tab.key}
                     style={[
                       styles.tabItem,
-                      activeTab === tab.key && { borderBottomColor: theme.accent, borderBottomWidth: 2 }
+                      activeTab === tab.key && { 
+                        borderBottomColor: theme.accent, 
+                        borderBottomWidth: 2 
+                      }
                     ]}
                     onPress={() => {
                       console.log(`Tab pressed: ${tab.key}`);
@@ -428,7 +447,12 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
               </View>
               
               {/* Challenge Explanation - conditional based on tab */}
-              <View style={[styles.explanationContainer, { backgroundColor: theme.backgroundLight }]}>
+              <View style={[
+                styles.explanationContainer, 
+                { 
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : theme.backgroundLight 
+                }
+              ]}>
                 <MaterialCommunityIcons 
                   name={activeTab === 'claimable' ? 'information-outline' : 'calendar-clock'} 
                   size={18} 
