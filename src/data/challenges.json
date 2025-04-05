@@ -6,7 +6,7 @@
       "description": "Complete any stretch routine today",
       "type": "routine_count",
       "requirement": 1,
-      "xp": 25
+      "xp": 20
     },
     {
       "id": "daily_minutes",
@@ -14,7 +14,7 @@
       "description": "Complete 5 minutes of stretching today",
       "type": "daily_minutes",
       "requirement": 5,
-      "xp": 30
+      "xp": 15
     },
     {
       "id": "daily_morning",
@@ -23,7 +23,7 @@
       "type": "time_of_day",
       "timeRange": { "start": 5, "end": 12 },
       "requirement": 1,
-      "xp": 35
+      "xp": 30
     },
     {
       "id": "daily_evening",
@@ -32,7 +32,7 @@
       "type": "time_of_day",
       "timeRange": { "start": 18, "end": 23 },
       "requirement": 1,
-      "xp": 35
+      "xp": 30
     },
     {
       "id": "daily_double",
@@ -40,7 +40,7 @@
       "description": "Complete 2 stretching routines today",
       "type": "routine_count",
       "requirement": 2,
-      "xp": 50
+      "xp": 40
     },
     {
       "id": "daily_focused",
@@ -48,7 +48,7 @@
       "description": "Complete 10 minutes of stretching today",
       "type": "daily_minutes",
       "requirement": 10,
-      "xp": 45
+      "xp": 40
     }
   ],
   "weekly": [
@@ -91,7 +91,7 @@
       "description": "Stretch 5 different body areas this week",
       "type": "area_variety",
       "requirement": 5,
-      "xp": 175
+      "xp": 150
     }
   ],
   "monthly": [
@@ -107,10 +107,10 @@
     {
       "id": "monthly_minutes",
       "title": "Stretch Master",
-      "description": "Complete 100 minutes of total stretching this month",
+      "description": "Complete 300 minutes of total stretching this month",
       "type": "total_minutes",
-      "requirement": 100,
-      "xp": 175,
+      "requirement": 300,
+      "xp": 200,
       "category": "monthly"
     },
     {

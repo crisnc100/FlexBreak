@@ -8,6 +8,8 @@ interface XpNotificationProps {
   amount: number;
   source: string;
   description: string;
+  originalAmount?: number;  // Original XP before boost was applied
+  wasXpBoosted?: boolean;  // Whether XP boost was active
   onDismiss: () => void;
 }
 
@@ -15,6 +17,8 @@ const XpNotification: React.FC<XpNotificationProps> = ({
   amount, 
   source, 
   description, 
+  originalAmount,
+  wasXpBoosted = false,
   onDismiss 
 }) => {
   const [animation] = useState(new Animated.Value(0));
@@ -77,7 +81,9 @@ const XpNotification: React.FC<XpNotificationProps> = ({
         return 'From unlocking an achievement';
       case 'challenge':
       case 'challenge_claim':
-        return 'From completing a challenge';
+        return wasXpBoosted 
+          ? `From completing a challenge (2x XP Boost)`
+          : 'From completing a challenge';
       case 'streak':
         return 'From maintaining your streak';
       case 'first_routine':
@@ -105,10 +111,25 @@ const XpNotification: React.FC<XpNotificationProps> = ({
       ]}
     >
       <View style={styles.iconContainer}>
-        <Ionicons name={getIcon()} size={24} color="#FFD700" />
+        {wasXpBoosted ? (
+          <View style={styles.boostBadgeContainer}>
+            <Ionicons name={getIcon()} size={24} color="#FFD700" />
+            <View style={styles.boostBadge}>
+              <Ionicons name="flash" size={12} color="#FFFFFF" />
+              <Text style={styles.boostBadgeText}>2x</Text>
+            </View>
+          </View>
+        ) : (
+          <Ionicons name={getIcon()} size={24} color="#FFD700" />
+        )}
       </View>
       <View style={styles.textContainer}>
-        <Text style={styles.title}>+{amount} XP</Text>
+        <Text style={styles.title}>
+          +{amount} XP
+          {wasXpBoosted && originalAmount && (
+            <Text style={styles.originalXp}> (was +{originalAmount})</Text>
+          )}
+        </Text>
         <Text style={styles.description}>{getFormattedMessage()}</Text>
       </View>
     </Animated.View>
@@ -138,6 +159,7 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
   },
   iconContainer: {
     marginRight: 15,
+    position: 'relative',
   },
   textContainer: {
     flex: 1,
@@ -150,6 +172,35 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
   description: {
     color: isDark ? theme.text : 'white',
     fontSize: 14,
+  },
+  boostBadgeContainer: {
+    position: 'relative',
+  },
+  boostBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -10,
+    backgroundColor: '#FF8F00',
+    borderRadius: 10,
+    width: 28,
+    height: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  boostBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+    marginLeft: 1,
+  },
+  originalXp: {
+    fontSize: 14,
+    color: 'rgba(255, 215, 0, 0.7)',
+    fontStyle: 'italic',
   }
 });
 

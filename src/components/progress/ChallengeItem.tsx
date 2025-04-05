@@ -1,25 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { Challenge, CHALLENGE_STATUS } from '../../utils/progress/types';
 import { useGamification } from '../../hooks/progress/useGamification';
 import * as Haptics from 'expo-haptics';
 import { Animated } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import * as xpBoostManager from '../../utils/progress/modules/xpBoostManager';
 
 interface ChallengeItemProps {
   challenge: Challenge;
   onClaimSuccess?: () => void;
   style?: any;
+  isXpBoosted?: boolean;
 }
 
-const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess, style }) => {
+const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess, style, isXpBoosted = false }) => {
   const { claimChallenge, getTimeRemainingForChallenge, formatTimeRemaining } = useGamification();
   const { theme, isDark } = useTheme();
   const [isClaiming, setIsClaiming] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [opacity] = useState(new Animated.Value(1));
+  const [xpMultiplier, setXpMultiplier] = useState(1);
+  
+  // Check for XP boost multiplier on mount
+  useEffect(() => {
+    const checkXpBoost = async () => {
+      if (isXpBoosted) {
+        const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
+        if (isActive) {
+          setXpMultiplier(data.multiplier);
+        }
+      }
+    };
+    
+    checkXpBoost();
+  }, [isXpBoosted]);
   
   // Update time remaining every minute
   useEffect(() => {
@@ -190,6 +207,10 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
     }
   };
   
+  // Calculate boosted and original XP
+  const originalXp = challenge.xp;
+  const boostedXp = isXpBoosted ? Math.floor(originalXp * xpMultiplier) : originalXp;
+  
   return (
     <Animated.View style={[
       styles.container, 
@@ -273,12 +294,25 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         <View style={styles.leftFooter}>
           <View style={[
             styles.xpContainer,
-            { backgroundColor: isDark ? 'rgba(227,242,253,0.2)' : '#E3F2FD' }
+            { backgroundColor: isDark ? 'rgba(227,242,253,0.2)' : '#E3F2FD' },
+            isXpBoosted && styles.xpBoostContainer
           ]}>
+            {isXpBoosted && (
+              <View style={styles.xpBoostBadge}>
+                <Ionicons name="flash" size={12} color="#FFFFFF" />
+                <Text style={styles.xpBoostBadgeText}>{xpMultiplier}x</Text>
+              </View>
+            )}
             <Text style={[
               styles.xpText,
-              { color: isDark ? '#82B1FF' : '#1976D2' }
-            ]}>+{challenge.xp} XP</Text>
+              { color: isDark ? '#82B1FF' : '#1976D2' },
+              isXpBoosted && styles.xpBoostText
+            ]}>
+              +{boostedXp} XP
+              {isXpBoosted && (
+                <Text style={styles.originalXpText}> (was {originalXp})</Text>
+              )}
+            </Text>
           </View>
           <Text style={[
             styles.categoryText,
@@ -427,11 +461,48 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     marginRight: 8,
+    position: 'relative',
   },
   xpText: {
     color: '#1976D2',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+  xpBoostContainer: {
+    borderWidth: 1,
+    borderColor: '#FFC107',
+    backgroundColor: 'rgba(255, 236, 179, 0.3) !important',
+    paddingRight: 14,
+  },
+  xpBoostText: {
+    color: '#FF8F00',
+    fontWeight: 'bold',
+  },
+  xpBoostBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFC107',
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 1,
+  },
+  xpBoostBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 1,
+  },
+  originalXpText: {
+    fontSize: 10,
+    color: '#757575',
+    marginLeft: 2,
+    fontStyle: 'italic',
   },
   categoryText: {
     fontSize: 12,

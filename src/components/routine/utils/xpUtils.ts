@@ -46,42 +46,8 @@ export const simulateLevelUpWithBoost = (
   levelUp: any,
   xpEarned: number
 ) => {
-  // Only create a simulated level-up if:
-  // 1. XP boost is active
-  // 2. No real level-up data was provided
-  // 3. We received a substantial amount of XP that might reasonably cause a level-up
-  if (hasXpBoost && !levelUp && xpEarned >= 50) {
-    // Calculate unboosted XP amount for better estimation
-    const originalXp = Math.floor(xpEarned / 2);
-    
-    // More reasonable level estimation based on XP amounts
-    // Most users level up around 250-500 XP intervals in early levels
-    const baseLevel = Math.max(1, Math.floor(originalXp / 40));
-    
-    // Only show simulated level-up for reasonable XP values
-    const isLikelyToLevelUp = 
-      (baseLevel <= 3 && originalXp >= 40) || // Lower levels level up more easily
-      (baseLevel <= 5 && originalXp >= 60) || // Mid levels need more XP
-      originalXp >= 100; // Higher levels need significant XP
-    
-    if (isLikelyToLevelUp) {
-      // Create a plausible level-up scenario - move up one level
-      return {
-        simulatedLevelUp: true,
-        oldLevel: baseLevel,
-        newLevel: baseLevel + 1,
-        rewards: [
-          {
-            id: 'xp_boost_reward',
-            name: 'XP Boost Bonus',
-            description: 'Your XP boost helped you level up faster!',
-            type: 'feature'
-          }
-        ]
-      };
-    }
-  }
-  
+  // Don't simulate level-ups based on XP boost alone
+  // This prevents false level-up displays when only XP boost is active
   return null;
 };
 

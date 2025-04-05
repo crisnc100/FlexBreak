@@ -435,6 +435,8 @@ export const getClaimableChallenges = async (): Promise<Challenge[]> => {
 export const claimChallenge = async (challengeId: string): Promise<{ 
   success: boolean; 
   xpEarned: number;
+  originalXp?: number;  // Original XP before any boost was applied
+  xpBoostApplied?: boolean;  // Whether XP boost was active when claimed
   message?: string;
   levelUp: boolean;
   newLevel: number;

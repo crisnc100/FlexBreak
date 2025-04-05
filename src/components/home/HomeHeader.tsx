@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { usePremium } from '../../context/PremiumContext';
 
 interface HomeHeaderProps {
   title?: string;
@@ -11,12 +12,14 @@ interface HomeHeaderProps {
 
 /**
  * Enhanced header component for the home screen with modern styling
+ * Shows "Pro" badge only for premium users
  */
 const HomeHeader: React.FC<HomeHeaderProps> = ({
   title = 'FlexBreak',
-  subtitle = 'Stretch. Relax. Thrive.'
+  subtitle = 'Stretch. Relax. Work Better.'
 }) => {
   const { theme, isDark } = useTheme();
+  const { isPremium } = usePremium();
   
   return (
     <View style={styles.container}>
@@ -39,7 +42,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: theme.text }]}>
             {title}
-            <Text style={styles.highlight}> Pro</Text>
+            {isPremium && <Text style={styles.highlight}> Pro</Text>}
           </Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
             {subtitle}

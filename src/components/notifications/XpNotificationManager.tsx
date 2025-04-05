@@ -140,7 +140,9 @@ const XpNotificationManager: React.FC = () => {
           data: {
             amount: data.xpEarned,
             source: data.source || 'unknown',
-            description: data.details || `From ${data.source || 'activity'}`
+            description: data.details || `From ${data.source || 'activity'}`,
+            originalAmount: data.originalXp,
+            wasXpBoosted: data.xpBoostApplied
           }
         }
       ]);
@@ -260,6 +262,8 @@ const XpNotificationManager: React.FC = () => {
                 amount={data.amount}
                 source={data.source}
                 description={data.description}
+                originalAmount={data.originalAmount}
+                wasXpBoosted={data.wasXpBoosted}
                 onDismiss={() => handleDismiss(id)}
               />
             </View>

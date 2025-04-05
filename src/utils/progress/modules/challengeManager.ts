@@ -6,6 +6,7 @@ import * as dateUtils from './utils/dateUtils';
 import * as cacheUtils from './utils/cacheUtils';
 import * as rewardManager from './rewardManager';
 import * as levelManager from './levelManager';
+import * as xpBoostManager from './xpBoostManager';
 
 // Track recent challenges to avoid repetition
 let recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
@@ -783,6 +784,8 @@ export const getClaimableChallenges = async (): Promise<Challenge[]> => {
 export const claimChallenge = async (challengeId: string): Promise<{ 
   success: boolean; 
   xpEarned: number;
+  originalXp: number;
+  xpBoostApplied: boolean;
   message?: string;
   levelUp: boolean;
   newLevel: number;
@@ -794,6 +797,8 @@ export const claimChallenge = async (challengeId: string): Promise<{
     return {
       success: false,
       xpEarned: 0,
+      originalXp: 0,
+      xpBoostApplied: false,
       message: "Challenge not found",
       levelUp: false,
       newLevel: userProgress.level
@@ -807,6 +812,8 @@ export const claimChallenge = async (challengeId: string): Promise<{
     return {
       success: false,
       xpEarned: 0,
+      originalXp: 0,
+      xpBoostApplied: false,
       message: "Challenge is not completed",
       levelUp: false,
       newLevel: userProgress.level
@@ -817,6 +824,8 @@ export const claimChallenge = async (challengeId: string): Promise<{
     return {
       success: false,
       xpEarned: 0,
+      originalXp: 0,
+      xpBoostApplied: false,
       message: "Challenge already claimed",
       levelUp: false,
       newLevel: userProgress.level
@@ -840,6 +849,18 @@ export const claimChallenge = async (challengeId: string): Promise<{
     }
   }
   
+  // Check if XP Boost is active and apply multiplier if it is
+  const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
+  let originalXp = xpEarned;
+  let xpBoostApplied = false;
+  
+  if (isActive) {
+    const multiplier = data.multiplier;
+    xpEarned = Math.floor(xpEarned * multiplier);
+    xpBoostApplied = true;
+    console.log(`XP Boost active! Multiplying challenge XP by ${multiplier}x: ${originalXp} -> ${xpEarned}`);
+  }
+  
   // Mark challenge as claimed
   challenge.claimed = true;
   challenge.dateClaimed = now.toISOString();
@@ -850,10 +871,13 @@ export const claimChallenge = async (challengeId: string): Promise<{
     challenge.history = [];
   }
   
+  // Store both original and boosted XP in history for reference
   challenge.history.push({
     completedDate: challenge.dateCompleted || now.toISOString(),
     claimedDate: now.toISOString(),
-    xpEarned: xpEarned
+    xpEarned: xpEarned,
+    originalXp: originalXp,
+    xpBoostApplied: xpBoostApplied
   });
   
   // Invalidate caches for this category and claimable
@@ -868,10 +892,19 @@ export const claimChallenge = async (challengeId: string): Promise<{
   // New challenges should only be generated when the cycle ends
   await storageService.saveUserProgress(userProgress);
   
+  let message = "Challenge claimed successfully";
+  if (xpReduction) {
+    message = "Challenge claimed with reduced XP (expired)";
+  } else if (xpBoostApplied) {
+    message = `Challenge claimed with ${data.multiplier}x XP Boost!`;
+  }
+  
   return {
     success: true,
     xpEarned,
-    message: xpReduction ? "Challenge claimed with reduced XP (expired)" : "Challenge claimed successfully",
+    originalXp,
+    xpBoostApplied,
+    message,
     levelUp,
     newLevel
   };

@@ -38,6 +38,8 @@ interface ChallengeClaimResult {
   xpEarned: number;
   levelUp: boolean;
   newLevel: number;
+  originalXp: number;
+  xpBoostApplied: boolean;
 }
 
 // Create an event emitter to notify level-up events across the app
@@ -289,13 +291,15 @@ export function useGamification() {
         if (result.xpEarned > 0) {
           setTotalXP(prev => prev + result.xpEarned);
           
-          // Emit XP updated event with challenge details
+          // Emit XP updated event with challenge details and boost information
           gamificationEvents.emit(XP_UPDATED_EVENT, {
             previousXP: totalXP,
             newXP: totalXP + result.xpEarned,
             xpEarned: result.xpEarned,
+            originalXp: result.originalXp, // Include original XP before boost
+            xpBoostApplied: result.xpBoostApplied, // Whether boost was applied
             source: 'challenge',
-            details: `From ${challengeTitle} challenge`
+            details: `From ${challengeTitle} challenge${result.xpBoostApplied ? ' (2x XP Boost)' : ''}`
           });
         }
         
@@ -311,7 +315,9 @@ export function useGamification() {
             details: `From claiming ${challengeTitle} challenge`,
             challengeId: challengeId,
             challengeTitle: challengeTitle,
-            xpEarned: result.xpEarned
+            xpEarned: result.xpEarned,
+            originalXp: result.originalXp,
+            xpBoostApplied: result.xpBoostApplied
           });
           
           console.log(`Level up triggered by challenge ${challengeTitle} - Level ${oldLevel} to ${result.newLevel}`);
@@ -322,8 +328,10 @@ export function useGamification() {
         
         return {
           success: true,
-          message: 'Challenge claimed successfully',
+          message: result.message || 'Challenge claimed successfully',
           xpEarned: result.xpEarned,
+          originalXp: result.originalXp,
+          xpBoostApplied: result.xpBoostApplied,
           levelUp: result.levelUp,
           newLevel: result.newLevel
         };
@@ -331,8 +339,10 @@ export function useGamification() {
       
       return {
         success: false,
-        message: result.message,
+        message: result.message || 'Failed to claim challenge',
         xpEarned: 0,
+        originalXp: 0,
+        xpBoostApplied: false,
         levelUp: false,
         newLevel: level
       };
@@ -342,6 +352,8 @@ export function useGamification() {
         success: false,
         message: 'Error claiming challenge',
         xpEarned: 0,
+        originalXp: 0,
+        xpBoostApplied: false,
         levelUp: false,
         newLevel: level
       };

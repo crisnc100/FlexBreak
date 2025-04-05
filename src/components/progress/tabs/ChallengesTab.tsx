@@ -11,6 +11,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { CHALLENGE_LIMITS } from '../../../utils/progress/constants';
 import * as cacheUtils from '../../../utils/progress/modules/utils/cacheUtils';
+import * as xpBoostManager from '../../../utils/progress/modules/xpBoostManager';
 
 interface ChallengesTabProps {
   isPremium: boolean;
@@ -49,44 +50,67 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
   } = useGamification();
   
   // Active tab index
-  const [activeTab, setActiveTab] = useState<string>(TABS[0].key);
+  const [activeTab, setActiveTab] = useState<string>('claimable');
   
   // Track last refresh time to avoid excessive refreshes
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   
   // Local state for challenges to avoid UI jumps
-  const [localChallenges, setLocalChallenges] = useState<Record<string, Challenge[]>>(activeChallenges);
+  const [localChallenges, setLocalChallenges] = useState<Record<string, Challenge[]>>({});
   const [localClaimable, setLocalClaimable] = useState<Challenge[]>(claimableChallenges || []);
   const [isLocalLoading, setIsLocalLoading] = useState<boolean>(true);
+  const [isXpBoosted, setIsXpBoosted] = useState(false);
   
   // Initialize local challenges from cache on first render
   useEffect(() => {
-    const initializeFromCache = async () => {
+    const initializeChallenges = async () => {
       setIsLocalLoading(true);
       
-      // Try to get challenges from cache first for each category
-      const cachedChallenges: Record<string, Challenge[]> = {
-        daily: cacheUtils.getCachedChallenges('daily') || [],
-        weekly: cacheUtils.getCachedChallenges('weekly') || [],
-        monthly: cacheUtils.getCachedChallenges('monthly') || [],
-        special: cacheUtils.getCachedChallenges('special') || [],
-      };
-      
-      // Try to get claimable challenges from cache
-      const cachedClaimable = cacheUtils.getCachedChallenges('claimable') || [];
-      
-      // If we have cached data, use it immediately to avoid UI jumps
-      if (Object.values(cachedChallenges).some(arr => arr.length > 0) || cachedClaimable.length > 0) {
-        setLocalChallenges(cachedChallenges);
-        setLocalClaimable(cachedClaimable);
+      try {
+        console.log('Loading challenges');
+        
+        // Check if XP boost is active
+        const { isActive } = await xpBoostManager.checkXpBoostStatus();
+        setIsXpBoosted(isActive);
+        
+        // Attempt to load from cache first for faster loading
+        const cachedClaimable = await cacheUtils.getCachedChallenges('claimable');
+        if (cachedClaimable && cachedClaimable.length > 0) {
+          setLocalClaimable(cachedClaimable);
+        }
+        
+        // Load cached challenges for each category
+        const loadCached = async () => {
+          const result: Record<string, Challenge[]> = {};
+          
+          for (const tab of TABS) {
+            if (tab.key !== 'claimable') {
+              const cachedChallenges = await cacheUtils.getCachedChallenges(tab.key);
+              if (cachedChallenges) {
+                result[tab.key] = cachedChallenges;
+              } else {
+                result[tab.key] = [];
+              }
+            }
+          }
+          
+          return result;
+        };
+        
+        const cachedChallenges = await loadCached();
+        if (Object.keys(cachedChallenges).length > 0) {
+          setLocalChallenges(cachedChallenges);
+        }
+        
+        console.log('Initialized challenges from cache');
+      } catch (error) {
+        console.error('Error initializing challenges:', error);
+      } finally {
+        setIsLocalLoading(false);
       }
-      
-      // Then load the actual data
-      refreshChallenges();
-      setIsLocalLoading(false);
     };
     
-    initializeFromCache();
+    initializeChallenges();
   }, []);
   
   // Update local state when gamification data changes
@@ -170,15 +194,25 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
   
   // Create a refresh handler with debouncing to prevent excessive refreshes
   const handleRefresh = useCallback(async () => {
-    const now = Date.now();
-    if (now - lastRefresh > 2000) { // Minimum 2 seconds between refreshes
-      console.log('Manual refresh triggered');
-      setLastRefresh(now);
+    if (isRefreshing) return;
+    
+    console.log('Refreshing challenges...');
+    // Let's use our own state logic instead of trying to pass parameters to refreshProgress
+    try {
+      // Check if XP boost is active on refresh
+      const { isActive } = await xpBoostManager.checkXpBoostStatus();
+      setIsXpBoosted(isActive);
+      
+      // Refresh challenges from the game engine
       await refreshChallenges();
-    } else {
-      console.log('Skipping refresh, too soon after last refresh');
+      setLastRefresh(Date.now());
+      
+      // Call refreshProgress after challenges refresh is complete
+      await refreshProgress();
+    } catch (error) {
+      console.error('Error refreshing challenges:', error);
     }
-  }, [refreshChallenges, lastRefresh]);
+  }, [isRefreshing, refreshChallenges, refreshProgress]);
   
   // Handle when a challenge is successfully claimed
   const handleClaimSuccess = useCallback(() => {
@@ -286,6 +320,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
               key={challenge.id}
               challenge={challenge}
               onClaimSuccess={handleClaimSuccess}
+              isXpBoosted={isXpBoosted}
             />
           ))}
         </ScrollView>
@@ -344,6 +379,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
             key={challenge.id}
             challenge={challenge}
             onClaimSuccess={handleClaimSuccess}
+            isXpBoosted={isXpBoosted}
           />
         ))}
         {/* Provide explanation if user has fewer challenges than the typical limit */}

@@ -69,6 +69,8 @@ export interface ChallengeHistory {
   completedDate: string;
   claimedDate?: string;
   xpEarned: number;
+  originalXp?: number;  // Original XP before any boosts were applied
+  xpBoostApplied?: boolean;  // Whether XP boost was active when claimed
 }
 
 // Interface for reward objects
@@ -167,6 +169,8 @@ export interface ChallengeClaimResult {
   message: string;
   progress: UserProgress;
   xpEarned: number;
+  originalXp?: number;  // Original XP before any boosts were applied
+  xpBoostApplied?: boolean;  // Whether XP boost was active when claimed
   xpReduction?: boolean; // Indicates if XP was reduced due to expiration
 }
 

@@ -84,7 +84,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   // Get simulated level-up and level display values
   const simulatedLevelData = simulateLevelUpWithBoost(hasXpBoost, levelUp, xpEarned);
-  const showAnyLevelUp = showLevelUp || (!showLevelUp && !!simulatedLevelData);
+  const showAnyLevelUp = showLevelUp;
   const { oldLevel: displayOldLevel, newLevel: displayNewLevel } = 
     calculateLevelDisplay(levelUp, simulatedLevelData, xpEarned);
 
@@ -225,8 +225,8 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
             oldLevel={displayOldLevel}
             newLevel={displayNewLevel}
             isDark={isDark}
-            isSimulated={!!simulatedLevelData}
-            rewards={(simulatedLevelData?.rewards as RewardItem[]) || levelUp?.rewards}
+            isSimulated={false}
+            rewards={levelUp?.rewards || []}
             animValues={{
               levelUpAnim,
               levelUpScale
