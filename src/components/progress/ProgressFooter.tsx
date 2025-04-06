@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useGamification, gamificationEvents, XP_UPDATED_EVENT } from '../../hooks/progress/useGamification';
 
 interface ProgressFooterProps {
@@ -45,6 +47,34 @@ export const ProgressFooter: React.FC<ProgressFooterProps> = ({
   const userLevel = level || progressSystemData?.user?.level || progressSystemData?.level || 1;
   const userXP = totalXP || progressSystemData?.user?.totalXP || progressSystemData?.totalXP || 0;
   
+  if (isDark) {
+    return (
+      <View style={styles.footer}>
+        <LinearGradient
+          colors={['#111827', '#1F2937']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.darkFooterContent}
+        >
+          <View style={styles.darkLevelBadge}>
+            <Text style={styles.darkLevelText}>{userLevel}</Text>
+          </View>
+          <View style={styles.darkTextContainer}>
+            <Text style={styles.darkFooterTitle}>
+              FlexBreak Premium
+            </Text>
+            <Text style={styles.darkFooterXP}>
+              {userXP.toLocaleString()} XP
+            </Text>
+          </View>
+          <View style={styles.darkIconContainer}>
+            <Ionicons name="trophy" size={20} color="#F59E0B" />
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  }
+  
   return (
     <View style={styles.footer}>
       <Text style={[styles.footerText, { color: isDark ? '#FFFFFF' : '#666' }]}>
@@ -63,6 +93,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 12,
+  },
+  darkFooterContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+    width: '100%',
+  },
+  darkLevelBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  darkLevelText: {
+    color: '#F59E0B',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  darkTextContainer: {
+    flex: 1,
+  },
+  darkFooterTitle: {
+    color: '#D1D5DB',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  darkFooterXP: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  darkIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   devTools: {
     marginTop: 12,

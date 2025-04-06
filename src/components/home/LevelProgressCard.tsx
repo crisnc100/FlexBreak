@@ -219,7 +219,19 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
             </View>
           </View>
           
-        
+          {/* Use the LevelProgressBar component */}
+          <View style={styles.progressSection}>
+            <LevelProgressBar
+              currentLevel={currentLevel}
+              levelTitle={currentLevelData?.title}
+              totalXP={totalXP}
+              xpProgress={xpProgress}
+              xpToNextLevel={xpToNextLevel}
+              nextLevelTitle={nextLevelData?.title}
+              compact={true}
+              showXpCounter={false}
+            />
+          </View>
           
           {isPremium ? (
             <View style={styles.viewMoreContainer}>
@@ -268,12 +280,16 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
     marginHorizontal: 16,
-    marginVertical: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 3,
-    overflow: 'hidden'
   },
   cardBackground: {
     borderRadius: 16,
@@ -326,7 +342,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   progressSection: {
+    marginTop: 8,
     marginBottom: 10,
+    paddingHorizontal: 2,
   },
   viewMoreContainer: {
     flexDirection: 'row',

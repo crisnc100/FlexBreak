@@ -19,6 +19,7 @@ interface StatsTabProps {
   canAccessFeature: (feature: string) => boolean;
   theme: any;
   isDark: boolean;
+  streakFreezeActive?: boolean;
 }
 
 /**
@@ -32,7 +33,8 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   isPremium,
   canAccessFeature,
   theme,
-  isDark
+  isDark,
+  streakFreezeActive = false
 }) => {
   return (
     <>
@@ -41,11 +43,17 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         currentStreak={stats.currentStreak}
         totalRoutines={stats.totalRoutines}
         isTodayComplete={stats.isTodayComplete}
+        theme={theme}
+        isDark={isDark}
+        streakFreezeActive={streakFreezeActive}
       />
       
       {/* Only show streak freeze card for premium users with level 6+ */}
       {isPremium && canAccessFeature('streak_freezes') && (
-        <StreakFreezeCard currentStreak={stats.currentStreak} />
+        <StreakFreezeCard 
+          currentStreak={stats.currentStreak} 
+          isDark={isDark}
+        />
       )}
       
       <ConsistencyInsights
@@ -71,6 +79,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
       
       <TipSection
         currentStreak={stats.currentStreak}
+        isDark={isDark}
       />
     </>
   );

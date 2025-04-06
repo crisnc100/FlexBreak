@@ -56,7 +56,7 @@ const SubscriptionTeaser: React.FC<SubscriptionTeaserProps> = ({
               </View>
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={16} color={isDark ? "#4CAF50" : "#FFFFFF"} />
-                <Text style={styles.featureText}>Detailed Analytics</Text>
+                <Text style={styles.featureText}>Analytics and Rewards</Text>
               </View>
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={16} color={isDark ? "#4CAF50" : "#FFFFFF"} />

@@ -10,6 +10,8 @@ import {
   calculateActiveDays
 } from '../../utils/progress/modules/progressTracker';
 import * as storageService from '../../services/storageService';
+import { UserProgress } from '../../utils/progress/types';
+import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
 
 // Define progress stats interface
 export interface ProgressStats {
@@ -22,6 +24,16 @@ export interface ProgressStats {
   activeRoutineDays: number;
   isTodayComplete: boolean;
 }
+
+// Cache data with timestamps to minimize unnecessary refreshes
+const dataCache = {
+  userProgress: null as UserProgress | null,
+  lastUpdated: 0,
+  freezeCount: 0,
+  freezeLastUpdated: 0,
+  // Cooldown period in ms (300ms)
+  cooldownPeriod: 300
+};
 
 /**
  * Custom hook to manage progress data loading and calculation
@@ -44,18 +56,24 @@ export function useProgressData() {
     activeRoutineDays: 0,
     isTodayComplete: false
   });
+  const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
+  const [freezeCount, setFreezeCount] = useState(0);
 
   // Check if user has completed routines but they're all hidden
   const hasHiddenRoutinesOnly = allProgressData.length > 0 && progressData.length === 0;
 
   // Calculate all stats from progress data
-  const calculateStats = useCallback((data: ProgressEntry[]) => {
+  const calculateStats = useCallback(async (data: ProgressEntry[]) => {
     if (!data || data.length === 0) {
       console.log('No data to calculate stats from');
       return;
     }
     
     console.log(`Calculating stats from ${data.length} routines (including hidden)`);
+    
+    // First get user progress from storage to ensure we have the most accurate streak
+    const userProgress = await storageService.getUserProgress();
+    const storedStreak = userProgress.statistics.currentStreak;
     
     // Total routines
     const totalRoutines = data.length;
@@ -71,7 +89,17 @@ export function useProgressData() {
     }, 0);
 
     // Calculate current streak
-    const streak = calculateStreak(data);
+    const calculatedStreak = calculateStreak(data);
+    
+    // Use the stored streak from user progress if it's higher than the calculated streak
+    // This ensures that freeze-protected streaks are properly recognized
+    const displayStreak = Math.max(calculatedStreak, storedStreak);
+    
+    console.log('Streak comparison:', {
+      calculatedStreak, 
+      storedStreak, 
+      displayStreak
+    });
 
     // Check if there's an activity today
     const today = new Date();
@@ -100,12 +128,12 @@ export function useProgressData() {
     // Calculate active days over the last 30 days
     const activeRoutineDays = calculateActiveDays(data);
 
-    console.log(`Stats calculated: ${totalRoutines} routines, ${totalMinutes} minutes, streak: ${streak}, today complete: ${isTodayComplete}`);
+    console.log(`Stats calculated: ${totalRoutines} routines, ${totalMinutes} minutes, streak: ${displayStreak}, today complete: ${isTodayComplete}`);
     
     setStats({
       totalRoutines,
       totalMinutes,
-      currentStreak: streak,
+      currentStreak: displayStreak,
       areaBreakdown,
       weeklyActivity,
       dayOfWeekBreakdown,
@@ -116,12 +144,66 @@ export function useProgressData() {
     // Log stats for debugging
     console.log('Stats updated for achievements:', {
       totalRoutines,
-      streak,
+      streak: displayStreak,
       areaCount: Object.keys(areaBreakdown).length,
       totalMinutes,
       areaBreakdown
     });
   }, []);
+
+  // Load user progress with caching
+  const loadUserProgress = useCallback(async (forceRefresh = false) => {
+    try {
+      setIsLoading(true);
+      
+      const now = Date.now();
+      const cacheValid = !forceRefresh && 
+                         dataCache.userProgress && 
+                         (now - dataCache.lastUpdated < dataCache.cooldownPeriod);
+      
+      // Use cached data if valid and not forcing refresh
+      if (cacheValid) {
+        console.log('Using cached progress data (age: ' + (now - dataCache.lastUpdated) + 'ms)');
+        setUserProgress(dataCache.userProgress);
+      } else {
+        // Load fresh data from storage
+        console.log('Loading fresh progress data from storage');
+        const progress = await storageService.getUserProgress();
+        
+        // Update cache
+        dataCache.userProgress = progress;
+        dataCache.lastUpdated = now;
+        
+        setUserProgress(progress);
+      }
+      
+      // Check streak freeze count with caching
+      const freezeCacheValid = !forceRefresh && 
+                              (now - dataCache.freezeLastUpdated < dataCache.cooldownPeriod);
+      
+      if (freezeCacheValid) {
+        console.log('Using cached freeze count: ' + dataCache.freezeCount);
+        setFreezeCount(dataCache.freezeCount);
+      } else {
+        const count = await streakFreezeManager.getStreakFreezeCount();
+        
+        // Update freeze cache
+        dataCache.freezeCount = count;
+        dataCache.freezeLastUpdated = now;
+        
+        setFreezeCount(count);
+      }
+    } catch (error) {
+      console.error('Error loading progress data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+  
+  // Force refresh bypassing cache
+  const forceRefresh = useCallback(async () => {
+    await loadUserProgress(true);
+  }, [loadUserProgress]);
 
   // Handle refresh - this now ensures both progress and gamification data are refreshed
   const handleRefresh = useCallback(async () => {
@@ -146,8 +228,8 @@ export function useProgressData() {
       setAllProgressData(allRoutines);
       setProgressData(allRoutines.filter(r => !r.hidden));
       
-      // Calculate stats
-      calculateStats(allRoutines);
+      // Calculate stats - now we need to await this since it's async
+      await calculateStats(allRoutines);
     } catch (error) {
       console.error('Error refreshing all routines and gamification data:', error);
     } finally {
@@ -200,6 +282,11 @@ export function useProgressData() {
     loadData();
   }, [calculateStats, getAllRoutines]);
 
+  // Load data on component mount
+  useEffect(() => {
+    loadUserProgress();
+  }, [loadUserProgress]);
+
   return { 
     stats, 
     progressData, 
@@ -208,6 +295,10 @@ export function useProgressData() {
     isLoading: isLoading || isRoutinesLoading || isRefreshing,
     isRefreshing,
     handleRefresh,
-    calculateStats
+    calculateStats,
+    userProgress,
+    freezeCount,
+    loadUserProgress,
+    forceRefresh
   };
 } 

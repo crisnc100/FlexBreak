@@ -7,6 +7,10 @@ import { useGamification } from './useGamification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserProgress, saveUserProgress } from '../../services/storageService';
 import { resetStreakAchievements } from '../../utils/progress/modules/achievementManager';
+import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import * as streakManager from '../../utils/progress/modules/streakManager';
+import { useIsFocused } from '@react-navigation/native';
+import * as achievementManager from '../../utils/progress/modules/achievementManager';
 
 /**
  * Custom hook to check streak status and update related achievements
@@ -14,32 +18,22 @@ import { resetStreakAchievements } from '../../utils/progress/modules/achievemen
  */
 export function useStreakChecker() {
   const { handleStreakReset, refreshData } = useGamification();
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     console.warn('useStreakChecker is deprecated. Use useGamification().handleStreakReset() instead.');
     
     const checkStreakStatus = async () => {
       try {
-        // Check if streak is broken and reset if needed
-        const lastSessionDate = await AsyncStorage.getItem('lastSessionDate');
-        const today = new Date().toDateString();
+        // First, ensure streak freezes are properly initialized
+        await streakFreezeManager.refillMonthlyStreakFreezes();
         
-        // If no previous session or session was yesterday, streak is intact
-        if (!lastSessionDate) {
-          await AsyncStorage.setItem('lastSessionDate', today);
-          return;
-        }
+        // Check streak status
+        const streakStatus = await streakManager.checkStreakStatus();
         
-        const lastDate = new Date(lastSessionDate);
-        const currentDate = new Date(today);
-        
-        // Calculate days between sessions
-        const timeDiff = currentDate.getTime() - lastDate.getTime();
-        const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
-        
-        // If more than 1 day has passed, streak is broken
-        if (daysDiff > 1) {
-          console.log('Streak broken! Resetting streak challenges...');
+        // If streak is broken and can't be saved, reset streak achievements
+        if (streakStatus.streakBroken && !streakStatus.canSaveYesterdayStreak) {
+          console.log('Streak broken and cannot be saved, resetting achievements');
           
           // First use the gamification hook's method
           await handleStreakReset();
@@ -54,9 +48,20 @@ export function useStreakChecker() {
               await saveUserProgress(userProgress);
             }
           }
+        } else if (streakStatus.currentStreak > 0) {
+          // Current streak is active, ensure it's properly handled
+          console.log(`Active streak detected: ${streakStatus.currentStreak} days`);
+          
+          // If streak freeze was used, check if activity today should increment it
+          const streakFreezeUsed = await streakFreezeManager.wasStreakFreezeUsedForCurrentDay();
+          if (streakFreezeUsed) {
+            console.log('Streak freeze was used recently - ensuring streak is maintained');
+            // The check in streakManager.checkStreakStatus will handle the increment
+          }
         }
         
         // Update last session date
+        const today = new Date().toDateString();
         await AsyncStorage.setItem('lastSessionDate', today);
         
         // Always refresh data to ensure UI is up to date
@@ -66,6 +71,8 @@ export function useStreakChecker() {
       }
     };
     
-    checkStreakStatus();
-  }, [handleStreakReset, refreshData]);
+    if (isFocused) {
+      checkStreakStatus();
+    }
+  }, [handleStreakReset, refreshData, isFocused]);
 } 

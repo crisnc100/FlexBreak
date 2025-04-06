@@ -46,6 +46,52 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
     outputRange: ['0%', '100%'],
   });
   
+  // If compact mode and no XP counter, return just the progress bar
+  if (compact && !showXpCounter) {
+    return (
+      <View style={styles.justProgressBarWrapper}>
+        <View style={[
+          styles.progressContainer, 
+          styles.enhancedProgressContainer,
+          { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }
+        ]}>
+          <Animated.View style={{ width: animatedWidth, overflow: 'hidden' }}>
+            <LinearGradient
+              colors={isDark ? ['#388E3C', '#7CB342'] : ['#4CAF50', '#8BC34A']}
+              style={[
+                styles.progressBar,
+                styles.enhancedProgressBar
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            />
+          </Animated.View>
+          
+          {/* Progress indicator */}
+          <Animated.View 
+            style={[
+              styles.progressIndicator,
+              { 
+                left: animatedWidth,
+                backgroundColor: isDark ? '#7CB342' : '#4CAF50',
+              }
+            ]}
+          />
+        </View>
+        
+        {/* Minimal XP counter below the bar */}
+        <View style={styles.minimalXpInfoContainer}>
+          <Text style={[
+            styles.minimalXpText, 
+            { color: isDark ? theme.textSecondary : '#757575' }
+          ]}>
+            {xpToNextLevel ? `${xpToNextLevel} XP to next level` : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  
   return (
     <View style={[
       styles.container,
@@ -182,6 +228,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
+  },
+  justProgressBarWrapper: {
+    width: '100%',
+    paddingVertical: 4,
+  },
+  enhancedProgressContainer: {
+    height: 10,
+    borderRadius: 5,
+    position: 'relative',
+  },
+  enhancedProgressBar: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  progressIndicator: {
+    position: 'absolute',
+    top: -4,
+    width: 8,
+    height: 18,
+    borderRadius: 4,
+    transform: [{ translateX: -4 }],
+  },
+  minimalXpInfoContainer: {
+    alignItems: 'flex-end',
+    marginTop: 4,
+  },
+  minimalXpText: {
+    fontSize: 10,
+    fontWeight: '500',
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Animated,
   ActivityIndicator
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { usePremium } from '../context/PremiumContext';
 import { useTheme } from '../context/ThemeContext';
 import { getMostActiveDay, getOrderedDayNames } from '../utils/progress/modules/progressTracker';
@@ -31,6 +31,8 @@ import {
   ChallengesTab,
   RewardsTab
 } from '../components/progress';
+import * as streakFreezeManager from '../utils/progress/modules/streakFreezeManager';
+import * as streakManager from '../utils/progress/modules/streakManager';
 
 // Day names for labels
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -57,7 +59,9 @@ export default function ProgressScreen({ navigation }) {
     hasHiddenRoutinesOnly,
     isLoading,
     isRefreshing,
-    handleRefresh
+    handleRefresh,
+    userProgress,
+    freezeCount 
   } = useProgressData();
   
   // Use the centralized gamification hook for everything
@@ -150,6 +154,9 @@ export default function ProgressScreen({ navigation }) {
           // Refresh all data - this will update both progress stats and gamification data
           await handleRefresh();
           
+          // Check streak freeze status
+          await checkStreakFreezeStatus();
+          
           console.log('ProgressScreen: Data refresh completed');
         } catch (error) {
           console.error('Error loading data in ProgressScreen:', error);
@@ -164,6 +171,53 @@ export default function ProgressScreen({ navigation }) {
       };
     }, [handleRefresh])
   );
+  
+  // Add state for streak freeze activity
+  const [streakFreezeActive, setStreakFreezeActive] = useState(false);
+
+  // Cache the results of checkStreakFreezeStatus to prevent repeated calls
+  const [streakFreezeStatus, setStreakFreezeStatus] = useState({
+    streakBroken: false,
+    canSaveYesterdayStreak: false,
+    freezesAvailable: 0
+  });
+  
+  // Keep track of the last check time to throttle checks
+  const lastCheckRef = useRef(0);
+  
+  // Check streak and streak freeze status with throttling
+  const checkStreakFreezeStatus = useCallback(async () => {
+    try {
+      const now = Date.now();
+      // Only check if 300ms have passed since last check
+      if (now - lastCheckRef.current < 300) {
+        console.log('Throttling streak freeze status check');
+        return;
+      }
+      
+      lastCheckRef.current = now;
+      
+      console.log('Checking streak freeze status...');
+      const status = await streakManager.checkStreakStatus();
+      console.log('Streak freeze card - status check:', status);
+      
+      setStreakFreezeStatus(status);
+      
+      // Start button animation if applicable
+      if (status.canSaveYesterdayStreak) {
+        console.log('Streak can be saved, starting button animation');
+      }
+    } catch (error) {
+      console.error('Error checking streak freeze status:', error);
+    }
+  }, []);
+  
+  // Check streak status with less frequency
+  useEffect(() => {
+    if (!isLoading && userProgress) {
+      checkStreakFreezeStatus();
+    }
+  }, [isLoading, userProgress, checkStreakFreezeStatus]);
   
   // Render actual content based on conditions
   const renderContent = () => {
@@ -245,6 +299,7 @@ export default function ProgressScreen({ navigation }) {
                 canAccessFeature={canAccessFeature}
                 theme={theme}
                 isDark={isDark}
+                streakFreezeActive={streakFreezeActive}
               />
             )}
             

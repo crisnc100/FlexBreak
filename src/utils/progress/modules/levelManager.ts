@@ -78,7 +78,7 @@ export const addXp = async (userProgress: UserProgress, amount: number, source: 
     
     // Check for streak freeze eligibility at certain levels
     if (userProgress.rewards['streak_freezes']?.unlocked) {
-      await streakFreezeManager.checkAndGrantWeeklyStreakFreeze();
+      await streakFreezeManager.refillMonthlyStreakFreezes();
     }
   }
   

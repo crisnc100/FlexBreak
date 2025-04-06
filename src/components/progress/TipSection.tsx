@@ -1,21 +1,56 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface TipSectionProps {
   currentStreak: number;
+  isDark?: boolean;
 }
 
 const TipSection: React.FC<TipSectionProps> = ({
-  currentStreak
+  currentStreak,
+  isDark = false
 }) => {
+  const generateTipMessage = () => {
+    if (currentStreak === 0) {
+      return "Try to stretch daily to build a consistent habit.";
+    } else if (currentStreak === 1) {
+      return "You've started your streak! Keep it going tomorrow.";
+    } else if (currentStreak < 5) {
+      return `Great job on your ${currentStreak}-day streak! You're building a healthy habit.`;
+    } else if (currentStreak < 10) {
+      return `Impressive ${currentStreak}-day streak! You're making stretching a routine.`;
+    } else {
+      return `Amazing ${currentStreak}-day streak! Your dedication is truly inspiring!`;
+    }
+  };
+
+  if (isDark) {
+    return (
+      <LinearGradient
+        colors={['#1F2937', '#111827']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.darkTipContainer}
+      >
+        <View style={styles.iconContainer}>
+          <Ionicons name="flash" size={24} color="#F59E0B" />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.darkTipText}>
+            {generateTipMessage()}
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
   return (
     <View style={styles.tipSection}>
       <Ionicons name="bulb-outline" size={24} color="#FF9800" />
       <Text style={styles.tipText}>
-        {currentStreak > 0 
-          ? `Great job on your ${currentStreak}-day streak! Keep it going tomorrow.` 
-          : "Try to stretch daily to build a consistent habit."}
+        {generateTipMessage()}
       </Text>
     </View>
   );
@@ -38,6 +73,39 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 14,
     color: '#333',
+  },
+  darkTipContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  iconContainer: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderRadius: 12,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  darkTipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#D1D5DB',
+    lineHeight: 20,
   },
 });
 

@@ -129,4 +129,12 @@ export const getEndDateForCategory = (category: string): string => {
   }
   
   return result.toISOString();
+};
+
+/**
+ * Format a date as YYYY-MM-DD
+ */
+export const formatDateYYYYMMDD = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return toDateString(d);
 }; 

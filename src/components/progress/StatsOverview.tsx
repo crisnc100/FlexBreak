@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import * as streakManager from '../../utils/progress/modules/streakManager';
 
 interface StatsOverviewProps {
   totalMinutes: number;
@@ -10,6 +11,7 @@ interface StatsOverviewProps {
   isTodayComplete?: boolean; // Add this prop
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
+  streakFreezeActive: boolean;
 }
 
 const StatsOverview: React.FC<StatsOverviewProps> = ({
@@ -18,19 +20,34 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   totalRoutines,
   isTodayComplete = false, // Default to false if not provided
   theme: propTheme,
-  isDark: propIsDark
+  isDark: propIsDark,
+  streakFreezeActive
 }) => {
   // Use theme from props if provided, otherwise use theme context
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
 
-  // Determine if today's activity is complete - use the prop instead of calculating here
-  const today = new Date();
-  const todayStr = today.toLocaleDateString();
+  // Track if streak can be saved with a freeze
+  const [streakAtRisk, setStreakAtRisk] = useState(false);
   
+  // Check if the streak is at risk and can be saved with a freeze
+  useEffect(() => {
+    const checkStreakStatus = async () => {
+      // Only check if this is a meaningful streak (5+ days) and not already protected
+      if (currentStreak >= 5 && !streakFreezeActive && !isTodayComplete) {
+        const status = await streakManager.checkStreakStatus();
+        setStreakAtRisk(status.canSaveYesterdayStreak);
+      } else {
+        setStreakAtRisk(false);
+      }
+    };
+    
+    checkStreakStatus();
+  }, [currentStreak, streakFreezeActive, isTodayComplete]);
+
   // For streak of 5+ days, show a warning indicator if today's activity isn't done
-  const showWarning = currentStreak >= 5 && !isTodayComplete;
+  const showWarning = currentStreak >= 5 && !isTodayComplete && !streakAtRisk && !streakFreezeActive;
 
   return (
     <View style={{ backgroundColor: isDark ? theme.background : 'transparent' }}>
@@ -72,24 +89,55 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
           borderWidth: isDark ? 1 : 0
         }]}>
           <View style={[styles.statIconContainer, { 
-            backgroundColor: isDark ? showWarning ? 'rgba(255, 87, 34, 0.2)' : 'rgba(255, 152, 0, 0.2)' : '#F0F0F0'
+            backgroundColor: isDark ? 
+              (streakFreezeActive ? 'rgba(33, 150, 243, 0.2)' : 
+                (streakAtRisk ? 'rgba(255, 193, 7, 0.2)' :
+                  (showWarning ? 'rgba(255, 87, 34, 0.2)' : 'rgba(255, 152, 0, 0.2)'))) 
+              : (streakFreezeActive ? 'rgba(33, 150, 243, 0.15)' : 
+                 (streakAtRisk ? 'rgba(255, 193, 7, 0.15)' : '#F0F0F0'))
           }]}>
             <Ionicons 
-              name={showWarning ? "warning-outline" : "flame-outline"} 
+              name={streakFreezeActive ? "snow" : 
+                    (streakAtRisk ? "shield-outline" : 
+                     (showWarning ? "warning-outline" : "flame-outline"))} 
               size={20} 
-              color={showWarning ? "#FF5722" : "#FF9800"} 
+              color={streakFreezeActive ? "#2196F3" : 
+                     (streakAtRisk ? "#FFC107" : 
+                      (showWarning ? "#FF5722" : "#FF9800"))} 
             />
           </View>
           <Text style={[styles.statValue, { color: isDark ? theme.text : '#333' }]}>
             {currentStreak}
           </Text>
           <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
-            Day Streak{showWarning ? " (at risk)" : ""}
+            Day Streak
+            {streakFreezeActive ? " (Protected)" : 
+             (streakAtRisk ? " (At Risk)" : 
+              (showWarning ? " (at risk)" : ""))}
           </Text>
-          {showWarning && (
+          
+          {showWarning && !streakFreezeActive && !streakAtRisk && (
             <Text style={[styles.streakNote, { color: '#FF5722' }]}>
               Complete today to maintain!
             </Text>
+          )}
+          
+          {streakAtRisk && (
+            <View style={styles.streakRiskIndicator}>
+              <Ionicons name="shield-outline" size={14} color="#FFC107" />
+              <Text style={[styles.streakRiskText, { color: '#FFC107' }]}>
+                Use Streak Freeze to save!
+              </Text>
+            </View>
+          )}
+          
+          {streakFreezeActive && (
+            <View style={styles.streakFreezeIndicator}>
+              <Ionicons name="snow-outline" size={14} color="#2196F3" />
+              <Text style={[styles.streakFreezeText, { color: '#2196F3' }]}>
+                Streak Freeze Applied
+              </Text>
+            </View>
           )}
         </View>
         
@@ -176,6 +224,26 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  streakFreezeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  streakFreezeText: {
+    fontSize: 10,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  streakRiskIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  streakRiskText: {
+    fontSize: 10,
+    marginLeft: 4,
+    fontWeight: '500',
   }
 });
 

@@ -16,6 +16,7 @@ import * as streakFreezeManager from './modules/streakFreezeManager';
 import * as xpBoostManager from './modules/xpBoostManager';
 import * as achievementManager from './modules/achievementManager';
 import * as challengeManager from './modules/challengeManager';
+import * as streakManager from './modules/streakManager';
 import { calculateStreak } from './modules/progressTracker';
 import * as dateUtils from './modules/utils/dateUtils';
 import * as cacheUtils from './modules/utils/cacheUtils';
@@ -161,7 +162,7 @@ export const processCompletedRoutine = async (routine: ProgressEntry): Promise<{
     await rewardManager.updateRewards(userProgress);
     
     if (userProgress.rewards['streak_freezes']?.unlocked) {
-      await streakFreezeManager.checkAndGrantWeeklyStreakFreeze();
+      await streakFreezeManager.refillMonthlyStreakFreezes();
     }
   }
 
@@ -214,14 +215,10 @@ const handleStreakChanges = async (userProgress: UserProgress, allRoutines: Prog
     // Reset incomplete streak achievements using achievementManager
     achievementManager.resetStreakAchievements(userProgress);
     
-    // Try to use a streak freeze if available
-    const isAvailable = await streakFreezeManager.isStreakFreezeAvailable();
-    if (isAvailable) {
-      const success = await streakFreezeManager.useStreakFreeze();
-      if (success) {
-        userProgress.statistics.currentStreak = oldStreak;
-      }
-    }
+    console.log(`Streak broken! Old streak was ${oldStreak} days.`);
+    // We don't auto-apply streak freezes anymore
+    // Instead we'll show a prompt to the user to manually use streak freeze
+    // This is handled by the streakManager module during app start and routine checks
   }
 };
 
@@ -308,6 +305,9 @@ export const recalculateStatistics = async (): Promise<UserProgress> => {
   let userProgress = await storageService.getUserProgress();
   userProgress = normalizeUserProgress(userProgress);
   const allRoutines = await cacheUtils.getCachedRoutines();
+  
+  // Setup monthly streak freezes if user qualifies
+  await streakManager.setupMonthlyStreakFreezes();
   
   // Reset statistics to zero values
   userProgress.statistics = {

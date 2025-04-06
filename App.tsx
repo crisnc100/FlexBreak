@@ -17,6 +17,9 @@ import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as streakFreezeManager from './src/utils/progress/modules/streakFreezeManager';
+import * as streakManager from './src/utils/progress/modules/streakManager';
+import StreakFreezePrompt from './src/components/notifications/StreakFreezePrompt';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -176,6 +179,24 @@ function TabNavigator() {
 function MainApp() {
   const { theme, isDark } = useTheme();
   
+  // Initialize streaks and streak freezes when app launches
+  useEffect(() => {
+    const initStreakSystem = async () => {
+      try {
+        // Check for streak freezes to refill monthly
+        await streakFreezeManager.refillMonthlyStreakFreezes();
+        
+        // Check if a streak is broken and show notification if needed
+        const streakStatus = await streakManager.checkStreakStatus();
+        console.log('Streak status on app launch:', streakStatus);
+      } catch (error) {
+        console.error('Error initializing streak system:', error);
+      }
+    };
+    
+    initStreakSystem();
+  }, []);
+  
   const navigationTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
     colors: {
@@ -199,6 +220,9 @@ function MainApp() {
           <Stack.Screen name="BobSimulator" component={BobSimulatorScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+      
+      {/* Streak Freeze Prompt */}
+      <StreakFreezePrompt />
     </>
   );
 }
