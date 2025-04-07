@@ -132,6 +132,46 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     loadFreezeData(true);
   }, [currentStreak]);
   
+  // Listen for streak events from other components (like the StreakFreezePrompt)
+  useEffect(() => {
+    // When a streak is saved via the prompt, update our local state
+    const handleStreakSaved = (data: any) => {
+      console.log('StreakFreezeCard received streak saved event:', data);
+      
+      // Update our state to reflect the saved streak
+      setRecentlySaved(true);
+      setCanSaveStreak(false);
+      
+      // This was from another component, so show the snowflake effect for consistency
+      if (data.freezeApplied) {
+        createSnowflakeEffect();
+      }
+      
+      // Refresh our data to get the latest streak freeze count
+      loadFreezeData(true);
+    };
+    
+    // When a streak is intentionally broken, update our state
+    const handleStreakBroken = (data: any) => {
+      // Only handle user initiated resets (like from the prompt)
+      if (data.userReset) {
+        console.log('StreakFreezeCard received user streak reset event');
+        setCanSaveStreak(false);
+        loadFreezeData(true);
+      }
+    };
+    
+    // Subscribe to events
+    streakManager.streakEvents.on(streakManager.STREAK_SAVED_EVENT, handleStreakSaved);
+    streakManager.streakEvents.on(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
+    
+    // Clean up event listeners on unmount
+    return () => {
+      streakManager.streakEvents.off(streakManager.STREAK_SAVED_EVENT, handleStreakSaved);
+      streakManager.streakEvents.off(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
+    };
+  }, []); // Empty dependency array since we want this to run only once
+  
   // Create snowflake effect
   const createSnowflakeEffect = () => {
     const numSnowflakes = 12;
@@ -209,24 +249,18 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     }
   };
   
-  // Check if streak is broken and needs saving
+  // Check if streak is broken and should be saved
   const checkStreakStatus = async () => {
     try {
-      // Force reset the streakBreakNotificationShown flag to ensure proper testing
-      streakManager.resetNotificationFlag();
-      
       const status = await streakManager.checkStreakStatus();
-      
       console.log('Streak freeze card - status check:', status);
       
-      // Can save if either the streak is broken OR if yesterday's streak can be saved
       setIsStreakBroken(status.streakBroken);
-      setCanSaveStreak(status.streakBroken || status.canSaveYesterdayStreak);
+      setCanSaveStreak(status.canSaveYesterdayStreak);
       
-      // Start button animation if we can save a streak
-      if (status.streakBroken || status.canSaveYesterdayStreak) {
-        console.log('Streak can be saved, starting button animation');
-        pulseButton();
+      // If streak was broken, animate the icon to draw attention
+      if (status.streakBroken) {
+        startRotateAnimation();
       }
     } catch (error) {
       console.error('Error checking streak status:', error);
@@ -239,39 +273,51 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.1,
-          duration: 1000,
+          duration: 800,
           useNativeDriver: true
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: 800,
           useNativeDriver: true
         })
       ])
     ).start();
-    
-    // Also start rotation animation for snowflake
+  };
+  
+  const startRotateAnimation = () => {
     Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 6000,
+        duration: 3000,
         useNativeDriver: true
       })
     ).start();
   };
   
-  // Shake animation for denied action
   const startShakeAnimation = () => {
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true })
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 100,
+        useNativeDriver: true
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 100,
+        useNativeDriver: true
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 100,
+        useNativeDriver: true
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true
+      })
     ]).start();
-    
-    // Provide haptic feedback for denied action
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
   };
   
   // Animate the freeze counter change
@@ -316,64 +362,79 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   
   // Handle applying a streak freeze
   const handleApplyStreakFreeze = async () => {
-    if (!canSaveStreak || freezeCount <= 0) {
-      startShakeAnimation();
-      return;
-    }
-    
-    // Stop button animation
-    buttonScaleAnim.stopAnimation();
-    buttonScaleAnim.setValue(1);
+    if (!canSaveStreak) return;
     
     try {
-      setIsLoading(true);
+      // Disable the button immediately to prevent double-tap
+      setCanSaveStreak(false);
       
-      // Start snowflake animation
+      // Trigger the snowflake animation
       createSnowflakeEffect();
       
-      // Store the original count for UI animation
-      const originalCount = freezeCount;
-      const expectedNewCount = Math.max(0, originalCount - 1);
+      // Show loading indicator
+      setIsLoading(true);
       
-      // Immediately update UI for better responsiveness
-      setFreezeCount(expectedNewCount);
-      
-      // Animate the freeze count change
-      animateFreezeCountChange(originalCount, expectedNewCount);
+      // Scale down the button animation
+      Animated.sequence([
+        Animated.timing(buttonScaleAnim, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true
+        }),
+        Animated.timing(buttonScaleAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true
+        })
+      ]).start();
       
       // Apply the streak freeze
-      console.log(`Applying streak freeze. Current count: ${originalCount}, Expected new count: ${expectedNewCount}`);
       const success = await streakManager.saveStreakWithFreeze();
       
       if (success) {
-        console.log('Streak freeze applied successfully');
-        
-        // Provide haptic feedback for success
+        // Apply quick haptic feedback on success
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
-        // Force the UI to maintain the expected count regardless of what comes back from storage
-        // This ensures consistency in the UI after applying the streak freeze
-        console.log('Maintaining UI streak freeze count at:', expectedNewCount);
+        // Animate the freeze counter to show it decreased
+        Animated.sequence([
+          Animated.timing(freezeCounterAnim, {
+            toValue: 0.5,
+            duration: 200,
+            useNativeDriver: true
+          }),
+          Animated.timing(freezeCounterAnim, {
+            toValue: 1.2,
+            duration: 300,
+            useNativeDriver: true
+          }),
+          Animated.timing(freezeCounterAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true
+          })
+        ]).start();
         
-        // Update UI state
+        // Set state to show saved message
         setRecentlySaved(true);
-        setCanSaveStreak(false);
         
-        // Persist the expected count to ensure it's visible
-        setFreezeCount(expectedNewCount);
+        // Update the freeze count (force refresh from storage)
+        setTimeout(async () => {
+          const newCount = await streakFreezeManager.getStreakFreezeCount(true);
+          console.log(`Updated freeze count after applying: ${newCount}/2`);
+          setFreezeCount(newCount);
+        }, 800); // Give time for storage to update
+        
       } else {
         console.error('Failed to apply streak freeze');
-        
-        // Revert the UI back to original count on failure
-        setFreezeCount(originalCount);
-        animateFreezeCountChange(expectedNewCount, originalCount);
-        
-        // Show error animation
-        startShakeAnimation();
+        // Show error feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+      
+      // Reload streak status
+      await checkStreakStatus();
+      
     } catch (error) {
       console.error('Error applying streak freeze:', error);
-      startShakeAnimation();
     } finally {
       setIsLoading(false);
     }
@@ -553,6 +614,15 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
               </Animated.View>
             )}
             
+            {isStreakBroken && !canSaveStreak && currentStreak === 0 && (
+              <View style={styles.warningContainer}>
+                <Ionicons name="alert-circle-outline" size={18} color={isDark ? '#FFB74D' : '#FF9800'} style={{ marginRight: 6 }} />
+                <Text style={[styles.warningText, { color: isDark ? '#FFB74D' : '#FF9800' }]}>
+                  Streak reset: You missed 2+ days. Streak freezes only work for 1-day gaps.
+                </Text>
+              </View>
+            )}
+            
             {!canSaveStreak && !isStreakBroken && currentStreak > 0 && (
               <Text style={[styles.explainerText, { color: isDark ? theme.textSecondary : '#666' }]}>
                 Streak freezes apply when you've missed a day of activity.
@@ -718,6 +788,15 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     marginHorizontal: 3,
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  warningText: {
+    fontSize: 13,
+    fontStyle: 'italic',
   },
 });
 

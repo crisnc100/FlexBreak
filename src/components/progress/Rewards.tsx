@@ -43,6 +43,9 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
   const loadRewards = async () => {
     setIsLoading(true);
     try {
+      // Clean up any duplicate rewards before loading
+      await rewardManager.cleanupDuplicateRewards();
+      
       // Get rewards from reward manager
       const allRewards = await rewardManager.getAllRewards();
       
@@ -56,6 +59,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
         ) || allRewards.find(reward => 
           reward.id === 'dark_theme'
         );
+        
         
         // Filter out all dark theme rewards
         const otherRewards = allRewards.filter(reward => reward.id !== 'dark_theme');

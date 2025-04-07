@@ -94,10 +94,14 @@ export const checkStreakStatus = async (): Promise<{
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   
+  const dayBeforeYesterday = new Date(yesterday);
+  dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 1);
+  
   const todayStr = dateUtils.formatDateYYYYMMDD(today);
   const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
+  const dayBeforeYesterdayStr = dateUtils.formatDateYYYYMMDD(dayBeforeYesterday);
   
-  // Check for specific activity on today and yesterday
+  // Check for specific activity on today, yesterday, and the day before
   const hasTodayActivity = allRoutines.some(routine => 
     routine.date && routine.date.startsWith(todayStr)
   );
@@ -106,10 +110,31 @@ export const checkStreakStatus = async (): Promise<{
     routine.date && routine.date.startsWith(yesterdayStr)
   );
   
+  const hasDayBeforeYesterdayActivity = allRoutines.some(routine => 
+    routine.date && routine.date.startsWith(dayBeforeYesterdayStr)
+  );
+  
   // Check if a streak freeze was used for yesterday
   const streakFreezeUsed = await streakFreezeManager.wasStreakFreezeUsedForCurrentDay();
   
-  console.log(`Activity check - Today (${todayStr}): ${hasTodayActivity}, Yesterday (${yesterdayStr}): ${hasYesterdayActivity}, Streak freeze used: ${streakFreezeUsed}`);
+  console.log(`Activity check - Today (${todayStr}): ${hasTodayActivity}, Yesterday (${yesterdayStr}): ${hasYesterdayActivity}, Day Before (${dayBeforeYesterdayStr}): ${hasDayBeforeYesterdayActivity}, Streak freeze used: ${streakFreezeUsed}`);
+  
+  // Check for a multi-day gap in activity (2+ days missed)
+  // A 2-day gap is when both yesterday AND day before yesterday have no activity
+  const hasMultiDayGap = !hasYesterdayActivity && !hasDayBeforeYesterdayActivity && storedStreak > 0;
+  
+  // Log multi-day gap check
+  console.log(`Multi-day gap check: ${hasMultiDayGap} (Yesterday: ${!hasYesterdayActivity}, Day before: ${!hasDayBeforeYesterdayActivity}, Stored streak: ${storedStreak > 0})`);
+  
+  // If there's a multi-day gap (both yesterday AND day before yesterday were missed), 
+  // automatically reset streak to 0 - streak freeze can't save a 2+ day gap
+  if (hasMultiDayGap) {
+    console.log('Multi-day gap detected (2+ days missed). Streak freeze cannot be applied.');
+    // Reset streak to 0
+    userProgress.statistics.currentStreak = 0;
+    await storageService.saveUserProgress(userProgress);
+    storedStreak = 0;
+  }
   
   // Important: If a streak freeze was applied, treat yesterday as if it had activity
   const effectiveYesterdayActivity = hasYesterdayActivity || streakFreezeUsed;
@@ -132,6 +157,15 @@ export const checkStreakStatus = async (): Promise<{
     storedStreak > 0 && 
     !isLastUpdatedToday;
   
+  // Special case: Start a new streak when:
+  // 1. There's activity today
+  // 2. There was a gap in activity (streak is 0 or was reset due to multi-day gap)
+  // 3. We haven't already processed today's activity
+  const shouldStartNewStreak = 
+    hasTodayActivity && 
+    storedStreak === 0 && 
+    !isLastUpdatedToday;
+  
   // Debug the increment condition
   console.log('Streak increment check:', {
     hasTodayActivity,
@@ -140,7 +174,8 @@ export const checkStreakStatus = async (): Promise<{
     isLastUpdatedToday,
     lastUpdatedStr: userProgress.statistics.lastUpdated,
     todayStr,
-    shouldIncrementStreak
+    shouldIncrementStreak,
+    shouldStartNewStreak
   });
   
   if (shouldIncrementStreak) {
@@ -170,21 +205,46 @@ export const checkStreakStatus = async (): Promise<{
       currentStreak: newStreak,
       increment: true
     });
+  } else if (shouldStartNewStreak) {
+    // Start a new streak at 1 after a gap
+    console.log(`Starting new streak after a gap. Setting streak to 1.`);
+    
+    userProgress.statistics.currentStreak = 1;
+    
+    // Update lastUpdated to mark that we processed today's activity
+    userProgress.statistics.lastUpdated = new Date().toISOString();
+    
+    // Save the updated progress
+    await storageService.saveUserProgress(userProgress);
+    
+    // Use the updated streak value
+    storedStreak = 1;
+    
+    // Emit streak maintained event
+    streakEvents.emit(STREAK_MAINTAINED_EVENT, {
+      currentStreak: 1,
+      increment: false,
+      newStreak: true
+    });
   }
   
   // A streak is broken if:
   // 1. User had a streak (storedStreak > 0)
   // 2. Yesterday had no activity AND no streak freeze was used
-  const streakBroken = storedStreak > 0 && !effectiveYesterdayActivity;
+  // 3. OR there was a multi-day gap which automatically breaks the streak
+  const streakBroken = (storedStreak > 0 && !effectiveYesterdayActivity) || hasMultiDayGap;
   
   // User can save yesterday's streak if:
   // 1. They have a streak (storedStreak > 0)
   // 2. Yesterday had no activity and no streak freeze was used
-  // 3. Recent enough to be saved (not too many days ago)
+  // 3. MUST NOT have a multi-day gap (can't save if both yesterday AND day before were missed)
+  // 4. Recent enough to be saved (not too many days ago)
   const canSaveYesterdayStreak = 
     !effectiveYesterdayActivity && 
     storedStreak > 0 &&
-    daysSinceLastRoutine <= 2; // Allow saving if within 2 days
+    hasDayBeforeYesterdayActivity && // Require activity on the day before yesterday
+    daysSinceLastRoutine <= 2 && // Allow saving if within 2 days
+    !hasMultiDayGap; // Explicitly check that there is not a multi-day gap
   
   console.log('Streak evaluation:', { 
     storedStreak, 
@@ -194,6 +254,8 @@ export const checkStreakStatus = async (): Promise<{
     canSaveYesterdayStreak,
     streakFreezeUsed,
     effectiveYesterdayActivity,
+    hasMultiDayGap,
+    hasDayBeforeYesterdayActivity,
     lastUpdated: userProgress.statistics.lastUpdated
   });
   
@@ -299,7 +361,7 @@ export const saveStreakWithFreeze = async (): Promise<boolean> => {
     }
     
     // Check if streak freeze reward exists and is unlocked
-    const streakFreezeReward = userProgress.rewards['streak_freeze'];
+    const streakFreezeReward = userProgress.rewards['streak_freezes'];
     if (!streakFreezeReward || !streakFreezeReward.unlocked) {
       console.log('Streak freeze reward not found or not unlocked');
       return false;
@@ -307,6 +369,7 @@ export const saveStreakWithFreeze = async (): Promise<boolean> => {
     
     // Check if user has streak freezes available
     const currentCount = streakFreezeReward.uses || 0;
+    console.log(`Current streak freeze count before applying: ${currentCount}`);
     if (currentCount <= 0) {
       console.log('No streak freezes available to use');
       return false;
@@ -325,10 +388,34 @@ export const saveStreakWithFreeze = async (): Promise<boolean> => {
     // This ensures atomic update of both the streak freeze count and the streak maintenance
     await storageService.saveUserProgress(userProgress);
     
+    // Double-check that the update was successful by retrieving the latest data
+    setTimeout(async () => {
+      const updatedProgress = await storageService.getUserProgress();
+      const updatedCount = updatedProgress.rewards['streak_freezes']?.uses || 0;
+      console.log(`Verification - After saving, streak freeze count is: ${updatedCount}`);
+      
+      // If count still shows as 2 despite using one, force fix it
+      if (updatedCount > currentCount - 1) {
+        console.log('Detected inconsistent streak freeze count after update, applying fix');
+        const fixReward = updatedProgress.rewards['streak_freezes'];
+        if (fixReward) {
+          fixReward.uses = currentCount - 1;
+          await storageService.saveUserProgress(updatedProgress);
+          console.log(`Fixed streak freeze count, now: ${fixReward.uses}`);
+        }
+      }
+    }, 500);
+    
     console.log(`Saved streak with freeze. Current streak: ${userProgress.statistics.currentStreak}, Streak freezes remaining: ${streakFreezeReward.uses}`);
     
     // Reset notification flag
     streakBreakNotificationShown = false;
+    
+    // Emit streak saved event
+    streakEvents.emit(STREAK_SAVED_EVENT, {
+      currentStreak: userProgress.statistics.currentStreak,
+      freezesRemaining: streakFreezeReward.uses
+    });
     
     // Return success
     return true;
@@ -365,6 +452,48 @@ export const letStreakBreak = async (): Promise<boolean> => {
  */
 export const setupMonthlyStreakFreezes = async (): Promise<void> => {
   const userProgress = await storageService.getUserProgress();
+  
+  // Clean up any old streak_freeze (singular) entries
+  if (userProgress.rewards && userProgress.rewards['streak_freeze']) {
+    // Copy over any important data from the old entry
+    const oldFreeze = userProgress.rewards['streak_freeze'] as any;
+    
+    if (!userProgress.rewards['streak_freezes']) {
+      // Create the new entry with correct data
+      userProgress.rewards['streak_freezes'] = {
+        id: 'streak_freezes',
+        title: 'Streak Freezes',
+        description: 'Prevent losing your streak when you miss a day',
+        icon: 'snow-outline',
+        unlocked: userProgress.level >= 6,
+        levelRequired: 6,
+        type: 'power_up'
+      };
+    }
+    
+    // Copy extended properties
+    const newFreeze = userProgress.rewards['streak_freezes'] as any;
+    
+    // For uses, lastUsed, and lastRefill, only copy if they exist
+    if (oldFreeze.uses !== undefined) {
+      newFreeze.uses = oldFreeze.uses;
+    }
+    
+    if (oldFreeze.lastUsed) {
+      newFreeze.lastUsed = oldFreeze.lastUsed;
+    }
+    
+    if (oldFreeze.lastRefill) {
+      newFreeze.lastRefill = oldFreeze.lastRefill;
+    }
+    
+    // Delete the old entry
+    delete userProgress.rewards['streak_freeze'];
+    
+    // Save changes
+    await storageService.saveUserProgress(userProgress);
+    console.log('Migrated streak_freeze to streak_freezes');
+  }
   
   // Only proceed if user is at least level 6
   if (userProgress.level < 6) {

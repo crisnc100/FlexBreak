@@ -91,9 +91,10 @@ export function useProgressData() {
     // Calculate current streak
     const calculatedStreak = calculateStreak(data);
     
-    // Use the stored streak from user progress if it's higher than the calculated streak
-    // This ensures that freeze-protected streaks are properly recognized
-    const displayStreak = Math.max(calculatedStreak, storedStreak);
+    // IMPORTANT: Always use the stored streak from userProgress for consistent UI display
+    // This ensures multi-day gaps are properly handled according to the streak rules
+    // Previously used Math.max which could override the 0 value set by the streak manager
+    const displayStreak = storedStreak;
     
     console.log('Streak comparison:', {
       calculatedStreak, 

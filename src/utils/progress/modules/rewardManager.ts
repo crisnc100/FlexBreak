@@ -40,6 +40,12 @@ export const getAllRewards = async (): Promise<Reward[]> => {
   // Create a map of all rewards from user progress
   const rewardsMap = { ...userProgress.rewards };
   
+  // Check for and remove any 'streak_freeze' (singular) entries - this fixes the duplicate streak freeze issue
+  if (rewardsMap['streak_freeze']) {
+    console.log('Found duplicate streak_freeze entry, removing it in favor of streak_freezes (plural)');
+    delete rewardsMap['streak_freeze'];
+  }
+  
   // Ensure all core rewards are included by checking against CORE_REWARDS
   CORE_REWARDS.forEach(coreReward => {
     if (!rewardsMap[coreReward.id]) {
@@ -54,8 +60,19 @@ export const getAllRewards = async (): Promise<Reward[]> => {
   // Convert rewards map to array
   const allRewards = Object.values(rewardsMap);
   
+  // Deduplicate any rewards with the same ID to prevent multiple cards
+  const uniqueRewards: Reward[] = [];
+  const rewardIds = new Set<string>();
+  
+  allRewards.forEach(reward => {
+    if (!rewardIds.has(reward.id)) {
+      rewardIds.add(reward.id);
+      uniqueRewards.push(reward);
+    }
+  });
+  
   // Sort rewards by level required
-  return allRewards.sort((a, b) => a.levelRequired - b.levelRequired);
+  return uniqueRewards.sort((a, b) => a.levelRequired - b.levelRequired);
 };
 
 /**
@@ -297,5 +314,92 @@ export const unlockReward = async (
       message: 'Error unlocking reward',
       progress: await storageService.getUserProgress()
     };
+  }
+};
+
+/**
+ * Clean up duplicate rewards in storage
+ * This function removes any duplicated streak freeze rewards that might 
+ * exist from the old 'streak_freeze' ID to ensure only the proper 'streak_freezes' ID is used
+ * @returns Whether changes were made
+ */
+export const cleanupDuplicateRewards = async (): Promise<boolean> => {
+  try {
+    const userProgress = await storageService.getUserProgress();
+    
+    if (!userProgress.rewards) {
+      console.log('No rewards to clean up');
+      return false;
+    }
+    
+    let changesMade = false;
+    
+    // Check for the singular streak_freeze entry (old/incorrect ID)
+    if (userProgress.rewards['streak_freeze']) {
+      console.log('Found duplicate streak_freeze entry during cleanup');
+      
+      // Make sure the proper streak_freezes (plural) exists
+      if (!userProgress.rewards['streak_freezes']) {
+        console.log('Creating proper streak_freezes entry from the duplicate');
+        
+        // Copy data from the old entry to the new one
+        const oldEntry = userProgress.rewards['streak_freeze'];
+        userProgress.rewards['streak_freezes'] = {
+          ...oldEntry,
+          id: 'streak_freezes',
+          title: 'Streak Freezes',
+          description: 'Miss a day, keep your streak—perfect for busy schedules',
+          icon: 'snow',
+          unlocked: oldEntry.unlocked,
+          levelRequired: 6,
+          type: 'app_feature'
+        };
+        
+        // Copy any extended properties like uses, lastRefill, etc.
+        if ((oldEntry as any).uses !== undefined) {
+          (userProgress.rewards['streak_freezes'] as any).uses = (oldEntry as any).uses;
+        }
+        
+        if ((oldEntry as any).lastUsed) {
+          (userProgress.rewards['streak_freezes'] as any).lastUsed = (oldEntry as any).lastUsed;
+        }
+        
+        if ((oldEntry as any).lastRefill) {
+          (userProgress.rewards['streak_freezes'] as any).lastRefill = (oldEntry as any).lastRefill;
+        }
+      } else {
+        console.log('Both streak_freeze and streak_freezes exist, merging data');
+        
+        // Both entries exist, make sure uses and last used date are preserved
+        const oldEntry = userProgress.rewards['streak_freeze'] as any;
+        const newEntry = userProgress.rewards['streak_freezes'] as any;
+        
+        // Always use the most recent lastUsed date
+        if (oldEntry.lastUsed && (!newEntry.lastUsed || new Date(oldEntry.lastUsed) > new Date(newEntry.lastUsed))) {
+          newEntry.lastUsed = oldEntry.lastUsed;
+        }
+        
+        // For uses, take the minimum of the two to prevent abuse
+        // (user shouldn't get more freezes from a bug)
+        if (oldEntry.uses !== undefined && newEntry.uses !== undefined) {
+          newEntry.uses = Math.min(oldEntry.uses, newEntry.uses);
+        }
+      }
+      
+      // Delete the old entry
+      delete userProgress.rewards['streak_freeze'];
+      console.log('Removed duplicate streak_freeze entry');
+      changesMade = true;
+    }
+    
+    if (changesMade) {
+      await storageService.saveUserProgress(userProgress);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error cleaning up duplicate rewards:', error);
+    return false;
   }
 }; 

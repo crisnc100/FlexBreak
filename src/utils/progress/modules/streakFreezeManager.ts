@@ -2,7 +2,7 @@ import { UserProgress, Reward } from '../types';
 import * as storageService from '../../../services/storageService';
 import * as dateUtils from './utils/dateUtils';
 
-const STREAK_FREEZE_REWARD_ID = 'streak_freeze';
+const STREAK_FREEZE_REWARD_ID = 'streak_freezes';
 
 /**
  * Check if a streak freeze is available and can be used
@@ -211,6 +211,20 @@ export const refillMonthlyStreakFreezes = async (): Promise<boolean> => {
   const lastRefill = freezeReward.lastRefill ? new Date(freezeReward.lastRefill) : null;
   const now = new Date();
   
+  // If a streak freeze was used, make sure the uses count accurately reflects that
+  if (freezeReward.lastUsed) {
+    const lastUsed = new Date(freezeReward.lastUsed);
+    const lastRefillDate = lastRefill ? new Date(lastRefill) : null;
+    
+    // If the freeze was used after the last refill, make sure count is properly decremented
+    if (lastRefillDate && lastUsed > lastRefillDate && freezeReward.uses > 1) {
+      console.log('Detected inconsistent streak freeze count. Ensuring it reflects recent usage.');
+      // If used this month but count still shows 2, fix it to 1
+      freezeReward.uses = 1;
+      await storageService.saveUserProgress(userProgress);
+    }
+  }
+  
   // Check if a streak freeze was used recently (within the last 6 hours)
   const lastUsed = freezeReward.lastUsed ? new Date(freezeReward.lastUsed) : null;
   const recentlyUsed = lastUsed && ((now.getTime() - lastUsed.getTime()) < 21600000); // 6 hours in milliseconds
@@ -245,14 +259,6 @@ export const refillMonthlyStreakFreezes = async (): Promise<boolean> => {
     
     await storageService.saveUserProgress(userProgress);
     console.log('Monthly streak freezes refilled: 2 streak freezes granted');
-    return true;
-  } else if (freezeReward.uses < 2 && freezeReward.uses !== undefined && !recentlyUsed) {
-    // If for some reason the user has less than 2 but has already had a refill this month,
-    // we'll top them up to 2 as a fallback (fixes potential bugs from earlier versions)
-    // BUT ONLY if they haven't recently used a streak freeze
-    console.log('Topping up streak freezes to 2 (had ' + freezeReward.uses + ')');
-    freezeReward.uses = 2;
-    await storageService.saveUserProgress(userProgress);
     return true;
   }
   

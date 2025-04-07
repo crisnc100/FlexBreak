@@ -203,6 +203,11 @@ export default function ProgressScreen({ navigation }) {
       
       setStreakFreezeStatus(status);
       
+      // Check if a streak freeze is active for today
+      const wasFreezedUsed = await streakFreezeManager.wasStreakFreezeUsedForCurrentDay();
+      setStreakFreezeActive(wasFreezedUsed);
+      console.log('Streak freeze active:', wasFreezedUsed);
+      
       // Start button animation if applicable
       if (status.canSaveYesterdayStreak) {
         console.log('Streak can be saved, starting button animation');
@@ -211,6 +216,50 @@ export default function ProgressScreen({ navigation }) {
       console.error('Error checking streak freeze status:', error);
     }
   }, []);
+  
+  // Listen for streak events from StreakFreezePrompt
+  useEffect(() => {
+    // Function to handle streak saved event
+    const handleStreakSaved = async (data: any) => {
+      console.log('ProgressScreen: Streak saved event received:', data);
+      
+      // Wait a moment to allow server-side updates to complete
+      setTimeout(async () => {
+        // Force a refresh of all data
+        await handleRefresh();
+        
+        // Update streak freeze status
+        await checkStreakFreezeStatus();
+        
+        // Update streakFreezeActive state
+        setStreakFreezeActive(true);
+      }, 300);
+    };
+    
+    // Function to handle streak broken event
+    const handleStreakBroken = async (data: any) => {
+      console.log('ProgressScreen: Streak broken event received:', data);
+      
+      // Wait a moment to allow server-side updates to complete
+      setTimeout(async () => {
+        // Force a refresh of all data
+        await handleRefresh();
+        
+        // Update streak freeze status
+        await checkStreakFreezeStatus();
+      }, 300);
+    };
+    
+    // Subscribe to events
+    streakManager.streakEvents.on(streakManager.STREAK_SAVED_EVENT, handleStreakSaved);
+    streakManager.streakEvents.on(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
+    
+    // Clean up listeners on unmount
+    return () => {
+      streakManager.streakEvents.off(streakManager.STREAK_SAVED_EVENT, handleStreakSaved);
+      streakManager.streakEvents.off(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
+    };
+  }, [handleRefresh, checkStreakFreezeStatus]);
   
   // Check streak status with less frequency
   useEffect(() => {

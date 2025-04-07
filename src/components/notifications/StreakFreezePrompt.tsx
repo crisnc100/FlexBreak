@@ -16,6 +16,7 @@ import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePremium } from '../../context/PremiumContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Snowflake component that animates from a central source outward with various effects
 const Snowflake: React.FC<{
@@ -132,6 +133,12 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   // Screen dimensions for positioning
   const { width, height } = Dimensions.get('window');
   
+  // Rate limiting for streak prompt - key constants
+  const PROMPT_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours between prompts
+  const MAX_PROMPTS_PER_DAY = 3; // Maximum 3 prompts per day
+  const PROMPT_KEY = 'last_streak_prompt_time';
+  const PROMPT_COUNT_KEY = 'streak_prompt_count_today';
+  
   // Snow sparkle effect
   const createSnowflakeEffect = () => {
     const positions = [];
@@ -158,6 +165,99 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     }, 3000);
   };
   
+  // Check if we can show the prompt based on rate limiting
+  const canShowPrompt = async () => {
+    try {
+      // Get the last time the prompt was shown
+      const lastPromptTimeStr = await AsyncStorage.getItem(PROMPT_KEY);
+      const lastPromptTime = lastPromptTimeStr ? parseInt(lastPromptTimeStr, 10) : 0;
+      
+      // Get the count of prompts shown today
+      const todayStartTime = new Date();
+      todayStartTime.setHours(0, 0, 0, 0);
+      
+      // Reset the count if it's from a previous day
+      const countStr = await AsyncStorage.getItem(PROMPT_COUNT_KEY);
+      let promptCount = 0;
+      let countDate = 0;
+      
+      if (countStr) {
+        const countData = JSON.parse(countStr);
+        promptCount = countData.count || 0;
+        countDate = countData.date || 0;
+      }
+      
+      // If the count is from a previous day, reset it
+      if (countDate < todayStartTime.getTime()) {
+        promptCount = 0;
+      }
+      
+      // Check if we're within the cooldown period
+      const now = Date.now();
+      const timeSinceLastPrompt = now - lastPromptTime;
+      
+      // We can show if:
+      // 1. We haven't shown it today yet OR
+      // 2. It's been long enough since the last prompt AND
+      // 3. We haven't exceeded the maximum number of prompts for today
+      const canShow = 
+        (lastPromptTimeStr === null) || 
+        (timeSinceLastPrompt > PROMPT_COOLDOWN_MS && promptCount < MAX_PROMPTS_PER_DAY);
+      
+      console.log('Streak prompt rate limiting check:', {
+        lastPromptTime: new Date(lastPromptTime).toLocaleString(),
+        timeSinceLastPrompt: Math.floor(timeSinceLastPrompt / 1000 / 60) + ' minutes',
+        promptCount,
+        canShow
+      });
+      
+      return canShow;
+    } catch (error) {
+      console.error('Error checking prompt rate limits:', error);
+      return true; // Default to showing if there's an error
+    }
+  };
+  
+  // Update the prompt count and last shown time
+  const updatePromptRateLimits = async () => {
+    try {
+      const now = Date.now();
+      await AsyncStorage.setItem(PROMPT_KEY, now.toString());
+      
+      // Get current count for today
+      const todayStartTime = new Date();
+      todayStartTime.setHours(0, 0, 0, 0);
+      
+      const countStr = await AsyncStorage.getItem(PROMPT_COUNT_KEY);
+      let promptCount = 0;
+      let countDate = todayStartTime.getTime();
+      
+      if (countStr) {
+        const countData = JSON.parse(countStr);
+        // Only use the count if it's from today
+        if (countData.date >= todayStartTime.getTime()) {
+          promptCount = countData.count || 0;
+        }
+      }
+      
+      // Increment the count
+      promptCount += 1;
+      
+      // Save the new count
+      await AsyncStorage.setItem(PROMPT_COUNT_KEY, JSON.stringify({
+        count: promptCount,
+        date: countDate
+      }));
+      
+      console.log('Updated streak prompt rate limits:', {
+        lastShownTime: new Date(now).toLocaleString(),
+        todayCount: promptCount
+      });
+    } catch (error) {
+      console.error('Error updating prompt rate limits:', error);
+    }
+  };
+  
   // Listen for streak broken events
   useEffect(() => {
     // Only show for premium users
@@ -166,6 +266,33 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     }
     
     const handleStreakBroken = async (data: any) => {
+      // First check if we should show the prompt based on rate limiting
+      const shouldShow = await canShowPrompt();
+      
+      if (!shouldShow) {
+        console.log('Not showing streak prompt due to rate limiting');
+        return;
+      }
+      
+      // Check if this is a valid streak freeze case (only 1 day missed, not multi-day)
+      const status = await streakManager.checkStreakStatus();
+      
+      // Only show the prompt if:
+      // 1. The streak can be saved (not a multi-day gap)
+      // 2. There are freezes available
+      // 3. The user has a meaningful streak (3+ days)
+      if (!status.canSaveYesterdayStreak || status.freezesAvailable <= 0 || status.currentStreak < 3) {
+        console.log('Not showing streak prompt - not eligible:', {
+          canSave: status.canSaveYesterdayStreak,
+          freezesAvailable: status.freezesAvailable,
+          currentStreak: status.currentStreak
+        });
+        return;
+      }
+      
+      // Show and track the prompt
+      updatePromptRateLimits();
+      
       setStreakData({
         currentStreak: data.currentStreak,
         freezesAvailable: data.freezesAvailable
@@ -199,6 +326,17 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
           useNativeDriver: true
         })
       ]).start();
+      
+      // Auto-dismiss after 2 minutes if user doesn't interact with it
+      const autoDismissTimeout = setTimeout(() => {
+        if (visible) {
+          console.log('Auto-dismissing streak prompt after timeout');
+          handleClose();
+        }
+      }, 2 * 60 * 1000); // 2 minutes
+      
+      // Clean up timeout on unmount
+      return () => clearTimeout(autoDismissTimeout);
     };
     
     // Subscribe to streak broken event
@@ -207,10 +345,20 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     // Check on mount if there's a broken streak
     const checkStreakOnMount = async () => {
       const status = await streakManager.checkStreakStatus();
-      if (status.shouldShowFreezePrompt) {
+      const shouldShow = await canShowPrompt();
+      
+      // Only show if rate limiting allows and the streak qualifies
+      if (shouldShow && status.canSaveYesterdayStreak && status.freezesAvailable > 0 && status.currentStreak >= 3) {
         handleStreakBroken({
           currentStreak: status.currentStreak,
           freezesAvailable: status.freezesAvailable
+        });
+      } else {
+        console.log('Not showing streak prompt on mount - conditions not met:', {
+          shouldShow,
+          canSave: status.canSaveYesterdayStreak,
+          freezesAvailable: status.freezesAvailable,
+          currentStreak: status.currentStreak
         });
       }
     };
@@ -276,6 +424,12 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     if (success) {
       console.log('Streak saved with freeze!');
       
+      // Emit the streak saved event so other components can refresh
+      streakManager.streakEvents.emit(streakManager.STREAK_SAVED_EVENT, {
+        currentStreak: streakData.currentStreak,
+        freezeApplied: true
+      });
+      
       // Show success message
       setShowSuccess(true);
       
@@ -335,6 +489,12 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     // Let streak break
     await streakManager.letStreakBreak();
     console.log('Streak reset.');
+    
+    // Emit event that the streak was intentionally broken
+    streakManager.streakEvents.emit(streakManager.STREAK_BROKEN_EVENT, {
+      currentStreak: 0,
+      userReset: true
+    });
     
     // Fade out animation
     Animated.timing(opacityAnim, {
@@ -417,7 +577,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               <Ionicons name="checkmark-circle" size={40} color="#FFFFFF" />
               <Text style={styles.successTitle}>Streak Saved!</Text>
               <Text style={styles.successMessage}>
-                Your {streakData.currentStreak}-day streak is protected
+                Your {streakData.currentStreak}-day streak is preserved. Complete a routine today to continue your streak!
               </Text>
             </LinearGradient>
           </Animated.View>
@@ -445,12 +605,13 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                 color={isDark ? '#90CAF9' : theme.accent} 
               />
             </Animated.View>
-            <Text style={[styles.title, { color: theme.text }]}>Streak Broken!</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Streak at Risk!</Text>
           </View>
           
           <View style={styles.content}>
             <Text style={[styles.message, { color: theme.text }]}>
-              You missed a day and your {streakData.currentStreak}-day streak is about to end.
+              You missed yesterday's exercise and your {streakData.currentStreak}-day streak is at risk. 
+              Use a streak freeze to preserve your progress!
             </Text>
             
             <View style={[
@@ -468,6 +629,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               />
               <Text style={[styles.freezeText, { color: theme.text }]}>
                 You have {streakData.freezesAvailable} streak {streakData.freezesAvailable === 1 ? 'freeze' : 'freezes'} available.
+                {streakData.freezesAvailable > 1 ? ' ' : ''}
               </Text>
             </View>
           </View>
@@ -485,7 +647,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                 styles.buttonText,
                 { color: isDark ? 'rgba(255,255,255,0.7)' : '#757575' }
               ]}>
-                Let Streak End
+                Reset Streak
               </Text>
             </TouchableOpacity>
             
@@ -498,7 +660,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               onPress={handleUseStreakFreeze}
             >
               <Text style={styles.buttonText}>
-                Apply Streak Freeze
+                Use Streak Freeze
               </Text>
               <Text style={styles.buttonBadge}>
                 {streakData.freezesAvailable}
