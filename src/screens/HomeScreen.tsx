@@ -34,11 +34,13 @@ import {
   TimePicker,
   DaySelector,
   LevelProgressCard,
-  CustomRoutineModal
+  CustomRoutineModal,
+  StreakDisplay
 } from '../components/home';
 import * as notifications from '../utils/notifications';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
 import * as rewardManager from '../utils/progress/modules/rewardManager';
+import * as storageService from '../services/storageService';
 
 const { height, width } = Dimensions.get('window');
 
@@ -49,6 +51,9 @@ export default function HomeScreen() {
   const [level, setLevel] = useState<StretchLevel>('beginner');
   const { isPremium, refreshPremiumStatus } = usePremium();
   const { isRefreshing, refreshHome } = useRefresh();
+  
+  // Streak state
+  const [currentStreak, setCurrentStreak] = useState(0);
   
   // Reminder state
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -93,6 +98,9 @@ export default function HomeScreen() {
     const level = await getUserLevel();
     setUserLevel(level);
     
+    // Load user streak data
+    await loadUserStreak();
+    
     // Force refresh feature access state to immediately update UI for custom reminders
     await refreshAccess(); // Explicitly refresh feature access state
     const customRemindersAccess = await rewardManager.isRewardUnlocked('custom_reminders');
@@ -100,6 +108,18 @@ export default function HomeScreen() {
     
     // Refresh other home data
     await refreshHome();
+  };
+  
+  // Load user streak from storage
+  const loadUserStreak = async () => {
+    try {
+      const userProgress = await storageService.getUserProgress();
+      if (userProgress && userProgress.statistics) {
+        setCurrentStreak(userProgress.statistics.currentStreak || 0);
+      }
+    } catch (error) {
+      console.error('Error loading user streak:', error);
+    }
   };
   
   // Create a ref to store the latest handleRefresh function
@@ -156,6 +176,9 @@ export default function HomeScreen() {
         // Load user level
         const level = await getUserLevel();
         setUserLevel(level);
+        
+        // Load user streak
+        await loadUserStreak();
 
         // Load reminder settings
         const settings = await notifications.getAllReminderSettings();
@@ -556,6 +579,12 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <HomeHeader />
+
+        {/* Streak Display */}
+        <StreakDisplay 
+          currentStreak={currentStreak} 
+          onPremiumPress={showPremiumModal}
+        />
 
         {/* Routine Picker */}
         <RoutinePicker

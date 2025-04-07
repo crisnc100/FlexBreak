@@ -22,7 +22,23 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
   const [isClaiming, setIsClaiming] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [opacity] = useState(new Animated.Value(1));
+  const [scale] = useState(new Animated.Value(1));
+  const [highlight] = useState(new Animated.Value(0));
   const [xpMultiplier, setXpMultiplier] = useState(1);
+  
+  // Add debug logging for streak challenges on mount
+  useEffect(() => {
+    if (challenge.type === 'streak') {
+      console.log(`STREAK CHALLENGE DEBUG - ${challenge.title}`, {
+        id: challenge.id,
+        progress: challenge.progress,
+        requirement: challenge.requirement,
+        completed: challenge.completed,
+        status: challenge.status,
+        lastUpdated: challenge.lastUpdated
+      });
+    }
+  }, [challenge]);
   
   // Check for XP boost multiplier on mount
   useEffect(() => {
@@ -53,6 +69,16 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
     return () => clearInterval(interval);
   }, [challenge, getTimeRemainingForChallenge, formatTimeRemaining]);
   
+  // Create interpolated values for the highlight effect
+  const highlightBackground = highlight.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [
+      'transparent', 
+      isDark ? 'rgba(76, 175, 80, 0.2)' : 'rgba(76, 175, 80, 0.15)',
+      'transparent'
+    ]
+  });
+  
   // Handle claiming the challenge
   const handleClaim = async () => {
     if (!challenge.completed || challenge.claimed || isClaiming) return;
@@ -66,16 +92,48 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
-        // Animate the opacity to fade out
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true
-        }).start(() => {
-          if (onClaimSuccess) {
-            onClaimSuccess();
-          }
-        });
+        // Play highlight animation first
+        Animated.timing(highlight, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: false, // We need to animate backgroundColor
+        }).start();
+        
+        // Delay the fade out animation slightly for a more satisfying sequence
+        setTimeout(() => {
+          // Create a smoother animation sequence with scale and opacity
+          Animated.parallel([
+            // Fade out animation (slower)
+            Animated.timing(opacity, {
+              toValue: 0,
+              duration: 800, // Increased from 500ms
+              useNativeDriver: true,
+              easing: (t) => t, // Linear easing for smoother fade
+            }),
+            // Add a subtle scale animation
+            Animated.sequence([
+              // First scale up slightly
+              Animated.timing(scale, {
+                toValue: 1.03,
+                duration: 200,
+                useNativeDriver: true,
+              }),
+              // Then scale down and away
+              Animated.timing(scale, {
+                toValue: 0.95,
+                duration: 600,
+                useNativeDriver: true,
+              }),
+            ]),
+          ]).start(() => {
+            // Wait a moment before triggering the success callback
+            setTimeout(() => {
+              if (onClaimSuccess) {
+                onClaimSuccess();
+              }
+            }, 150); // Add a short delay before removing from list
+          });
+        }, 200); // Wait 200ms to start fade out animation
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setIsClaiming(false);
@@ -123,15 +181,26 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
       case 'routine_count':
         return `${challenge.progress}/${challenge.requirement} routines`;
       case 'daily_minutes':
+      case 'total_minutes':
         return `${challenge.progress}/${challenge.requirement} minutes`;
       case 'streak':
-        return `${challenge.progress}/${challenge.requirement} day streak`;
+        // Add more descriptive text for streak challenges
+        if (challenge.progress === 0) {
+          return `Start your streak! 0/${challenge.requirement} days`;
+        } else if (challenge.progress === 1) {
+          return `1/${challenge.requirement} day streak`;
+        } else {
+          return `${challenge.progress}/${challenge.requirement} day streak`;
+        }
       case 'weekly_consistency':
         return `${challenge.progress}/${challenge.requirement} days this week`;
+      case 'unique_days':
+        return `${challenge.progress}/${challenge.requirement} unique days`;
       case 'area_variety':
         return `${challenge.progress}/${challenge.requirement} unique areas`;
       case 'specific_area':
-        return `${challenge.progress}/${challenge.requirement} routines in area`;
+        const area = challenge.requirementData?.area || challenge.areaTarget || 'specified area';
+        return `${challenge.progress}/${challenge.requirement} routines in ${area}`;
       default:
         return `${challenge.progress}/${challenge.requirement}`;
     }
@@ -219,7 +288,13 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         shadowColor: isDark ? 'rgba(0,0,0,0.8)' : '#000',
       },
       style, 
-      { opacity }
+      { 
+        opacity,
+        transform: [
+          { scale }
+        ],
+        backgroundColor: highlightBackground
+      }
     ]}>
       <View style={styles.header}>
         <View style={styles.titleRow}>

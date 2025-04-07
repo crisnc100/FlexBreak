@@ -19,6 +19,7 @@ import * as gamificationManager from '../../utils/progress/gameEngine';
 import * as achievementManager from '../../utils/progress/modules/achievementManager';
 import * as storageService from '../../services/storageService';
 import { EventEmitter } from '../../utils/EventEmitter';
+import * as streakManager from '../../utils/progress/modules/streakManager';
 
 // Define result types for better type safety
 interface RoutineProcessResult {
@@ -600,8 +601,49 @@ export function useGamification() {
       // Get the current user progress
       const userProgress = await storageService.getUserProgress();
       
+      // Debug current streak status
+      const streakStatus = await streakManager.checkStreakStatus();
+      console.log('STREAK STATUS in refreshChallenges:', {
+        currentStreak: streakStatus.currentStreak,
+        hasTodayActivity: streakStatus.hasTodayActivity,
+        lastUpdated: userProgress.statistics.lastUpdated
+      });
+      
+      // Look specifically for streak challenges before refresh
+      const streakChallengesBefore = Object.values(userProgress.challenges)
+        .filter(c => c.type === 'streak' && !c.completed);
+      
+      if (streakChallengesBefore.length > 0) {
+        console.log('STREAK CHALLENGES BEFORE REFRESH:', 
+          streakChallengesBefore.map(c => ({
+            title: c.title,
+            progress: c.progress,
+            requirement: c.requirement,
+            status: c.status
+          }))
+        );
+      }
+      
       // Refresh challenges
       await gamificationManager.refreshChallenges(userProgress);
+      
+      // Get fresh user progress to see changes
+      const updatedProgress = await storageService.getUserProgress();
+      
+      // Look for streak challenges after refresh
+      const streakChallengesAfter = Object.values(updatedProgress.challenges)
+        .filter(c => c.type === 'streak' && !c.completed);
+      
+      if (streakChallengesAfter.length > 0) {
+        console.log('STREAK CHALLENGES AFTER REFRESH:', 
+          streakChallengesAfter.map(c => ({
+            title: c.title,
+            progress: c.progress,
+            requirement: c.requirement,
+            status: c.status
+          }))
+        );
+      }
       
       // Clear existing challenges first to avoid overlap
       setActiveChallenges({

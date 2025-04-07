@@ -12,6 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { CHALLENGE_LIMITS } from '../../../utils/progress/constants';
 import * as cacheUtils from '../../../utils/progress/modules/utils/cacheUtils';
 import * as xpBoostManager from '../../../utils/progress/modules/xpBoostManager';
+import * as streakManager from '../../../utils/progress/modules/streakManager';
 
 interface ChallengesTabProps {
   isPremium: boolean;
@@ -148,6 +149,82 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
     }, [refreshChallenges, lastRefresh])
   );
   
+  // Listen for streak events to update streak-related challenges
+  useEffect(() => {
+    const handleStreakEvent = () => {
+      console.log('Streak event detected, refreshing challenges');
+      
+      // Only refresh if it's been more than 5 seconds since the last refresh to avoid excessive updates
+      const now = Date.now();
+      if (now - lastRefresh > 5000) {
+        refreshChallenges();
+        setLastRefresh(now);
+      }
+    };
+    
+    // Subscribe to streak events
+    streakManager.streakEvents.on(streakManager.STREAK_SAVED_EVENT, handleStreakEvent);
+    streakManager.streakEvents.on(streakManager.STREAK_BROKEN_EVENT, handleStreakEvent);
+    streakManager.streakEvents.on(streakManager.STREAK_MAINTAINED_EVENT, handleStreakEvent);
+    
+    // Cleanup event listeners
+    return () => {
+      streakManager.streakEvents.off(streakManager.STREAK_SAVED_EVENT, handleStreakEvent);
+      streakManager.streakEvents.off(streakManager.STREAK_BROKEN_EVENT, handleStreakEvent);
+      streakManager.streakEvents.off(streakManager.STREAK_MAINTAINED_EVENT, handleStreakEvent);
+    };
+  }, [refreshChallenges, lastRefresh]);
+  
+  // Debug streak challenges and status
+  useEffect(() => {
+    const debugStreakChallenges = async () => {
+      try {
+        // Check current streak status
+        const streakStatus = await streakManager.checkStreakStatus();
+        
+        // Find streak challenges in all tabs
+        let potentialIssueDetected = false;
+        
+        for (const category in activeChallenges) {
+          const streakChallenges = activeChallenges[category].filter(c => c.type === 'streak');
+          
+          if (streakChallenges.length > 0) {
+            // Check for streak challenges with 0 progress when there's activity today or streak > 0
+            if (streakStatus.currentStreak > 0 || streakStatus.hasTodayActivity) {
+              const zeroProgressChallenges = streakChallenges.filter(c => c.progress === 0);
+              
+              if (zeroProgressChallenges.length > 0) {
+                potentialIssueDetected = true;
+              }
+            }
+          }
+        }
+        
+        // If we detect an issue with streak challenges, try to fix it automatically
+        if (potentialIssueDetected && 
+            (streakStatus.currentStreak > 0 || streakStatus.hasTodayActivity)) {
+          // Fix it immediately but silently - no alerts
+          try {
+            const updated = await streakManager.forceUpdateStreakChallenges();
+            
+            if (updated) {
+              // Refresh challenges after fix without showing alert
+              setTimeout(() => refreshChallenges(), 500);
+            }
+          } catch (error) {
+            console.error('Error auto-fixing streak challenges:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error debugging streak challenges:', error);
+      }
+    };
+    
+    if (!challengesLoading && Object.keys(activeChallenges).length > 0) {
+      debugStreakChallenges();
+    }
+  }, [activeChallenges, challengesLoading, refreshChallenges]);
+  
   // Check and refresh challenges only when the active tab changes with optimizations
   useEffect(() => {
     console.log(`Active tab changed to: ${activeTab}`);
@@ -227,13 +304,15 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
       }
     });
     
-    refreshChallenges();
-    
-    // Switch back to the original tab after claiming
-    // This helps users see that their claim affected the available challenges
-    if (activeTab === 'claimable') {
-      setTimeout(() => setActiveTab('daily'), 300);
-    }
+    // Add longer delay before refreshing to allow for smoother animation
+    setTimeout(() => {
+      refreshChallenges();
+      
+      // Delay the tab switch even more to finish animation completely
+      if (activeTab === 'claimable') {
+        setTimeout(() => setActiveTab('daily'), 500);
+      }
+    }, 300); // Increase from immediate refresh to 300ms delay
   }, [refreshChallenges, activeTab]);
   
   // Count total active challenges
@@ -329,8 +408,6 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
     
     // Normal tab rendering for category tabs
     const challenges = localChallenges[activeTab] || [];
-    
-    console.log(`Rendering ${challenges.length} challenges for ${activeTab} tab`);
     
     // Show empty state if no challenges
     if (challenges.length === 0) {
@@ -623,6 +700,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  fixStreakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2979FF',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    marginHorizontal: 16,
+  },
+  fixStreakButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   limitExplanationContainer: {
     flexDirection: 'row',

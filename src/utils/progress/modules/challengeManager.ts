@@ -7,6 +7,7 @@ import * as cacheUtils from './utils/cacheUtils';
 import * as rewardManager from './rewardManager';
 import * as levelManager from './levelManager';
 import * as xpBoostManager from './xpBoostManager';
+import * as streakManager from './streakManager';
 
 // Track recent challenges to avoid repetition
 let recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
@@ -107,14 +108,33 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
   }
   
   const stats = userProgress.statistics;
-  const allRoutines = await cacheUtils.getCachedRoutines(true); // Force refresh routines
+  const allRoutines = await cacheUtils.getCachedRoutines(true); // Force refresh routines cache
   
   // Log for debugging
   console.log(`Updating challenge: ${challenge.title} (${challenge.type}), current progress: ${challenge.progress}/${challenge.requirement}`);
   
   // Handle challenge based on its type and specific ID
   try {
-    // Update progress based on challenge type - with special case handling
+    // FIRST CHECK: Special case for streak challenges when there's activity today
+    // This ensures any streak challenge gets proper update when a new streak is starting
+    if (challenge.type === 'streak') {
+      // Get direct streak status from streak manager to ensure we have the latest values
+      const streakStatus = await streakManager.checkStreakStatus();
+      
+      // If there's activity today but the challenge progress is still at 0, it means
+      // we're starting a new streak after a multi-day gap
+      if (streakStatus.hasTodayActivity && challenge.progress === 0) {
+        console.log(`DIRECT FIX: Challenge "${challenge.title}" has streak type with 0 progress despite activity today`);
+        // Set progress to 1 to match the current streak (which should be 1 when there's activity today)
+        challenge.progress = 1;
+        console.log(`Corrected streak challenge progress: ${challenge.progress}/${challenge.requirement}`);
+        
+        // Return the updated challenge immediately to skip the normal update logic
+        return challenge;
+      }
+    }
+    
+    // Normal challenge update logic based on types...
     switch (challenge.type) {
       case 'routine_count':
         // Handle special named challenges with specific conditions
@@ -221,9 +241,43 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         break;
         
       case 'streak':
-        // Use the current streak from statistics, ensuring it's a number
+        // Get current streak from statistics, ensuring it's a number
         challenge.progress = Number(stats.currentStreak) || 0;
-        console.log(`Streak challenge: ${challenge.progress}/${challenge.requirement}`);
+        
+        // Check if there's activity today using the streak manager
+        const streakStatus = await streakManager.checkStreakStatus();
+        const hasTodayActivity = streakStatus.hasTodayActivity;
+        
+        // Add detailed logging for streak challenges to debug any issues
+        console.log(`Streak challenge update:`, {
+          challengeId: challenge.id,
+          challengeTitle: challenge.title,
+          currentStreak: stats.currentStreak,
+          progress: challenge.progress,
+          requirement: challenge.requirement,
+          hasTodayActivity,
+          streakLastUpdated: stats.lastUpdated
+        });
+        
+        // If there's activity today but the streak is at 0 (meaning we're starting a new streak),
+        // make sure the progress is at least 1 to properly represent the new streak
+        if (hasTodayActivity && Number(stats.currentStreak) === 0) {
+          console.log(`Detected activity today with reset streak. Setting challenge progress to 1.`);
+          challenge.progress = 1;
+        }
+        
+        // Special case handling for "Stretching Virtuoso" which is a streak challenge
+        if (challenge.id === "monthly_long_streak" || challenge.title === "Stretching Virtuoso") {
+          console.log(`Special handling for Stretching Virtuoso challenge`);
+          
+          // If there's activity today and the currentStreak should be at least 1
+          if (hasTodayActivity) {
+            challenge.progress = Math.max(1, challenge.progress);
+            console.log(`Updated Stretching Virtuoso progress to ${challenge.progress} because there's activity today`);
+          }
+        }
+        
+        console.log(`Final streak challenge progress: ${challenge.progress}/${challenge.requirement}`);
         break;
         
       case 'weekly_consistency':
@@ -923,6 +977,11 @@ export const batchUpdateChallenges = async (
 
   console.log(`Processing ${Object.keys(userProgress.challenges).length} challenges in batch update`);
   
+  // Check if there's activity today using the streak manager first to avoid multiple calls
+  const streakStatus = await streakManager.checkStreakStatus();
+  const hasTodayActivity = streakStatus.hasTodayActivity;
+  console.log(`Batch update - current streak: ${userProgress.statistics.currentStreak}, has today's activity: ${hasTodayActivity}`);
+  
   // Process all challenges in a single pass
   for (const id of Object.keys(userProgress.challenges)) {
     const challenge = userProgress.challenges[id];
@@ -938,13 +997,31 @@ export const batchUpdateChallenges = async (
         const beforeProgress = challenge.progress;
         const beforeCompleted = challenge.completed;
         
+        // Special handling for streak challenges to avoid the "0→0" issue
+        if (challenge.type === 'streak' && hasTodayActivity) {
+          console.log(`Pre-processing streak challenge "${challenge.title}" (ID: ${challenge.id})`);
+          console.log(`Current progress: ${challenge.progress}, Current streak: ${userProgress.statistics.currentStreak}`);
+          
+          // If there's activity today, progress should be at least 1
+          if (challenge.progress === 0) {
+            console.log(`Fixing streak challenge with 0 progress despite today's activity`);
+            
+            // Direct fix for specific challenge we know is having issues
+            if (challenge.id === "monthly_long_streak" || challenge.title === "Stretching Virtuoso") {
+              challenge.progress = 1;
+              console.log(`Reset streak challenge: ${challenge.title} (0 → 1) - Fixed!`);
+              updatedCount++;
+            }
+          }
+        }
+        
         // Update the challenge progress
         const updatedChallenge = await updateChallengeProgress(userProgress, challenge);
         userProgress.challenges[id] = updatedChallenge;
         
         // Check if progress changed or challenge was completed
         if (beforeProgress !== updatedChallenge.progress) {
-          console.log(`Challenge ${updatedChallenge.title} progress updated: ${beforeProgress} -> ${updatedChallenge.progress}/${updatedChallenge.requirement}`);
+          console.log(`Challenge ${updatedChallenge.title} progress updated: ${beforeProgress} → ${updatedChallenge.progress}/${updatedChallenge.requirement}`);
           updatedCount++;
         }
         
@@ -987,8 +1064,35 @@ export const updateUserChallenges = async (userProgress: UserProgress): Promise<
       ...userProgress.statistics
     };
     
+    // Get streak status directly to check for activity today
+    const streakStatus = await streakManager.checkStreakStatus();
+    const hasTodayActivity = streakStatus.hasTodayActivity;
+    
     // First expire any challenges that are past their end date
     await expireChallenges(userProgress);
+    
+    // Special case: Check for streak challenges that might need immediate updating
+    // This handles the case of starting a new streak after a multi-day gap
+    if (hasTodayActivity && userProgress.statistics.currentStreak <= 1) {
+      console.log('Activity detected today with streak <= 1, checking for streak challenges needing updates');
+      
+      // Find any streak challenges with progress 0
+      const streakChallenges = Object.values(userProgress.challenges)
+        .filter(c => c.type === 'streak' && !c.completed && c.progress === 0);
+      
+      if (streakChallenges.length > 0) {
+        console.log(`Found ${streakChallenges.length} streak challenges to update with new streak value`);
+        
+        // Update each streak challenge to have progress 1
+        for (const challenge of streakChallenges) {
+          console.log(`Setting ${challenge.title} progress from 0 to 1 due to today's activity`);
+          userProgress.challenges[challenge.id].progress = 1;
+        }
+        
+        // Save changes immediately
+        await storageService.saveUserProgress(userProgress);
+      }
+    }
     
     // Then batch update all challenge progress and statuses
     const { updatedCount, completedChallenges: newlyCompletedChallenges } = 
@@ -997,11 +1101,9 @@ export const updateUserChallenges = async (userProgress: UserProgress): Promise<
     // Keep track of newly completed challenges
     completedChallenges = newlyCompletedChallenges;
     
-    // Save progress after updating challenges
-    if (updatedCount > 0 || completedChallenges.length > 0) {
-      console.log(`Saving user progress after updating ${updatedCount} challenges`);
-      await storageService.saveUserProgress(userProgress);
-    }
+    // Save progress after updating challenges - ALWAYS save to ensure all changes take effect
+    console.log(`Saving user progress after challenge update (updated: ${updatedCount}, completed: ${completedChallenges.length})`);
+    await storageService.saveUserProgress(userProgress);
     
     // Finally, ensure we have the right number of challenges for each category
     await ensureChallengeCount(userProgress, CORE_CHALLENGES);
