@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
 import { useTheme } from '../../context/ThemeContext';
+import { enhanceRoutineWithPremiumInfo } from '../../utils/premiumUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,7 +40,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const { theme, isDark } = useTheme();
   
   // State
-  const [routine, setRoutine] = useState<(Stretch | RestPeriod)[]>([]);
+  const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string })[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
@@ -98,16 +99,23 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   
   // Generate the routine when the component mounts
   useEffect(() => {
-    if (area && duration) {
-      console.log(`Generating routine with level: ${level}`);
-      const generatedRoutine = generateRoutine(area, duration, level, customStretches);
-      setRoutine(generatedRoutine);
-      
-      if (generatedRoutine.length > 0) {
-        // Start the timer with the first stretch duration
-        startTimer(generatedRoutine[0].duration);
+    const initRoutine = async () => {
+      if (area && duration) {
+        console.log(`Generating routine with level: ${level}`);
+        const generatedRoutine = await generateRoutine(area, duration, level, customStretches);
+        
+        // Enhance the routine with premium information
+        const enhancedRoutine = await enhanceRoutineWithPremiumInfo(generatedRoutine);
+        setRoutine(enhancedRoutine);
+        
+        if (enhancedRoutine.length > 0) {
+          // Start the timer with the first stretch duration
+          startTimer(enhancedRoutine[0].duration);
+        }
       }
-    }
+    };
+    
+    initRoutine();
   }, [area, duration, level, customStretches]);
   
   // Handle skip to next stretch
@@ -215,6 +223,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     if (!currentStretch) return null;
 
     const isRest = 'isRest' in currentStretch;
+    const isPremium = !isRest && (currentStretch as any).isPremium;
 
     return (
       <Animated.View 
@@ -239,34 +248,42 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               {currentStretch.name}
             </Text>
             
-            {currentStretch.bilateral && (
-              <View style={[styles.bilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
-                <Ionicons name="swap-horizontal" size={16} color="#FFF" />
-                <Text style={styles.bilateralText}>Both Sides</Text>
-              </View>
-            )}
-            
-            <View style={[styles.imageContainer, { 
-              backgroundColor: isDark ? theme.cardBackground : '#FFF',
-              shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
-            }]}>
-              {currentStretch.image && (
-                <Image 
-                  source={currentStretch.image} 
-                  style={styles.stretchImage}
-                  resizeMode="contain"
-                />
+            <View style={styles.badgeContainer}>
+              {currentStretch.bilateral && (
+                <View style={[styles.bilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+                  <Ionicons name="swap-horizontal" size={16} color="#FFF" />
+                  <Text style={styles.bilateralText}>Both Sides</Text>
+                </View>
+              )}
+              
+              {isPremium && (
+                <View style={[styles.premiumBadge, { backgroundColor: (currentStretch as any).vipBadgeColor || '#FFD700' }]}>
+                  <Ionicons name="star" size={16} color="#FFF" />
+                  <Text style={styles.premiumText}>VIP</Text>
+                </View>
               )}
             </View>
             
-            <ScrollView style={[styles.descriptionContainer, { 
+            <View style={[styles.imageContainer, { 
               backgroundColor: isDark ? theme.cardBackground : '#FFF',
-              borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0'
+              borderColor: isPremium ? ((currentStretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD')
             }]}>
-              <Text style={[styles.descriptionText, { color: isDark ? theme.text : '#333' }]}>
-                {currentStretch.description}
+              <Image 
+                source={currentStretch.image}
+                style={styles.stretchImage}
+                resizeMode="contain"
+              />
+            </View>
+            
+            <Text style={[styles.stretchDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
+              {currentStretch.description}
+            </Text>
+            
+            {isPremium && (
+              <Text style={[styles.premiumNote, { color: (currentStretch as any).vipBadgeColor || '#FFD700' }]}>
+                This is a premium stretch unlocked at level 7!
               </Text>
-            </ScrollView>
+            )}
           </>
         )}
       </Animated.View>
@@ -489,18 +506,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  descriptionContainer: {
-    flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  descriptionText: {
+  stretchDescription: {
     fontSize: 16,
     lineHeight: 24,
     color: '#333',
@@ -508,35 +514,62 @@ const styles = StyleSheet.create({
   bilateralBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 10,
+    marginHorizontal: 5,
   },
   bilateralText: {
     color: '#FFF',
-    fontWeight: 'bold',
-    marginLeft: 6,
-    fontSize: 14,
+    fontSize: 12,
+    marginLeft: 5,
+    fontWeight: '600',
   },
-  bilateralInstructions: {
+  premiumBadge: {
     flexDirection: 'row',
-    backgroundColor: '#E8F5E9',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 16,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 10,
+    marginHorizontal: 5,
   },
-  bilateralInstructionsText: {
+  premiumText: {
+    color: '#FFF',
+    fontSize: 12,
+    marginLeft: 5,
+    fontWeight: '600',
+  },
+  premiumNote: {
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 10,
     fontSize: 14,
-    color: '#2E7D32',
-    marginLeft: 8,
-    flex: 1,
-    lineHeight: 20,
   },
-  // Updated control styles
+  badgeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: 5,
+  },
+  restContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  restTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  restDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
   controlsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -617,24 +650,6 @@ const styles = StyleSheet.create({
   overallProgressFill: {
     height: '100%',
     backgroundColor: '#FF9800',
-  },
-  restContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  restTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  restDescription: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
   },
 });
 

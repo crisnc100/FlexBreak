@@ -13,6 +13,7 @@ export interface Stretch {
   level: StretchLevel;
   image: any;
   bilateral?: boolean;
+  premium?: boolean;
 }
 
 export interface Tip {

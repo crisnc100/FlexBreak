@@ -1,12 +1,16 @@
 import stretches from '../data/stretches';
 import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../types';
+import * as rewardManager from './progress/modules/rewardManager';
 
-export const generateRoutine = (
+export const generateRoutine = async (
   area: BodyArea,
   duration: Duration,
   level: StretchLevel,
   customStretches?: (Stretch | RestPeriod)[]
-): (Stretch | RestPeriod)[] => {
+): Promise<(Stretch | RestPeriod)[]> => {
+  // Check if premium stretches are unlocked
+  const premiumUnlocked = await rewardManager.isRewardUnlocked('premium_stretches');
+  
   // If custom stretches are provided, use them instead of generating a routine
   if (customStretches && customStretches.length > 0) {
     console.log(`[DEBUG] Using ${customStretches.length} custom items for routine`);
@@ -41,10 +45,12 @@ export const generateRoutine = (
         .filter(item => !('isRest' in item))
         .map(item => (item as Stretch).id);
       
+      // Filter stretches by area and premium status
       let availableStretches = stretches.filter(stretch => 
         !selectedIds.includes(stretch.id) && 
         (stretch.tags.includes(area) || 
-         (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body')))
+         (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))) &&
+        (!stretch.premium || premiumUnlocked) // Filter out premium stretches if not unlocked
       );
       
       // Shuffle available stretches
@@ -81,16 +87,18 @@ export const generateRoutine = (
   // Define max stretch counts
   const maxStretches = { 5: 7, 10: 12, 15: 16 }[durationMinutes] || Math.ceil(durationMinutes / 1.7);
 
-  // Filter by area
+  // Filter by area and premium status
   let filteredStretches = stretches.filter(stretch => 
-    stretch.tags.includes(area) || 
-    (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))
+    (stretch.tags.includes(area) || 
+    (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))) &&
+    (!stretch.premium || premiumUnlocked) // Filter out premium stretches if not unlocked
   );
 
   // Debug logging
   console.log(`[DEBUG] Generating routine for area: ${area}, level: ${level}, duration: ${duration}`);
   console.log(`[DEBUG] Total stretches: ${stretches.length}`);
-  console.log(`[DEBUG] Filtered by area: ${filteredStretches.length}`);
+  console.log(`[DEBUG] Filtered by area and premium status: ${filteredStretches.length}`);
+  console.log(`[DEBUG] Premium stretches unlocked: ${premiumUnlocked}`);
   
   const advancedCount = filteredStretches.filter(s => s.level === 'advanced').length;
   const intermediateCount = filteredStretches.filter(s => s.level === 'intermediate').length;
@@ -249,6 +257,7 @@ export const generateRoutine = (
   
   console.log(`[DEBUG] Final routine: ${routine.length} stretches, total duration: ${totalDuration}s`);
   console.log(`[DEBUG] Routine levels: ${routine.map(s => s.level).join(', ')}`);
+  console.log(`[DEBUG] Premium stretches in routine: ${routine.filter(s => (s as Stretch).premium).length}`);
 
   return routine;
 };
@@ -264,3 +273,17 @@ function shuffleArray<T>(array: T[]): T[] {
   }
   return newArray;
 }
+
+/**
+ * Get a sample of premium stretches to preview
+ * This function returns 5 random premium stretches for users to try in the rewards screen
+ */
+export const getRandomPremiumStretches = (sampleSize: number = 5): Stretch[] => {
+  const premiumStretches = stretches.filter(stretch => stretch.premium);
+  
+  if (premiumStretches.length <= sampleSize) {
+    return premiumStretches;
+  }
+  
+  return shuffleArray(premiumStretches).slice(0, sampleSize);
+};

@@ -2,6 +2,8 @@ import { Reward, UserProgress } from '../types';
 import * as storageService from '../../../services/storageService';
 import * as xpBoostManager from './xpBoostManager';
 import CORE_REWARDS from '../../../data/rewards.json';
+import { getRandomPremiumStretches } from '../../routineGenerator';
+import { Stretch } from '../../../types';
 
 // Extend the Reward interface to include additional properties for management
 interface ExtendedReward extends Reward {
@@ -401,5 +403,31 @@ export const cleanupDuplicateRewards = async (): Promise<boolean> => {
   } catch (error) {
     console.error('Error cleaning up duplicate rewards:', error);
     return false;
+  }
+};
+
+/**
+ * Get a sample of premium stretches to preview
+ * This can be used to let users try premium stretches before unlocking
+ * @param count Number of premium stretches to get
+ * @returns Array of premium stretches
+ */
+export const getSamplePremiumStretches = async (count: number = 5): Promise<Stretch[]> => {
+  try {
+    // Check if premium stretches are already unlocked
+    const isPremiumUnlocked = await isRewardUnlocked('premium_stretches');
+    
+    if (isPremiumUnlocked) {
+      console.log('Premium stretches already unlocked, returning full set of premium stretches');
+      // If premium is already unlocked, let them see all premium stretches
+      return getRandomPremiumStretches(count);
+    }
+    
+    // Get a sample of premium stretches to preview
+    console.log(`Getting ${count} premium stretches to preview`);
+    return getRandomPremiumStretches(count);
+  } catch (error) {
+    console.error('Error getting sample premium stretches:', error);
+    return [];
   }
 }; 
