@@ -55,6 +55,14 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   
   // Start or restart a timer
   const startTimer = (duration: number) => {
+    // Ensure duration is a valid number
+    if (typeof duration !== 'number' || isNaN(duration) || duration <= 0) {
+      console.warn(`Invalid duration provided to startTimer: ${duration}, using default of 30 seconds`);
+      duration = 30; // Default to 30 seconds as a fallback
+    }
+    
+    console.log(`Starting timer with duration: ${duration} seconds`);
+    
     // Clear existing timer
     if (timerId) {
       clearInterval(timerId);
@@ -100,18 +108,165 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Generate the routine when the component mounts
   useEffect(() => {
     const initRoutine = async () => {
-      if (area && duration) {
-        console.log(`Generating routine with level: ${level}`);
-        const generatedRoutine = await generateRoutine(area, duration, level, customStretches);
+      try {
+        console.log(`[ActiveRoutine] Initializing routine: ${area}, ${duration}, ${level}, custom stretches: ${customStretches?.length || 0}`);
         
-        // Enhance the routine with premium information
-        const enhancedRoutine = await enhanceRoutineWithPremiumInfo(generatedRoutine);
-        setRoutine(enhancedRoutine);
-        
-        if (enhancedRoutine.length > 0) {
-          // Start the timer with the first stretch duration
-          startTimer(enhancedRoutine[0].duration);
+        if (area && duration) {
+          console.log(`Generating routine: area=${area}, duration=${duration}, level=${level}, customStretches=${customStretches?.length || 0}`);
+          
+          // If we have custom stretches, log them for debugging
+          if (customStretches && customStretches.length > 0) {
+            console.log(`Custom stretches: ${customStretches.length}`);
+            console.log(`First custom stretch: ${JSON.stringify(customStretches[0])}`);
+            
+            // Validate the custom stretches
+            const validCustomStretches = customStretches.map((stretch, index) => {
+              // Clone to avoid modifying the original
+              let stretchCopy: any = {...stretch};
+              
+              // Log each stretch being processed for better debugging
+              console.log(`Processing stretch ${index}: ID=${stretch.id}, Type=${typeof stretch.id}, Name=${stretch.name || 'unnamed'}`);
+              
+              // Ensure required properties
+              if (!('id' in stretchCopy)) {
+                stretchCopy.id = `custom-${Math.random().toString(36).substring(2, 9)}`;
+                console.log(`Generated new ID for stretch without ID: ${stretchCopy.id}`);
+              } else if (typeof stretchCopy.id === 'number') {
+                // Convert number IDs to strings to ensure consistency
+                stretchCopy.id = String(stretchCopy.id);
+                console.log(`Converted ID from number to string: ${stretchCopy.id}`);
+              }
+              
+              if (!('duration' in stretchCopy) || typeof stretchCopy.duration !== 'number') {
+                console.warn(`Found stretch with invalid duration: ${JSON.stringify(stretchCopy)}`);
+                stretchCopy.duration = 30; // Default to 30 seconds
+              }
+              
+              if ('isRest' in stretchCopy) {
+                // This is a rest period, make sure it has all required fields
+                if (!stretchCopy.name) {
+                  stretchCopy.name = 'Rest Period';
+                }
+                if (!stretchCopy.description) {
+                  stretchCopy.description = 'Take a short break';
+                }
+              } else {
+                // This is a stretch
+                if (!stretchCopy.name) {
+                  stretchCopy.name = 'Stretch';
+                }
+                if (!stretchCopy.description) {
+                  stretchCopy.description = 'Follow the instructions';
+                }
+                if (stretchCopy.bilateral === undefined) {
+                  stretchCopy.bilateral = false;
+                }
+                if (!stretchCopy.level) {
+                  stretchCopy.level = 'beginner';
+                }
+                if (!Array.isArray(stretchCopy.tags)) {
+                  stretchCopy.tags = [area];
+                }
+                if (!stretchCopy.image) {
+                  stretchCopy.image = { uri: `https://via.placeholder.com/200/FF9800/FFFFFF?text=${encodeURIComponent(stretchCopy.name)}` };
+                }
+              }
+              
+              return stretchCopy;
+            });
+            
+            console.log(`Using ${validCustomStretches.length} validated custom stretches`);
+            console.log(`First validated stretch ID type: ${typeof validCustomStretches[0].id}`);
+            
+            // Additional debugging - validate final stretches before enhancing
+            const idTypes = validCustomStretches.map(s => typeof s.id);
+            console.log(`ID types before enhancement: ${JSON.stringify(idTypes)}`);
+            
+            // When using custom stretches directly, we should still enhance them with premium info
+            try {
+              console.log('Attempting to enhance routine with premium info...');
+              
+              // Wrap the enhancement in another try/catch to handle any errors
+              let enhancedRoutine;
+              try {
+                enhancedRoutine = await enhanceRoutineWithPremiumInfo(validCustomStretches);
+                console.log(`Enhanced routine has ${enhancedRoutine.length} stretches`);
+              } catch (enhanceError) {
+                console.error('Error in enhanceRoutineWithPremiumInfo:', enhanceError);
+                console.log('Using validated stretches without enhancement due to error');
+                enhancedRoutine = validCustomStretches;
+              }
+              
+              // Log the first enhanced stretch for debugging
+              if (enhancedRoutine.length > 0) {
+                console.log(`First enhanced stretch: ID=${enhancedRoutine[0].id}, Type=${typeof enhancedRoutine[0].id}`);
+                console.log(`Setting routine with ${enhancedRoutine.length} stretches`);
+                setRoutine(enhancedRoutine);
+                
+                // Start the timer with the first stretch duration
+                console.log(`Starting timer with duration: ${enhancedRoutine[0].duration} (${typeof enhancedRoutine[0].duration})`);
+                startTimer(enhancedRoutine[0].duration);
+              } else {
+                throw new Error('No stretches in enhanced routine');
+              }
+            } catch (enhanceError) {
+              console.error('Error enhancing routine:', enhanceError);
+              // Fallback to using the validated stretches directly
+              console.log('Falling back to validated stretches without enhancement');
+              
+              if (validCustomStretches.length > 0) {
+                console.log(`Setting routine with ${validCustomStretches.length} stretches directly`);
+                setRoutine(validCustomStretches);
+                
+                console.log(`Starting timer with fallback duration: ${validCustomStretches[0].duration} (${typeof validCustomStretches[0].duration})`);
+                startTimer(validCustomStretches[0].duration);
+              } else {
+                throw new Error('No valid custom stretches to show');
+              }
+            }
+          } else {
+            // Generate a routine normally if no custom stretches
+            console.log('Generating routine without custom stretches');
+            const generatedRoutine = await generateRoutine(area, duration, level);
+            
+            // Enhance the routine with premium information
+            try {
+              const enhancedRoutine = await enhanceRoutineWithPremiumInfo(generatedRoutine);
+              console.log(`Enhanced generated routine has ${enhancedRoutine.length} stretches`);
+              setRoutine(enhancedRoutine);
+              
+              if (enhancedRoutine.length > 0) {
+                // Start the timer with the first stretch duration
+                startTimer(enhancedRoutine[0].duration);
+              } else {
+                throw new Error('No stretches in enhanced routine');
+              }
+            } catch (enhanceError) {
+              console.error('Error enhancing generated routine:', enhanceError);
+              // Fallback to the generated routine directly
+              setRoutine(generatedRoutine);
+              if (generatedRoutine.length > 0) {
+                startTimer(generatedRoutine[0].duration);
+              } else {
+                throw new Error('No stretches in generated routine');
+              }
+            }
+          }
+        } else {
+          throw new Error('Missing required area or duration parameters');
         }
+      } catch (error) {
+        console.error('Error initializing routine:', error);
+        Alert.alert(
+          'Error Loading Routine',
+          'There was a problem loading your routine. Please try again.',
+          [
+            { 
+              text: 'Go Back', 
+              onPress: onNavigateHome 
+            }
+          ]
+        );
       }
     };
     
@@ -220,7 +375,15 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   
   // Render the current stretch or rest period
   const renderCurrentItem = () => {
-    if (!currentStretch) return null;
+    if (!currentStretch) {
+      return (
+        <View style={[styles.loadingContainer, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
+          <Text style={[styles.loadingText, { color: isDark ? theme.text : '#333' }]}>
+            Loading stretch data...
+          </Text>
+        </View>
+      );
+    }
 
     const isRest = 'isRest' in currentStretch;
     const isPremium = !isRest && (currentStretch as any).isPremium;
@@ -233,23 +396,23 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         }]}
       >
         {isRest ? (
-          <View style={styles.restContainer}>
+          <View style={[styles.restContainer, { backgroundColor: isDark ? theme.cardBackground : '#f0f0f0' }]}>
             <Ionicons name="time-outline" size={60} color={isDark ? theme.accent : '#4CAF50'} />
             <Text style={[styles.restTitle, { color: isDark ? theme.text : '#333' }]}>
-              {currentStretch.name}
+              {currentStretch.name || 'Rest Period'}
             </Text>
             <Text style={[styles.restDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
-              {currentStretch.description}
+              {currentStretch.description || 'Take a short break before continuing'}
             </Text>
           </View>
         ) : (
-          <>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.stretchName, { color: isDark ? theme.text : '#333' }]}>
-              {currentStretch.name}
+              {currentStretch.name || 'Stretch'}
             </Text>
             
             <View style={styles.badgeContainer}>
-              {currentStretch.bilateral && (
+              {(currentStretch as Stretch)?.bilateral && (
                 <View style={[styles.bilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
                   <Ionicons name="swap-horizontal" size={16} color="#FFF" />
                   <Text style={styles.bilateralText}>Both Sides</Text>
@@ -272,11 +435,21 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 source={currentStretch.image}
                 style={styles.stretchImage}
                 resizeMode="contain"
+                onError={(e) => {
+                  console.log(`Image error for stretch ${currentStretch.name}:`, e.nativeEvent.error);
+                  // Attempt to update the image source to a fallback
+                  if (currentStretch && !('isRest' in currentStretch)) {
+                    const safeName = encodeURIComponent((currentStretch as Stretch).name || 'Stretch');
+                    console.log(`Setting fallback image for ${safeName}`);
+                    // We can't directly modify the source, but we can log it for debugging
+                  }
+                }}
+                defaultSource={{uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent(currentStretch.name || 'Stretch')}`}}
               />
             </View>
             
             <Text style={[styles.stretchDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
-              {currentStretch.description}
+              {currentStretch.description || 'No description available'}
             </Text>
             
             {isPremium && (
@@ -284,7 +457,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 This is a premium stretch unlocked at level 7!
               </Text>
             )}
-          </>
+          </View>
         )}
       </Animated.View>
     );
@@ -300,7 +473,10 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   }
   
   return (
-    <View style={{ flex: 1, backgroundColor: isDark ? theme.background : '#FFF' }}>
+    <View style={{ 
+      flex: 1, 
+      backgroundColor: isDark ? theme.background : '#FFF'
+    }}>
       {/* Header with progress */}
       <View style={[styles.header, { 
         backgroundColor: isDark ? theme.cardBackground : '#FFF',
@@ -348,7 +524,12 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       </View>
       
       {/* Main content */}
-      {renderCurrentItem()}
+      <View style={{
+        flex: 1, 
+        backgroundColor: isDark ? theme.background : '#FFF'
+      }}>
+        {renderCurrentItem()}
+      </View>
       
       {/* Improved Controls */}
       <View style={[styles.controlsContainer, { 
@@ -480,6 +661,9 @@ const styles = StyleSheet.create({
   stretchContainer: {
     flex: 1,
     padding: 16,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    minHeight: 400, // Ensure minimum height
   },
   stretchName: {
     fontSize: 24,
@@ -650,6 +834,38 @@ const styles = StyleSheet.create({
   overallProgressFill: {
     height: '100%',
     backgroundColor: '#FF9800',
+  },
+  noImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noImageText: {
+    fontSize: 16,
+    color: '#DDD',
+  },
+  imageWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  debugImageText: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    color: '#FFF',
+    padding: 5,
+  },
+  debugText: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    color: '#FFF',
+    padding: 5,
   },
 });
 

@@ -88,7 +88,12 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   const getRecentRoutines = useCallback(async (): Promise<ProgressEntry[]> => {
     try {
       // Use storageService instead of direct AsyncStorage calls
-      return await storageService.getRecentRoutines();
+      const freshRoutines = await storageService.getRecentRoutines();
+      
+      // Update local state with fresh data
+      setRecentRoutines(freshRoutines);
+      
+      return freshRoutines;
     } catch (error) {
       console.error('Error getting recent routines:', error);
       return [];

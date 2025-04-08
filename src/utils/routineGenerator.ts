@@ -1,5 +1,5 @@
 import stretches from '../data/stretches';
-import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../types';
+import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod, IssueType, SmartRoutineInput, SmartRoutineConfig } from '../types';
 import * as rewardManager from './progress/modules/rewardManager';
 
 export const generateRoutine = async (
@@ -286,4 +286,488 @@ export const getRandomPremiumStretches = (sampleSize: number = 5): Stretch[] => 
   }
   
   return shuffleArray(premiumStretches).slice(0, sampleSize);
+};
+
+// Keyword mappings for body areas
+const bodyAreaKeywords: Record<string, BodyArea> = {
+  'neck': 'Neck',
+  'back': 'Lower Back',
+  'upper back': 'Upper Back & Chest',
+  'lower back': 'Lower Back',
+  'shoulder': 'Shoulders & Arms',
+  'shoulders': 'Shoulders & Arms',
+  'arm': 'Shoulders & Arms',
+  'arms': 'Shoulders & Arms',
+  'leg': 'Hips & Legs',
+  'legs': 'Hips & Legs',
+  'hip': 'Hips & Legs',
+  'hips': 'Hips & Legs',
+  'chest': 'Upper Back & Chest',
+  'whole': 'Full Body',
+  'full': 'Full Body',
+  'body': 'Full Body',
+};
+
+// Keyword mappings for issues
+const issueKeywords: Record<string, IssueType> = {
+  'stiff': 'stiffness',
+  'tight': 'stiffness',
+  'tense': 'stiffness',
+  'pain': 'pain',
+  'hurt': 'pain',
+  'sore': 'pain',
+  'ache': 'pain',
+  'tired': 'tiredness',
+  'fatigue': 'tiredness',
+  'exhausted': 'tiredness',
+  'flexible': 'flexibility',
+  'stretch': 'flexibility',
+};
+
+// Activity keywords that indicate non-desk activity
+const activityKeywords = [
+  'run', 'running', 'jog', 'jogging',
+  'workout', 'exercise', 'training',
+  'gym', 'sports', 'practice',
+  'bike', 'cycling', 'ride',
+];
+
+export const parseUserInput = (input: string): SmartRoutineInput => {
+  // Define keywords for different body areas with more synonyms and variations
+  const areaKeywords: { [key: string]: BodyArea } = {
+    // Neck
+    'neck': 'Neck',
+    'throat': 'Neck',
+    'cervical': 'Neck',
+    
+    // Shoulders & Arms
+    'shoulder': 'Shoulders & Arms',
+    'deltoid': 'Shoulders & Arms',
+    'arm': 'Shoulders & Arms',
+    'elbow': 'Shoulders & Arms',
+    'wrist': 'Shoulders & Arms',
+    'hand': 'Shoulders & Arms',
+    'finger': 'Shoulders & Arms',
+    'bicep': 'Shoulders & Arms',
+    'tricep': 'Shoulders & Arms',
+    'forearm': 'Shoulders & Arms',
+    
+    // Upper Back & Chest
+    'upper back': 'Upper Back & Chest',
+    'thoracic': 'Upper Back & Chest',
+    'chest': 'Upper Back & Chest',
+    'pectoral': 'Upper Back & Chest',
+    'pec': 'Upper Back & Chest',
+    'trap': 'Upper Back & Chest',
+    'traps': 'Upper Back & Chest',
+    'trapezius': 'Upper Back & Chest',
+    'posture': 'Upper Back & Chest',
+    'slouch': 'Upper Back & Chest',
+    
+    // Lower Back
+    'lower back': 'Lower Back',
+    'lumbar': 'Lower Back',
+    'spine': 'Lower Back',
+    'back pain': 'Lower Back',
+    'sciatic': 'Lower Back',
+    'sciatica': 'Lower Back',
+    
+    // Hips & Legs
+    'hip': 'Hips & Legs',
+    'leg': 'Hips & Legs',
+    'thigh': 'Hips & Legs',
+    'quad': 'Hips & Legs',
+    'quadricep': 'Hips & Legs',
+    'hamstring': 'Hips & Legs',
+    'calf': 'Hips & Legs',
+    'calves': 'Hips & Legs',
+    'knee': 'Hips & Legs',
+    'ankle': 'Hips & Legs',
+    'foot': 'Hips & Legs',
+    'feet': 'Hips & Legs',
+    'toe': 'Hips & Legs',
+    'glute': 'Hips & Legs',
+    'gluteal': 'Hips & Legs',
+    'piriformis': 'Hips & Legs',
+    'it band': 'Hips & Legs',
+    'iliotibial': 'Hips & Legs',
+    
+    // Full Body
+    'full': 'Full Body',
+    'body': 'Full Body',
+    'whole': 'Full Body',
+    'entire': 'Full Body',
+    'all over': 'Full Body',
+    'everything': 'Full Body',
+    'head to toe': 'Full Body',
+  };
+
+  // Keywords for issues with more variations and context
+  const issueKeywords: { [key: string]: IssueType } = {
+    // Stiffness
+    'stiff': 'stiffness',
+    'tight': 'stiffness',
+    'tense': 'stiffness',
+    'rigid': 'stiffness',
+    'restricted': 'stiffness',
+    'limited': 'stiffness',
+    'stuck': 'stiffness',
+    'lock': 'stiffness',
+    'locked': 'stiffness',
+    'knot': 'stiffness',
+    'knotted': 'stiffness',
+    'cramped': 'stiffness',
+    
+    // Pain
+    'pain': 'pain',
+    'ache': 'pain',
+    'hurt': 'pain',
+    'sore': 'pain',
+    'tender': 'pain',
+    'discomfort': 'pain',
+    'irritation': 'pain',
+    'sharp': 'pain',
+    'shooting': 'pain',
+    'throbbing': 'pain',
+    'burning': 'pain',
+    
+    // Tiredness
+    'tired': 'tiredness',
+    'fatigue': 'tiredness',
+    'exhaust': 'tiredness',
+    'worn': 'tiredness',
+    'drained': 'tiredness',
+    'lethargic': 'tiredness',
+    'sluggish': 'tiredness',
+    'weary': 'tiredness',
+    'weak': 'tiredness',
+    'recover': 'tiredness',
+    'recovery': 'tiredness',
+    'rest': 'tiredness',
+    
+    // Flexibility
+    'stretch': 'flexibility',
+    'flexible': 'flexibility',
+    'mobility': 'flexibility',
+    'loosen': 'flexibility',
+    'limber': 'flexibility',
+    'supple': 'flexibility',
+    'agile': 'flexibility',
+    'range of motion': 'flexibility',
+    'rom': 'flexibility',
+  };
+
+  // Keywords for activities with more variations
+  const activityKeywords: { [key: string]: string } = {
+    // Running
+    'running': 'running',
+    'run': 'running',
+    'jogging': 'running',
+    'jog': 'running',
+    'sprint': 'running',
+    
+    // Cycling
+    'cycling': 'cycling',
+    'cycle': 'cycling',
+    'biking': 'cycling',
+    'bike': 'cycling',
+    'spinning': 'cycling',
+    
+    // Swimming
+    'swimming': 'swimming',
+    'swim': 'swimming',
+    'pool': 'swimming',
+    
+    // General workouts
+    'workout': 'working out',
+    'exercise': 'working out',
+    'training': 'working out',
+    'gym': 'working out',
+    'cardio': 'working out',
+    'weights': 'working out',
+    'lifting': 'weight lifting',
+    'lift': 'weight lifting',
+    'strength': 'weight lifting',
+    
+    // Other activities
+    'yoga': 'yoga',
+    'pilates': 'pilates',
+    'hiking': 'hiking',
+    'hike': 'hiking',
+    'walking': 'walking',
+    'walk': 'walking',
+    'tennis': 'tennis',
+    'golf': 'golf',
+    'basketball': 'basketball',
+    'soccer': 'soccer',
+    'football': 'football',
+    'hockey': 'hockey',
+    'baseball': 'baseball',
+    'volleyball': 'volleyball',
+    'climbing': 'climbing',
+    'dance': 'dancing',
+    'dancing': 'dancing',
+    
+    // Computer/desk related 
+    'sitting': 'sitting',
+    'computer': 'desk work',
+    'desk': 'desk work',
+    'typing': 'desk work',
+    'coding': 'desk work',
+    'gaming': 'gaming',
+    'driving': 'driving',
+    'commuting': 'commuting',
+  };
+
+  // Specific contexts to help with disambiguating
+  const contextPatterns: { [key: string]: { area?: BodyArea, issue?: IssueType, activity?: string } } = {
+    'hunched over': { area: 'Upper Back & Chest', issue: 'stiffness' },
+    'slumped': { area: 'Upper Back & Chest', issue: 'stiffness' },
+    'rounded shoulders': { area: 'Upper Back & Chest', issue: 'stiffness' },
+    'text neck': { area: 'Neck', issue: 'stiffness' },
+    'tech neck': { area: 'Neck', issue: 'stiffness' },
+    'poor posture': { area: 'Upper Back & Chest', issue: 'stiffness' },
+    'desk job': { activity: 'desk work' },
+    'office work': { activity: 'desk work' },
+    'woke up': { issue: 'stiffness' },
+    'morning': { issue: 'stiffness' },
+    'before bed': { issue: 'tiredness' },
+    'quick stretch': { issue: 'flexibility' },
+    'cool down': { issue: 'tiredness' },
+    'warm up': { issue: 'flexibility' },
+  };
+
+  const lowercaseInput = input.toLowerCase();
+  console.log('Parsing input:', lowercaseInput);
+
+  // Find body areas
+  const parsedArea: BodyArea[] = [];
+  Object.entries(areaKeywords).forEach(([keyword, area]) => {
+    if (lowercaseInput.includes(keyword)) {
+      if (!parsedArea.includes(area)) {
+        parsedArea.push(area);
+      }
+    }
+  });
+
+  // Find issue types
+  let parsedIssue: IssueType | null = null;
+  Object.entries(issueKeywords).forEach(([keyword, issue]) => {
+    if (lowercaseInput.includes(keyword)) {
+      parsedIssue = issue;
+    }
+  });
+
+  // Find activities
+  let parsedActivity: string | null = null;
+  for (const [keyword, activity] of Object.entries(activityKeywords)) {
+    if (lowercaseInput.includes(keyword)) {
+      parsedActivity = activity;
+      break;
+    }
+  }
+
+  // Check for specific context patterns
+  for (const [pattern, context] of Object.entries(contextPatterns)) {
+    if (lowercaseInput.includes(pattern)) {
+      if (context.area && !parsedArea.includes(context.area)) {
+        parsedArea.push(context.area);
+      }
+      if (context.issue && !parsedIssue) {
+        parsedIssue = context.issue;
+      }
+      if (context.activity && !parsedActivity) {
+        parsedActivity = context.activity;
+      }
+    }
+  }
+
+  // Fallbacks if we couldn't determine key information
+  if (parsedArea.length === 0) {
+    // Default to Full Body if no specific area is mentioned
+    parsedArea.push('Full Body');
+  }
+
+  // If no specific issue is mentioned, try to infer from other clues
+  if (!parsedIssue) {
+    if (parsedActivity) {
+      // If they mentioned an activity but no issue, assume flexibility
+      parsedIssue = 'flexibility';
+    } else if (lowercaseInput.includes('all day') || 
+               lowercaseInput.includes('long time') || 
+               lowercaseInput.includes('hours')) {
+      // If they mentioned sitting/working for a long time, assume stiffness
+      parsedIssue = 'stiffness';
+    } else {
+      // Default fallback
+      parsedIssue = 'stiffness';
+    }
+  }
+
+  console.log('Parsed results:', {
+    parsedArea,
+    parsedIssue,
+    parsedActivity
+  });
+
+  return {
+    rawInput: input,
+    parsedArea,
+    parsedIssue,
+    parsedActivity,
+  };
+};
+
+export const generateRoutineConfig = (
+  input: SmartRoutineInput,
+  selectedIssue: IssueType,
+  selectedDuration: Duration
+): SmartRoutineConfig => {
+  // Determine body areas - ensure we're working with valid BodyArea types
+  const areas: BodyArea[] = input.parsedArea && input.parsedArea.length > 0 ? 
+    input.parsedArea as BodyArea[] : ['Full Body' as BodyArea];
+  
+  console.log('Generating routine for areas:', areas);
+  
+  // Determine stretch level based on issue
+  let level: StretchLevel;
+  switch (selectedIssue) {
+    case 'pain':
+      level = 'beginner';
+      break;
+    case 'stiffness':
+      level = Math.random() > 0.5 ? 'beginner' : 'intermediate';
+      break;
+    case 'tiredness':
+      level = 'beginner';
+      break;
+    case 'flexibility':
+      level = Math.random() > 0.5 ? 'intermediate' : 'advanced';
+      break;
+    default:
+      level = 'beginner';
+  }
+  
+  // Determine if routine should be desk-friendly
+  const isDeskFriendly = !input.parsedActivity;
+  
+  console.log(`Generated config: level=${level}, duration=${selectedDuration}, desk-friendly=${isDeskFriendly}`);
+  
+  return {
+    areas,
+    duration: selectedDuration,
+    level,
+    issueType: selectedIssue,
+    isDeskFriendly,
+    postActivity: input.parsedActivity,
+  };
+};
+
+export const selectStretches = (
+  config: SmartRoutineConfig,
+  availableStretches: Stretch[],
+): Stretch[] => {
+  // Filter stretches by area and level
+  let filtered = availableStretches.filter(stretch =>
+    config.areas.some(area => stretch.tags.includes(area)) &&
+    stretch.level === config.level
+  );
+  
+  // If no stretches match the criteria, fall back to any stretches for these areas
+  if (filtered.length === 0) {
+    console.log('No stretches found for specific level, falling back to any level');
+    filtered = availableStretches.filter(stretch =>
+      config.areas.some(area => stretch.tags.includes(area))
+    );
+  }
+  
+  // If still no matches, use Full Body stretches
+  if (filtered.length === 0) {
+    console.log('No stretches found for areas, falling back to Full Body');
+    filtered = availableStretches.filter(stretch =>
+      stretch.tags.includes('Full Body')
+    );
+  }
+  
+  // Final fallback - just use any stretches
+  if (filtered.length === 0) {
+    console.log('Using all stretches as fallback');
+    filtered = [...availableStretches];
+  }
+  
+  // If desk-friendly is required, prioritize those stretches
+  if (config.isDeskFriendly) {
+    // Just prioritize non-bilateral stretches, don't filter out completely
+    const deskFriendly = filtered.filter(stretch => !stretch.bilateral);
+    if (deskFriendly.length > 0) {
+      filtered = deskFriendly;
+    }
+  }
+  
+  // Shuffle the filtered stretches
+  filtered.sort(() => Math.random() - 0.5);
+  
+  // Calculate target duration based on selected duration
+  // Use the appropriate range: 5 mins (3-5 mins), 10 mins (6-10 mins), 15 mins (11-15 mins)
+  const selectedDuration = parseInt(config.duration);
+  let minDuration: number;
+  let maxDuration: number;
+  
+  switch (selectedDuration) {
+    case 5:
+      minDuration = 3 * 60; // 3 minutes in seconds
+      maxDuration = 5 * 60; // 5 minutes in seconds
+      break;
+    case 10:
+      minDuration = 6 * 60; // 6 minutes in seconds
+      maxDuration = 10 * 60; // 10 minutes in seconds
+      break;
+    case 15:
+      minDuration = 11 * 60; // 11 minutes in seconds
+      maxDuration = 15 * 60; // 15 minutes in seconds
+      break;
+    default:
+      // For any other duration, use 80-100% of the requested time
+      minDuration = selectedDuration * 60 * 0.8;
+      maxDuration = selectedDuration * 60;
+  }
+  
+  // Select stretches to fill the time
+  const selectedStretches: Stretch[] = [];
+  let currentDuration = 0;
+  
+  // First pass: try to get at least to the minimum duration
+  for (const stretch of filtered) {
+    if (currentDuration >= minDuration) break;
+    
+    const stretchDuration = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
+    selectedStretches.push(stretch);
+    currentDuration += stretchDuration;
+  }
+  
+  // Second pass: add more stretches if we're below max duration and have more available
+  if (currentDuration < maxDuration) {
+    for (const stretch of filtered) {
+      // Skip stretches we've already added
+      if (selectedStretches.includes(stretch)) continue;
+      
+      const stretchDuration = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
+      
+      // Only add if it doesn't push us far beyond the max duration
+      if (currentDuration + stretchDuration <= maxDuration * 1.1) {
+        selectedStretches.push(stretch);
+        currentDuration += stretchDuration;
+      }
+      
+      if (currentDuration >= maxDuration) break;
+    }
+  }
+  
+  // Make sure we have at least one stretch
+  if (selectedStretches.length === 0 && filtered.length > 0) {
+    selectedStretches.push(filtered[0]);
+  }
+  
+  console.log(`Selected ${selectedStretches.length} stretches for smart routine (${Math.round(currentDuration/60)} minutes)`);
+  return selectedStretches;
 };

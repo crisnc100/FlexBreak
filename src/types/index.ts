@@ -5,7 +5,7 @@ export type BodyArea = 'Full Body' | 'Lower Back' | 'Upper Back & Chest' | 'Neck
 export type Duration = '5' | '10' | '15';
 
 export interface Stretch {
-  id: number;
+  id: number | string;
   name: string;
   description: string;
   duration: number; // seconds
@@ -14,6 +14,14 @@ export interface Stretch {
   image: any;
   bilateral?: boolean;
   premium?: boolean;
+}
+
+export interface CustomRestPeriod {
+  id: string;
+  name: string;
+  description: string;
+  duration: number;
+  isRest: true;
 }
 
 export interface Tip {
@@ -141,3 +149,21 @@ export type RootStackParamList = {
 };
 
 export type AppNavigationProp = NavigationProp<RootStackParamList>;
+
+export type IssueType = 'stiffness' | 'pain' | 'tiredness' | 'flexibility';
+
+export interface SmartRoutineInput {
+  rawInput: string;
+  parsedArea?: BodyArea[];
+  parsedIssue?: IssueType;
+  parsedActivity?: string;
+}
+
+export interface SmartRoutineConfig {
+  areas: BodyArea[];
+  duration: Duration;
+  level: StretchLevel;
+  issueType: IssueType;
+  isDeskFriendly: boolean;
+  postActivity?: string;
+}

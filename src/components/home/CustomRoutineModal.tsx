@@ -4,17 +4,15 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  FlatList, 
-  TextInput, 
   Alert,
   Modal,
   SafeAreaView,
-  Switch,
-  ScrollView
+  ScrollView,
+  Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { BodyArea, Duration, RoutineParams, Stretch } from '../../types';
+import { BodyArea, Duration, RoutineParams, Stretch, StretchLevel, CustomRestPeriod } from '../../types';
 import { 
   saveFavoriteRoutine, 
   saveCustomRoutine as saveCustomRoutineToStorage, 
@@ -24,19 +22,18 @@ import {
 import { usePremium } from '../../context/PremiumContext';
 import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import StretchSelector from './StretchSelector';
+import SmartRoutineGenerator from './SmartRoutineGenerator';
 import stretches from '../../data/stretches';
-
-// Define a rest period type
-interface RestPeriod {
-  id: string;
-  name: string;
-  description: string;
-  duration: number;
-  isRest: true;
-}
+import * as rewardManager from '../../utils/progress/modules/rewardManager';
+import { 
+  CustomRoutineHeader,
+  CustomForm,
+  PremiumTeaser,
+  RoutineList
+} from './tabs';
 
 // Max number of custom routines a user can save
-const MAX_CUSTOM_ROUTINES = 10;
+const MAX_CUSTOM_ROUTINES = 15;
 
 // Interface for custom routine
 interface CustomRoutine {
@@ -65,29 +62,18 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   
   // State variables
   const [customRoutines, setCustomRoutines] = useState<CustomRoutine[]>([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(true);
   const [routineName, setRoutineName] = useState('');
   const [selectedArea, setSelectedArea] = useState<BodyArea>('Neck');
   const [selectedDuration, setSelectedDuration] = useState<Duration>('5');
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [showStretchSelector, setShowStretchSelector] = useState(false);
-  const [selectedStretches, setSelectedStretches] = useState<(Stretch | RestPeriod)[]>([]);
-  const [useCustomStretches, setUseCustomStretches] = useState(false);
+  const [selectedStretches, setSelectedStretches] = useState<(Stretch | CustomRestPeriod)[]>([]);
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'routines' | 'create'>('routines');
   
-  // Body area options
-  const bodyAreas: BodyArea[] = [
-    'Full Body', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'
-  ];
-  
-  // Duration options
-  const durations: { value: Duration; label: string }[] = [
-    { value: '5', label: '5 minutes' },
-    { value: '10', label: '10 minutes' },
-    { value: '15', label: '15 minutes' }
-  ];
-
   // Rest period options
-  const restPeriods: RestPeriod[] = [
+  const restPeriods: CustomRestPeriod[] = [
     { 
       id: 'rest-15', 
       name: "15-Second Break", 
@@ -123,6 +109,17 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       loadCustomRoutines();
     }
   }, [visible, isPremium]);
+  
+  // Update tabs based on custom routines availability
+  useEffect(() => {
+    // If there are custom routines, default to showing them
+    if (customRoutines.length > 0) {
+      setActiveTab('routines');
+    } else {
+      // If no custom routines, default to create tab
+      setActiveTab('create');
+    }
+  }, [customRoutines.length]);
   
   // Refresh feature access
   const refreshFeatureAccess = async () => {
@@ -171,7 +168,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       }
       
       // Validate minimum time requirements when using custom stretches
-      if (useCustomStretches && selectedStretches.length > 0) {
+      if (selectedStretches.length > 0) {
         // Calculate total time
         const totalTime = selectedStretches.reduce((total, stretch) => {
           if ('isRest' in stretch) {
@@ -211,7 +208,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       };
       
       // Add selected stretches if using custom stretches
-      if (useCustomStretches && selectedStretches.length > 0) {
+      if (selectedStretches.length > 0) {
         newRoutine.customStretches = selectedStretches.map(stretch => {
           if ('isRest' in stretch) {
             return { id: stretch.id, isRest: true };
@@ -231,7 +228,6 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
         setRoutineName('');
         setShowCreateForm(false);
         setSelectedStretches([]);
-        setUseCustomStretches(false);
         
         // Reload routines to get the updated list with IDs
         await loadCustomRoutines();
@@ -292,7 +288,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
           const stretchDetail = stretches.find(stretch => stretch.id === s.id);
           return stretchDetail;
         }
-      }).filter(Boolean) as (Stretch | RestPeriod)[];
+      }).filter(Boolean) as (Stretch | CustomRestPeriod)[];
       
       params.customStretches = selectedStretchDetails;
       
@@ -343,13 +339,14 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   };
   
   // Handle stretches selected
-  const handleStretchesSelected = (stretches: (Stretch | RestPeriod)[]) => {
+  const handleStretchesSelected = (stretches: (Stretch | CustomRestPeriod)[]) => {
+    console.log('handleStretchesSelected called with', stretches.length, 'stretches');
     setSelectedStretches(stretches);
-    // Don't close the modal - let the user close it manually
   };
   
   // Handle closing the stretch selector
   const handleCloseStretchSelector = () => {
+    console.log('handleCloseStretchSelector called - closing StretchSelector modal');
     setShowStretchSelector(false);
   };
   
@@ -413,8 +410,8 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   
   // Check if current selection meets minimum requirement
   const meetsMinimumRequirement = () => {
-    if (!useCustomStretches || selectedStretches.length === 0) {
-      return true; // No need to check if not using custom stretches
+    if (selectedStretches.length === 0) {
+      return true; // No need to check if no stretches selected
     }
     
     // Calculate total time
@@ -432,8 +429,8 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   };
   
   // Add a rest period to selected stretches
-  const addRestPeriod = (restPeriod: RestPeriod) => {
-    setSelectedStretches([...selectedStretches, restPeriod]);
+  const addRestPeriod = (restPeriod: CustomRestPeriod) => {
+    setSelectedStretches(prev => [...prev, restPeriod]);
   };
   
   // Remove a stretch or rest period at specific index
@@ -453,114 +450,184 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     updatedStretches.splice(toIndex, 0, item);
     setSelectedStretches(updatedStretches);
   };
-  
-  // Render a routine item
-  const renderRoutineItem = ({ item }: { item: CustomRoutine }) => {
-    // Calculate count of stretches and breaks
-    let stretchCount = 0;
-    let breakCount = 0;
-    
-    if (item.customStretches) {
-      stretchCount = item.customStretches.filter(s => !s.isRest).length;
-      breakCount = item.customStretches.filter(s => s.isRest).length;
-    }
-    
-    return (
-      <View style={[
-        styles.routineItem,
-        { backgroundColor: isDark ? theme.backgroundLight : '#fff' }
-      ]}>
-        <View style={styles.routineInfo}>
-          <Text style={[
-            styles.routineName,
-            { color: theme.text }
-          ]}>
-            {item.name}
-          </Text>
-          <Text style={[
-            styles.routineDetails,
-            { color: theme.textSecondary }
-          ]}>
-            {item.area} • {item.duration} minutes
-            {item.customStretches && ` • ${stretchCount} stretches${breakCount > 0 ? `, ${breakCount} breaks` : ''}`}
-          </Text>
-        </View>
-        
-        <View style={styles.routineActions}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => startCustomRoutine(item)}
-          >
-            <Ionicons name="play" size={18} color={theme.accent} />
-          </TouchableOpacity>
+
+  // Handle smart routine generation
+  const handleSmartRoutineGenerated = async (generatedStretches: Stretch[], smartRoutineInput?: { 
+    description: string;
+    issueType: string;
+    duration: Duration;
+    area?: BodyArea;
+  }) => {
+    try {
+      console.log(`SMART ROUTINE DEBUG: Received ${generatedStretches.length} stretches`);
+      
+      // Check if user has premium access
+      const hasPremiumAccess = await rewardManager.isRewardUnlocked('premium_stretches');
+      console.log(`SMART ROUTINE DEBUG: User has premium access: ${hasPremiumAccess}`);
+      
+      const validatedStretches = generatedStretches
+        // Filter out premium stretches if user doesn't have access
+        .filter(stretch => !stretch.premium || hasPremiumAccess)
+        // Map to ensure all properties are properly set
+        .map(stretch => {
+          // Create a safe copy with all required fields
+          const stretchCopy = {
+            // Convert ID to string to ensure compatibility with ActiveRoutine
+            id: typeof stretch.id === 'number' ? String(stretch.id) : stretch.id,
+            
+            // Ensure name exists
+            name: stretch.name || 'Unnamed Stretch',
+            
+            // Ensure description exists
+            description: stretch.description || 'Follow the instructions for this stretch carefully.',
+            
+            // Ensure duration is a number
+            duration: typeof stretch.duration === 'number' ? stretch.duration : 30,
+            
+            // Ensure tags is an array
+            tags: Array.isArray(stretch.tags) && stretch.tags.length > 0 
+              ? stretch.tags 
+              : [smartRoutineInput?.area || selectedArea],
+            
+            // Ensure level exists
+            level: stretch.level || 'intermediate',
+            
+            // Ensure image exists
+            image: stretch.image || { 
+              uri: `https://via.placeholder.com/200/673AB7/FFFFFF?text=${encodeURIComponent(stretch.name || 'Stretch')}` 
+            },
+            
+            // Set bilateral property
+            bilateral: !!stretch.bilateral,
+            
+            // Optional premium property - ensure it's filtered already
+            premium: !!stretch.premium && hasPremiumAccess
+          };
           
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => deleteCustomRoutine(item.id)}
-          >
-            <Ionicons name="trash" size={18} color="#FF5252" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+          return stretchCopy;
+        });
+      
+      console.log(`SMART ROUTINE DEBUG: Validated ${validatedStretches.length} stretches`);
+      
+      if (validatedStretches.length === 0) {
+        Alert.alert('Error', 'No valid stretches could be generated. Please try again with different input.');
+        return;
+      }
+      
+      // Create the routine parameters
+      const routineParams: RoutineParams = {
+        area: smartRoutineInput?.area || selectedArea,
+        duration: smartRoutineInput?.duration || selectedDuration as Duration,
+        level: 'intermediate' as StretchLevel,
+        customStretches: validatedStretches
+      };
+      
+      
+      // If generated from SmartRoutineGenerator, save it to custom routines
+      if (smartRoutineInput) {
+        try {
+          // Create a name for the routine based on input description
+          const routineName = generateSmartRoutineName(smartRoutineInput);
+          
+          // Create routine object
+          const newRoutine: any = {
+            name: routineName,
+            area: routineParams.area,
+            duration: routineParams.duration,
+            customStretches: validatedStretches.map(stretch => ({ id: stretch.id }))
+          };
+          
+          // Save to storage
+          const success = await saveCustomRoutineToStorage(newRoutine);
+          
+          if (success) {
+            // Also save as a favorite routine
+            await saveFavoriteRoutine(newRoutine);
+            
+            // Reload routines to include the newly saved one
+            await loadCustomRoutines();
+            
+          }
+        } catch (error) {
+          console.error('Error saving smart routine as custom routine:', error);
+          // Continue with the routine even if saving fails
+        }
+      }
+      
+      // Start the routine
+      onStartRoutine(routineParams);
+      onClose();
+    } catch (error) {
+      console.error('Error in handleSmartRoutineGenerated:', error);
+      Alert.alert('Error', 'There was a problem generating your routine. Please try again.');
+    }
   };
 
-  // Render a selected item (stretch or rest period)
-  const renderSelectedItem = (item: Stretch | RestPeriod, index: number) => {
-    const isRest = 'isRest' in item;
+  // Generate a meaningful name for a smart routine
+  const generateSmartRoutineName = (input: { 
+    description: string;
+    issueType: string;
+    duration: Duration;
+    area?: BodyArea;
+  }): string => {
+    // Create a smart name based on the issue type and description
+    const area = input.area || 'Full Body';
+    const issueType = input.issueType.charAt(0).toUpperCase() + input.issueType.slice(1);
+    const durationMin = input.duration;
     
+    let name = '';
+    
+    // Try to extract a meaningful name from the description
+    const description = input.description.trim();
+    if (description.length > 0) {
+      // Try to create a more descriptive name
+      if (description.length <= 30) {
+        // If it's a short description, capitalize first letter and use it as is
+        name = `${description.charAt(0).toUpperCase() + description.slice(1)} (${durationMin}min)`;
+      } else {
+        // If it's longer, truncate it
+        name = `${description.substring(0, 27).trim()}... (${durationMin}min)`;
+      }
+    } else {
+      // Fallback to generic name based on area and issue
+      name = `${area} ${issueType} Routine (${durationMin}min)`;
+    }
+    
+    return name;
+  };
+
+  // Render create form content based on mode
+  const renderCreateFormContent = () => {
+    if (!isCustomMode) {
+      return (
+        <View style={styles.smartModeContainer}>
+          <SmartRoutineGenerator onRoutineGenerated={handleSmartRoutineGenerated} />
+        </View>
+      );
+    }
+
     return (
-      <View 
-        key={`${item.id}-${index}`} 
-        style={[
-          styles.selectedItemRow, 
-          { backgroundColor: isDark ? theme.backgroundLight : '#f8f8f8' }
-        ]}
-      >
-        <View style={styles.selectedItemInfo}>
-          <View style={styles.itemIndexContainer}>
-            <Text style={[styles.itemIndexText, { color: theme.textSecondary }]}>
-              {index + 1}
-            </Text>
-          </View>
-          
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.selectedItemName, { color: theme.text }]}>
-              {item.name}
-            </Text>
-            <Text style={[styles.selectedItemDuration, { color: theme.textSecondary }]}>
-              {isRest ? `${item.duration}s rest` : `${item.duration}s${(item as Stretch).bilateral ? ' (both sides)' : ''}`}
-            </Text>
-          </View>
-        </View>
-        
-        <View style={styles.selectedItemActions}>
-          {index > 0 && (
-            <TouchableOpacity 
-              style={styles.itemActionButton} 
-              onPress={() => moveItem(index, index - 1)}
-            >
-              <Ionicons name="chevron-up" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-          )}
-          
-          {index < selectedStretches.length - 1 && (
-            <TouchableOpacity 
-              style={styles.itemActionButton} 
-              onPress={() => moveItem(index, index + 1)}
-            >
-              <Ionicons name="chevron-down" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-          )}
-          
-          <TouchableOpacity 
-            style={styles.itemActionButton} 
-            onPress={() => removeItem(index)}
-          >
-            <Ionicons name="close" size={20} color="#FF5252" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CustomForm
+        theme={theme}
+        isDark={isDark}
+        routineName={routineName}
+        setRoutineName={setRoutineName}
+        selectedArea={selectedArea}
+        setSelectedArea={setSelectedArea}
+        selectedDuration={selectedDuration}
+        setSelectedDuration={setSelectedDuration}
+        selectedStretches={selectedStretches}
+        setSelectedStretches={setSelectedStretches}
+        openStretchSelector={openStretchSelector}
+        addRestPeriod={addRestPeriod}
+        removeItem={removeItem}
+        moveItem={moveItem}
+        saveCustomRoutine={saveCustomRoutine}
+        restPeriods={restPeriods}
+        formatCustomStretchesInfo={formatCustomStretchesInfo}
+        meetsMinimumRequirement={meetsMinimumRequirement}
+        isCustomMode={isCustomMode}
+      />
     );
   };
 
@@ -593,334 +660,160 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   const modalContent = () => {
     if (!hasAccess) {
       return (
-        <View style={styles.premiumTeaser}>
-          <Ionicons 
-            name="lock-closed" 
-            size={48} 
-            color={isDark ? theme.textSecondary : '#ccc'} 
-          />
-          <Text style={[
-            styles.premiumTeaserTitle,
-            { color: theme.text }
-          ]}>
-            Premium Feature
-          </Text>
-          <Text style={[
-            styles.premiumTeaserText,
-            { color: theme.textSecondary }
-          ]}>
-            Custom Routines are available to premium users at level {requiredLevel}.
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.premiumButton,
-              { backgroundColor: theme.accent }
-            ]}
-            onPress={() => {
-              refreshFeatureAccess();
-              onClose();
-            }}
-          >
-            <Text style={styles.premiumButtonText}>Got it</Text>
-          </TouchableOpacity>
-        </View>
+        <PremiumTeaser
+          theme={theme}
+          isDark={isDark}
+          requiredLevel={requiredLevel}
+          refreshFeatureAccess={refreshFeatureAccess}
+          onClose={onClose}
+        />
       );
     }
     
     return (
       <>
-        <View style={styles.header}>
-          <Text style={[
-            styles.screenTitle,
-            { color: theme.text }
-          ]}>
-            Custom Routines
+        {/* Mode toggle for smart/custom selection */}
+        <View style={styles.modeToggleContainer}>
+          <Text style={[styles.modeToggleLabel, { color: theme.text }]}>
+            Creation Mode:
           </Text>
+          <View style={styles.segmentedControl}>
+            <TouchableOpacity
+              style={[
+                styles.segmentButton,
+                !isCustomMode && styles.segmentButtonActive,
+                { backgroundColor: !isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
+              ]}
+              onPress={() => setIsCustomMode(false)}
+            >
+              <Text style={[
+                styles.segmentButtonText,
+                { color: !isCustomMode ? '#fff' : theme.text }
+              ]}>
+                Smart
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.segmentButton,
+                isCustomMode && styles.segmentButtonActive,
+                { backgroundColor: isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
+              ]}
+              onPress={() => setIsCustomMode(true)}
+            >
+              <Text style={[
+                styles.segmentButtonText,
+                { color: isCustomMode ? '#fff' : theme.text }
+              ]}>
+                Manual
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Tab navigation */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab === 'routines' && { borderBottomColor: theme.accent, borderBottomWidth: 2 }
+            ]}
+            onPress={() => setActiveTab('routines')}
+          >
+            <Text 
+              style={[
+                styles.tabText, 
+                { color: activeTab === 'routines' ? theme.accent : theme.textSecondary }
+              ]}
+            >
+              My Routines
+            </Text>
+          </TouchableOpacity>
           
           <TouchableOpacity
             style={[
-              styles.createButton,
-              { backgroundColor: theme.accent }
+              styles.tabButton,
+              activeTab === 'create' && { borderBottomColor: theme.accent, borderBottomWidth: 2 }
             ]}
-            onPress={() => setShowCreateForm(!showCreateForm)}
+            onPress={() => setActiveTab('create')}
           >
-            <Ionicons 
-              name={showCreateForm ? "close" : "add"} 
-              size={20} 
-              color="#fff" 
-            />
+            <Text 
+              style={[
+                styles.tabText, 
+                { color: activeTab === 'create' ? theme.accent : theme.textSecondary }
+              ]}
+            >
+              Create New
+            </Text>
           </TouchableOpacity>
         </View>
-        
-        {/* Create Form */}
-        {showCreateForm && (
-          <View style={[
-            styles.createForm,
-            { backgroundColor: isDark ? theme.cardBackground : '#fff' }
-          ]}>
-            <Text style={[
-              styles.formTitle,
-              { color: theme.text }
-            ]}>
-              Create New Routine
-            </Text>
-            
-            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  { 
-                    color: theme.text,
-                    backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
-                    borderColor: theme.border
-                  }
-                ]}
-                placeholder="Routine name"
-                placeholderTextColor={theme.textSecondary}
-                value={routineName}
-                onChangeText={setRoutineName}
+
+        {/* Tab content */}
+        {activeTab === 'routines' && (
+          <ScrollView 
+            style={styles.tabContent}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+          >
+            {customRoutines.length > 0 ? (
+              <RoutineList
+                customRoutines={customRoutines}
+                startCustomRoutine={startCustomRoutine}
+                deleteCustomRoutine={deleteCustomRoutine}
+                theme={theme}
+                isDark={isDark}
+                MAX_CUSTOM_ROUTINES={MAX_CUSTOM_ROUTINES}
               />
-              
-              <Text style={[
-                styles.formLabel,
-                { color: theme.text }
-              ]}>
-                Area
-              </Text>
-              
-              <View style={styles.optionsGrid}>
-                {bodyAreas.map(area => (
-                  <TouchableOpacity
-                    key={area}
-                    style={[
-                      styles.optionButton,
-                      { 
-                        backgroundColor: selectedArea === area 
-                          ? theme.accent 
-                          : isDark ? theme.backgroundLight : '#f5f5f5'
-                      }
-                    ]}
-                    onPress={() => setSelectedArea(area)}
-                  >
-                    <Text style={[
-                      styles.optionText,
-                      { color: selectedArea === area ? '#fff' : theme.text }
-                    ]}>
-                      {area}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <Text style={[
-                styles.formLabel,
-                { color: theme.text }
-              ]}>
-                Duration
-              </Text>
-              
-              <View style={styles.durationOptions}>
-                {durations.map(duration => (
-                  <TouchableOpacity
-                    key={duration.value}
-                    style={[
-                      styles.durationButton,
-                      { 
-                        backgroundColor: selectedDuration === duration.value 
-                          ? theme.accent 
-                          : isDark ? theme.backgroundLight : '#f5f5f5'
-                      }
-                    ]}
-                    onPress={() => setSelectedDuration(duration.value)}
-                  >
-                    <Text style={[
-                      styles.durationText,
-                      { color: selectedDuration === duration.value ? '#fff' : theme.text }
-                    ]}>
-                      {duration.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <View style={styles.customStretchesOption}>
-                <View style={styles.switchLabelContainer}>
-                  <Text style={[styles.switchLabel, { color: theme.text }]}>
-                    Choose specific stretches
-                  </Text>
-                  <Text style={[
-                    styles.switchSubLabel, 
-                    { 
-                      color: useCustomStretches && !meetsMinimumRequirement() 
-                        ? '#FF5252' 
-                        : theme.textSecondary 
-                    }
-                  ]}>
-                    {useCustomStretches ? formatCustomStretchesInfo() : 'We\'ll pick the best stretches for you'}
-                  </Text>
-                </View>
-                <Switch
-                  value={useCustomStretches}
-                  onValueChange={setUseCustomStretches}
-                  trackColor={{ false: '#767577', true: theme.accent + '50' }}
-                  thumbColor={useCustomStretches ? theme.accent : '#f4f3f4'}
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons 
+                  name="fitness-outline" 
+                  size={70} 
+                  color={isDark ? theme.textSecondary : '#ccc'} 
                 />
-              </View>
-              
-              {useCustomStretches && (
-                <>
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Select Stretches</Text>
-                  </View>
-                  
-                  <TouchableOpacity
-                    style={[
-                      styles.selectStretchesButton,
-                      { 
-                        backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
-                        borderColor: theme.border
-                      }
-                    ]}
-                    onPress={openStretchSelector}
-                  >
-                    <Ionicons 
-                      name="fitness-outline" 
-                      size={20} 
-                      color={theme.accent}
-                      style={styles.selectStretchesIcon} 
-                    />
-                    <Text style={[styles.selectStretchesText, { color: theme.text }]}>
-                      {selectedStretches.filter(s => !('isRest' in s)).length > 0 
-                        ? 'Edit selected stretches' 
-                        : 'Select stretches'
-                      }
-                    </Text>
-                    <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                  </TouchableOpacity>
-                  
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Add Rest Periods</Text>
-                  </View>
-                  
-                  <View style={styles.restPeriodsContainer}>
-                    {restPeriods.map((restPeriod) => (
-                      <TouchableOpacity
-                        key={restPeriod.id}
-                        style={[
-                          styles.restPeriodButton,
-                          { backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5' }
-                        ]}
-                        onPress={() => addRestPeriod(restPeriod)}
-                      >
-                        <View style={styles.restPeriodIconContainer}>
-                          <Ionicons name="time-outline" size={24} color={theme.accent} />
-                        </View>
-                        <View style={styles.restPeriodContent}>
-                          <Text style={[styles.restPeriodName, { color: theme.text }]}>
-                            {restPeriod.name}
-                          </Text>
-                          <Text
-                            numberOfLines={1}
-                            style={[styles.restPeriodDescription, { color: theme.textSecondary }]}
-                          >
-                            {restPeriod.description}
-                          </Text>
-                        </View>
-                        <Ionicons name="add-circle" size={24} color={theme.accent} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  
-                  {selectedStretches.length > 0 && (
-                    <>
-                      <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                          Your Routine Order
-                        </Text>
-                        <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                          Drag to reorder
-                        </Text>
-                      </View>
-                      
-                      <View style={styles.selectedItemsContainer}>
-                        {selectedStretches.map((item, index) => (
-                          renderSelectedItem(item, index)
-                        ))}
-                      </View>
-                    </>
-                  )}
-                </>
-              )}
-              
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  { 
-                    backgroundColor: (useCustomStretches && !meetsMinimumRequirement()) 
-                      ? '#CCCCCC' 
-                      : theme.accent,
-                    opacity: (useCustomStretches && !meetsMinimumRequirement()) ? 0.7 : 1
-                  }
-                ]}
-                onPress={saveCustomRoutine}
-                disabled={useCustomStretches && !meetsMinimumRequirement()}
-              >
-                <Text style={styles.saveButtonText}>
-                  {(useCustomStretches && !meetsMinimumRequirement())
-                    ? 'Add More Stretches First'
-                    : 'Save Routine'
-                  }
+                <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
+                  No Custom Routines Yet
                 </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        )}
-        
-        {/* Warning about max routines */}
-        {customRoutines.length >= MAX_CUSTOM_ROUTINES - 3 && (
-          <View style={[
-            styles.warningBox, 
-            { backgroundColor: isDark ? theme.cardBackground : '#FFF9C4' }
-          ]}>
-            <Ionicons name="information-circle" size={20} color={isDark ? theme.textSecondary : '#FFA000'} />
-            <Text style={[
-              styles.warningText,
-              { color: isDark ? theme.textSecondary : '#5D4037' }
-            ]}>
-              You have {MAX_CUSTOM_ROUTINES - customRoutines.length} routine slots remaining. Maximum is {MAX_CUSTOM_ROUTINES}.
-            </Text>
-          </View>
-        )}
-        
-        {/* Routines List */}
-        {customRoutines.length > 0 ? (
-          <View style={styles.routinesList}>
-            {customRoutines.map(item => (
-              <View key={item.id} style={styles.routineItemContainer}>
-                {renderRoutineItem({ item })}
+                <Text style={[styles.emptyStateDescription, { color: theme.textSecondary }]}>
+                  Create your first custom routine or use the AI powered generator to get started.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.createEmptyButton, { backgroundColor: theme.accent }]}
+                  onPress={() => setActiveTab('create')}
+                >
+                  <Text style={styles.createEmptyButtonText}>Create New Routine</Text>
+                </TouchableOpacity>
               </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons 
-              name="fitness-outline" 
-              size={48} 
-              color={isDark ? theme.textSecondary : '#ccc'} 
-            />
-            <Text style={[
-              styles.emptyText,
-              { color: theme.textSecondary }
+            )}
+          </ScrollView>
+        )}
+
+        {activeTab === 'create' && (
+          <ScrollView 
+            style={styles.tabContent}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+          >
+            <View style={[
+              styles.createForm,
+              { backgroundColor: isDark ? theme.cardBackground : '#fff' }
             ]}>
-              You haven't created any custom routines yet.
-            </Text>
-            <Text style={[
-              styles.emptySubtext,
-              { color: theme.textSecondary }
-            ]}>
-              Tap the + button to create your first routine.
-            </Text>
-          </View>
+              <Text style={[
+                styles.formTitle,
+                { color: theme.text }
+              ]}>
+                {isCustomMode ? 'Create Custom Routine' : 'Smart Routine Generator (Beta)'}
+              </Text>
+              
+              <Text style={[styles.formDescription, { color: theme.textSecondary }]}>
+                {isCustomMode 
+                  ? 'Select your own stretches and create a personalized routine.' 
+                  : 'Describe your needs in natural language, and I\'ll create a personalized routine for you.'}
+              </Text>
+              
+              {renderCreateFormContent()}
+            </View>
+          </ScrollView>
         )}
       </>
     );
@@ -937,26 +830,24 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
         styles.container,
         { backgroundColor: isDark ? theme.background : '#f5f5f5' }
       ]}>
-        <TouchableOpacity 
-          style={[styles.closeButton, { backgroundColor: isDark ? theme.backgroundLight : '#fff' }]} 
-          onPress={onClose}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </TouchableOpacity>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={[styles.closeButton, { backgroundColor: isDark ? theme.backgroundLight : '#fff' }]} 
+            onPress={onClose}
+          >
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Custom Routines</Text>
+        </View>
         
-        <ScrollView 
-          style={styles.scrollContainer}
-          showsVerticalScrollIndicator={true}
-          bounces={true}
-        >
-          {modalContent()}
-        </ScrollView>
+        {modalContent()}
         
         {/* Stretch Selector Modal */}
         <Modal
           visible={showStretchSelector}
           animationType="slide"
           transparent={false}
+          onRequestClose={handleCloseStretchSelector}
         >
           <SafeAreaView style={{ flex: 1 }}>
             <StretchSelector
@@ -996,83 +887,7 @@ const styles = StyleSheet.create({
     margin: 16,
     marginBottom: 8,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  screenTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  createButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  routinesList: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-  },
-  routineItemContainer: {
-    marginBottom: 12,
-  },
-  routineItem: {
-    flexDirection: 'row',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  routineInfo: {
-    flex: 1,
-  },
-  routineName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  routineDetails: {
-    fontSize: 14,
-    color: '#666',
-  },
-  routineActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-  },
   createForm: {
-    margin: 16,
     padding: 16,
     borderRadius: 12,
     backgroundColor: '#fff',
@@ -1081,234 +896,116 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    maxHeight: '80%',
   },
   formTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
   },
-  textInput: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 16,
-    backgroundColor: '#f5f5f5',
-  },
-  formLabel: {
+  formDescription: {
     fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  optionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     marginBottom: 16,
-  },
-  optionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginRight: 8,
-    marginBottom: 8,
-    backgroundColor: '#f5f5f5',
-  },
-  optionText: {
-    fontSize: 14,
-  },
-  durationOptions: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  durationButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginRight: 8,
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  durationText: {
-    fontSize: 14,
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  premiumTeaser: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  premiumTeaserTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  premiumTeaserText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  premiumButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: '#4CAF50',
-  },
-  premiumButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  customStretchesOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  switchLabelContainer: {
-    flex: 1,
-  },
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  switchSubLabel: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  selectStretchesButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  selectStretchesIcon: {
-    marginRight: 8,
-  },
-  selectStretchesText: {
-    flex: 1,
-    fontSize: 14,
-  },
-  warningBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF9C4',
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginBottom: 12,
-  },
-  warningText: {
-    marginLeft: 8,
-    fontSize: 12,
-    color: '#5D4037',
-    flex: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-  },
-  restPeriodsContainer: {
-    marginBottom: 16,
-  },
-  restPeriodButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  restPeriodIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  restPeriodContent: {
-    flex: 1,
-  },
-  restPeriodName: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  restPeriodDescription: {
-    fontSize: 12,
-  },
-  selectedItemsContainer: {
-    marginBottom: 16,
-  },
-  selectedItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    justifyContent: 'space-between',
-  },
-  selectedItemInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  itemIndexContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  itemIndexText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  selectedItemName: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  selectedItemDuration: {
-    fontSize: 12,
-  },
-  selectedItemActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemActionButton: {
-    padding: 6,
   },
   scrollContainer: {
     flex: 1,
+  },
+  smartModeContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  modeToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  modeToggleLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginRight: 16,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tabButton: {
+    flex: 1,
+    padding: 16,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  emptyStateContainer: {
+    padding: 40,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 400,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 20,
+  },
+  createEmptyButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  createEmptyButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 16,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  segmentButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  segmentButtonActive: {
+    // No bottom border needed with filled background
+  },
+  segmentButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

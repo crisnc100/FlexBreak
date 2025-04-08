@@ -54,7 +54,7 @@ export default function RoutineScreen() {
     isLoading: isStorageLoading, 
     saveRoutineProgress, 
     hideRoutine,
-    getAllRoutines 
+    getRecentRoutines 
   } = useRoutineStorage();
   const { suggestions, isLoading: isSuggestionsLoading } = useRoutineSuggestions();
   
@@ -141,8 +141,10 @@ export default function RoutineScreen() {
         stretchCount: stretchCount
       };
       
-      await saveRoutineProgress(entry);
-      console.log('Routine saved successfully');
+      // REMOVED: Direct call to saveRoutineProgress - removed to avoid duplicate entries
+      // The routine is saved inside processCompletedRoutine already
+      // await saveRoutineProgress(entry);
+      console.log('Routine will be saved through gamification system');
       
       // Check if XP boost is active
       const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
@@ -162,6 +164,20 @@ export default function RoutineScreen() {
         // CRITICAL FIX: Explicitly update challenge progress after routine completion
         console.log('Explicitly updating challenge progress after routine completion');
         refreshChallenges();
+        
+        // CRITICAL FIX: Manually refresh recent routines to ensure UI is updated
+        try {
+          // Fetch the updated routines directly from storage
+          const freshRoutines = await storageService.getRecentRoutines();
+          
+          // Refresh the recent routines list in the component state
+          // This ensures the UI will show the updated list when returning to the dashboard
+          await refreshRoutine();
+          
+          console.log('Manually refreshed recent routines:', freshRoutines.length);
+        } catch (refreshError) {
+          console.error('Error refreshing recent routines:', refreshError);
+        }
         
         if (result && result.success) {
           // Check if XP boost is active
@@ -513,9 +529,22 @@ export default function RoutineScreen() {
   };
   
   // FIXED: Reset level-up data when returning to dashboard
-  const showDashboard = () => {
-    setScreenState('DASHBOARD');
-    setLevelUpData(null); // Reset level-up data when changing screens
+  const showDashboard = async () => {
+    try {
+      // Refresh recent routines before showing dashboard
+      await getRecentRoutines();
+      
+      // Then update screen state
+      setScreenState('DASHBOARD');
+      setLevelUpData(null); // Reset level-up data when changing screens
+      
+      console.log('Refreshed routines before showing dashboard');
+    } catch (error) {
+      console.error('Error refreshing routines:', error);
+      // Still show dashboard even if refresh fails
+      setScreenState('DASHBOARD');
+      setLevelUpData(null);
+    }
   };
   
   // Handle smart pick modal
@@ -578,11 +607,26 @@ export default function RoutineScreen() {
   };
 
   // FIXED: Reset level-up data when creating a new routine
-  const handleCreateNewRoutine = () => {
-    resetParams();
-    setScreenState('DASHBOARD');
-    setLevelUpData(null); // Reset level-up data when starting a new routine
-    navigateToHome();
+  const handleCreateNewRoutine = async () => {
+    try {
+      // Refresh recent routines before resetting
+      await getRecentRoutines();
+      
+      // Reset parameters and state
+      resetParams();
+      setScreenState('DASHBOARD');
+      setLevelUpData(null); // Reset level-up data when starting a new routine
+      navigateToHome();
+      
+      console.log('Refreshed routines before creating new routine');
+    } catch (error) {
+      console.error('Error refreshing routines:', error);
+      // Continue with reset even if refresh fails
+      resetParams();
+      setScreenState('DASHBOARD');
+      setLevelUpData(null);
+      navigateToHome();
+    }
   };
 
   // Handle hiding a routine from view (but keep it for stats)

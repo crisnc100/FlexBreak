@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as rewardManager from '../../utils/progress/modules/rewardManager';
 import { Reward } from '../../utils/progress/types';
@@ -8,6 +8,7 @@ import { useTheme, ThemeType } from '../../context/ThemeContext';
 import PremiumLock from './PremiumLock';
 import CORE_REWARDS from '../../data/rewards.json';
 import { ThemedText } from '../common';
+import PremiumStretchesPreview from '../rewards/PremiumStretchesPreview';
 
 // Fallback rewards data in case loading fails
 const FALLBACK_REWARDS = CORE_REWARDS.map(reward => ({
@@ -28,6 +29,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
   const [isLoading, setIsLoading] = useState(true);
   const { theme, isDark, themeType, toggleTheme, setThemeType } = useTheme();
   const [refreshKey, setRefreshKey] = useState(0); // Add refresh key to force re-render
+  const [showPremiumStretches, setShowPremiumStretches] = useState(false);
   
   // Load rewards when component mounts
   useEffect(() => {
@@ -142,32 +144,73 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
     }
     
     // Handle different reward types
-    switch (reward.type) {
-      case 'theme':
-      case 'app_feature': // handle both types since rewards.json might have app_feature
-        // Toggle dark theme if it's the dark theme reward
-        if (reward.id === 'dark_theme') {
-          // DIRECTLY SET THEME - no alerts, no conditions, no logs
-          setThemeType(isDark ? 'light' : 'dark');
-        }
+    switch (reward.id) {
+      case 'dark_theme':
+        // DIRECTLY SET THEME - no alerts, no conditions, no logs
+        setThemeType(isDark ? 'light' : 'dark');
         break;
         
-      case 'boost':
-        // Handle boost rewards
+      case 'custom_reminders':
         Alert.alert(
-          'Use Boost?',
-          `Would you like to activate your ${reward.title}?`,
+          'Custom Reminders',
+          'You can set personalized reminders with custom messages from the home screen in the reminders section.',
+          [{ text: 'Got it!' }]
+        );
+        break;
+        
+      case 'xp_boost':
+        Alert.alert(
+          'XP Boost Available',
+          'You have 2 XP boosts available that last 72 hours each. Would you like to activate one now?',
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: 'Not Now', style: 'cancel' },
             { 
-              text: 'Activate', 
+              text: 'Activate Boost', 
               onPress: () => {
-                // Implement boost activation logic here
-                console.log('Activating boost:', reward.title);
-                Alert.alert('Boost Activated', `Your ${reward.title} is now active!`);
+                Alert.alert('Boost Activated', 'Your 2x XP boost will be active for the next 72 hours!');
+                // Implementation for XP boost activation would go here
               } 
             }
           ]
+        );
+        break;
+        
+      case 'custom_routines':
+        Alert.alert(
+          'Custom Routines',
+          'You can create and save your own personalized stretching routines from the home screen. Choose either "Smart Routine" or "Custom" options in the routine generator.',
+          [{ text: 'Got it!' }]
+        );
+        break;
+        
+      case 'streak_freezes':
+        Alert.alert(
+          'Streak Freezes',
+          'You have 2 streak freezes available per month. These will automatically be used when you miss a day to preserve your streak.',
+          [{ text: 'Awesome!' }]
+        );
+        break;
+        
+      case 'premium_stretches':
+        Alert.alert(
+          'Premium VIP Stretches',
+          'You\'ve unlocked 15 premium VIP stretches! Would you like to view them now?',
+          [
+            { text: 'Not Now', style: 'cancel' },
+            { 
+              text: 'View Stretches', 
+              onPress: () => setShowPremiumStretches(true)
+            }
+          ]
+        );
+        break;
+        
+      case 'desk_break_boost':
+      case 'focus_area_mastery':
+        Alert.alert(
+          reward.title,
+          `${reward.description} This feature will be available soon!`,
+          [{ text: 'OK' }]
         );
         break;
         
@@ -179,7 +222,12 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
           [{ text: 'Close' }]
         );
     }
-  }, [isPremium, onUpgradeToPremium, setThemeType, userLevel, isDark]);
+  }, [isPremium, onUpgradeToPremium, setThemeType, userLevel, isDark, setShowPremiumStretches]);
+  
+  // Close premium stretches preview modal
+  const closePremiumStretches = useCallback(() => {
+    setShowPremiumStretches(false);
+  }, []);
   
   // Render premium lock if user is not premium
   if (!isPremium) {
@@ -229,6 +277,16 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
           />
         ))}
       </View>
+      
+      {/* Premium Stretches Preview Modal */}
+      <Modal
+        visible={showPremiumStretches}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={closePremiumStretches}
+      >
+        <PremiumStretchesPreview onClose={closePremiumStretches} isModal={true} />
+      </Modal>
     </View>
   );
 };
