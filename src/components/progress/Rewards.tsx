@@ -161,17 +161,8 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
       case 'xp_boost':
         Alert.alert(
           'XP Boost Available',
-          'You have 2 XP boosts available that last 72 hours each. Would you like to activate one now?',
-          [
-            { text: 'Not Now', style: 'cancel' },
-            { 
-              text: 'Activate Boost', 
-              onPress: () => {
-                Alert.alert('Boost Activated', 'Your 2x XP boost will be active for the next 72 hours!');
-                // Implementation for XP boost activation would go here
-              } 
-            }
-          ]
+          'You have 2 XP boosts available that last 72 hours each. This can be activated at the top of the screen.',
+          [{ text: 'Nice!' }]
         );
         break;
         
@@ -186,7 +177,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
       case 'streak_freezes':
         Alert.alert(
           'Streak Freezes',
-          'You have 2 streak freezes available per month. These will automatically be used when you miss a day to preserve your streak.',
+          'You have 2 streak freezes available per month. These can be used when you miss a day to preserve your streak.',
           [{ text: 'Awesome!' }]
         );
         break;

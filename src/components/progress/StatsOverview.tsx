@@ -12,6 +12,7 @@ interface StatsOverviewProps {
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
   streakFreezeActive: boolean;
+  userLevel: number; // Add user level prop
 }
 
 const StatsOverview: React.FC<StatsOverviewProps> = ({
@@ -21,7 +22,8 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   isTodayComplete = false, // Default to false if not provided
   theme: propTheme,
   isDark: propIsDark,
-  streakFreezeActive
+  streakFreezeActive,
+  userLevel = 1 // Default to level 1 if not provided
 }) => {
   // Use theme from props if provided, otherwise use theme context
   const themeContext = useTheme();
@@ -48,6 +50,9 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
 
   // For streak of 5+ days, show a warning indicator if today's activity isn't done
   const showWarning = currentStreak >= 5 && !isTodayComplete && !streakAtRisk && !streakFreezeActive;
+  
+  // Only show streak freeze option if user level is 6+
+  const canUseStreakFreeze = userLevel >= 6;
 
   return (
     <View style={{ backgroundColor: isDark ? theme.background : 'transparent' }}>
@@ -122,11 +127,20 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
             </Text>
           )}
           
-          {streakAtRisk && (
+          {streakAtRisk && canUseStreakFreeze && (
             <View style={styles.streakRiskIndicator}>
               <Ionicons name="shield-outline" size={14} color="#FFC107" />
               <Text style={[styles.streakRiskText, { color: '#FFC107' }]}>
                 Use Streak Freeze to save!
+              </Text>
+            </View>
+          )}
+          
+          {streakAtRisk && !canUseStreakFreeze && (
+            <View style={styles.streakRiskIndicator}>
+              <Ionicons name="lock-closed-outline" size={14} color="#FFC107" />
+              <Text style={[styles.streakRiskText, { color: '#FFC107' }]}>
+                Reach level 6 to use Streak Freeze
               </Text>
             </View>
           )}

@@ -21,7 +21,10 @@ export function useFeatureAccess() {
     customReminders: false,
     xpBoost: false,
     customRoutines: false,
-    streakFreezes: false
+    streakFreezes: false,
+    premiumStretches: false,
+    deskBreakBoost: false,
+    focusAreaMastery: false
   });
   
   // Load feature access status
@@ -34,7 +37,10 @@ export function useFeatureAccess() {
         customReminders: false,
         xpBoost: false,
         customRoutines: false,
-        streakFreezes: false
+        streakFreezes: false,
+        premiumStretches: false,
+        deskBreakBoost: false,
+        focusAreaMastery: false
       });
       setIsLoading(false);
       return;
@@ -48,13 +54,19 @@ export function useFeatureAccess() {
       const xpBoostAccess = await rewardManager.isRewardUnlocked('xp_boost');
       const customRoutinesAccess = await rewardManager.isRewardUnlocked('custom_routines');
       const streakFreezesAccess = await rewardManager.isRewardUnlocked('streak_freezes');
+      const premiumStretchesAccess = await rewardManager.isRewardUnlocked('premium_stretches');
+      const deskBreakBoostAccess = await rewardManager.isRewardUnlocked('desk_break_boost');
+      const focusAreaMasteryAccess = await rewardManager.isRewardUnlocked('focus_area_mastery');
       
       console.log('Feature access check results:', {
         darkTheme: darkThemeAccess,
         customReminders: customRemindersAccess,
         xpBoost: xpBoostAccess,
         customRoutines: customRoutinesAccess,
-        streakFreezes: streakFreezesAccess
+        streakFreezes: streakFreezesAccess,
+        premiumStretches: premiumStretchesAccess,
+        deskBreakBoost: deskBreakBoostAccess,
+        focusAreaMastery: focusAreaMasteryAccess
       });
       
       setFeatures({
@@ -62,7 +74,10 @@ export function useFeatureAccess() {
         customReminders: customRemindersAccess,
         xpBoost: xpBoostAccess,
         customRoutines: customRoutinesAccess,
-        streakFreezes: streakFreezesAccess
+        streakFreezes: streakFreezesAccess,
+        premiumStretches: premiumStretchesAccess,
+        deskBreakBoost: deskBreakBoostAccess,
+        focusAreaMastery: focusAreaMasteryAccess
       });
     } catch (error) {
       console.error('Error loading feature access:', error);
@@ -122,6 +137,12 @@ export function useFeatureAccess() {
         return 5;
       case 'streak_freezes':
         return 6;
+      case 'premium_stretches':
+        return 7;
+      case 'desk_break_boost':
+        return 8;
+      case 'focus_area_mastery':
+        return 9;
       default:
         return 99; // Very high level for unknown features
     }
@@ -159,6 +180,15 @@ export function useFeatureAccess() {
         
       case 'streak_freezes':
         return features.streakFreezes || meetsLevelRequirement('streak_freezes');
+        
+      case 'premium_stretches':
+        return features.premiumStretches || meetsLevelRequirement('premium_stretches');
+        
+      case 'desk_break_boost':
+        return features.deskBreakBoost || meetsLevelRequirement('desk_break_boost');
+        
+      case 'focus_area_mastery':
+        return features.focusAreaMastery || meetsLevelRequirement('focus_area_mastery');
         
       default:
         return false;

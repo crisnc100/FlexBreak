@@ -10,9 +10,10 @@ import HomeScreen from './src/screens/HomeScreen';
 import RoutineScreen from './src/screens/RoutineScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
 import FavoritesScreen from './src/screens/FavoritesScreen';
+import PlaylistsScreen from './src/screens/PlaylistsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import BobSimulatorScreen from './src/screens/BobSimulatorScreen';
-import { PremiumProvider } from './src/context/PremiumContext';
+import { PremiumProvider, usePremium } from './src/context/PremiumContext';
 import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { useState } from 'react';
@@ -20,6 +21,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as streakFreezeManager from './src/utils/progress/modules/streakFreezeManager';
 import * as streakManager from './src/utils/progress/modules/streakManager';
 import StreakFreezePrompt from './src/components/notifications/StreakFreezePrompt';
+import * as rewardManager from './src/utils/progress/modules/rewardManager';
+import { useFeatureAccess } from './src/hooks/progress/useFeatureAccess';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -34,62 +37,49 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Function to register for push notifications and get token
-async function registerForPushNotificationsAsync() {
-  try {
-    // For Expo Go, we can use the default projectId
-    let projectId = undefined;
-    
-    // Only use project ID if not in Expo Go
-    if (!Constants.appOwnership || Constants.appOwnership !== 'expo') {
-      projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    }
-    
-    console.log('Using projectId:', projectId || 'default Expo projectId');
-
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    if (finalStatus !== 'granted') {
-      console.log('Failed to get push token: Permission denied');
-      return;
-    }
-
-    // Get token (use default project ID in Expo Go)
-    try {
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: projectId
-      });
-      
-      console.log('Push Token:', tokenData.data);
-      await AsyncStorage.setItem('pushToken', tokenData.data);
-      return tokenData.data;
-    } catch (tokenError) {
-      console.log('Error getting push token:', tokenError);
-      // For testing in Expo Go, we can still use local notifications
-      console.log('Will use local notifications for testing instead');
-    }
-  } catch (error) {
-    console.log('Error registering for notifications:', error);
+// Helper function to navigate from outside a navigation component
+function navigate(name, params) {
+  if (navigationRef.isReady()) {
+    // @ts-ignore: Ignore the type-checking error for now
+    navigationRef.navigate(name, params);
   }
 }
 
-// Create a function to navigate outside of a component
-function navigate(name: string, params?: any) {
-  if (navigationRef.isReady()) {
-    navigationRef.navigate(name as never, params as never);
-  }
+// Main entry point for the app
+export default function App() {
+  return (
+    <ThemeProvider>
+      <PremiumProvider>
+        <RefreshProvider>
+          <StatusBar 
+            barStyle="dark-content" 
+            backgroundColor="transparent" 
+            translucent={true} 
+          />
+          <MainApp />
+        </RefreshProvider>
+      </PremiumProvider>
+    </ThemeProvider>
+  );
 }
 
 // Create the main tab navigator component
 function TabNavigator() {
   const { theme, isDark } = useTheme();
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const { isPremium } = usePremium();
+  const { canAccessFeature } = useFeatureAccess();
+  const [hasPlaylistAccess, setHasPlaylistAccess] = useState(false);
+  
+  // Check if user has access to playlists feature
+  useEffect(() => {
+    const checkPlaylistAccess = async () => {
+      const hasAccess = await rewardManager.isRewardUnlocked('focus_area_mastery');
+      setHasPlaylistAccess(isPremium && hasAccess);
+    };
+    
+    checkPlaylistAccess();
+  }, [isPremium]);
   
   const tabBarStyle = {
     backgroundColor: theme.cardBackground,
@@ -100,7 +90,6 @@ function TabNavigator() {
 
   return (
     <>
-      {/* @ts-ignore - id prop is required in types but works fine without in practice */}
       <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
@@ -114,6 +103,8 @@ function TabNavigator() {
               iconName = focused ? 'bar-chart' : 'bar-chart-outline';
             } else if (route.name === 'Favorites') {
               iconName = focused ? 'heart' : 'heart-outline';
+            } else if (route.name === 'Playlists') {
+              iconName = focused ? 'list' : 'list-outline';
             }
 
             // @ts-ignore - Handle undefined iconName in extreme case
@@ -152,6 +143,9 @@ function TabNavigator() {
         <Tab.Screen name="Routine" component={RoutineScreen} />
         <Tab.Screen name="Progress" component={ProgressScreen} />
         <Tab.Screen name="Favorites" component={FavoritesScreen} />
+        {hasPlaylistAccess && (
+          <Tab.Screen name="Playlists" component={PlaylistsScreen} />
+        )}
       </Tab.Navigator>
       
       {/* Settings Modal */}
@@ -224,18 +218,5 @@ function MainApp() {
       {/* Streak Freeze Prompt */}
       <StreakFreezePrompt />
     </>
-  );
-}
-
-// App root with providers
-export default function App() {
-  return (
-    <PremiumProvider>
-      <ThemeProvider>
-        <RefreshProvider>
-          <MainApp />
-        </RefreshProvider>
-      </ThemeProvider>
-    </PremiumProvider>
   );
 } 

@@ -49,89 +49,89 @@ type LevelUpData = {
 export default function RoutineScreen() {
   // Use our custom hooks
   const { area, duration, level, customStretches, hasParams, navigateToHome, resetParams, navigateToRoutine } = useRoutineParams();
-  const { 
-    recentRoutines, 
-    isLoading: isStorageLoading, 
-    saveRoutineProgress, 
+  const {
+    recentRoutines,
+    isLoading: isStorageLoading,
+    saveRoutineProgress,
     hideRoutine,
-    getRecentRoutines 
+    getRecentRoutines
   } = useRoutineStorage();
   const { suggestions, isLoading: isSuggestionsLoading } = useRoutineSuggestions();
-  
+
   // Replace progressSystem with useGamification
-  const { 
-    processRoutine, 
+  const {
+    processRoutine,
     isLoading: isGamificationLoading,
     recentlyUnlockedAchievements,
     recentlyCompletedChallenges,
     recentlyUnlockedRewards,
     refreshChallenges
   } = useGamification();
-  
+
   // Get premium status from context
   const { isPremium } = usePremium();
-  
+
   // Get refresh functionality from context
   const { isRefreshing, refreshRoutine } = useRefresh();
-  
+
   // Get theme context for refreshing access to dark theme
   const { refreshThemeAccess, themeType, setThemeType } = useTheme();
-  
+
   // Single screen state to track what we're showing
   const [screenState, setScreenState] = useState<RoutineScreenState>('LOADING');
-  
+
   // Modal visibility state
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [smartPickModalVisible, setSmartPickModalVisible] = useState(false);
-  
+
   // Add state for XP earned
   const [routineXpEarned, setRoutineXpEarned] = useState(0);
-  
+
   // Add state for storing XP breakdown
   const [xpBreakdown, setXpBreakdown] = useState<Array<{ source: string; amount: number; description: string }>>([]);
-  
+
   // Add state for level-up data
   const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
-  
+
   // Add state for XP boost
   const [isXpBoosted, setIsXpBoosted] = useState<boolean>(false);
-  
+
   // Effect for initial load and param changes
   useEffect(() => {
     // If we have params, we should show the active routine
     if (hasParams && screenState !== 'COMPLETED') {
       console.log('We have params, showing active routine:', area, duration, level);
       setScreenState('ACTIVE');
-    } 
+    }
     // If we don't have params and we're not on the completion screen, show dashboard
     else if (!hasParams && screenState !== 'COMPLETED') {
       console.log('No params, showing dashboard');
       setScreenState('DASHBOARD');
     }
   }, [hasParams, area, duration, level]);
-  
+
   // Handle focus changes from tab navigation
   useFocusEffect(
     React.useCallback(() => {
       console.log('Routine screen focused with state:', screenState, 'hasParams:', hasParams);
-      
+
       // The important thing is that when returning to this tab,
       // we should show the dashboard unless we're in the middle of a routine
       if (screenState === 'LOADING') {
         setScreenState('DASHBOARD');
       }
-      
+
       return () => {
         // This runs when the screen loses focus
         console.log('Routine screen lost focus');
       };
     }, [screenState, hasParams])
   );
-  
+
   // Handle routine completion
   const handleRoutineComplete = async (routineArea: BodyArea, routineDuration: Duration, stretchCount: number = 5, hasAdvancedStretch: boolean = false) => {
     console.log('Routine completed');
-    
+
     try {
       // Save to recent routines
       const entry = {
@@ -140,56 +140,56 @@ export default function RoutineScreen() {
         date: new Date().toISOString(),
         stretchCount: stretchCount
       };
-      
+
       // REMOVED: Direct call to saveRoutineProgress - removed to avoid duplicate entries
       // The routine is saved inside processCompletedRoutine already
       // await saveRoutineProgress(entry);
       console.log('Routine will be saved through gamification system');
-      
+
       // Check if XP boost is active
       const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
       const xpMultiplier = isXpBoostActive ? xpBoostData.multiplier : 1;
       setIsXpBoosted(isXpBoostActive);
       console.log('XP Boost active:', isXpBoostActive);
-      
+
       // Refresh theme access to check if user unlocked dark theme
       await refreshThemeAccess();
       console.log('Theme access refreshed after routine completion');
-      
+
       // Use the new gamification system to process the routine
       try {
         // Process the routine through the gamification system
         const result = await processRoutine(entry);
-        
+
         // CRITICAL FIX: Explicitly update challenge progress after routine completion
         console.log('Explicitly updating challenge progress after routine completion');
         refreshChallenges();
-        
+
         // CRITICAL FIX: Manually refresh recent routines to ensure UI is updated
         try {
           // Fetch the updated routines directly from storage
           const freshRoutines = await storageService.getRecentRoutines();
-          
+
           // Refresh the recent routines list in the component state
           // This ensures the UI will show the updated list when returning to the dashboard
           await refreshRoutine();
-          
+
           console.log('Manually refreshed recent routines:', freshRoutines.length);
         } catch (refreshError) {
           console.error('Error refreshing recent routines:', refreshError);
         }
-        
+
         if (result && result.success) {
           // Check if XP boost is active
           const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
           const xpMultiplier = isXpBoostActive ? xpBoostData.multiplier : 1;
           setIsXpBoosted(isXpBoostActive);
-          
+
           // Use breakdown from the result if available
           if (result.xpBreakdown && Array.isArray(result.xpBreakdown) && result.xpBreakdown.length > 0) {
             console.log('Using XP breakdown from result:', result.xpBreakdown);
             setXpBreakdown(result.xpBreakdown);
-            
+
             // Calculate total XP from breakdown
             const totalXpEarned = result.xpBreakdown.reduce((sum, item) => sum + item.amount, 0);
             setRoutineXpEarned(totalXpEarned);
@@ -199,26 +199,26 @@ export default function RoutineScreen() {
             // Create an XP breakdown array based on the actual XP earned
             const breakdownItems: Array<{ source: string; amount: number; description: string }> = [];
             let totalXpEarned = 0;
-            
+
             // Check if this was the first routine of day (base XP > 0)
             const isFirstOfDay = result.xpEarned > 0;
-            
+
             if (isFirstOfDay) {
               // Determine base routine XP (only if this is first routine of day)
               let routineBaseXP = 0;
               if (Number(routineDuration) <= 5) routineBaseXP = 30;
               else if (Number(routineDuration) <= 10) routineBaseXP = 60;
               else routineBaseXP = 90;
-              
+
               // Adjust for XP boost if active
               let boostedBaseXP = routineBaseXP;
               let routineDesc = `${routineDuration}-Minute Routine`;
-              
+
               if (isXpBoostActive) {
                 boostedBaseXP = Math.floor(routineBaseXP * xpMultiplier);
                 routineDesc = `${routineDuration}-Minute Routine (2x XP Boost Applied)`;
               }
-              
+
               // Add routine base XP
               breakdownItems.push({
                 source: 'routine',
@@ -226,7 +226,7 @@ export default function RoutineScreen() {
                 description: routineDesc
               });
               totalXpEarned += boostedBaseXP;
-              
+
               // If there's exactly 50 XP more than boosted base, it's likely the first ever routine
               if (result.xpEarned === boostedBaseXP + 50) {
                 breakdownItems.push({
@@ -244,66 +244,66 @@ export default function RoutineScreen() {
                 description: 'Not the first routine today (XP already earned today)'
               });
             }
-            
+
             // Set the total XP earned - this should be the actual total from all sources
             setRoutineXpEarned(totalXpEarned);
-            
+
             // Set the breakdown
             setXpBreakdown(breakdownItems);
           }
-          
+
           // Log results
           console.log(`Total XP earned: ${xpBreakdown.reduce((sum, item) => sum + item.amount, 0)}`);
           console.log('XP Breakdown:', xpBreakdown);
           console.log('XP Boost active:', isXpBoostActive, 'Multiplier:', xpMultiplier);
-          
+
           // ===== SIMPLIFIED LEVEL-UP DETECTION =====
           // Import needed functions to check XP thresholds
           const { getUserProgress } = require('../services/storageService');
           const { LEVELS } = require('../utils/progress/constants');
           const userProgress = await getUserProgress();
-          
+
           // Get XP values - handle both regular and testing property names
           const earnedXp = xpBreakdown.reduce((sum, item) => sum + item.amount, 0);
-          const previousXp = userProgress.xp !== undefined 
-            ? userProgress.xp - earnedXp 
-            : userProgress.totalXP !== undefined 
-              ? userProgress.totalXP - earnedXp 
+          const previousXp = userProgress.xp !== undefined
+            ? userProgress.xp - earnedXp
+            : userProgress.totalXP !== undefined
+              ? userProgress.totalXP - earnedXp
               : 0;
-              
-          const currentXp = userProgress.xp !== undefined 
-            ? userProgress.xp 
-            : userProgress.totalXP !== undefined 
-              ? userProgress.totalXP 
+
+          const currentXp = userProgress.xp !== undefined
+            ? userProgress.xp
+            : userProgress.totalXP !== undefined
+              ? userProgress.totalXP
               : 0;
-          
+
           // Get level thresholds for detection
           const xpThresholds = LEVELS.map(level => level.xpRequired);
           const previousLevelThreshold = xpThresholds[userProgress.level - 1] || 0;
-          
+
           // Log basic level detection info
           console.log('Level detection - Current level:', userProgress.level);
           console.log(`XP progress: ${previousXp} → ${currentXp}`);
-                    
+
           // ===== LEVEL-UP DETECTION STRATEGIES =====
           // Strategy 1: Direct flag from gamification system
           const hasDirectLevelUpFlag = result.levelUp === true;
-          
+
           // Strategy 2: Check if we crossed a level threshold with this routine's XP
           const crossedThreshold = previousXp < previousLevelThreshold && currentXp >= previousLevelThreshold;
-          
+
           // Strategy 3: Check for dark theme unlock (reliable indicator for level 2)
-          const justUnlockedDarkTheme = result.newlyUnlockedRewards && 
-                                       result.newlyUnlockedRewards.some(r => 
-                                         r.id === 'dark_theme' || 
-                                         (r.title && r.title.includes('Dark Theme')));
-          
+          const justUnlockedDarkTheme = result.newlyUnlockedRewards &&
+            result.newlyUnlockedRewards.some(r =>
+              r.id === 'dark_theme' ||
+              (r.title && r.title.includes('Dark Theme')));
+
           // Strategy 4: Check for explicit level up message in result
           const hasLevelUpMessage = JSON.stringify(result).includes('Level Up');
-          
+
           // Strategy 5: Check for testing flag that might be set
           const hasTestLevelUp = (userProgress as any).testLevelUp === true;
-          
+
           // Reset the test flag if it exists to avoid persistence
           if (hasTestLevelUp) {
             console.log('🧪 Detected testing level-up flag - will reset after use');
@@ -314,28 +314,28 @@ export default function RoutineScreen() {
               console.log('Error resetting test level-up flag:', err);
             }
           }
-          
+
           // Make the final decision based on all strategies
-          const hasLeveledUp = hasDirectLevelUpFlag || 
-                              crossedThreshold ||
-                              justUnlockedDarkTheme ||
-                              hasLevelUpMessage || 
-                              hasTestLevelUp ||
-                              // Special case for level 2
-                              (userProgress.level === 2 && previousXp < 250 && currentXp >= 250);
-          
+          const hasLeveledUp = hasDirectLevelUpFlag ||
+            crossedThreshold ||
+            justUnlockedDarkTheme ||
+            hasLevelUpMessage ||
+            hasTestLevelUp ||
+            // Special case for level 2
+            (userProgress.level === 2 && previousXp < 250 && currentXp >= 250);
+
           console.log(`Level-up detected: ${hasLeveledUp}`);
-          
+
           // Set previous and new level based on our detection
           const previousLevel = hasLeveledUp ? userProgress.level - 1 : userProgress.level;
           const newLevel = userProgress.level;
-          
+
           // Extract level-up information if available
           let levelUpInfo: LevelUpData | null = null;
-          
+
           if (hasLeveledUp) {
             console.log(`🎉 Level Up detected! ${previousLevel} → ${newLevel}`);
-            
+
             // Create the levelUp object to pass to CompletedRoutine with accurate levels
             levelUpInfo = {
               oldLevel: previousLevel,
@@ -343,7 +343,7 @@ export default function RoutineScreen() {
               rewards: [],
               unlockedAchievements: []
             };
-            
+
             // Handle level-specific rewards
             if (newLevel === 2) {
               console.log('Adding Dark Theme reward for level 2');
@@ -377,7 +377,39 @@ export default function RoutineScreen() {
                 description: 'Create and save your own personalized stretching routines',
                 type: 'feature'
               });
-            } else if (newLevel >= 6) {
+            } else if (newLevel === 6) {
+              console.log('Adding Streak Freeze reward for level 6');
+              levelUpInfo.rewards.push({
+                id: 'streak_freeze',
+                name: 'Streak Freeze',
+                description: 'Protect your streak on days you miss your stretching routine',
+                type: 'feature'
+              });
+            } else if (newLevel === 7) {
+              console.log('Adding Premium Stretches reward for level 7');
+              levelUpInfo.rewards.push({
+                id: 'premium_stretches',
+                name: 'Premium Stretches',
+                description: 'Access advanced stretching techniques for deeper relief',
+                type: 'feature'
+              });
+            } else if (newLevel === 8) {
+              console.log('Adding Desk Break Boost reward for level 8');
+              levelUpInfo.rewards.push({
+                id: 'desk_break_boost',
+                name: 'Desk Break Boost',
+                description: 'Earn additional XP during work hours with optimized short breaks',
+                type: 'feature'
+              });
+            } else if (newLevel === 9) {
+              console.log('Adding Focus Area Mastery reward for level 9');
+              levelUpInfo.rewards.push({
+                id: 'focus_area_playlists',
+                name: 'Focus Area Mastery',
+                description: 'Access specialized stretch playlists for targeted relief by body area',
+                type: 'feature'
+              });
+            } else if (newLevel >= 10) {
               console.log(`Adding reward for level ${newLevel}`);
               levelUpInfo.rewards.push({
                 id: `level_${newLevel}_reward`,
@@ -386,10 +418,10 @@ export default function RoutineScreen() {
                 type: 'feature'
               });
             }
-            
+
             // Look for additional rewards from the result
             const resultRewards = result.newlyUnlockedRewards || [];
-            
+
             // Add any missing rewards from the result
             if (resultRewards && resultRewards.length > 0) {
               for (const reward of resultRewards) {
@@ -397,11 +429,11 @@ export default function RoutineScreen() {
                 if (levelUpInfo.rewards.some(r => r.id === reward.id)) {
                   continue;
                 }
-                
+
                 // Extract reward details, providing defaults if properties don't exist
                 const rewardName = reward.title || (reward as any).name || 'New Reward';
                 console.log(`Reward unlocked: ${rewardName} (Level ${newLevel})`);
-                
+
                 // Ensure the type is one of the allowed values
                 let rewardType: 'feature' | 'item' | 'cosmetic' = 'feature';
                 if (reward.type === 'item' || reward.type === 'cosmetic') {
@@ -409,7 +441,7 @@ export default function RoutineScreen() {
                 } else if (reward.type === 'app_feature') {
                   rewardType = 'feature';
                 }
-                
+
                 levelUpInfo.rewards.push({
                   id: reward.id || `reward-${Date.now()}`,
                   name: rewardName,
@@ -418,11 +450,11 @@ export default function RoutineScreen() {
                 });
               }
             }
-            
+
             // Check for unlocked achievements
             if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
               console.log(`Unlocked ${result.unlockedAchievements.length} achievements!`);
-              
+
               // Add the unlocked achievements to the levelUpInfo
               levelUpInfo.unlockedAchievements = result.unlockedAchievements.map(achievement => ({
                 id: achievement.id,
@@ -431,35 +463,35 @@ export default function RoutineScreen() {
                 xp: achievement.xp || 0,
                 icon: achievement.icon
               }));
-              
+
               // Log the achievements for debugging
-              console.log('Achievements to show in CompletedRoutine:', 
+              console.log('Achievements to show in CompletedRoutine:',
                 JSON.stringify(levelUpInfo.unlockedAchievements, null, 2));
-              
+
               // Add achievement XP to the breakdown if not already included
-              const existingAchievementEntries = xpBreakdown.filter(item => 
-                item.source === 'achievement' || 
+              const existingAchievementEntries = xpBreakdown.filter(item =>
+                item.source === 'achievement' ||
                 result.unlockedAchievements.some(a => item.description.includes(a.title))
               );
-              
+
               if (existingAchievementEntries.length === 0) {
                 console.log('Adding unlocked achievements to XP breakdown manually');
-                
+
                 // Create new breakdown entries for the achievements
                 const achievementXpEntries = result.unlockedAchievements.map(achievement => ({
                   source: 'achievement',
                   amount: achievement.xp || 0,
                   description: `Achievement Unlocked: ${achievement.title}`
                 }));
-                
+
                 // Add these to the existing breakdown
                 if (achievementXpEntries.length > 0) {
                   setXpBreakdown(prevBreakdown => [...prevBreakdown, ...achievementXpEntries]);
-                  
+
                   // Update total XP earned
                   const additionalXp = achievementXpEntries.reduce((sum, item) => sum + item.amount, 0);
                   setRoutineXpEarned(prevXp => prevXp + additionalXp);
-                  
+
                   console.log(`Added ${achievementXpEntries.length} achievement entries to XP breakdown`);
                   console.log('New breakdown entries:', achievementXpEntries);
                 }
@@ -468,7 +500,7 @@ export default function RoutineScreen() {
           } else {
             console.log('No level up detected in this routine completion. Current level:', newLevel);
           }
-          
+
           // Check if dark theme was unlocked and set it automatically
           const hasDarkThemeReward = levelUpInfo?.rewards?.some(r => r.id === 'dark_theme');
           if (hasDarkThemeReward && isPremium) {
@@ -485,11 +517,11 @@ export default function RoutineScreen() {
               });
             }, 500);
           }
-          
+
           // Store level-up data in component state
           setLevelUpData(levelUpInfo);
           console.log('Level-up data being passed to CompletedRoutine:', JSON.stringify(levelUpInfo, null, 2));
-          
+
           // Check for completed challenges
           if (result.completedChallenges.length > 0) {
             console.log(`Completed ${result.completedChallenges.length} challenges!`);
@@ -498,7 +530,7 @@ export default function RoutineScreen() {
               console.log(`Challenge ${index + 1}: ${challenge.title} - ${challenge.description} (${challenge.progress}/${challenge.requirement})`);
             });
           }
-          
+
           // Check for unlocked rewards
           if (result.newlyUnlockedRewards.length > 0) {
             console.log(`Unlocked ${result.newlyUnlockedRewards.length} rewards!`);
@@ -515,7 +547,7 @@ export default function RoutineScreen() {
         setRoutineXpEarned(50); // Default fallback XP value
         setXpBreakdown([{ source: 'routine', amount: 50, description: 'Stretching Routine' }]);
       }
-      
+
       // Update state to show completed screen
       setScreenState('COMPLETED');
     } catch (error) {
@@ -527,16 +559,19 @@ export default function RoutineScreen() {
       setXpBreakdown([{ source: 'routine', amount: 50, description: 'Stretching Routine' }]);
     }
   };
-  
+
   // FIXED: Reset level-up data when returning to dashboard
   const showDashboard = async () => {
     try {
       // Refresh recent routines before showing dashboard
       await getRecentRoutines();
       
-      // Then update screen state
+      // First update screen state
       setScreenState('DASHBOARD');
       setLevelUpData(null); // Reset level-up data when changing screens
+      
+      // Then clear navigation stack to prevent looping back to active screen
+      navigateToHome();
       
       console.log('Refreshed routines before showing dashboard');
     } catch (error) {
@@ -544,9 +579,10 @@ export default function RoutineScreen() {
       // Still show dashboard even if refresh fails
       setScreenState('DASHBOARD');
       setLevelUpData(null);
+      navigateToHome();
     }
   };
-  
+
   // Handle smart pick modal
   const handleSmartPickTap = () => {
     console.log('Smart Pick tapped, isPremium:', isPremium);
@@ -561,13 +597,13 @@ export default function RoutineScreen() {
   // Handle starting a recent routine
   const handleStartRecentRoutine = (routine: ProgressEntry) => {
     console.log('Starting recent routine:', routine);
-    
+
     // Clear current state first
     resetParams();
-    
+
     // Navigate to home to ensure clean navigation stack
     navigateToHome();
-    
+
     // Navigate to the routine screen with new params
     setTimeout(() => {
       console.log('Navigating to routine with params:', routine.area, routine.duration);
@@ -586,13 +622,13 @@ export default function RoutineScreen() {
       const randomIndex = Math.floor(Math.random() * suggestions.length);
       const suggestion = suggestions[randomIndex];
       console.log('Starting random suggestion:', suggestion);
-      
+
       // Clear current state first
       resetParams();
-      
+
       // Navigate to home to ensure clean navigation stack
       navigateToHome();
-      
+
       // Navigate to the routine screen with random suggestion params
       setTimeout(() => {
         console.log('Navigating to routine with suggestion params:', suggestion.area, suggestion.duration);
@@ -611,13 +647,13 @@ export default function RoutineScreen() {
     try {
       // Refresh recent routines before resetting
       await getRecentRoutines();
-      
+
       // Reset parameters and state
       resetParams();
       setScreenState('DASHBOARD');
       setLevelUpData(null); // Reset level-up data when starting a new routine
       navigateToHome();
-      
+
       console.log('Refreshed routines before creating new routine');
     } catch (error) {
       console.error('Error refreshing routines:', error);
@@ -634,34 +670,34 @@ export default function RoutineScreen() {
     try {
       await hideRoutine(routineDate);
       console.log('Routine hidden successfully');
-      } catch (error) {
+    } catch (error) {
       console.error('Error hiding routine:', error);
     }
   };
-  
+
   // Handle refresh
   const handleRefresh = async () => {
     console.log('Performing comprehensive routine screen refresh...');
-    
+
     try {
       // First refresh the routine data
       await refreshRoutine();
       console.log('Routine data refreshed');
-      
+
       // Then reload suggestions if needed
       if (suggestions.length === 0) {
         console.log('No suggestions found, attempting to reload...');
         // You might need to add a method to reload suggestions in the useRoutineSuggestions hook
       }
-      
+
       // Add any other data refresh logic here
-      
+
       console.log('Comprehensive routine screen refresh complete');
     } catch (error) {
       console.error('Error during routine screen refresh:', error);
     }
   };
-  
+
   // Handle skipping an exercise
   const skipCurrentExercise = () => {
     setLevelUpData(null); // Reset level-up data when skipping exercises
@@ -674,9 +710,9 @@ export default function RoutineScreen() {
     setLevelUpData(null); // Reset level-up data when discarding a routine
     navigateToHome();
   };
-  
+
   // ============= RENDERING LOGIC =============
-  
+
   // Render loading state
   if (screenState === 'LOADING' || isStorageLoading) {
     return (
@@ -688,13 +724,13 @@ export default function RoutineScreen() {
       </SafeAreaView>
     );
   }
-  
+
   // Render dashboard
   if (screenState === 'DASHBOARD') {
     return (
       <SafeAreaView style={styles.container}>
         <XpNotificationManager />
-        <RoutineDashboard 
+        <RoutineDashboard
           recentRoutines={recentRoutines}
           isPremium={isPremium}
           isLoading={isSuggestionsLoading}
@@ -706,12 +742,12 @@ export default function RoutineScreen() {
           onCreateNew={handleCreateNewRoutine}
           onDeleteRoutine={handleHideRoutine}
         />
-        
-        <SubscriptionModal 
+
+        <SubscriptionModal
           visible={subscriptionModalVisible}
           onClose={() => setSubscriptionModalVisible(false)}
         />
-        
+
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
@@ -723,15 +759,15 @@ export default function RoutineScreen() {
       </SafeAreaView>
     );
   }
-  
+
   // Render completed routine
   if (screenState === 'COMPLETED') {
-    console.log('Rendering COMPLETED state with the following level-up data:', 
+    console.log('Rendering COMPLETED state with the following level-up data:',
       levelUpData ? JSON.stringify(levelUpData, null, 2) : 'null');
-    
+
     return (
       <SafeAreaView style={styles.container}>
-        <CompletedRoutine 
+        <CompletedRoutine
           area={area as BodyArea}
           duration={duration as Duration}
           isPremium={isPremium}
@@ -743,12 +779,12 @@ export default function RoutineScreen() {
           onNavigateHome={handleCreateNewRoutine}
           onOpenSubscription={() => setSubscriptionModalVisible(true)}
         />
-        
-        <SubscriptionModal 
+
+        <SubscriptionModal
           visible={subscriptionModalVisible}
           onClose={() => setSubscriptionModalVisible(false)}
         />
-        
+
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
@@ -760,13 +796,13 @@ export default function RoutineScreen() {
       </SafeAreaView>
     );
   }
-  
+
   // Render active routine
   if (screenState === 'ACTIVE' && area && duration) {
     return (
       <SafeAreaView style={styles.container}>
         <XpNotificationManager />
-        <ActiveRoutine 
+        <ActiveRoutine
           area={area}
           duration={duration}
           level={level || 'intermediate'}
@@ -777,12 +813,12 @@ export default function RoutineScreen() {
             navigateToHome();
           }}
         />
-        
-        <SubscriptionModal 
+
+        <SubscriptionModal
           visible={subscriptionModalVisible}
           onClose={() => setSubscriptionModalVisible(false)}
         />
-        
+
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
@@ -794,7 +830,7 @@ export default function RoutineScreen() {
       </SafeAreaView>
     );
   }
-  
+
   // Default return (should never happen, but needed for typechecking)
   return null;
 }

@@ -167,3 +167,14 @@ export interface SmartRoutineConfig {
   isDeskFriendly: boolean;
   postActivity?: string;
 }
+
+export interface Playlist {
+  id: string;
+  title: string;
+  description: string;
+  duration: number;
+  focusArea: string;
+  image: { uri: string };
+  stretchIds: number[];
+  stretchDurations: Record<number, number>;
+}

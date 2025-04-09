@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Theme } from '../../context/ThemeContext';
+import { Theme } from '../../../context/ThemeContext';
 
 type SimpleXpDisplayProps = {
   xpEarned: number;

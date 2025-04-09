@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel, Stretch } from '../types';
+import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel, Stretch, RestPeriod } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { tw } from '../utils/tw';
@@ -35,12 +35,14 @@ import {
   DaySelector,
   LevelProgressCard,
   CustomRoutineModal,
-  StreakDisplay
+  StreakDisplay,
+  DeskBreakBoost
 } from '../components/home';
 import * as notifications from '../utils/notifications';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
 import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
+import { generateDeskBreakBoostRoutine, isDeskBreakBoostAvailable } from '../utils/deskBreakBoostGenerator';
 
 const { height, width } = Dimensions.get('window');
 
@@ -555,6 +557,46 @@ export default function HomeScreen() {
     }, 100);
   };
 
+  // Handle desk break boost
+  const handleDeskBreakBoost = useCallback(async () => {
+    // If user is not premium, they should not see the button at all
+    // (handled by the component's conditional rendering)
+    
+    // If the feature is not available by level, show the level requirement alert
+    if (!canAccessFeature('desk_break_boost')) {
+      const currentLevel = await getUserLevel(); // Get current user level
+      const xpNeeded = (getRequiredLevel('desk_break_boost') - currentLevel) * 500; // Rough estimate of XP needed
+      
+      Alert.alert(
+        '🔒 Desk Break Boost - Locked',
+        `You'll unlock this feature at Level ${getRequiredLevel('desk_break_boost')}!\n\n` +
+        `You're making great progress at Level ${userLevel}. Keep stretching to unlock quick desk stretches and improve your productivity.`,
+        [
+          { 
+            text: 'Maybe Later', 
+            style: 'cancel' 
+          },
+          { 
+            text: 'Start Routine',
+            onPress: () => handleStartStretching()
+          }
+        ]
+      );
+      return;
+    }
+    
+    // Generate the desk break boost routine
+    const deskBreakStretches = generateDeskBreakBoostRoutine();
+    
+    // Navigate to the routine screen with the desk break stretches
+    navigation.navigate('Routine', {
+      area: 'Full Body',
+      duration: '5',
+      level: 'beginner',
+      customStretches: deskBreakStretches as Stretch[]
+    });
+  }, [navigation, canAccessFeature, getRequiredLevel, userLevel, getUserLevel, handleStartStretching]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -597,6 +639,15 @@ export default function HomeScreen() {
           onStartStretching={handleStartStretching}
           canAccessCustomRoutines={canAccessFeature('custom_routines')}
           onCustomRoutinesPress={handleCustomRoutinesPress}
+        />
+        
+        {/* Desk Break Boost */}
+        <DeskBreakBoost
+          onPress={handleDeskBreakBoost}
+          isAvailable={canAccessFeature('desk_break_boost')}
+          requiredLevel={getRequiredLevel('desk_break_boost')}
+          userLevel={userLevel}
+          isPremium={isPremium}
         />
 
         {/* Daily Tip */}

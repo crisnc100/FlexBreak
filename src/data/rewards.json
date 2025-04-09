@@ -56,7 +56,7 @@
     {
       "id": "desk_break_boost",
       "title": "Desk Break Boost",
-      "description": "Stretch in quick 15-sec bursts—3 fast routines!",
+      "description": "Micro-stretches to power through your day!",
       "icon": "desktop",
       "unlocked": false,
       "levelRequired": 8,
@@ -65,7 +65,7 @@
     {
       "id": "focus_area_mastery",
       "title": "Focus Area Mastery",
-      "description": "Get ultimate focus badges for your favorite areas",
+      "description": "Unlock expert stretch playlists for targeted relief and recovery",
       "icon": "star",
       "unlocked": false,
       "levelRequired": 9,

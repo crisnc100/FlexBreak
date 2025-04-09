@@ -124,17 +124,13 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               // Clone to avoid modifying the original
               let stretchCopy: any = {...stretch};
               
-              // Log each stretch being processed for better debugging
-              console.log(`Processing stretch ${index}: ID=${stretch.id}, Type=${typeof stretch.id}, Name=${stretch.name || 'unnamed'}`);
-              
+                          
               // Ensure required properties
               if (!('id' in stretchCopy)) {
                 stretchCopy.id = `custom-${Math.random().toString(36).substring(2, 9)}`;
-                console.log(`Generated new ID for stretch without ID: ${stretchCopy.id}`);
               } else if (typeof stretchCopy.id === 'number') {
                 // Convert number IDs to strings to ensure consistency
                 stretchCopy.id = String(stretchCopy.id);
-                console.log(`Converted ID from number to string: ${stretchCopy.id}`);
               }
               
               if (!('duration' in stretchCopy) || typeof stretchCopy.duration !== 'number') {
@@ -175,8 +171,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               return stretchCopy;
             });
             
-            console.log(`Using ${validCustomStretches.length} validated custom stretches`);
-            console.log(`First validated stretch ID type: ${typeof validCustomStretches[0].id}`);
+      
             
             // Additional debugging - validate final stretches before enhancing
             const idTypes = validCustomStretches.map(s => typeof s.id);
@@ -199,7 +194,6 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               
               // Log the first enhanced stretch for debugging
               if (enhancedRoutine.length > 0) {
-                console.log(`First enhanced stretch: ID=${enhancedRoutine[0].id}, Type=${typeof enhancedRoutine[0].id}`);
                 console.log(`Setting routine with ${enhancedRoutine.length} stretches`);
                 setRoutine(enhancedRoutine);
                 
@@ -218,7 +212,6 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 console.log(`Setting routine with ${validCustomStretches.length} stretches directly`);
                 setRoutine(validCustomStretches);
                 
-                console.log(`Starting timer with fallback duration: ${validCustomStretches[0].duration} (${typeof validCustomStretches[0].duration})`);
                 startTimer(validCustomStretches[0].duration);
               } else {
                 throw new Error('No valid custom stretches to show');
@@ -436,11 +429,9 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 style={styles.stretchImage}
                 resizeMode="contain"
                 onError={(e) => {
-                  console.log(`Image error for stretch ${currentStretch.name}:`, e.nativeEvent.error);
                   // Attempt to update the image source to a fallback
                   if (currentStretch && !('isRest' in currentStretch)) {
                     const safeName = encodeURIComponent((currentStretch as Stretch).name || 'Stretch');
-                    console.log(`Setting fallback image for ${safeName}`);
                     // We can't directly modify the source, but we can log it for debugging
                   }
                 }}

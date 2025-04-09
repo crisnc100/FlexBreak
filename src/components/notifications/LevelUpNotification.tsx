@@ -106,27 +106,31 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
       ]}
     >
       <TouchableOpacity style={styles.dismissButton} onPress={onDismiss}>
-        <Ionicons name="close" size={18} color={isDark ? "#999" : "#ccc"} />
+        <Ionicons name="close" size={16} color={isDark ? "#999" : "#ccc"} />
       </TouchableOpacity>
       
-      <View style={styles.iconContainer}>
-        <Ionicons name="trophy" size={28} color="#FFD700" />
-      </View>
-      
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>LEVEL UP!</Text>
-        <View style={styles.levelContainer}>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>{oldLevel}</Text>
+      <View style={styles.contentWrapper}>
+        <View style={styles.headerContainer}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="trophy" size={24} color="#FFD700" />
           </View>
-          <Ionicons name="arrow-forward" size={20} color={isDark ? theme.text : "#FFF"} style={styles.arrow} />
-          <View style={[styles.levelBadge, styles.newLevelBadge]}>
-            <Text style={styles.levelText}>{newLevel}</Text>
-          </View>
+          <Text style={styles.title}>LEVEL UP!</Text>
         </View>
-        <Text style={styles.description}>
-          You've reached level {newLevel} {getSourceText()}
-        </Text>
+        
+        <View style={styles.contentContainer}>
+          <View style={styles.levelContainer}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>{oldLevel}</Text>
+            </View>
+            <Ionicons name="arrow-forward" size={18} color={isDark ? theme.text : "#FFF"} style={styles.arrow} />
+            <View style={[styles.levelBadge, styles.newLevelBadge]}>
+              <Text style={styles.levelText}>{newLevel}</Text>
+            </View>
+          </View>
+          <Text style={styles.description}>
+            You've reached level {newLevel} {getSourceText()}
+          </Text>
+        </View>
       </View>
     </Animated.View>
   );
@@ -136,14 +140,14 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
 const themedStyles = (theme, isDark) => StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
+    top: 40,
+    left: 16,
+    right: 16,
     backgroundColor: isDark 
       ? 'rgba(45, 45, 60, 0.95)' 
       : 'rgba(67, 93, 141, 0.95)',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 12,
+    padding: 12,
     flexDirection: 'column',
     alignItems: 'center',
     zIndex: 1000,
@@ -157,26 +161,37 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
   },
   dismissButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 24,
-    height: 24,
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
+  contentWrapper: {
+    width: '100%',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
   iconContainer: {
-    marginBottom: 10,
-    height: 50,
-    width: 50,
-    borderRadius: 25,
+    height: 38,
+    width: 38,
+    borderRadius: 19,
     backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : 'rgba(255,215,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowRadius: 8,
+    marginRight: 8,
   },
   contentContainer: {
     alignItems: 'center',
@@ -184,9 +199,8 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
   },
   title: {
     color: '#FFD700',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
@@ -194,16 +208,16 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
   levelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginVertical: 6,
   },
   levelBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 10,
+    marginHorizontal: 6,
   },
   newLevelBadge: {
     backgroundColor: '#FFD700',
@@ -213,17 +227,18 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
     shadowRadius: 8,
   },
   levelText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: isDark ? theme.text : '#FFF',
   },
   arrow: {
-    marginHorizontal: 5,
+    marginHorizontal: 3,
   },
   description: {
     color: isDark ? theme.text : 'white',
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
+    marginVertical: 2,
   }
 });
 

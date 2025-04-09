@@ -10,4 +10,5 @@ export { default as DaySelector } from './DaySelector';
 export { default as LevelProgressCard } from './LevelProgressCard';
 export { default as CustomRoutineModal } from './CustomRoutineModal';
 export { default as StreakDisplay } from './StreakDisplay';
-export { default as StretchSelector } from './StretchSelector'; 
+export { default as StretchSelector } from './StretchSelector';
+export { default as DeskBreakBoost } from './DeskBreakBoost'; 
