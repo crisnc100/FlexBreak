@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { clearAllData } from '../services/storageService';
 import DiagnosticsScreen from './DiagnosticsScreen';
-import { useTheme } from '../context/ThemeContext';
+import { ThemeType, useTheme } from '../context/ThemeContext';
 import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
 import { useGamification } from '../hooks/progress/useGamification';
 import { usePremium } from '../context/PremiumContext';
@@ -60,7 +60,8 @@ const progressBarStyles = StyleSheet.create({
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) => {
   const [diagnosticsModalVisible, setDiagnosticsModalVisible] = useState(false);
-  const [themePreviewModalVisible, setThemePreviewModalVisible] = useState(false);
+  const [privacyPolicyModalVisible, setPrivacyPolicyModalVisible] = useState(false);
+  const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const { theme, themeType, setThemeType, toggleTheme, isDark, canUseDarkTheme } = useTheme();
   const { isPremium } = usePremium();
@@ -69,9 +70,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const [showTestingSection, setShowTestingSection] = useState(false);
   const [isRunningSimulation, setIsRunningSimulation] = useState(false);
   const [testResults, setTestResults] = useState<string[]>([]);
-  const { rewardManager } = usePremium();
-  const { currentProgress } = useGamification();
   const hasSeenDarkModeUnlock = useRef(false);
+  const appVersion = "1.0.0";
   
   const handleGoBack = () => {
     if (onClose) {
@@ -93,6 +93,16 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     setSubscriptionModalVisible(false);
   };
   
+  // Function to send email to support
+  const handleContactSupport = () => {
+    Linking.openURL('mailto:support@flexbreak.com?subject=FlexBreak%20Support%20Request');
+  };
+
+  // Function to open website
+  const handleOpenWebsite = () => {
+    Linking.openURL('https://ortegafit.com');
+  };
+
   // Handle reset data
   const handleResetData = async () => {
     Alert.alert(
@@ -339,6 +349,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         <TouchableOpacity 
           onPress={handleGoBack}
           style={styles.backButton}
+          hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
         >
           <Ionicons name="close" size={24} color={theme.text} />
         </TouchableOpacity>
@@ -475,6 +486,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         {/* About Section */}
         <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
           <Text style={[styles.sectionTitle, {color: theme.text}]}>About</Text>
+          
           <TouchableOpacity style={styles.settingItem}>
             <View style={styles.settingContent}>
               <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
@@ -482,12 +494,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               </View>
               <View style={styles.textContainer}>
                 <Text style={[styles.settingTitle, {color: theme.text}]}>App Version</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>1.0.0</Text>
+                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>{appVersion}</Text>
               </View>
             </View>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => setPrivacyPolicyModalVisible(true)}
+          >
             <View style={styles.settingContent}>
               <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="document-text-outline" size={22} color="#2196F3" />
@@ -500,14 +515,49 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => setHelpModalVisible(true)}  
+          >
             <View style={styles.settingContent}>
               <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="help-circle-outline" size={22} color="#2196F3" />
               </View>
               <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Help</Text>
+                <Text style={[styles.settingTitle, {color: theme.text}]}>Help & Support</Text>
                 <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Get support and assistance</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={handleOpenWebsite}
+          >
+            <View style={styles.settingContent}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                <Ionicons name="globe-outline" size={22} color="#2196F3" />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.settingTitle, {color: theme.text}]}>Website</Text>
+                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Visit our website</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.settingItem, styles.lastItem]}
+            onPress={handleContactSupport}
+          >
+            <View style={styles.settingContent}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                <Ionicons name="mail-outline" size={22} color="#2196F3" />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.settingTitle, {color: theme.text}]}>Contact Us</Text>
+                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Send us an email</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
@@ -529,23 +579,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 <View style={styles.textContainer}>
                   <Text style={[styles.settingTitle, {color: theme.text}]}>Diagnostics</Text>
                   <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Storage and performance monitoring</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-            
-            {/* Theme Preview */}
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => setThemePreviewModalVisible(true)}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
-                  <Ionicons name="color-palette-outline" size={22} color={theme.accent} />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Theme Preview</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Test and preview theme components</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
@@ -584,16 +617,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 Gamification System Testing Tools
               </Text>
               
-              <TouchableOpacity 
-                style={[
-                  styles.simulationButton,
-                  {backgroundColor: theme.accent}
-                ]}
-                onPress={() => navigation.navigate('TestSimulation')}
-              >
-                <Ionicons name="time-outline" size={20} color="#FFF" style={styles.simulationButtonIcon} />
-                <Text style={styles.simulationButtonText}>Open Simulation Tool</Text>
-              </TouchableOpacity>
+
               
               <TouchableOpacity 
                 style={[
@@ -616,7 +640,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         
         {/* Version info at bottom */}
         <View style={styles.footer}>
-          <Text style={[styles.footerText, {color: theme.textSecondary}]}>Made with ♥ by Your App Team</Text>
+          <Text style={[styles.footerText, {color: theme.textSecondary}]}>FlexBreak v{appVersion} • © 2025-2026 FlexBreak</Text>
         </View>
       </ScrollView>
       
@@ -632,6 +656,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             <TouchableOpacity 
               onPress={() => setDiagnosticsModalVisible(false)}
               style={styles.backButton}
+              hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
             >
               <Ionicons name="close" size={24} color={theme.text} />
             </TouchableOpacity>
@@ -642,27 +667,185 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         </View>
       </Modal>
       
-      {/* Theme Preview Modal */}
+      {/* Privacy Policy Modal */}
       <Modal
         animationType="slide"
         transparent={false}
-        visible={themePreviewModalVisible}
-        onRequestClose={() => setThemePreviewModalVisible(false)}
+        visible={privacyPolicyModalVisible}
+        onRequestClose={() => setPrivacyPolicyModalVisible(false)}
       >
-        <View style={[styles.safeArea, {backgroundColor: theme.background}]}>
-          <View style={[styles.header, {borderBottomColor: theme.border, backgroundColor: theme.cardBackground}]}>
+        <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
+          <View style={[styles.modalHeader, {borderBottomColor: theme.border, backgroundColor: theme.cardBackground}]}>
             <TouchableOpacity 
-              onPress={() => setThemePreviewModalVisible(false)}
-              style={styles.backButton}
+              onPress={() => setPrivacyPolicyModalVisible(false)}
+              style={styles.modalCloseButton}
+              hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
             >
-              <Ionicons name="close" size={24} color={theme.text} />
+              <Ionicons name="arrow-back" size={24} color={theme.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, {color: theme.text}]}>Theme Preview</Text>
+            <Text style={[styles.headerTitle, {color: theme.text}]}>Privacy Policy</Text>
             <View style={styles.headerRight} />
           </View>
           
-          <ThemePreview />
-        </View>
+          <ScrollView style={[styles.container, {padding: 16}]}>
+            <ThemedText style={styles.policyTitle} bold size={22}>
+              FlexBreak Privacy Policy
+            </ThemedText>
+            <ThemedText style={styles.policyDate} type="secondary">
+              Last Updated: May 15, 2025
+            </ThemedText>
+            
+            <ThemedText style={styles.policySection} bold size={18}>
+              1. Introduction
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              FlexBreak is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and share your personal information when you use our application.
+            </ThemedText>
+            
+            <ThemedText style={styles.policySection} bold size={18}>
+              2. Information We Collect
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              We collect information that you provide directly to us, such as when you create an account, subscribe to our service, or contact us for support. This may include your name, email address, and payment information.
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              We also automatically collect certain information when you use our app, including:
+            </ThemedText>
+            <View style={styles.bulletList}>
+              <ThemedText style={styles.bulletItem}>• Device information (model, operating system)</ThemedText>
+              <ThemedText style={styles.bulletItem}>• Usage statistics and exercise data</ThemedText>
+              <ThemedText style={styles.bulletItem}>• Performance and error data</ThemedText>
+            </View>
+            
+            <ThemedText style={styles.policySection} bold size={18}>
+              3. How We Use Your Information
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              We use the information we collect to:
+            </ThemedText>
+            <View style={styles.bulletList}>
+              <ThemedText style={styles.bulletItem}>• Provide and maintain our services</ThemedText>
+              <ThemedText style={styles.bulletItem}>• Process transactions and send related information</ThemedText>
+              <ThemedText style={styles.bulletItem}>• Send you technical notices and support messages</ThemedText>
+              <ThemedText style={styles.bulletItem}>• Improve and personalize your experience</ThemedText>
+            </View>
+            
+            <ThemedText style={styles.policySection} bold size={18}>
+              4. Data Storage and Security
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              We take the security of your data seriously and implement appropriate measures to protect your information. Your personal data is stored securely and is only accessible to authorized personnel.
+            </ThemedText>
+            
+            <ThemedText style={styles.policySection} bold size={18}>
+              5. Your Rights
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              You have the right to access, correct, or delete your personal information. You can manage your account settings within the app or contact us directly for assistance.
+            </ThemedText>
+            
+            <ThemedText style={styles.policySection} bold size={18}>
+              6. Changes to This Policy
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy in the app and updating the "Last Updated" date.
+            </ThemedText>
+            
+            <ThemedText style={styles.policySection} bold size={18}>
+              7. Contact Us
+            </ThemedText>
+            <ThemedText style={styles.policyText}>
+              If you have any questions about this Privacy Policy, please contact us at:
+            </ThemedText>
+            <ThemedText style={[styles.policyText, {marginBottom: 30}]}>
+              privacy@flexbreak.com
+            </ThemedText>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+      
+      {/* Help Modal */}
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={helpModalVisible}
+        onRequestClose={() => setHelpModalVisible(false)}
+      >
+        <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
+          <View style={[styles.modalHeader, {borderBottomColor: theme.border, backgroundColor: theme.cardBackground}]}>
+            <TouchableOpacity 
+              onPress={() => setHelpModalVisible(false)}
+              style={styles.modalCloseButton}
+              hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
+            >
+              <Ionicons name="arrow-back" size={24} color={theme.text} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, {color: theme.text}]}>Help & Support</Text>
+            <View style={styles.headerRight} />
+          </View>
+          
+          <ScrollView style={[styles.container, {padding: 16}]}>
+            <ThemedText style={styles.helpTitle} bold size={20}>
+              Frequently Asked Questions
+            </ThemedText>
+            
+            <ThemedText style={styles.helpQuestion} bold>
+              How do I start a stretching routine?
+            </ThemedText>
+            <ThemedText style={styles.helpAnswer}>
+              From the home screen, tap on "Start Stretching" or select a specific routine from the routines tab. Follow the on-screen instructions for each stretch.
+            </ThemedText>
+            
+            <ThemedText style={styles.helpQuestion} bold>
+              Can I create custom routines?
+            </ThemedText>
+            <ThemedText style={styles.helpAnswer}>
+              Yes! Go to the Routines tab and tap "Create New" to build your own custom routine with stretches of your choice.
+            </ThemedText>
+            
+            <ThemedText style={styles.helpQuestion} bold>
+              How do I track my progress?
+            </ThemedText>
+            <ThemedText style={styles.helpAnswer}>
+              Your progress is automatically tracked in the Stats tab. You can view your daily and weekly stretching minutes, completed routines, and streaks.
+            </ThemedText>
+            
+            <ThemedText style={styles.helpQuestion} bold>
+              What is the Premium subscription?
+            </ThemedText>
+            <ThemedText style={styles.helpAnswer}>
+              Premium gives you access to all stretching routines, removes ads, enables dark mode (at level 2), and unlocks custom routine creation. Subscribe in the app settings.
+            </ThemedText>
+            
+            <ThemedText style={styles.helpQuestion} bold>
+              How do I set up stretch reminders?
+            </ThemedText>
+            <ThemedText style={styles.helpAnswer}>
+              Go to the Reminders tab and tap "Add Reminder". Choose your preferred time and frequency, and ensure notifications are enabled for the app in your device settings.
+            </ThemedText>
+            
+            <View style={styles.helpDivider} />
+            
+            <ThemedText style={styles.helpTitle} bold size={20}>
+              Contact Support
+            </ThemedText>
+            <ThemedText style={styles.helpContactText}>
+              Need additional help? Our support team is ready to assist you:
+            </ThemedText>
+            
+            <TouchableOpacity 
+              style={[styles.helpContactButton, {backgroundColor: theme.accent}]}
+              onPress={handleContactSupport}
+            >
+              <Ionicons name="mail-outline" size={20} color="#FFF" style={{marginRight: 8}} />
+              <Text style={styles.helpContactButtonText}>Email Support</Text>
+            </TouchableOpacity>
+            
+            <ThemedText style={styles.helpResponseTime} type="secondary">
+              We typically respond within 24 hours on business days.
+            </ThemedText>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
       
       {/* Subscription Modal */}
@@ -697,7 +880,8 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
   },
   backButton: {
-    padding: 8,
+    padding: 10,
+    marginLeft: 4,
   },
   headerTitle: {
     fontSize: 18,
@@ -997,6 +1181,87 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 4,
     flex: 1,
+  },
+  // Privacy Policy styles
+  policyTitle: {
+    marginBottom: 8,
+  },
+  policyDate: {
+    marginBottom: 24,
+  },
+  policySection: {
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  policyText: {
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  bulletList: {
+    marginLeft: 8,
+    marginBottom: 16,
+  },
+  bulletItem: {
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  
+  // Help screen styles
+  helpTitle: {
+    marginBottom: 20,
+  },
+  helpQuestion: {
+    marginBottom: 8,
+  },
+  helpAnswer: {
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  helpDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 24,
+  },
+  helpContactText: {
+    marginBottom: 16,
+  },
+  helpContactButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  helpContactButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  helpResponseTime: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eaeaea',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+  },
+  modalCloseButton: {
+    padding: 10,
+    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
 });
 

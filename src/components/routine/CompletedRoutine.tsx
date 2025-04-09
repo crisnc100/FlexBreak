@@ -1,13 +1,14 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   TouchableOpacity,
   Text,
   StyleSheet,
-  Animated
+  Animated,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { BodyArea, Duration, RoutineParams } from '../../types';
 import { AppNavigationProp } from '../../types';
 import { generateRoutine } from '../../utils/routineGenerator';
@@ -16,6 +17,7 @@ import XpNotificationManager from '../notifications/XpNotificationManager';
 import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
 import { useRefresh } from '../../context/RefreshContext';
+import { Toast } from 'react-native-toast-notifications';
 
 // Import subcomponents from tabs
 import LevelUpDisplay from './tabs/LevelUpDisplay';
@@ -58,6 +60,9 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   const { triggerRefresh } = useRefresh();
   const styles = themedStyles(theme);
   
+  // State to store resolved routine data
+  const [routineLength, setRoutineLength] = useState(0);
+  
   // Get unlocked achievements using the custom hook
   const { unlockedAchievements } = useAchievements(levelUp);
   
@@ -68,6 +73,19 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   useEffect(() => {
     console.log('CompletedRoutine mounted - triggering data refresh');
     triggerRefresh();
+    
+    // Generate routine and get length
+    const loadRoutine = async () => {
+      try {
+        const generatedRoutine = await generateRoutine(area, duration, 'beginner');
+        setRoutineLength(generatedRoutine.length);
+      } catch (error) {
+        console.error('Error loading routine:', error);
+        setRoutineLength(0);
+      }
+    };
+    
+    loadRoutine();
   }, []);
   
   // XP and Level Up calculations
@@ -145,11 +163,55 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     }
   }, [hasXpBoost]);
   
+  // Reference to Toast component - might be undefined
+  const toast = useRef(null);
+  
+  // Add animation refs for favorite saving animation with slower values
+  const favoriteAnimScale = useRef(new Animated.Value(0)).current;
+  const favoriteAnimOpacity = useRef(new Animated.Value(0)).current;
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Function to navigate properly with params
+  const navigateToScreen = (screenName: string, params?: any) => {
+    // Reset navigation state and navigate to the specific screen with params
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [
+          { 
+            name: screenName,
+            params: params || {} 
+          }
+        ],
+      })
+    );
+  };
+  
   // Action handlers
   const handleNewRoutine = () => {
-      triggerRefresh();
-      onShowDashboard();
-      onNavigateHome();
+    triggerRefresh();
+    onShowDashboard();
+    navigateToScreen('Home');
+  };
+  
+  // Safely show toast message without Alert fallback
+  const showMessage = (message: string, type: 'success' | 'warning' | 'danger' = 'success') => {
+    try {
+      if (Toast && Toast.show) {
+        Toast.show(message, {
+          type: type,
+          placement: 'bottom',
+          duration: type === 'warning' ? 4000 : 3000,
+          animationType: 'slide-in',
+        });
+      } else {
+        // Just log if Toast is not available, no alert
+        console.log(`Message (${type}):`, message);
+      }
+    } catch (error) {
+      // Log only
+      console.log('Failed to show message:', message);
+    }
   };
   
   const saveToFavorites = async () => {
@@ -159,6 +221,31 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     }
     
     try {
+      // Set saving state to show animation
+      setIsSaving(true);
+      
+      // Start animation - slower and smoother
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(favoriteAnimScale, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(favoriteAnimOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          })
+        ]),
+        Animated.delay(800),
+        Animated.timing(favoriteAnimOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        })
+      ]).start();
+      
       triggerRefresh();
       const routineParams: RoutineParams = {
         area: area,
@@ -166,11 +253,45 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         level: 'beginner'
       };
       
-      await saveFavoriteRoutine(routineParams);
-      onShowDashboard();
-      onNavigateHome();
+      const result = await saveFavoriteRoutine(routineParams);
+      
+      if (result.success) {
+        // Use showMessage but don't rely on it for UX flow
+        showMessage(result.message || 'Routine saved to favorites!', 'success');
+        
+        // Wait longer for animation to complete
+        setTimeout(() => {
+          setIsSaving(false);
+          onShowDashboard();
+          
+          // Navigate to Favorites tab with params indicating a newly saved routine
+          navigateToScreen('Favorites', { 
+            newSave: true,
+            savedRoutineId: Date.now().toString(), // Use timestamp as temporary ID
+            area: area,
+            duration: duration
+          });
+        }, 1200);
+      } else if (result.limitReached) {
+        // Show limit reached notification
+        showMessage(
+          result.message || 'You have reached the maximum number of favorites (15)', 
+          'warning'
+        );
+        setIsSaving(false);
+      } else {
+        // Show error but don't use Alert
+        showMessage(
+          result.message || 'Failed to save to favorites', 
+          'danger'
+        );
+        setIsSaving(false);
+      }
     } catch (error) {
       console.error('Error saving to favorites:', error);
+      // No Alert, just log and set state
+      console.log('Failed to save routine to favorites');
+      setIsSaving(false);
     }
   };
   
@@ -182,15 +303,20 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     
     triggerRefresh();
     onShowDashboard();
-    onNavigateHome();
     
+    // Use the proper navigation method
     setTimeout(() => {
       try {
-        navigation.navigate('Routine', {
-          area: 'Neck' as BodyArea,
-          duration: '5' as Duration,
-          level: 'beginner'
-        });
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: 'Routine',
+            params: {
+              area: 'Neck' as BodyArea,
+              duration: '5' as Duration,
+              level: 'beginner'
+            }
+          })
+        );
       } catch (error) {
         console.error('Error navigating to smart pick routine:', error);
       }
@@ -200,6 +326,30 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   return (
     <View style={styles.container}>
       <XpNotificationManager />
+      
+      {/* Saving Animation Overlay - with improved styling */}
+      {isSaving && (
+        <Animated.View 
+          style={[
+            styles.savingOverlay,
+            {
+              opacity: favoriteAnimOpacity,
+            }
+          ]}
+        >
+          <Animated.View 
+            style={[
+              styles.savingAnimationContainer,
+              {
+                transform: [{ scale: favoriteAnimScale }]
+              }
+            ]}
+          >
+            <Ionicons name="bookmark" size={70} color="#FF9800" />
+            <Text style={styles.savingText}>Saving to Favorites...</Text>
+          </Animated.View>
+        </Animated.View>
+      )}
       
       <TouchableOpacity 
         style={[
@@ -263,7 +413,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         <RoutineStats 
           area={area}
           duration={duration}
-          numStretches={routine.length}
+          numStretches={routineLength}
           showAnyLevelUp={showAnyLevelUp}
           theme={theme}
         />
@@ -348,6 +498,37 @@ const themedStyles = createThemedStyles(theme => StyleSheet.create({
     fontSize: 12,
     color: theme.textSecondary,
     marginLeft: 6,
+  },
+  savingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  savingAnimationContainer: {
+    backgroundColor: theme.cardBackground,
+    padding: 30,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+    minWidth: 200,
+  },
+  savingText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.text,
+    marginTop: 20,
+    textAlign: 'center',
   },
 }));
 

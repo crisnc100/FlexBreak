@@ -452,18 +452,28 @@ export const removeFavorite = async (stretchId: number): Promise<boolean> => {
 /**
  * Save a routine to favorites
  * @param routine Routine to save
- * @returns Success boolean
+ * @returns Success boolean or object with status and message
  */
 export const saveFavoriteRoutine = async (routine: { 
   name?: string; 
   area: BodyArea; 
   duration: Duration 
-}): Promise<boolean> => {
+}): Promise<{success: boolean, limitReached?: boolean, message?: string}> => {
   try {
     console.log('Saving favorite routine:', routine);
     
     // Get existing favorites
     const favorites = await getData<any[]>(KEYS.ROUTINES.FAVORITE_ROUTINES, []);
+    
+    // Check if we've reached the maximum number of favorites (15)
+    if (favorites.length >= 15) {
+      console.log('Maximum number of favorites reached (15)');
+      return {
+        success: false,
+        limitReached: true,
+        message: 'You can save up to 15 favorite routines. Please remove some before adding more.'
+      };
+    }
     
     // Add new favorite
     const newFavorite = {
@@ -476,9 +486,61 @@ export const saveFavoriteRoutine = async (routine: {
     const updatedFavorites = [newFavorite, ...favorites];
     
     // Save to storage
-    return await setData(KEYS.ROUTINES.FAVORITE_ROUTINES, updatedFavorites);
+    const saveResult = await setData(KEYS.ROUTINES.FAVORITE_ROUTINES, updatedFavorites);
+    
+    return {
+      success: saveResult,
+      message: saveResult ? 'Routine saved to favorites!' : 'Failed to save routine'
+    };
   } catch (error) {
     console.error('Error saving favorite routine:', error);
+    return {
+      success: false,
+      message: 'An error occurred while saving the routine'
+    };
+  }
+};
+
+/**
+ * Get favorite routines
+ * @returns Array of favorite routines
+ */
+export const getFavoriteRoutines = async (): Promise<any[]> => {
+  try {
+    const favorites = await getData<any[]>(KEYS.ROUTINES.FAVORITE_ROUTINES, []);
+    console.log(`Retrieved ${favorites.length} favorite routines`);
+    return favorites;
+  } catch (error) {
+    console.error('Error getting favorite routines:', error);
+    return [];
+  }
+};
+
+/**
+ * Delete a favorite routine by ID
+ * @param routineId ID of the routine to delete
+ * @returns Success boolean
+ */
+export const deleteFavoriteRoutine = async (routineId: string): Promise<boolean> => {
+  try {
+    // Get existing favorite routines
+    const favorites = await getFavoriteRoutines();
+    
+    // Filter out the routine to delete
+    const updatedFavorites = favorites.filter(routine => routine.id !== routineId);
+    
+    // If nothing was removed, return false
+    if (updatedFavorites.length === favorites.length) {
+      console.log('No favorite routine found with ID:', routineId);
+      return false;
+    }
+    
+    // Save updated favorites
+    const success = await setData(KEYS.ROUTINES.FAVORITE_ROUTINES, updatedFavorites);
+    console.log(`Deleted favorite routine with ID: ${routineId}, success: ${success}`);
+    return success;
+  } catch (error) {
+    console.error('Error deleting favorite routine:', error);
     return false;
   }
 };
