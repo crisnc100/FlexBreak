@@ -20,6 +20,7 @@ import * as achievementManager from '../../utils/progress/modules/achievementMan
 import * as storageService from '../../services/storageService';
 import { EventEmitter } from '../../utils/EventEmitter';
 import * as streakManager from '../../utils/progress/modules/streakManager';
+import * as soundEffects from '../../utils/soundEffects';
 
 // Define result types for better type safety
 interface RoutineProcessResult {
@@ -230,6 +231,9 @@ export function useGamification() {
         console.log('Level up detected in useGamification.processRoutine!');
         setLevel(result.newLevel);
         
+        // Play level up sound
+        soundEffects.playLevelUpSound();
+        
         // Emit level up event to notify other components
         gamificationEvents.emit(LEVEL_UP_EVENT, {
           oldLevel: prevLevel,
@@ -238,6 +242,7 @@ export function useGamification() {
         
         // If rewards were unlocked, emit reward unlocked event
         if (result.newlyUnlockedRewards && result.newlyUnlockedRewards.length > 0) {
+          soundEffects.playAchievementSound();
           gamificationEvents.emit(REWARD_UNLOCKED_EVENT, result.newlyUnlockedRewards);
         }
       }
@@ -307,6 +312,9 @@ export function useGamification() {
         // Update level if needed
         if (result.levelUp) {
           setLevel(result.newLevel);
+          
+          // Play level up sound
+          soundEffects.playLevelUpSound();
           
           // Emit level up event with detailed challenge source information
           gamificationEvents.emit(LEVEL_UP_EVENT, {
@@ -490,6 +498,9 @@ export function useGamification() {
       
       if (levelUp) {
         setLevel(newLevelInfo.level);
+        
+        // Play level up sound
+        soundEffects.playLevelUpSound();
         
         // Emit level up event with source information
         gamificationEvents.emit(LEVEL_UP_EVENT, {

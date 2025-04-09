@@ -1,6 +1,7 @@
 import * as storageService from '../../../services/storageService';
 import { UserProgress } from '../types';
 import * as dateUtils from './utils/dateUtils';
+import * as soundEffects from '../../../utils/soundEffects';
 
 // Constants
 const XP_BOOST_REWARD_ID = 'xp_boost';
@@ -133,6 +134,9 @@ export const activateXpBoost = async (
   
   // Save updated progress
   await storageService.saveUserProgress(userProgress);
+  
+  // Play XP boost sound
+  await soundEffects.playXpBoostSound();
   
   return { 
     success: true, 

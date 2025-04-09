@@ -134,7 +134,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             'Dark theme requires a premium subscription. Unlock all premium features to access dark theme.',
             [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Upgrade', style: 'default', onPress: () => onUpgradeToPremium?.() }
+              { text: 'Upgrade', style: 'default', onPress: () => handleOpenSubscription() }
             ]
           );
         } else {

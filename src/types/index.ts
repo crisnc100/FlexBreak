@@ -42,6 +42,7 @@ export interface RoutineParams {
   duration: Duration;
   level?: StretchLevel;
   customStretches?: (Stretch | RestPeriod)[];
+  includePremiumStretches?: boolean;
 }
 
 export interface ProgressEntry {

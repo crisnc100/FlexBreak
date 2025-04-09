@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react';
-import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from './src/screens/HomeScreen';
 import RoutineScreen from './src/screens/RoutineScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
@@ -16,13 +17,17 @@ import BobSimulatorScreen from './src/screens/BobSimulatorScreen';
 import { PremiumProvider, usePremium } from './src/context/PremiumContext';
 import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
-import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as streakFreezeManager from './src/utils/progress/modules/streakFreezeManager';
 import * as streakManager from './src/utils/progress/modules/streakManager';
 import StreakFreezePrompt from './src/components/notifications/StreakFreezePrompt';
 import * as rewardManager from './src/utils/progress/modules/rewardManager';
 import { useFeatureAccess } from './src/hooks/progress/useFeatureAccess';
+import * as soundEffects from './src/utils/soundEffects';
+import IntroManager from './src/components/intro/IntroManager';
+
+// Avoid playing intro sound twice
+let introSoundPlayed = false;
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -48,23 +53,25 @@ function navigate(name, params) {
 // Main entry point for the app
 export default function App() {
   return (
-    <ThemeProvider>
-      <PremiumProvider>
-        <RefreshProvider>
-          <StatusBar 
-            barStyle="dark-content" 
-            backgroundColor="transparent" 
-            translucent={true} 
-          />
-          <MainApp />
-        </RefreshProvider>
-      </PremiumProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <PremiumProvider>
+          <RefreshProvider>
+            <StatusBar 
+              barStyle="dark-content" 
+              backgroundColor="transparent" 
+              translucent={true} 
+            />
+            <MainApp />
+          </RefreshProvider>
+        </PremiumProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
 // Create the main tab navigator component
-function TabNavigator() {
+const TabNavigator = () => {
   const { theme, isDark } = useTheme();
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const { isPremium } = usePremium();
@@ -91,9 +98,10 @@ function TabNavigator() {
   return (
     <>
       <Tab.Navigator
+        id="tab-navigator"
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
+            let iconName: string = 'home';
 
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
@@ -172,6 +180,8 @@ function TabNavigator() {
 // Main app with stack navigator for screens outside the tab flow
 function MainApp() {
   const { theme, isDark } = useTheme();
+  const [showIntro, setShowIntro] = useState(true);
+  const fadeInAnim = useRef(new Animated.Value(0)).current;
   
   // Initialize streaks and streak freezes when app launches
   useEffect(() => {
@@ -191,6 +201,43 @@ function MainApp() {
     initStreakSystem();
   }, []);
   
+  // Initialize sound effects system (but don't play intro here - we'll play it in the intro screens)
+  useEffect(() => {
+    const initSounds = async () => {
+      try {
+        // Initialize sound system with user preferences
+        await soundEffects.initSoundSystem();
+        
+        // Preload all sound effects for faster playback
+        await soundEffects.preloadAllSounds();
+        
+        // Don't play intro sound here - it will be played by the intro screens
+        console.log('Sound effects system initialized');
+      } catch (error) {
+        console.error('Error initializing sound effects system:', error);
+      }
+    };
+    
+    initSounds();
+    
+    // Cleanup sounds when app is unmounted
+    return () => {
+      soundEffects.unloadAllSounds();
+    };
+  }, []);
+  
+  // Effect to animate fade-in when transitioning from intro screens
+  useEffect(() => {
+    if (!showIntro) {
+      // Start the fade-in animation when intro is complete
+      Animated.timing(fadeInAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showIntro]);
+  
   const navigationTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
     colors: {
@@ -202,13 +249,25 @@ function MainApp() {
     },
   };
   
+  // Handle intro complete
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+  };
+  
+  // If showing intro, render the IntroManager
+  if (showIntro) {
+    return <IntroManager onComplete={handleIntroComplete} />;
+  }
+  
+  // Otherwise, render the main app with fade-in effect
   return (
-    <>
+    <Animated.View style={{ flex: 1, opacity: fadeInAnim }}>
       <StatusBar 
         barStyle={isDark ? 'light-content' : 'dark-content'} 
         backgroundColor={theme.background} 
       />
       <NavigationContainer theme={navigationTheme} ref={navigationRef}>
+        {/* @ts-ignore - Fixing type error with id property */}
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen name="BobSimulator" component={BobSimulatorScreen} />
@@ -217,6 +276,6 @@ function MainApp() {
       
       {/* Streak Freeze Prompt */}
       <StreakFreezePrompt />
-    </>
+    </Animated.View>
   );
 } 

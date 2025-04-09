@@ -1,6 +1,7 @@
 import { UserProgress, Reward } from '../types';
 import * as storageService from '../../../services/storageService';
 import * as dateUtils from './utils/dateUtils';
+import * as soundEffects from '../../../utils/soundEffects';
 
 const STREAK_FREEZE_REWARD_ID = 'streak_freezes';
 

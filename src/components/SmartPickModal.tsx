@@ -1,14 +1,104 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { RoutineRecommendation } from '../utils/smartPickGenerator';
+import { useTheme } from '../context/ThemeContext';
 
 interface SmartPickModalProps {
   visible: boolean;
   onClose: () => void;
-  onUpgrade: () => void;
+  onUpgrade?: () => void;
+  isPremium?: boolean;
+  recommendation?: RoutineRecommendation;
+  onStartRecommendation?: (recommendation: RoutineRecommendation) => void;
 }
 
-export default function SmartPickModal({ visible, onClose, onUpgrade }: SmartPickModalProps) {
+export default function SmartPickModal({ 
+  visible, 
+  onClose, 
+  onUpgrade, 
+  isPremium = false,
+  recommendation,
+  onStartRecommendation
+}: SmartPickModalProps) {
+  const { theme, isDark } = useTheme();
+
+  // For premium users with a recommendation
+  if (isPremium && recommendation) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[
+            styles.modalContent,
+            { backgroundColor: isDark ? theme.cardBackground : '#fff' }
+          ]}>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color={isDark ? theme.text : '#333'} />
+            </TouchableOpacity>
+            
+            <Ionicons name="bulb" size={60} color="#4CAF50" style={styles.featureIcon} />
+            
+            <Text style={[
+              styles.modalHeader,
+              { color: isDark ? theme.text : '#333' }
+            ]}>Smart Pick</Text>
+            
+            <View style={styles.recommendationBox}>
+              <Text style={[
+                styles.recommendationTitle,
+                { color: isDark ? theme.text : '#333' }
+              ]}>
+                {recommendation.area} - {recommendation.duration} min ({recommendation.level})
+              </Text>
+              
+              <Text style={[
+                styles.recommendationReason,
+                { color: isDark ? theme.textSecondary : '#666' }
+              ]}>
+                {recommendation.reason}
+              </Text>
+              
+              {recommendation.isPremiumEnabled && (
+                <View style={styles.premiumBadgeContainer}>
+                  <Ionicons name="star" size={16} color="#FF9800" />
+                  <Text style={[
+                    styles.premiumBadgeText,
+                    { color: isDark ? '#FFC107' : '#FF9800' }
+                  ]}>
+                    Includes premium stretches
+                  </Text>
+                </View>
+              )}
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.startButton} 
+              onPress={() => {
+                onStartRecommendation && onStartRecommendation(recommendation);
+                onClose();
+              }}
+            >
+              <Text style={styles.startButtonText}>Start Routine</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.skipButton} onPress={onClose}>
+              <Text style={[
+                styles.skipButtonText,
+                { color: isDark ? theme.textSecondary : '#666' }
+              ]}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+  
+  // For non-premium users (upgrade prompt)
   return (
     <Modal
       visible={visible}
@@ -17,40 +107,67 @@ export default function SmartPickModal({ visible, onClose, onUpgrade }: SmartPic
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[
+          styles.modalContent,
+          { backgroundColor: isDark ? theme.cardBackground : '#fff' }
+        ]}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#333" />
+            <Ionicons name="close" size={24} color={isDark ? theme.text : '#333'} />
           </TouchableOpacity>
           
           <Ionicons name="analytics" size={60} color="#FF9800" style={styles.featureIcon} />
           
-          <Text style={styles.modalHeader}>Smart Pick</Text>
+          <Text style={[
+            styles.modalHeader,
+            { color: isDark ? theme.text : '#333' }
+          ]}>Smart Pick</Text>
           
-          <Text style={styles.modalDescription}>
+          <Text style={[
+            styles.modalDescription,
+            { color: isDark ? theme.textSecondary : '#666' }
+          ]}>
             Smart Pick analyzes your stretching history to suggest personalized routines based on your patterns and needs.
           </Text>
           
           <View style={styles.benefitsList}>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={24} color="#FF9800" />
-              <Text style={styles.benefitText}>Personalized recommendations</Text>
+              <Text style={[
+                styles.benefitText,
+                { color: isDark ? theme.text : '#333' }
+              ]}>Personalized recommendations</Text>
             </View>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={24} color="#FF9800" />
-              <Text style={styles.benefitText}>Based on your stretching history</Text>
+              <Text style={[
+                styles.benefitText,
+                { color: isDark ? theme.text : '#333' }
+              ]}>Based on your stretching history</Text>
             </View>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={24} color="#FF9800" />
-              <Text style={styles.benefitText}>Targets neglected body areas</Text>
+              <Text style={[
+                styles.benefitText,
+                { color: isDark ? theme.text : '#333' }
+              ]}>Targets neglected body areas</Text>
             </View>
           </View>
           
-          <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
+          <TouchableOpacity 
+            style={styles.upgradeButton} 
+            onPress={() => {
+              onUpgrade && onUpgrade();
+              onClose();
+            }}
+          >
             <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.skipButton} onPress={onClose}>
-            <Text style={styles.skipButtonText}>Maybe Later</Text>
+            <Text style={[
+              styles.skipButtonText,
+              { color: isDark ? theme.textSecondary : '#666' }
+            ]}>Maybe Later</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -127,5 +244,52 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontSize: 14,
     color: '#666',
+  },
+  recommendationBox: {
+    width: '100%',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 16,
+  },
+  recommendationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  recommendationReason: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  startButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  startButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  premiumBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    padding: 4,
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderRadius: 4,
+    alignSelf: 'center',
+  },
+  premiumBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 }); 

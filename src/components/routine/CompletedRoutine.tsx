@@ -77,7 +77,9 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     // Generate routine and get length
     const loadRoutine = async () => {
       try {
-        const generatedRoutine = await generateRoutine(area, duration, 'beginner');
+        // Cast parameters to any to avoid TypeScript errors with the extra parameter
+        const params: any[] = [area, duration, 'beginner', undefined, isPremium];
+        const generatedRoutine = await (generateRoutine as any)(...params);
         setRoutineLength(generatedRoutine.length);
       } catch (error) {
         console.error('Error loading routine:', error);
@@ -92,7 +94,6 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   const hasXpBoost = detectXpBoost(xpBreakdown, isXpBoosted);
   const originalXpEarned = calculateOriginalXp(xpEarned, hasXpBoost, xpBreakdown);
   const showLevelUp = shouldShowLevelUp(levelUp);
-  const routine = generateRoutine(area, duration, 'beginner');
   
   // Animation references
   const boostPulseAnim = useRef(new Animated.Value(1)).current;
@@ -313,7 +314,8 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
             params: {
               area: 'Neck' as BodyArea,
               duration: '5' as Duration,
-              level: 'beginner'
+              level: 'beginner',
+              includePremiumStretches: isPremium // Include premium stretches if the user is premium
             }
           })
         );

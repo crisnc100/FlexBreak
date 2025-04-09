@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
+import * as soundEffects from '../../utils/soundEffects';
 
 interface LevelUpNotificationProps {
   oldLevel: number;
@@ -31,6 +32,9 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
   useEffect(() => {
     console.log(`Rendering LevelUpNotification: ${oldLevel} → ${newLevel}`);
     console.log(`Source: ${source}, Challenge: ${challengeTitle || 'None'}`);
+    
+    // Play level up sound when component mounts
+    soundEffects.playLevelUpSound();
   }, []);
 
   useEffect(() => {

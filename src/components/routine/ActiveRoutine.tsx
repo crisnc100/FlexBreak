@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,8 @@ import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../../typ
 import { generateRoutine } from '../../utils/routineGenerator';
 import { useTheme } from '../../context/ThemeContext';
 import { enhanceRoutineWithPremiumInfo } from '../../utils/premiumUtils';
+import * as soundEffects from '../../utils/soundEffects';
+import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ export interface ActiveRoutineProps {
   duration: Duration;
   level: StretchLevel;
   customStretches?: (Stretch | RestPeriod)[];
+  includePremiumStretches?: boolean;
   onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean) => Promise<void>;
   onNavigateHome: () => void;
 }
@@ -34,6 +37,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   duration,
   level,
   customStretches,
+  includePremiumStretches,
   onComplete,
   onNavigateHome
 }) => {
@@ -42,68 +46,106 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // State
   const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string })[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
   const [isDone, setIsDone] = useState(false);
   
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const progressAnim = useRef(new Animated.Value(1)).current;
+  // Track last second where we played a sound to avoid multiple plays
+  const lastSecondPlayedRef = useRef<number>(-1);
+  const initialRenderRef = useRef(true);
+  
+  // Add state for paused status
+  const [isPaused, setIsPaused] = useState(false);
+  
+  // Define handleNext as useCallback to avoid dependency issues
+  const handleNext = useCallback(() => {
+    console.log('handleNext called');
+    
+    // Play sound effect
+    try {
+      soundEffects.playClickSound();
+    } catch (error) {
+      console.error('Error playing click sound:', error);
+    }
+    
+    // Reset the last second played reference
+    lastSecondPlayedRef.current = -1;
+    
+    if (currentIndex < routine.length - 1) {
+      console.log(`Moving to next stretch: ${currentIndex + 1}`);
+      fadeAnim.setValue(0);
+      
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+      
+      // Update current index
+      setCurrentIndex(prevIndex => {
+        const newIndex = prevIndex + 1;
+        console.log(`Setting new index to ${newIndex}`);
+        return newIndex;
+      });
+    } else {
+      // Play completion sound
+      try {
+        soundEffects.playCompletionSound();
+      } catch (error) {
+        console.error('Error playing completion sound:', error);
+      }
+      
+      // Call handleComplete
+      console.log('Reached the end of the routine, completing...');
+      handleComplete();
+    }
+  }, [currentIndex, routine.length]);
+  
+  // Use the routine timer hook
+  const { 
+    timeRemaining, 
+    progressAnim, 
+    fadeAnim,
+    startTimer, 
+    pauseTimer, 
+    resumeTimer,
+    resetTimer,
+    isPaused: isTimerPaused,  // Get isPaused from the hook
+    togglePause           // Get togglePause function
+  } = useRoutineTimer({
+    onComplete: handleNext
+  });
+  
+  // Keep local isPaused state in sync with timer hook
+  useEffect(() => {
+    setIsPaused(isTimerPaused);
+  }, [isTimerPaused]);
   
   // Get the current stretch
   const currentStretch = routine[currentIndex];
   
-  // Start or restart a timer
-  const startTimer = (duration: number) => {
-    // Ensure duration is a valid number
-    if (typeof duration !== 'number' || isNaN(duration) || duration <= 0) {
-      console.warn(`Invalid duration provided to startTimer: ${duration}, using default of 30 seconds`);
-      duration = 30; // Default to 30 seconds as a fallback
+  // Effect to start timer for the current stretch when currentIndex changes
+  useEffect(() => {
+    if (!initialRenderRef.current && routine.length > 0 && currentIndex < routine.length) {
+      const currentDuration = routine[currentIndex]?.duration || 30;
+      console.log(`Starting timer for stretch ${currentIndex} with duration ${currentDuration}`);
+      try {
+        startTimer(currentDuration);
+      } catch (error) {
+        console.error('Error starting timer:', error);
+      }
     }
     
-    console.log(`Starting timer with duration: ${duration} seconds`);
-    
-    // Clear existing timer
-    if (timerId) {
-      clearInterval(timerId);
+    // After first render, set initialRender to false
+    if (initialRenderRef.current) {
+      initialRenderRef.current = false;
     }
-    
-    // Set initial time
-    setTimeRemaining(duration);
-    
-    // Reset animation
-    progressAnim.setValue(1);
-    
-    // Start timer animation
-    Animated.timing(progressAnim, {
-      toValue: 0,
-      duration: duration * 1000,
-      useNativeDriver: false,
-      easing: Easing.linear
-    }).start();
-    
-    // Start timer
-    const id = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          // Time's up - go to next stretch
-          clearInterval(id);
-          handleNext();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    setTimerId(id);
-  };
+  }, [currentIndex, routine]);
   
   // Clean up timer on unmount
   useEffect(() => {
     return () => {
-      if (timerId) clearInterval(timerId);
+      pauseTimer();
     };
-  }, [timerId]);
+  }, []);
   
   // Generate the routine when the component mounts
   useEffect(() => {
@@ -220,7 +262,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           } else {
             // Generate a routine normally if no custom stretches
             console.log('Generating routine without custom stretches');
-            const generatedRoutine = await generateRoutine(area, duration, level);
+            const generatedRoutine = await generateRoutine(area, duration, level, undefined, includePremiumStretches);
             
             // Enhance the routine with premium information
             try {
@@ -264,68 +306,54 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     };
     
     initRoutine();
-  }, [area, duration, level, customStretches]);
+  }, [area, duration, level, customStretches, includePremiumStretches]);
   
-  // Handle skip to next stretch
-  const handleNext = () => {
-    if (currentIndex < routine.length - 1) {
-      // Animate the transition
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        })
-      ]).start();
-      
-      // Move to next stretch
-      const nextIndex = currentIndex + 1;
-      setCurrentIndex(nextIndex);
-      
-      // Start timer for the next stretch
-      startTimer(routine[nextIndex].duration);
-    } else {
-      // Complete routine if on last stretch
-      handleComplete();
-    }
-  };
-  
-  // Handle previous stretch
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      // Animate the transition
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        })
-      ]).start();
-      
-      // Move to previous stretch
-      const prevIndex = currentIndex - 1;
-      setCurrentIndex(prevIndex);
-      
-      // Start timer for the previous stretch
-      startTimer(routine[prevIndex].duration);
-    }
-  };
-  
-  // Format time as MM:SS
+  // Format time from seconds to MM:SS
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+    // Round seconds to nearest integer to avoid decimal display
+    const roundedSeconds = Math.round(seconds);
+    
+    // Only play timer tick when transitioning to a new second
+    // and only for the countdown (5,4,3,2,1)
+    if (roundedSeconds <= 5 && roundedSeconds > 0 && roundedSeconds !== lastSecondPlayedRef.current) {
+      lastSecondPlayedRef.current = roundedSeconds;
+      // Wrap in try/catch to prevent errors from affecting the routine
+      try {
+        soundEffects.playTimerTickSound();
+      } catch (error) {
+        console.error('Error playing timer tick:', error);
+        // Don't let sound errors affect the routine flow
+      }
+    }
+    
+    // Format as MM:SS with fixed integer display (no decimals)
+    const mins = Math.floor(roundedSeconds / 60);
+    const secs = roundedSeconds % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+  
+  // Function to handle going back to previous stretch
+  const handlePrevious = () => {
+    // Play sound effect
+    try {
+      soundEffects.playClickSound();
+    } catch (error) {
+      console.error('Error playing click sound:', error);
+    }
+    
+    if (currentIndex > 0) {
+      console.log(`Moving to previous stretch: ${currentIndex - 1}`);
+      fadeAnim.setValue(0);
+      
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+      
+      // Update current index - timer will start in the useEffect
+      setCurrentIndex(prevIndex => prevIndex - 1);
+    }
   };
   
   // Calculate overall progress
@@ -334,36 +362,62 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     
     const totalStretches = routine.length;
     const completedStretches = currentIndex;
+    
+    // Get the current stretch's duration
+    const currentDuration = currentStretch ? currentStretch.duration : 30;
+    
+    // Calculate progress as a ratio of time remaining to total duration
     const currentProgress = currentStretch ? 
-      1 - (timeRemaining / currentStretch.duration) : 0;
+      1 - (timeRemaining / currentDuration) : 0;
     
     return (completedStretches + currentProgress) / totalStretches;
   };
   
-  // Handle save and exit
+  // Handle saving routine and exiting
   const handleSaveAndExit = () => {
-    // Save progress
-    const stretchCount = routine.filter(item => !('isRest' in item)).length;
-    // Check if any stretch is an advanced stretch
-    const hasAdvancedStretch = routine.some(item => 
-      !('isRest' in item) && (item as Stretch).level === 'advanced'
-    );
+    // Play sound effect
+    soundEffects.playClickSound();
     
-    onComplete(area, duration, stretchCount, hasAdvancedStretch);
-    Alert.alert('Progress Saved', 'Your routine has been saved to your progress');
+    // Clean up timer
+    pauseTimer();
+    
+    // Navigate to home screen
     onNavigateHome();
   };
   
   // Handle routine completion
   const handleComplete = () => {
-    // Call the onComplete callback
+    console.log('Completing routine');
+    
+    // Clean up timer
+    pauseTimer();
+    
+    // Play success sound
+    soundEffects.playSuccessSound();
+    
+    // Mark routine as done
+    setIsDone(true);
+    
+    // Calculate stretch count - exclude rest periods
     const stretchCount = routine.filter(item => !('isRest' in item)).length;
-    // Check if any stretch is an advanced stretch
-    const hasAdvancedStretch = routine.some(item => 
-      !('isRest' in item) && (item as Stretch).level === 'advanced'
+    
+    // Check if routine includes advanced stretches
+    const hasAdvancedStretch = routine.some(
+      item => !('isRest' in item) && (item as Stretch).level === 'advanced'
     );
     
+    // Call onComplete callback
     onComplete(area, duration, stretchCount, hasAdvancedStretch);
+  };
+  
+  // Handle pause/resume
+  const handleTogglePause = () => {
+    try {
+      soundEffects.playClickSound();
+      togglePause();
+    } catch (error) {
+      console.error('Error toggling pause:', error);
+    }
   };
   
   // Render the current stretch or rest period
@@ -476,12 +530,15 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         <TouchableOpacity 
           style={styles.backButton} 
           onPress={() => {
+            // Play click sound
+            soundEffects.playClickSound();
+            
             Alert.alert(
-              'Exit Routine',
-              'Do you want to save your progress and exit?',
+              '🧘‍♀️ Exit Workout?',
+              'Are you sure you want to exit? Your progress will not be saved.',
               [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Save & Exit', onPress: handleSaveAndExit }
+                { text: 'Keep Stretching', style: 'cancel' },
+                { text: 'Exit Anyway', style: 'destructive', onPress: handleSaveAndExit }
               ]
             );
           }}
@@ -522,7 +579,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         {renderCurrentItem()}
       </View>
       
-      {/* Improved Controls */}
+      {/* Controls */}
       <View style={[styles.controlsContainer, { 
         backgroundColor: isDark ? theme.cardBackground : '#FFF',
         borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
@@ -560,23 +617,50 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           </View>
         </TouchableOpacity>
         
+        {/* Pause/Resume Button */}
         <TouchableOpacity 
           style={styles.centerButton} 
-          onPress={handleNext}
+          onPress={handleTogglePause}
         >
           <View style={[styles.centerButtonInner, { 
             backgroundColor: isDark ? theme.accent : '#4CAF50',
             shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
           }]}>
             <Ionicons 
-              name="chevron-forward" 
-              size={32} 
+              name={isPaused ? "play" : "pause"} 
+              size={28} 
               color="#FFF" 
             />
           </View>
           <Text style={[styles.pauseText, { color: isDark ? theme.text : '#333' }]}>
-            {currentIndex < routine.length - 1 ? "Next" : "Finish"}
+            {isPaused ? "Resume" : "Pause"}
           </Text>
+        </TouchableOpacity>
+        
+        {/* Next/Finish Button */}
+        <TouchableOpacity 
+          style={[
+            styles.controlButton, 
+            styles.sideButton,
+            { 
+              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
+            }
+          ]} 
+          onPress={handleNext}
+        >
+          <View style={styles.buttonContentWrapper}>
+            <Ionicons 
+              name="chevron-forward" 
+              size={28} 
+              color={isDark ? theme.text : "#333"} 
+            />
+            <Text style={[
+              styles.controlText,
+              { color: isDark ? theme.text : "#333" }
+            ]}>
+              {currentIndex < routine.length - 1 ? "Next" : "Finish"}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
       
@@ -776,13 +860,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   centerButton: {
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   centerButtonInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',

@@ -227,7 +227,7 @@ export default function FavoritesScreen() {
       ) : (
         <RefreshableFlatList
           data={favoriteRoutines}
-          renderItem={renderFavoriteRoutine}
+          renderItem={renderFavoriteRoutine as any}
           keyExtractor={(item: FavoriteRoutine) => item.id}
           style={styles.favoritesList}
           contentContainerStyle={styles.favoritesListContent}

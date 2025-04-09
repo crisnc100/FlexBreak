@@ -24,6 +24,9 @@ import { useTheme } from '../context/ThemeContext';
 import * as xpBoostManager from '../utils/progress/modules/xpBoostManager';
 import * as storageService from '../services/storageService';
 
+// Import smart pick generator
+import { generateSmartPick, RoutineRecommendation } from '../utils/smartPickGenerator';
+
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
 
@@ -48,7 +51,17 @@ type LevelUpData = {
 
 export default function RoutineScreen() {
   // Use our custom hooks
-  const { area, duration, level, customStretches, hasParams, navigateToHome, resetParams, navigateToRoutine } = useRoutineParams();
+  const { 
+    area, 
+    duration, 
+    level, 
+    customStretches, 
+    includePremiumStretches,
+    hasParams, 
+    navigateToHome, 
+    resetParams, 
+    navigateToRoutine 
+  } = useRoutineParams();
   const {
     recentRoutines,
     isLoading: isStorageLoading,
@@ -95,6 +108,9 @@ export default function RoutineScreen() {
 
   // Add state for XP boost
   const [isXpBoosted, setIsXpBoosted] = useState<boolean>(false);
+
+  // Add state for smart pick recommendation
+  const [smartPickRecommendation, setSmartPickRecommendation] = useState<RoutineRecommendation | null>(null);
 
   // Effect for initial load and param changes
   useEffect(() => {
@@ -584,14 +600,49 @@ export default function RoutineScreen() {
   };
 
   // Handle smart pick modal
-  const handleSmartPickTap = () => {
+  const handleSmartPickTap = async () => {
     console.log('Smart Pick tapped, isPremium:', isPremium);
-    if (!isPremium) {
-      setSmartPickModalVisible(true);
+    
+    if (isPremium) {
+      try {
+        // Get a smart pick recommendation based on user's routine history
+        const recommendation = await generateSmartPick(recentRoutines);
+        setSmartPickRecommendation(recommendation);
+        setSmartPickModalVisible(true);
+        console.log('Generated smart pick recommendation:', recommendation);
+      } catch (error) {
+        console.error('Error generating smart pick:', error);
+        // Still show modal but with no recommendation - will show upgrade prompt
+        setSmartPickRecommendation(null);
+        setSmartPickModalVisible(true);
+      }
     } else {
-      // TODO: Implement smart pick for premium users
-      console.log('Smart pick for premium users not implemented yet');
+      // Non-premium users see the upgrade modal
+      setSmartPickRecommendation(null);
+      setSmartPickModalVisible(true);
     }
+  };
+
+  // Add a new function to start the recommended routine:
+  const handleStartRecommendation = (recommendation: RoutineRecommendation) => {
+    console.log('Starting recommended routine:', recommendation);
+
+    // Clear current state first
+    resetParams();
+
+    // Navigate to home to ensure clean navigation stack
+    navigateToHome();
+
+    // Navigate to the routine screen with recommended params
+    setTimeout(() => {
+      navigateToRoutine({
+        area: recommendation.area,
+        duration: recommendation.duration,
+        level: recommendation.level,
+        // Add a flag to indicate if premium stretches should be included
+        includePremiumStretches: recommendation.isPremiumEnabled
+      });
+    }, 100);
   };
 
   // Handle starting a recent routine
@@ -751,10 +802,10 @@ export default function RoutineScreen() {
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => {
-            setSmartPickModalVisible(false);
-            setSubscriptionModalVisible(true);
-          }}
+          onUpgrade={() => setSubscriptionModalVisible(true)}
+          isPremium={isPremium}
+          recommendation={smartPickRecommendation || undefined}
+          onStartRecommendation={handleStartRecommendation}
         />
       </SafeAreaView>
     );
@@ -788,10 +839,10 @@ export default function RoutineScreen() {
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => {
-            setSmartPickModalVisible(false);
-            setSubscriptionModalVisible(true);
-          }}
+          onUpgrade={() => setSubscriptionModalVisible(true)}
+          isPremium={isPremium}
+          recommendation={smartPickRecommendation || undefined}
+          onStartRecommendation={handleStartRecommendation}
         />
       </SafeAreaView>
     );
@@ -807,6 +858,7 @@ export default function RoutineScreen() {
           duration={duration}
           level={level || 'intermediate'}
           customStretches={customStretches}
+          includePremiumStretches={includePremiumStretches}
           onComplete={handleRoutineComplete}
           onNavigateHome={() => {
             resetParams();
@@ -822,10 +874,10 @@ export default function RoutineScreen() {
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => {
-            setSmartPickModalVisible(false);
-            setSubscriptionModalVisible(true);
-          }}
+          onUpgrade={() => setSubscriptionModalVisible(true)}
+          isPremium={isPremium}
+          recommendation={smartPickRecommendation || undefined}
+          onStartRecommendation={handleStartRecommendation}
         />
       </SafeAreaView>
     );

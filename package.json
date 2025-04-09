@@ -19,6 +19,7 @@
     "date-fns": "^4.1.0",
     "eventemitter": "^0.3.3",
     "expo": "^52.0.16",
+    "expo-av": "^15.0.2",
     "expo-constants": "~17.0.2",
     "expo-haptics": "^14.0.1",
     "expo-in-app-purchases": "^14.5.0",

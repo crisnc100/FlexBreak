@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { RewardItem } from '../types/completedRoutine.types';
+import * as soundEffects from '../../../utils/soundEffects';
 
 type LevelUpDisplayProps = {
   oldLevel: number;
@@ -24,6 +25,16 @@ const LevelUpDisplay: React.FC<LevelUpDisplayProps> = ({
   rewards,
   animValues
 }) => {
+  // Play level up sound when component mounts
+  useEffect(() => {
+    // When it's a simulated level-up, play achievement sound instead
+    if (isSimulated) {
+      soundEffects.playAchievementSound();
+    } else {
+      soundEffects.playLevelUpSound();
+    }
+  }, [isSimulated]);
+  
   // Render reward item with optional activate button
   const renderRewardItem = (reward: RewardItem, index: number) => {
     // Skip rendering if reward is invalid

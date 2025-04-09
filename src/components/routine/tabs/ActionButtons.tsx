@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Theme } from '../../context/ThemeContext';
+import { Theme } from '../../../context/ThemeContext';
 
 type ActionButtonsProps = {
   isPremium: boolean;
@@ -42,21 +42,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
               styles.buttonText,
               showAnyLevelUp && styles.buttonTextCompact
             ]}>Save</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.button, 
-              styles.smartPickButton,
-              showAnyLevelUp && styles.buttonCompact
-            ]} 
-            onPress={onSmartPick}
-          >
-            <Ionicons name="bulb" size={showAnyLevelUp ? 16 : 20} color="#FFF" />
-            <Text style={[
-              styles.buttonText,
-              showAnyLevelUp && styles.buttonTextCompact
-            ]}>Smart Pick</Text>
           </TouchableOpacity>
         </>
       ) : (

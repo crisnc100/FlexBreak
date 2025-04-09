@@ -9,11 +9,12 @@ interface UseRoutineParamsReturn {
   duration: Duration | null;
   level: StretchLevel | null;
   customStretches?: Stretch[];
+  includePremiumStretches?: boolean;
   hasParams: boolean;
-  setRoutineParams: (area: BodyArea, duration: Duration, level: StretchLevel, customStretches?: Stretch[]) => void;
+  setRoutineParams: (area: BodyArea, duration: Duration, level: StretchLevel, customStretches?: Stretch[], includePremiumStretches?: boolean) => void;
   resetParams: () => void;
   navigateToHome: () => void;
-  navigateToRoutine: (params: { area: BodyArea; duration: Duration; level?: StretchLevel; customStretches?: Stretch[] }) => void;
+  navigateToRoutine: (params: { area: BodyArea; duration: Duration; level?: StretchLevel; customStretches?: Stretch[]; includePremiumStretches?: boolean }) => void;
 }
 
 export function useRoutineParams(): UseRoutineParamsReturn {
@@ -24,6 +25,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   const [duration, setDuration] = useState<Duration | null>(null);
   const [level, setLevel] = useState<StretchLevel | null>(null);
   const [customStretches, setCustomStretches] = useState<Stretch[] | undefined>(undefined);
+  const [includePremiumStretches, setIncludePremiumStretches] = useState<boolean | undefined>(undefined);
   const [hasParams, setHasParams] = useState(false);
 
   // Initialize from route params
@@ -34,6 +36,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
       setDuration(route.params.duration);
       setLevel(route.params.level || 'beginner');
       setCustomStretches(route.params.customStretches);
+      setIncludePremiumStretches(route.params.includePremiumStretches);
       setHasParams(true);
     } else {
       console.log('No params in route, resetting hasParams');
@@ -46,17 +49,22 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     newArea: BodyArea, 
     newDuration: Duration, 
     newLevel: StretchLevel = 'beginner',
-    newCustomStretches?: Stretch[]
+    newCustomStretches?: Stretch[],
+    newIncludePremiumStretches?: boolean
   ) => {
     console.log('Setting routine params:', newArea, newDuration, newLevel);
     if (newCustomStretches) {
       console.log(`Setting ${newCustomStretches.length} custom stretches`);
+    }
+    if (newIncludePremiumStretches !== undefined) {
+      console.log(`Including premium stretches: ${newIncludePremiumStretches}`);
     }
     
     setArea(newArea);
     setDuration(newDuration);
     setLevel(newLevel);
     setCustomStretches(newCustomStretches);
+    setIncludePremiumStretches(newIncludePremiumStretches);
     setHasParams(true);
     
     // Update navigation params to match state
@@ -65,7 +73,8 @@ export function useRoutineParams(): UseRoutineParamsReturn {
         area: newArea,
         duration: newDuration,
         level: newLevel,
-        customStretches: newCustomStretches
+        customStretches: newCustomStretches,
+        includePremiumStretches: newIncludePremiumStretches
       });
     } catch (error) {
       console.error('Error setting navigation params:', error);
@@ -79,6 +88,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     setDuration(null);
     setLevel(null);
     setCustomStretches(undefined);
+    setIncludePremiumStretches(undefined);
     setHasParams(false);
     
     // Clear route params
@@ -108,6 +118,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     duration: Duration; 
     level?: StretchLevel;
     customStretches?: Stretch[];
+    includePremiumStretches?: boolean;
   }) => {
     console.log('Navigating to routine screen with params:', params);
     
@@ -127,6 +138,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     duration,
     level,
     customStretches,
+    includePremiumStretches,
     hasParams,
     setRoutineParams,
     resetParams,

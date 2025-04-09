@@ -7,6 +7,7 @@ import { calculateStreak } from './progressTracker';
 import { EventEmitter } from './utils/EventEmitter';
 import * as cacheUtils from './utils/cacheUtils';
 import * as challengeManager from './challengeManager';
+import * as soundEffects from '../../../utils/soundEffects';
 
 // Event emitter for streak-related events
 export const streakEvents = new EventEmitter();
@@ -429,39 +430,20 @@ export const saveStreakWithFreeze = async (): Promise<boolean> => {
     // This ensures atomic update of both the streak freeze count and the streak maintenance
     await storageService.saveUserProgress(userProgress);
     
-    // Double-check that the update was successful by retrieving the latest data
-    setTimeout(async () => {
-      const updatedProgress = await storageService.getUserProgress();
-      const updatedCount = updatedProgress.rewards['streak_freezes']?.uses || 0;
-      console.log(`Verification - After saving, streak freeze count is: ${updatedCount}`);
-      
-      // If count still shows as 2 despite using one, force fix it
-      if (updatedCount > currentCount - 1) {
-        console.log('Detected inconsistent streak freeze count after update, applying fix');
-        const fixReward = updatedProgress.rewards['streak_freezes'];
-        if (fixReward) {
-          fixReward.uses = currentCount - 1;
-          await storageService.saveUserProgress(updatedProgress);
-          console.log(`Fixed streak freeze count, now: ${fixReward.uses}`);
-        }
-      }
-    }, 500);
+    // Play streak freeze sound effect
+    await soundEffects.playStreakFreezeSound();
     
-    console.log(`Saved streak with freeze. Current streak: ${userProgress.statistics.currentStreak}, Streak freezes remaining: ${streakFreezeReward.uses}`);
+    // Update the streak freeze storage time
+    // Use UTC date string to easily track last shown notification across time zones
+    await cacheUtils.setStoredValue('lastStreakFreezeUsed', new Date().toISOString());
     
-    // Reset notification flag
-    streakBreakNotificationShown = false;
+    // Clear any pending notifications about broken streaks
+    await cacheUtils.setStoredValue('streakBreakNotificationShown', 'true');
     
-    // Emit streak saved event
-    streakEvents.emit(STREAK_SAVED_EVENT, {
-      currentStreak: userProgress.statistics.currentStreak,
-      freezesRemaining: streakFreezeReward.uses
-    });
-    
-    // Return success
+    console.log('Streak freeze applied successfully. Streak maintained.');
     return true;
   } catch (error) {
-    console.error('Error saving streak with freeze:', error);
+    console.error('Error applying streak freeze:', error);
     return false;
   }
 };

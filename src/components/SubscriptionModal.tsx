@@ -9,6 +9,7 @@ import * as storageService from '../services/storageService';
 import { gamificationEvents, REWARD_UNLOCKED_EVENT } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
 import CORE_REWARDS from '../data/rewards.json';
+import * as soundEffects from '../utils/soundEffects';
 
 /**
  * Helper function to initialize rewards from rewards.json
@@ -76,6 +77,13 @@ export default function SubscriptionModal({ visible, onClose, onSubscribe }: Sub
       // Only then update premium status
       await setPremiumStatus(true);
       console.log('Premium status updated');
+      
+      // Play premium unlocked sound effect
+      try {
+        await soundEffects.playPremiumUnlockedSound();
+      } catch (error) {
+        console.error('Error playing premium unlocked sound:', error);
+      }
       
       // Emit event for premium status change
       gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
