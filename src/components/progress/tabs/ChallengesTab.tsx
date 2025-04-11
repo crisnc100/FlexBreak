@@ -179,8 +179,10 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
   useEffect(() => {
     const debugStreakChallenges = async () => {
       try {
-        // Check current streak status
-        const streakStatus = await streakManager.checkStreakStatus();
+        // Get streak status before refresh
+        const streakStatus = await streakManager.getLegacyStreakStatus();
+        
+        console.log('Verifying streak challenges with streak status:', streakStatus);
         
         // Find streak challenges in all tabs
         let potentialIssueDetected = false;
@@ -205,12 +207,11 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
             (streakStatus.currentStreak > 0 || streakStatus.hasTodayActivity)) {
           // Fix it immediately but silently - no alerts
           try {
-            const updated = await streakManager.forceUpdateStreakChallenges();
+            // Use the getLegacyStreakStatus again which will trigger the fix
+            await streakManager.getLegacyStreakStatus();
             
-            if (updated) {
-              // Refresh challenges after fix without showing alert
-              setTimeout(() => refreshChallenges(), 500);
-            }
+            // Refresh challenges after fix without showing alert
+            setTimeout(() => refreshChallenges(), 500);
           } catch (error) {
             console.error('Error auto-fixing streak challenges:', error);
           }

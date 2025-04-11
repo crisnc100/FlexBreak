@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, ToastAndroid, Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import OnboardingScreen from './OnboardingScreen';
 import SplashScreen from './SplashScreen';
 import * as streakManager from '../../utils/progress/modules/streakManager';
@@ -30,12 +31,14 @@ const IntroManager: React.FC<IntroManagerProps> = ({ onComplete }) => {
         // Check if the user has opened the app before
         const firstTimeFlag = await AsyncStorage.getItem(FIRST_TIME_USER_KEY);
         
-        // Get streak status
-        const streakStatus = await streakManager.checkStreakStatus();
+        // Get streak status using the new API
+        const legacyStatus = await streakManager.getLegacyStreakStatus();
+        const streakStatus = await streakManager.getStreakStatus();
+        
         setUserStreak(streakStatus.currentStreak);
         
         // Check if streak is broken and can be saved
-        setIsMissedStreak(streakStatus.canSaveYesterdayStreak);
+        setIsMissedStreak(legacyStatus.canSaveYesterdayStreak);
         
         // If first time flag doesn't exist, this is a first-time user
         setIsFirstTimeUser(firstTimeFlag === null);
@@ -81,13 +84,42 @@ const IntroManager: React.FC<IntroManagerProps> = ({ onComplete }) => {
   // Handle saving the streak
   const handleSaveStreak = async () => {
     try {
-      // Call the streak manager to save the streak
-      const success = await streakManager.saveStreakWithFreeze();
+      // Vibrate to provide feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      if (success) {
+      // Call the streak manager to save the streak
+      const result = await streakManager.applyFreeze();
+      
+      if (result.success) {
         console.log('Streak saved successfully');
+        
+        // Show platform-specific notification
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Streak saved with freeze!', ToastAndroid.SHORT);
+        } else {
+          // iOS doesn't have Toast, so use Alert instead
+          Alert.alert('Streak Saved', 'Your streak has been protected!', 
+            [{ text: 'OK', onPress: performFadeTransition }]
+          );
+        }
+        
+        // Update UI
+        setUserStreak(result.currentStreak);
+        setIsMissedStreak(false);
+        
+        // On Android, auto-proceed after a short delay 
+        if (Platform.OS === 'android') {
+          setTimeout(performFadeTransition, 1500);
+        }
       } else {
         console.error('Failed to save streak');
+        
+        // Show error notification
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Could not apply freeze', ToastAndroid.SHORT);
+        } else {
+          Alert.alert('Error', 'Could not apply streak freeze', [{ text: 'OK' }]);
+        }
       }
     } catch (error) {
       console.error('Error saving streak:', error);

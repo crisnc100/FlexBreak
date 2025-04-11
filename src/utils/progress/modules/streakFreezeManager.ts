@@ -1,268 +1,245 @@
-import { UserProgress, Reward } from '../types';
+import { UserProgress } from '../types';
 import * as storageService from '../../../services/storageService';
 import * as dateUtils from './utils/dateUtils';
 import * as soundEffects from '../../../utils/soundEffects';
+import * as featureAccessUtils from '../../featureAccessUtils';
+import * as simpleStreakManager from './streakManager';
+import { saveUserProgressWithVersionCheck } from './utils';
 
+// Constants
 const STREAK_FREEZE_REWARD_ID = 'streak_freezes';
+const MAX_FREEZES = 2;
 
 /**
- * Check if a streak freeze is available and can be used
+ * Check if a streak freeze is available for use
+ * Validates user premium status, level, and available freezes
  */
-export const isStreakFreezeAvailable = async (): Promise<boolean> => {
-  const userProgress = await storageService.getUserProgress();
-  
-  // Check if user is at least level 6 (requirement for streak freezes)
-  if (userProgress.level < 6) {
+export const isFreezeAvailable = async (): Promise<boolean> => {
+  try {
+    // First, check if user has access to streak freezes feature
+    const hasAccess = await featureAccessUtils.canAccessFeature('streak_freezes');
+    if (!hasAccess) {
+      console.log('User does not have access to streak freezes feature');
+      return false;
+    }
+    
+    // Get streak status which includes freezes available
+    const streakStatus = await simpleStreakManager.getStreakStatus();
+    return streakStatus.canFreeze && streakStatus.freezesAvailable > 0;
+  } catch (error) {
+    console.error('Error checking streak freeze availability:', error);
     return false;
   }
-  
-  // Check if reward exists and is unlocked
-  if (
-    !userProgress.rewards || 
-    !userProgress.rewards[STREAK_FREEZE_REWARD_ID] || 
-    !userProgress.rewards[STREAK_FREEZE_REWARD_ID].unlocked
-  ) {
-    return false;
-  }
-  
-  // Check if user has streak freezes available
-  const freezes = (userProgress.rewards[STREAK_FREEZE_REWARD_ID] as any).uses || 0;
-  return freezes > 0;
 };
 
 /**
- * Check if a streak freeze was used for the current day or yesterday
+ * Check if a streak freeze was applied for a specific date
  */
-export const wasStreakFreezeUsedForCurrentDay = async (): Promise<boolean> => {
-  try {
-    console.log('Checking if streak freeze was used recently...');
-    
+export const wasStreakFreezeAppliedForDate = async (dateStr: string): Promise<boolean> => {
+  // Make sure streak manager is initialized
+  if (!simpleStreakManager.streakCache.initialized) {
+    await simpleStreakManager.initializeStreak();
+  }
+  
+  // Double check if the date is in the cache
+  if (!simpleStreakManager.streakCache.freezeDates.includes(dateStr)) {
+    // Check from storage as well to be sure
     const userProgress = await storageService.getUserProgress();
+    const freezeDates = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.appliedDates || [];
     
-    // If the streak_freezes reward doesn't exist or isn't unlocked, return false
-    if (
-      !userProgress.rewards || 
-      !userProgress.rewards[STREAK_FREEZE_REWARD_ID] || 
-      !userProgress.rewards[STREAK_FREEZE_REWARD_ID].unlocked
-    ) {
-      console.log('Streak freeze not unlocked or available');
-      return false;
+    if (freezeDates.includes(dateStr)) {
+      // Sync the cache if there's a discrepancy
+      console.log(`Found freeze date ${dateStr} in storage but not in cache, syncing...`);
+      simpleStreakManager.streakCache.freezeDates = [...freezeDates];
+      return true;
     }
     
-    const freezeReward = userProgress.rewards[STREAK_FREEZE_REWARD_ID] as any;
-    
-    // Check if lastUsed exists
-    if (!freezeReward.lastUsed) {
-      console.log('No streak freeze has been used yet');
-      return false;
-    }
-    
-    // Get precise timestamps for date comparison
-    const lastUsedDate = new Date(freezeReward.lastUsed);
-    
-    // Set up date objects properly for comparison (strip time portion)
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+    return false;
+  }
+  
+  // Check the freeze dates in the streak cache
+  return simpleStreakManager.streakCache.freezeDates.includes(dateStr);
+};
+
+/**
+ * Check if a streak freeze was applied for today or yesterday
+ */
+export const wasStreakFreezeAppliedRecently = async (): Promise<boolean> => {
+  try {
+    // Get today and yesterday dates
+    const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     
-    // Convert all to midnight timestamps for proper comparison
-    const lastUsedTimestamp = new Date(
-      lastUsedDate.getFullYear(),
-      lastUsedDate.getMonth(),
-      lastUsedDate.getDate()
-    ).getTime();
+    const todayStr = dateUtils.formatDateYYYYMMDD(today);
+    const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
     
-    const todayTimestamp = today.getTime();
-    const yesterdayTimestamp = yesterday.getTime();
+    // Check if a freeze was applied for either day
+    const appliedToday = await wasStreakFreezeAppliedForDate(todayStr);
+    const appliedYesterday = await wasStreakFreezeAppliedForDate(yesterdayStr);
     
-    // Check if lastUsed is today or yesterday
-    const usedToday = lastUsedTimestamp === todayTimestamp;
-    const usedYesterday = lastUsedTimestamp === yesterdayTimestamp;
-    
-    // Current streak freeze details for debugging
-    const freezeCount = freezeReward.uses || 0;
-    
-    console.log('Streak freeze usage check:', {
-      lastUsed: lastUsedDate.toISOString(),
-      today: today.toISOString(),
-      yesterday: yesterday.toISOString(),
-      lastUsedTimestamp,
-      todayTimestamp,
-      yesterdayTimestamp,
-      usedToday,
-      usedYesterday,
-      currentStreak: userProgress.statistics.currentStreak,
-      freezeCount
-    });
-    
-    const wasUsedRecently = usedToday || usedYesterday;
-    console.log('Streak freeze was used recently:', wasUsedRecently);
-    
-    return wasUsedRecently;
+    return appliedToday || appliedYesterday;
   } catch (error) {
-    console.error('Error checking if streak freeze was used for current day:', error);
+    console.error('Error checking if streak freeze was applied recently:', error);
     return false;
   }
-};
-
-/**
- * Use a streak freeze to prevent losing a streak
- * This function is a direct implementation and should not be used
- * in favor of streakManager.saveStreakWithFreeze which handles everything in one atomic update
- * @returns True if successful, false otherwise
- * @deprecated Use streakManager.saveStreakWithFreeze instead
- */
-export const useStreakFreeze = async (): Promise<boolean> => {
-  // This is now a STUB function that simply forwards to streakManager
-  console.warn('[DEPRECATED] useStreakFreeze called directly - this should not happen. Use streakManager.saveStreakWithFreeze instead.');
-  
-  // It's safer to return false to prevent any potential race conditions
-  return false;
 };
 
 /**
  * Gets the number of streak freezes available to the user
- * @param forceRefresh Whether to force a refresh from storage instead of using cached data
- * @returns The number of streak freezes available
  */
-export const getStreakFreezeCount = async (forceRefresh: boolean = false): Promise<number> => {
+export const getFreezesAvailable = async (): Promise<number> => {
   try {
-    // ALWAYS get a fresh copy from storage to avoid caching issues
+    // Always get the count directly from UserProgress for accuracy
     const userProgress = await storageService.getUserProgress();
     
-    if (!userProgress) {
-      console.log('[StreakFreezeManager] No user progress found');
-      return 0;
+    // If streak freezes have been initialized, use the count from UserProgress
+    if (userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.uses !== undefined) {
+      const storedCount = userProgress.rewards[STREAK_FREEZE_REWARD_ID].uses;
+      
+      // Update the streak manager cache to match
+      if (simpleStreakManager.streakCache.freezesAvailable !== storedCount) {
+        console.log(`Updating streak manager cache freeze count from ${simpleStreakManager.streakCache.freezesAvailable} to ${storedCount}`);
+        simpleStreakManager.streakCache.freezesAvailable = storedCount;
+      }
+      
+      console.log(`Direct freeze count from storage: ${storedCount}`);
+      return storedCount;
     }
-
-    // Check if streakFreezeReward exists and is unlocked
-    const streakFreezeReward = userProgress.rewards[STREAK_FREEZE_REWARD_ID] as Reward | undefined;
-
-    if (!streakFreezeReward || !streakFreezeReward.unlocked) {
-      console.log('[StreakFreezeManager] Streak freeze reward not found or not unlocked');
-      return 0;
-    }
-
-    // Return uses if it exists, otherwise 0
-    const uses = streakFreezeReward.uses !== undefined ? streakFreezeReward.uses : 0;
-    console.log(`[StreakFreezeManager] Current streak freeze count: ${uses}`);
-    return uses;
+    
+    // Fallback to streak manager status
+    const streakStatus = await simpleStreakManager.getStreakStatus();
+    return streakStatus.freezesAvailable;
   } catch (error) {
-    console.error('[StreakFreezeManager] Error getting streak freeze count:', error);
+    console.error('Error getting freezes available:', error);
     return 0;
   }
 };
 
 /**
- * Refill streak freezes on a monthly basis
- * Caps at exactly 2 per month (does not stack)
+ * Apply a streak freeze for yesterday
+ * Uses simpleStreakManager's implementation with version checking
  */
-export const refillMonthlyStreakFreezes = async (): Promise<boolean> => {
-  const userProgress = await storageService.getUserProgress();
-  
-  console.log('Checking streak freeze refill eligibility for level:', userProgress.level);
-  
-  // Only allow streak freezes for users at level 6 or higher
-  if (userProgress.level < 6) {
-    console.log('User level not high enough for streak freezes (minimum level 6)');
-    return false;
-  }
-  
-  // Make sure rewards object exists
-  if (!userProgress.rewards) {
-    console.log('Creating rewards object for the first time');
-    userProgress.rewards = {};
-  }
-  
-  // Ensure the streak freeze reward exists AND is properly initialized
-  if (!userProgress.rewards[STREAK_FREEZE_REWARD_ID]) {
-    console.log('Creating streak freeze reward for the first time');
-    userProgress.rewards[STREAK_FREEZE_REWARD_ID] = {
-      id: STREAK_FREEZE_REWARD_ID,
-      title: 'Streak Freezes',
-      description: 'Save your streak when you miss a day',
-      icon: 'snow-outline',
-      unlocked: userProgress.level >= 6, // Automatically unlock for eligible users
-      levelRequired: 6,
-      type: 'power_up',
-      uses: 0 // Initialize uses to 0
+export const applyFreeze = async (): Promise<{
+  success: boolean;
+  appliedDate: string;
+  remainingFreezes: number;
+}> => {
+  try {
+    // Apply freeze through the simpleStreakManager with retry for version conflicts
+    const result = await simpleStreakManager.applyFreeze();
+    
+    if (result.success) {
+      // Play freeze sound on success
+      await soundEffects.playSound('streakFreeze');
+      
+      // Get yesterday's date for the result
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
+      
+      return {
+        success: true,
+        appliedDate: yesterdayStr,
+        remainingFreezes: result.remainingFreezes
+      };
+    } else {
+      return {
+        success: false,
+        appliedDate: '',
+        remainingFreezes: result.remainingFreezes
+      };
+    }
+  } catch (error) {
+    console.error('Error applying streak freeze:', error);
+    return {
+      success: false,
+      appliedDate: '',
+      remainingFreezes: await getFreezesAvailable()
     };
   }
-  
-  const freezeReward = userProgress.rewards[STREAK_FREEZE_REWARD_ID] as any;
-  
-  // Ensure the reward is marked as unlocked if the user has reached level 6
-  if (!freezeReward.unlocked && userProgress.level >= 6) {
-    console.log('Unlocking streak freeze reward for level 6+ user');
-    freezeReward.unlocked = true;
-    
-    // Save immediately to ensure unlock state persists
-    await storageService.saveUserProgress(userProgress);
-  }
-  
-  // Initialize uses field if it doesn't exist
-  if (freezeReward.uses === undefined) {
-    console.log('Initializing streak freeze uses count for the first time');
-    freezeReward.uses = 0;
-  }
-  
-  // Check if we need to refill based on current month
-  const lastRefill = freezeReward.lastRefill ? new Date(freezeReward.lastRefill) : null;
-  const now = new Date();
-  
-  // If a streak freeze was used, make sure the uses count accurately reflects that
-  if (freezeReward.lastUsed) {
-    const lastUsed = new Date(freezeReward.lastUsed);
-    const lastRefillDate = lastRefill ? new Date(lastRefill) : null;
-    
-    // If the freeze was used after the last refill, make sure count is properly decremented
-    if (lastRefillDate && lastUsed > lastRefillDate && freezeReward.uses > 1) {
-      console.log('Detected inconsistent streak freeze count. Ensuring it reflects recent usage.');
-      // If used this month but count still shows 2, fix it to 1
-      freezeReward.uses = 1;
-      await storageService.saveUserProgress(userProgress);
+};
+
+/**
+ * Refill streak freezes on a monthly basis or when premium status changes
+ */
+export const refillFreezes = async (): Promise<boolean> => {
+  try {
+    // Check if user has access to streak freezes feature
+    const hasAccess = await featureAccessUtils.canAccessFeature('streak_freezes');
+    if (!hasAccess) {
+      console.log('User does not have access to streak freezes feature');
+      return false;
     }
-  }
-  
-  // Check if a streak freeze was used recently (within the last 6 hours)
-  const lastUsed = freezeReward.lastUsed ? new Date(freezeReward.lastUsed) : null;
-  const recentlyUsed = lastUsed && ((now.getTime() - lastUsed.getTime()) < 21600000); // 6 hours in milliseconds
-  
-  // Log current state
-  console.log('Streak freeze current state:', {
-    unlocked: freezeReward.unlocked,
-    uses: freezeReward.uses,
-    lastRefill: lastRefill ? lastRefill.toISOString() : 'never',
-    lastUsed: lastUsed ? lastUsed.toISOString() : 'never',
-    recentlyUsed: recentlyUsed,
-    currentMonth: now.getMonth(),
-    currentYear: now.getFullYear(),
-    lastRefillMonth: lastRefill ? lastRefill.getMonth() : 'N/A',
-    lastRefillYear: lastRefill ? lastRefill.getFullYear() : 'N/A'
-  });
-  
-  // If a freeze was recently used, don't reset the count to prevent overriding user actions
-  if (recentlyUsed) {
-    console.log('Skip refill: Streak freeze was recently used, preserving current count');
+    
+    // Get the current date
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    // Get the user progress to check last refill date and current freezes
+    const userProgress = await storageService.getUserProgress();
+    const freezeReward = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID];
+    
+    // Get current freeze count
+    const currentFreezes = freezeReward?.uses || 0;
+    
+    let lastRefill = new Date(0);
+    if (freezeReward?.lastRefill) {
+      lastRefill = new Date(freezeReward.lastRefill);
+    }
+    
+    const lastRefillMonth = lastRefill.getMonth();
+    const lastRefillYear = lastRefill.getFullYear();
+    
+    // If premium was just gained OR we're in a new month, refill freezes
+    const isDifferentMonth = lastRefillMonth !== currentMonth || lastRefillYear !== currentYear;
+    const needsRefill = isDifferentMonth && currentFreezes < MAX_FREEZES;
+    
+    if (needsRefill) {
+      console.log(`Refilling freezes: ${currentFreezes} → ${MAX_FREEZES} for month ${currentMonth + 1}/${currentYear}`);
+      
+      // Use simpleStreakManager to refill freezes with version checking
+      const result = await simpleStreakManager.refillFreezes();
+      
+      if (result) {
+        // Update the lastRefill date in UserProgress
+        const updatedUserProgress = await storageService.getUserProgress();
+        
+        if (updatedUserProgress.rewards[STREAK_FREEZE_REWARD_ID]) {
+          updatedUserProgress.rewards[STREAK_FREEZE_REWARD_ID].lastRefill = today.toISOString();
+          
+          // Save with version check
+          await saveUserProgressWithVersionCheck(updatedUserProgress, 'streak_freeze_refill');
+        }
+        
+        console.log(`Refilled streak freezes to ${MAX_FREEZES} for ${currentMonth + 1}/${currentYear}`);
+        return true;
+      }
+    } else {
+      if (currentFreezes >= MAX_FREEZES) {
+        console.log(`Streak freezes already at maximum: ${currentFreezes}/${MAX_FREEZES}`);
+      } else if (!isDifferentMonth) {
+        console.log(`Streak freezes already refilled this month (${currentMonth + 1}/${currentYear})`);
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error refilling streak freezes:', error);
     return false;
   }
-  
-  // If no previous refill or it's a new month since last refill
-  if (!lastRefill || 
-      lastRefill.getMonth() !== now.getMonth() || 
-      lastRefill.getFullYear() !== now.getFullYear()) {
-    
-    // Reset to exactly 2 streak freezes each month (don't accumulate)
-    freezeReward.uses = 2;
-    freezeReward.lastRefill = now.toISOString();
-    
-    await storageService.saveUserProgress(userProgress);
-    console.log('Monthly streak freezes refilled: 2 streak freezes granted');
-    return true;
-  }
-  
-  console.log('No streak freeze refill needed, current count:', freezeReward.uses);
-  return false;
+};
+
+/**
+ * Backward compatibility functions
+ */
+
+export const isStreakFreezeAvailable = isFreezeAvailable;
+export const refillMonthlyStreakFreezes = refillFreezes;
+export const getStreakFreezeCount = getFreezesAvailable;
+
+export const wasStreakFreezeUsedForCurrentDay = async (): Promise<boolean> => {
+  console.warn('[DEPRECATED] wasStreakFreezeUsedForCurrentDay is deprecated. Use wasStreakFreezeAppliedRecently instead.');
+  return wasStreakFreezeAppliedRecently();
 }; 

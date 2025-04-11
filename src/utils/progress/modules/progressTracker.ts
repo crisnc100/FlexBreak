@@ -1,10 +1,11 @@
 import { ProgressEntry } from '../../../types';
 import * as dateUtils from './utils/dateUtils';
-import * as streakFreezeManager from './streakFreezeManager';
 
 /**
  * Calculates the current streak from a list of routines
- * Accounts for streak freeze usage to maintain continuity
+ * This method handles basic streak calculation, not streak freeze logic
+ * Streak freeze handling is now centralized in streakManager.ts
+ * 
  * @param routines List of completed routines
  * @returns The current streak based on consecutive days
  */
@@ -22,36 +23,15 @@ export const calculateStreak = (routines: ProgressEntry[]): number => {
     )
   ).sort().reverse(); // Sort in descending order (newest first)
   
-  console.log(`Calculating streak from ${uniqueDates.length} unique dates:`, uniqueDates);
+  console.log(`Calculating basic streak from ${uniqueDates.length} unique dates`);
   
   // If no dates, return 0
   if (uniqueDates.length === 0) {
     return 0;
   }
   
-  // Get today's date
-  const today = dateUtils.formatDateYYYYMMDD(new Date());
-  
-  // Get yesterday's date
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayString = dateUtils.formatDateYYYYMMDD(yesterday);
-  
-  // Check if we have activity for yesterday or today
-  const hasTodayActivity = uniqueDates.includes(today);
-  const hasYesterdayActivity = uniqueDates.includes(yesterdayString);
-  
-  console.log(`Today activity: ${hasTodayActivity}, Yesterday activity: ${hasYesterdayActivity}`);
-  
-  // For initial check - if there's no activity yesterday or today, the streak is potentially broken
-  // But the actual decision will be made in streakManager.checkStreakStatus which can check streak freezes
-  if (!hasYesterdayActivity && !hasTodayActivity) {
-    console.log('Potential streak break: No activity yesterday or today - will check for streak freezes in streakManager');
-  }
-  
-  // Even if there's a gap in data, we count consecutive days before any gap to calculate the base streak
-  // Apply streak freeze logic will happen in streakManager.checkStreakStatus
-  let streakCount = 1;  // Start with 1 for the most recent routine
+  // Count consecutive days starting from most recent date
+  let streakCount = 1;  // Start with 1 for the most recent date
   let currentDate = new Date(uniqueDates[0]);
   
   // Start from the second date in our unique dates list
@@ -64,16 +44,8 @@ export const calculateStreak = (routines: ProgressEntry[]): number => {
       streakCount++;
       currentDate = prevDate;
     } else {
-      // Allow for a 1-day gap if this is a recent gap that could be covered by a streak freeze
-      // This is a provisional calculation - final decision happens in streakManager
-      if (dayDiff === 2 && i === 1 && hasTodayActivity && uniqueDates[0] === today) {
-        console.log('Found a 1-day gap in the streak that might be covered by a streak freeze');
-        streakCount++;
-        currentDate = prevDate;
-      } else {
-        // Streak is broken
-        break;
-      }
+      // Streak is broken by a gap (2+ days)
+      break;
     }
   }
   
@@ -241,4 +213,51 @@ export const getMostActiveDay = (dayOfWeekBreakdown: number[], dayNames: string[
   }
   
   return dayNames[maxIndex];
+};
+
+/**
+ * Calculates the streak with freeze dates included
+ * This addresses inconsistencies between streakManager and the main stats system
+ *
+ * @param routineDates Array of routine dates (YYYY-MM-DD)
+ * @param freezeDates Array of freeze dates (YYYY-MM-DD)
+ * @returns The current streak based on consecutive days
+ */
+export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: string[]): number => {
+  if ((!routineDates || routineDates.length === 0) && (!freezeDates || freezeDates.length === 0)) {
+    return 0;
+  }
+  
+  // Combine unique dates from routines and freezes
+  const uniqueDates = Array.from(
+    new Set([...routineDates, ...freezeDates])
+  ).sort().reverse(); // Sort in descending order (newest first)
+  
+  console.log(`Calculating streak from ${uniqueDates.length} unique dates (${routineDates.length} routines, ${freezeDates.length} freezes)`);
+  
+  // If no dates, return 0
+  if (uniqueDates.length === 0) {
+    return 0;
+  }
+  
+  // Count consecutive days starting from most recent date
+  let streakCount = 1;  // Start with 1 for the most recent date
+  let currentDate = new Date(uniqueDates[0]);
+  
+  // Start from the second date in our unique dates list
+  for (let i = 1; i < uniqueDates.length; i++) {
+    const prevDate = new Date(uniqueDates[i]);
+    const dayDiff = dateUtils.daysBetween(prevDate, currentDate);
+    
+    // Check if dates are consecutive
+    if (dayDiff === 1) {
+      streakCount++;
+      currentDate = prevDate;
+    } else {
+      // Streak is broken by a gap (2+ days)
+      break;
+    }
+  }
+  
+  return streakCount;
 }; 

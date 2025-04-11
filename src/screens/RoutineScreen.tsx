@@ -6,6 +6,7 @@ import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
 import { BodyArea, Duration, ProgressEntry, StretchLevel, Stretch } from '../types';
+import * as soundEffects from '../utils/soundEffects';
 
 // Import our components
 import ActiveRoutine from '../components/routine/ActiveRoutine';
@@ -149,6 +150,8 @@ export default function RoutineScreen() {
     console.log('Routine completed');
 
     try {
+      // Don't play any sound yet - we'll decide which sound to play based on level up status
+      
       // Save to recent routines
       const entry = {
         area: routineArea,
@@ -341,6 +344,17 @@ export default function RoutineScreen() {
             (userProgress.level === 2 && previousXp < 250 && currentXp >= 250);
 
           console.log(`Level-up detected: ${hasLeveledUp}`);
+
+          // PLAY THE CORRECT SOUND BASED ON LEVEL UP STATUS
+          if (hasLeveledUp) {
+            // If user leveled up, only play the level up sound
+            console.log('Playing level up sound only');
+            await soundEffects.playLevelUpSound();
+          } else {
+            // If user did not level up, play the routine completion sound
+            console.log('Playing routine completion sound');
+            await soundEffects.playCompletionSound();
+          }
 
           // Set previous and new level based on our detection
           const previousLevel = hasLeveledUp ? userProgress.level - 1 : userProgress.level;

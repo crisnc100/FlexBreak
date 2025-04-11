@@ -8,6 +8,7 @@ import * as rewardManager from './rewardManager';
 import * as levelManager from './levelManager';
 import * as xpBoostManager from './xpBoostManager';
 import * as streakManager from './streakManager';
+import { calculateStreakWithFreezes } from './progressTracker';
 
 // Track recent challenges to avoid repetition
 let recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
@@ -241,43 +242,33 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         break;
         
       case 'streak':
-        // Get current streak from statistics, ensuring it's a number
-        challenge.progress = Number(stats.currentStreak) || 0;
+        // Get current streak directly from the streak manager to ensure accuracy
+        const streakStatus = await streakManager.getStreakStatus();
+        challenge.progress = streakStatus.currentStreak;
         
-        // Check if there's activity today using the streak manager
-        const streakStatus = await streakManager.checkStreakStatus();
-        const hasTodayActivity = streakStatus.hasTodayActivity;
+        // For logging
+        console.log(`Streak challenge updated from streak manager: ${challenge.progress}/${challenge.requirement}`);
         
-        // Add detailed logging for streak challenges to debug any issues
-        console.log(`Streak challenge update:`, {
-          challengeId: challenge.id,
-          challengeTitle: challenge.title,
-          currentStreak: stats.currentStreak,
-          progress: challenge.progress,
-          requirement: challenge.requirement,
-          hasTodayActivity,
-          streakLastUpdated: stats.lastUpdated
-        });
+        // Double check with calculateStreakWithFreezes if there's a discrepancy
+        const routines = await storageService.getAllRoutines();
+        const userProgress = await storageService.getUserProgress();
+        const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
         
-        // If there's activity today but the streak is at 0 (meaning we're starting a new streak),
-        // make sure the progress is at least 1 to properly represent the new streak
-        if (hasTodayActivity && Number(stats.currentStreak) === 0) {
-          console.log(`Detected activity today with reset streak. Setting challenge progress to 1.`);
-          challenge.progress = 1;
-        }
+        // Extract routine dates
+        const routineDates = routines
+          .filter(r => r.date)
+          .map(r => r.date.split('T')[0]);
         
-        // Special case handling for "Stretching Virtuoso" which is a streak challenge
-        if (challenge.id === "monthly_long_streak" || challenge.title === "Stretching Virtuoso") {
-          console.log(`Special handling for Stretching Virtuoso challenge`);
+        // Calculate with both methods
+        const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
+        
+        if (calculatedStreak !== challenge.progress) {
+          console.log(`Streak discrepancy in challenge: ${challenge.progress} vs ${calculatedStreak}. Using calculated value.`);
+          challenge.progress = calculatedStreak;
           
-          // If there's activity today and the currentStreak should be at least 1
-          if (hasTodayActivity) {
-            challenge.progress = Math.max(1, challenge.progress);
-            console.log(`Updated Stretching Virtuoso progress to ${challenge.progress} because there's activity today`);
-          }
+          // Update streak in the streak manager to keep everything in sync
+          await streakManager.updateStoredStreak(calculatedStreak);
         }
-        
-        console.log(`Final streak challenge progress: ${challenge.progress}/${challenge.requirement}`);
         break;
         
       case 'weekly_consistency':

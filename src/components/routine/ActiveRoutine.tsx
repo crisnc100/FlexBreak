@@ -86,12 +86,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         return newIndex;
       });
     } else {
-      // Play completion sound
-      try {
-        soundEffects.playCompletionSound();
-      } catch (error) {
-        console.error('Error playing completion sound:', error);
-      }
+      // Don't play any completion sound here - this will be handled in RoutineScreen.tsx
       
       // Call handleComplete
       console.log('Reached the end of the routine, completing...');
@@ -391,9 +386,6 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     
     // Clean up timer
     pauseTimer();
-    
-    // Play success sound
-    soundEffects.playSuccessSound();
     
     // Mark routine as done
     setIsDone(true);

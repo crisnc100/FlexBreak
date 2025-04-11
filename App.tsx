@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider } from 'react-redux';
+import store from './src/state/store';
 import HomeScreen from './src/screens/HomeScreen';
 import RoutineScreen from './src/screens/RoutineScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
@@ -25,6 +27,7 @@ import * as rewardManager from './src/utils/progress/modules/rewardManager';
 import { useFeatureAccess } from './src/hooks/progress/useFeatureAccess';
 import * as soundEffects from './src/utils/soundEffects';
 import IntroManager from './src/components/intro/IntroManager';
+import * as streakValidator from './src/utils/progress/modules/streakValidator';
 
 // Avoid playing intro sound twice
 let introSoundPlayed = false;
@@ -53,20 +56,22 @@ function navigate(name, params) {
 // Main entry point for the app
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <PremiumProvider>
-          <RefreshProvider>
-            <StatusBar 
-              barStyle="dark-content" 
-              backgroundColor="transparent" 
-              translucent={true} 
-            />
-            <MainApp />
-          </RefreshProvider>
-        </PremiumProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <PremiumProvider>
+            <RefreshProvider>
+              <StatusBar 
+                barStyle="dark-content" 
+                backgroundColor="transparent" 
+                translucent={true} 
+              />
+              <MainApp />
+            </RefreshProvider>
+          </PremiumProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </Provider>
   );
 }
 
@@ -187,6 +192,9 @@ function MainApp() {
   useEffect(() => {
     const initStreakSystem = async () => {
       try {
+        // First run a validation to ensure streak values are consistent
+        await streakValidator.runStartupStreakValidation();
+        
         // Check for streak freezes to refill monthly
         await streakFreezeManager.refillMonthlyStreakFreezes();
         

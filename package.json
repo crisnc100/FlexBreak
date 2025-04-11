@@ -16,6 +16,7 @@
     "@react-navigation/bottom-tabs": "^7.2.1",
     "@react-navigation/native": "^7.0.15",
     "@react-navigation/stack": "^7.2.0",
+    "@reduxjs/toolkit": "^2.6.1",
     "date-fns": "^4.1.0",
     "eventemitter": "^0.3.3",
     "expo": "^52.0.16",
@@ -49,7 +50,8 @@
     "react-native-screens": "~4.1.0",
     "react-native-tab-view": "^4.0.7",
     "react-native-toast-notifications": "^3.3.1",
-    "react-native-web": "~0.19.6"
+    "react-native-web": "~0.19.6",
+    "react-redux": "^9.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

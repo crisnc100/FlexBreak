@@ -7,12 +7,10 @@ import {
   Easing,
   Dimensions,
   StatusBar,
-  Image,
   TouchableOpacity
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as soundEffects from '../../utils/soundEffects';
 
 const { width, height } = Dimensions.get('window');
@@ -21,22 +19,17 @@ interface SplashScreenProps {
   onComplete: () => void;
   userLevel: number;
   userStreak: number;
-  isMissedStreak: boolean;
-  onSaveStreak?: () => Promise<void>;
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({
   onComplete,
   userLevel = 1,
-  userStreak = 0,
-  isMissedStreak = false,
-  onSaveStreak
+  userStreak = 0
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const breatheAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const [showStreakPrompt, setShowStreakPrompt] = useState(isMissedStreak);
 
   // Start animations when component mounts
   useEffect(() => {
@@ -97,14 +90,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
       soundEffects.playSlowIntroSound();
     }, 1500);
 
-    // Auto-dismiss after 3 seconds if no streak prompt
-    if (!isMissedStreak) {
-      const timer = setTimeout(() => {
-        handleComplete();
-      }, 3000);
+    // Auto-dismiss after 3 seconds
+    const timer = setTimeout(() => {
+      handleComplete();
+    }, 3000);
 
-      return () => clearTimeout(timer);
-    }
+    return () => clearTimeout(timer);
   }, []);
 
   const handleComplete = () => {
@@ -116,31 +107,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
     }).start(() => {
       onComplete();
     });
-  };
-
-  const handleSaveStreak = async () => {
-    // Play sound effect for streak freeze
-    soundEffects.playStreakFreezeSound();
-    
-    // Call the streak save function
-    if (onSaveStreak) {
-      await onSaveStreak();
-    }
-    
-    // Hide the prompt
-    setShowStreakPrompt(false);
-    
-    // Auto dismiss after saving
-    setTimeout(handleComplete, 1000);
-  };
-
-  const handleSkipSaveStreak = () => {
-    // Play sound effect
-    soundEffects.playClickSound();
-    
-    // Hide the prompt and dismiss
-    setShowStreakPrompt(false);
-    handleComplete();
   };
 
   return (
@@ -200,44 +166,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
           <Text style={styles.levelText}>Level {userLevel}</Text>
         </View>
       </Animated.View>
-      
-      {/* Streak save prompt */}
-      {showStreakPrompt && (
-        <Animated.View 
-          style={[
-            styles.promptContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [50, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <Text style={styles.promptTitle}>Save your streak?</Text>
-          <Text style={styles.promptText}>
-            You missed yesterday's stretch. Use a streak freeze to maintain your {userStreak} day streak?
-          </Text>
-          
-          <View style={styles.promptButtons}>
-            <TouchableOpacity 
-              style={[styles.promptButton, styles.declineButton]}
-              onPress={handleSkipSaveStreak}
-            >
-              <Text style={styles.declineButtonText}>No Thanks</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.promptButton, styles.saveButton]}
-              onPress={handleSaveStreak}
-            >
-              <Text style={styles.saveButtonText}>Save Streak</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      )}
     </View>
   );
 };
@@ -302,65 +230,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 8,
-  },
-  promptContainer: {
-    position: 'absolute',
-    bottom: 100,
-    width: width * 0.85,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  promptTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  promptText: {
-    fontSize: 16,
-    color: '#555',
-    marginBottom: 20,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  promptButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  promptButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    flex: 1,
-    marginHorizontal: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  declineButton: {
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  saveButton: {
-    backgroundColor: '#4776E6',
-  },
-  declineButtonText: {
-    color: '#666',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-  },
+  }
 });
 
 export default SplashScreen; 

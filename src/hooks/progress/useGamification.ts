@@ -100,7 +100,7 @@ export function useGamification() {
       await gamificationManager.refreshChallenges(userProgress);
       
       // Update achievements and save if needed
-      const updatedCount = achievementManager.updateAchievements(userProgress);
+      const updatedCount = await achievementManager.updateAchievements(userProgress);
       if (updatedCount > 0) {
         console.log(`Updated ${updatedCount} achievements, saving progress...`);
         await storageService.saveUserProgress(userProgress);
@@ -169,14 +169,14 @@ export function useGamification() {
       const beforeProgress = await storageService.getUserProgress();
       
       // Update achievements before comparison
-      achievementManager.updateAchievements(beforeProgress);
+      await achievementManager.updateAchievements(beforeProgress);
       const beforeAchievements = achievementManager.getAchievementsSummary(beforeProgress);
       
       // Process through the gamification system
       const { userProgress, xpBreakdown, completedChallenges } = await gamificationManager.processCompletedRoutine(routine);
       
       // Update achievements after processing routine
-      achievementManager.updateAchievements(userProgress);
+      await achievementManager.updateAchievements(userProgress);
       await storageService.saveUserProgress(userProgress);
       
       // Get level info to check for level up
@@ -242,7 +242,6 @@ export function useGamification() {
         
         // If rewards were unlocked, emit reward unlocked event
         if (result.newlyUnlockedRewards && result.newlyUnlockedRewards.length > 0) {
-          soundEffects.playAchievementSound();
           gamificationEvents.emit(REWARD_UNLOCKED_EVENT, result.newlyUnlockedRewards);
         }
       }
@@ -612,11 +611,16 @@ export function useGamification() {
       // Get the current user progress
       const userProgress = await storageService.getUserProgress();
       
-      // Debug current streak status
-      const streakStatus = await streakManager.checkStreakStatus();
+      // Initialize streak if needed and get current status
+      if (!streakManager.streakCache.initialized) {
+        await streakManager.initializeStreak();
+      }
+      const streakStatus = await streakManager.getStreakStatus();
+      
       console.log('STREAK STATUS in refreshChallenges:', {
         currentStreak: streakStatus.currentStreak,
-        hasTodayActivity: streakStatus.hasTodayActivity,
+        maintainedToday: streakStatus.maintainedToday,
+        freezesAvailable: streakStatus.freezesAvailable,
         lastUpdated: userProgress.statistics.lastUpdated
       });
       

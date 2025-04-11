@@ -6,6 +6,7 @@
 import { ProgressEntry } from '../../../../types';
 import * as storageService from '../../../../services/storageService';
 import { Challenge } from '../../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface CacheEntry<T> {
   data: T | null;
@@ -102,6 +103,38 @@ export const setCachedChallenges = (category: string, challenges: Challenge[]): 
   
   challengeCache[category].data = challenges;
   challengeCache[category].timestamp = Date.now();
+};
+
+/**
+ * Set a value in AsyncStorage with proper string conversion
+ * @param key Storage key
+ * @param value Value to store
+ * @returns Promise that resolves to true if successful
+ */
+export const setStoredValue = async (key: string, value: string): Promise<boolean> => {
+  try {
+    await AsyncStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.error(`Error setting stored value for key ${key}:`, error);
+    return false;
+  }
+};
+
+/**
+ * Get a value from AsyncStorage
+ * @param key Storage key
+ * @param defaultValue Default value if not found
+ * @returns The stored value or default value
+ */
+export const getStoredValue = async (key: string, defaultValue: string = ''): Promise<string> => {
+  try {
+    const value = await AsyncStorage.getItem(key);
+    return value !== null ? value : defaultValue;
+  } catch (error) {
+    console.error(`Error getting stored value for key ${key}:`, error);
+    return defaultValue;
+  }
 };
 
 /**

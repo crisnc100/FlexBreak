@@ -115,9 +115,41 @@ export default function HomeScreen() {
   // Load user streak from storage
   const loadUserStreak = async () => {
     try {
+      console.log('HomeScreen: Loading user streak...');
       const userProgress = await storageService.getUserProgress();
       if (userProgress && userProgress.statistics) {
-        setCurrentStreak(userProgress.statistics.currentStreak || 0);
+        // Get all completed routines to calculate streak
+        const allRoutines = await storageService.getAllRoutines();
+        console.log(`HomeScreen: Found ${allRoutines.length} routines for streak calculation`);
+        
+        // Import the calculateStreak function (same one used in useProgressData)
+        const { calculateStreak } = require('../utils/progress/modules/progressTracker');
+        
+        // Calculate streak from routines
+        const calculatedStreak = calculateStreak(allRoutines);
+        
+        // Get the stored streak
+        const storedStreak = userProgress.statistics.currentStreak || 0;
+        
+        console.log(`HomeScreen: Streak values - Stored: ${storedStreak}, Calculated: ${calculatedStreak}`);
+        
+        // Check for discrepancy
+        if (storedStreak === calculatedStreak + 1) {
+          console.warn(`HomeScreen: Streak discrepancy detected! Stored: ${storedStreak}, Calculated: ${calculatedStreak}`);
+          
+          // Use calculated streak instead
+          setCurrentStreak(calculatedStreak);
+          
+          // Also update the stored streak
+          userProgress.statistics.currentStreak = calculatedStreak;
+          await storageService.saveUserProgress(userProgress);
+          
+          console.log(`HomeScreen: Corrected streak from ${storedStreak} to ${calculatedStreak}`);
+        } else {
+          // No discrepancy, use stored streak
+          setCurrentStreak(storedStreak);
+          console.log(`HomeScreen: Using stored streak value: ${storedStreak}`);
+        }
       }
     } catch (error) {
       console.error('Error loading user streak:', error);

@@ -66,12 +66,16 @@ export interface UserProgress {
     totalMinutes: number;
     routinesByArea: Record<string, number>;
     lastUpdated?: string;
+    processedToday?: boolean;
+    lastProcessedDate?: string;
+    streakState?: string;
   };
   challenges: Record<string, Challenge>;
   achievements: Record<string, Achievement>;
   rewards: Record<string, Reward>;
   lastDailyChallengeCheck?: string;
   lastUpdated: string;
+  _version?: number; // Version counter to prevent race conditions
   xpHistory?: Array<{
     id: string;
     amount: number;

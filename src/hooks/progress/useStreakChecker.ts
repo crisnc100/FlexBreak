@@ -5,19 +5,17 @@
 import { useEffect } from 'react';
 import { useGamification } from './useGamification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserProgress, saveUserProgress } from '../../services/storageService';
-import { resetStreakAchievements } from '../../utils/progress/modules/achievementManager';
-import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
 import * as streakManager from '../../utils/progress/modules/streakManager';
+import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
 import { useIsFocused } from '@react-navigation/native';
-import * as achievementManager from '../../utils/progress/modules/achievementManager';
 
 /**
  * Custom hook to check streak status and update related achievements
- * This is now a thin wrapper around useGamification to maintain compatibility.
+ * This is now a thin wrapper around useGamification to maintain compatibility,
+ * but it calls the centralized streak management functions.
  */
 export function useStreakChecker() {
-  const { handleStreakReset, refreshData } = useGamification();
+  const { refreshData } = useGamification();
   const isFocused = useIsFocused();
 
   useEffect(() => {
@@ -25,40 +23,27 @@ export function useStreakChecker() {
     
     const checkStreakStatus = async () => {
       try {
-        // First, ensure streak freezes are properly initialized
-        await streakFreezeManager.refillMonthlyStreakFreezes();
+        console.log('Running streak check on app focus');
         
-        // Check streak status
-        const streakStatus = await streakManager.checkStreakStatus();
+        // Ensure streak freezes are properly initialized/refilled if needed
+        await streakFreezeManager.refillFreezes();
         
-        // If streak is broken and can't be saved, reset streak achievements
-        if (streakStatus.streakBroken && !streakStatus.canSaveYesterdayStreak) {
-          console.log('Streak broken and cannot be saved, resetting achievements');
-          
-          // First use the gamification hook's method
-          await handleStreakReset();
-          
-          // Then also directly reset achievements in storage
-          const userProgress = await getUserProgress();
-          if (userProgress) {
-            const resetCount = resetStreakAchievements(userProgress);
-            console.log(`Reset ${resetCount} streak achievements directly in storage`);
-            
-            if (resetCount > 0) {
-              await saveUserProgress(userProgress);
-            }
-          }
-        } else if (streakStatus.currentStreak > 0) {
-          // Current streak is active, ensure it's properly handled
-          console.log(`Active streak detected: ${streakStatus.currentStreak} days`);
-          
-          // If streak freeze was used, check if activity today should increment it
-          const streakFreezeUsed = await streakFreezeManager.wasStreakFreezeUsedForCurrentDay();
-          if (streakFreezeUsed) {
-            console.log('Streak freeze was used recently - ensuring streak is maintained');
-            // The check in streakManager.checkStreakStatus will handle the increment
-          }
+        // Initialize streak if needed
+        if (!streakManager.streakCache.initialized) {
+          await streakManager.initializeStreak();
         }
+        
+        // Get current streak status
+        const streakStatus = await streakManager.getStreakStatus();
+        
+        console.log('Streak status check result:', {
+          currentStreak: streakStatus.currentStreak,
+          maintainedToday: streakStatus.maintainedToday,
+          freezesAvailable: streakStatus.freezesAvailable
+        });
+        
+        // Update streak challenges (now handled automatically by the streak manager)
+        const userProgress = await streakManager.getLegacyStreakStatus();
         
         // Update last session date
         const today = new Date().toDateString();
@@ -74,5 +59,5 @@ export function useStreakChecker() {
     if (isFocused) {
       checkStreakStatus();
     }
-  }, [handleStreakReset, refreshData, isFocused]);
+  }, [refreshData, isFocused]);
 } 

@@ -15,6 +15,7 @@ import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import { usePremium } from '../../context/PremiumContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as Haptics from 'expo-haptics';
+import * as featureAccessUtils from '../../utils/featureAccessUtils';
 
 // Snowflake component for animation
 const Snowflake = ({ x, y, size, duration, delay, rotation }) => {
@@ -206,7 +207,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       
       // If this is an initial load (not after using a streak freeze), check for monthly refill
       if (canAccessFeature('streak_freezes') && !forceRefresh) {
-        await streakFreezeManager.refillMonthlyStreakFreezes();
+        await streakFreezeManager.refillFreezes();
       }
       
       // If we recently saved a streak, never load the data again 
@@ -218,7 +219,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       }
       
       // Get the current count of streak freezes
-      const count = await streakFreezeManager.getStreakFreezeCount();
+      const count = await streakFreezeManager.getFreezesAvailable();
       
       // Only update the UI if we're not in a recently saved state
       if (!recentlySaved) {
@@ -252,18 +253,25 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   // Check if streak is broken and should be saved
   const checkStreakStatus = async () => {
     try {
-      const status = await streakManager.checkStreakStatus();
-      console.log('Streak freeze card - status check:', status);
+      // Get the legacy streak status for backward compatibility
+      const status = await streakManager.getLegacyStreakStatus();
       
+      // Also get the new streak status format for proper data
+      const newStatus = await streakManager.getStreakStatus();
+      
+      // Update UI based on legacy status
       setIsStreakBroken(status.streakBroken);
       setCanSaveStreak(status.canSaveYesterdayStreak);
       
-      // If streak was broken, animate the icon to draw attention
-      if (status.streakBroken) {
+      // Start animations if streak is at risk
+      if (status.streakBroken && !recentlySaved) {
+        startPulseAnimation();
         startRotateAnimation();
       }
+      
+      console.log(`StreakFreezeCard: Retrieved streak status: ${status.streakBroken ? 'BROKEN' : 'ACTIVE'}, streak=${newStatus.currentStreak}`);
     } catch (error) {
-      console.error('Error checking streak status:', error);
+      console.error('Error checking streak status in StreakFreezeCard:', error);
     }
   };
   
@@ -389,9 +397,9 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       ]).start();
       
       // Apply the streak freeze
-      const success = await streakManager.saveStreakWithFreeze();
+      const result = await streakManager.applyFreeze();
       
-      if (success) {
+      if (result.success) {
         // Apply quick haptic feedback on success
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
@@ -419,7 +427,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         
         // Update the freeze count (force refresh from storage)
         setTimeout(async () => {
-          const newCount = await streakFreezeManager.getStreakFreezeCount(true);
+          const newCount = await streakFreezeManager.getFreezesAvailable();
           console.log(`Updated freeze count after applying: ${newCount}/2`);
           setFreezeCount(newCount);
         }, 800); // Give time for storage to update
@@ -471,6 +479,19 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   
   // Render locked state for non-premium users or users below required level
   if (!isPremium || !meetsLevelRequirement('streak_freezes')) {
+    // Double-check premium status using the more reliable method
+    const checkFeatureAccess = async () => {
+      const hasPremium = await featureAccessUtils.canAccessFeature('streak_freezes');
+      if (hasPremium && meetsLevelRequirement('streak_freezes') && !isLoading) {
+        // Force reload data with the correct premium status
+        console.log('Premium status corrected, reloading streak freeze data');
+        loadFreezeData(true);
+      }
+    };
+    
+    // Call the async function
+    checkFeatureAccess();
+
     return (
       <View style={[styles.container, { backgroundColor: isDark ? theme.cardBackground : '#FFF' }]}>
         <View style={[styles.iconContainer, { backgroundColor: isDark ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD' }]}>

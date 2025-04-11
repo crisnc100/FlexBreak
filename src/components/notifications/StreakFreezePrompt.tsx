@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import * as storageService from '../../services/storageService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePremium } from '../../context/PremiumContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -121,6 +122,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   const [showSnowflakes, setShowSnowflakes] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [snowflakePositions, setSnowflakePositions] = useState<Array<{x: number, y: number, delay: number, duration: number, scale: number}>>([]);
+  const [userProgress, setUserProgress] = useState(null);
   
   // Animation refs
   const slideAnim = useRef(new Animated.Value(400)).current;
@@ -138,6 +140,20 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   const MAX_PROMPTS_PER_DAY = 3; // Maximum 3 prompts per day
   const PROMPT_KEY = 'last_streak_prompt_time';
   const PROMPT_COUNT_KEY = 'streak_prompt_count_today';
+  
+  // Get user progress on component mount
+  useEffect(() => {
+    const loadUserProgress = async () => {
+      try {
+        const progress = await storageService.getUserProgress();
+        setUserProgress(progress);
+      } catch (error) {
+        console.error('Error loading user progress:', error);
+      }
+    };
+    
+    loadUserProgress();
+  }, []);
   
   // Snow sparkle effect
   const createSnowflakeEffect = () => {
@@ -258,118 +274,120 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     }
   };
   
-  // Listen for streak broken events
-  useEffect(() => {
-    // Only show for premium users
-    if (!isPremium) {
-      return;
-    }
-    
-    const handleStreakBroken = async (data: any) => {
-      // First check if we should show the prompt based on rate limiting
-      const shouldShow = await canShowPrompt();
+  // Check if streak is broken and prompt user
+  const checkStreak = async () => {
+    try {
+      // Always get a fresh premium status directly from storage
+      const directPremiumCheck = await storageService.getIsPremium();
       
-      if (!shouldShow) {
-        console.log('Not showing streak prompt due to rate limiting');
-        return;
+      console.log('StreakFreezePrompt - Direct premium check:', directPremiumCheck);
+      
+      // Initialize streak if needed
+      if (!streakManager.streakCache.initialized) {
+        await streakManager.initializeStreak();
       }
       
-      // Check if this is a valid streak freeze case (only 1 day missed, not multi-day)
-      const status = await streakManager.checkStreakStatus();
+      // Get the streak status
+      const status = await streakManager.getStreakStatus();
       
-      // Only show the prompt if:
-      // 1. The streak can be saved (not a multi-day gap)
-      // 2. There are freezes available
-      // 3. The user has a meaningful streak (3+ days)
-      if (!status.canSaveYesterdayStreak || status.freezesAvailable <= 0 || status.currentStreak < 3) {
-        console.log('Not showing streak prompt - not eligible:', {
-          canSave: status.canSaveYesterdayStreak,
-          freezesAvailable: status.freezesAvailable,
-          currentStreak: status.currentStreak
-        });
-        return;
-      }
+      // Get freeze availability
+      const freezeAvailable = await streakFreezeManager.isFreezeAvailable();
       
-      // Show and track the prompt
-      updatePromptRateLimits();
+      // Get legacy streak status for backwards compatibility
+      const legacyStatus = await streakManager.getLegacyStreakStatus();
       
-      setStreakData({
-        currentStreak: data.currentStreak,
-        freezesAvailable: data.freezesAvailable
-      });
+      // Only show if:
+      // 1. Streak is broken (legacy status for compatibility)
+      // 2. Freezes are available
+      // 3. User had a meaningful streak before (3+)
+      // 4. Rate limiting allows it
+      const isBroken = legacyStatus.streakBroken;
+      const hadMeaningfulStreak = status.currentStreak >= 3 || userProgress?.statistics?.bestStreak >= 3;
       
-      // Start rotation animation for snowflake icon
-      Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 8000,
-          useNativeDriver: true,
-        })
-      ).start();
-      
-      // Show the prompt
-      setVisible(true);
-      
-      // Vibrate to get user attention
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      
-      // Animate in
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true
-        })
-      ]).start();
-      
-      // Auto-dismiss after 2 minutes if user doesn't interact with it
-      const autoDismissTimeout = setTimeout(() => {
-        if (visible) {
-          console.log('Auto-dismissing streak prompt after timeout');
-          handleClose();
+      if (isBroken && status.freezesAvailable > 0 && hadMeaningfulStreak && freezeAvailable) {
+        // First check if we should show the prompt based on rate limiting
+        const shouldShow = await canShowPrompt();
+        
+        if (!shouldShow) {
+          console.log('Not showing streak prompt due to rate limiting');
+          return;
         }
-      }, 2 * 60 * 1000); // 2 minutes
-      
-      // Clean up timeout on unmount
-      return () => clearTimeout(autoDismissTimeout);
-    };
-    
-    // Subscribe to streak broken event
-    streakManager.streakEvents.on(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
-    
-    // Check on mount if there's a broken streak
-    const checkStreakOnMount = async () => {
-      const status = await streakManager.checkStreakStatus();
-      const shouldShow = await canShowPrompt();
-      
-      // Only show if rate limiting allows and the streak qualifies
-      if (shouldShow && status.canSaveYesterdayStreak && status.freezesAvailable > 0 && status.currentStreak >= 3) {
-        handleStreakBroken({
+        
+        // Show and track the prompt
+        updatePromptRateLimits();
+        
+        setStreakData({
           currentStreak: status.currentStreak,
           freezesAvailable: status.freezesAvailable
         });
+        
+        // Start rotation animation for snowflake icon
+        Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 8000,
+            useNativeDriver: true,
+          })
+        ).start();
+        
+        // Show the prompt
+        setVisible(true);
+        
+        // Vibrate to get user attention
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        
+        // Animate in
+        Animated.parallel([
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true
+          })
+        ]).start();
+
+        // Auto-dismiss after 2 minutes if user doesn't interact with it
+        const autoDismissTimeout = setTimeout(() => {
+          if (visible) {
+            console.log('Auto-dismissing streak prompt after timeout');
+            handleClose();
+          }
+        }, 2 * 60 * 1000); // 2 minutes
       } else {
-        console.log('Not showing streak prompt on mount - conditions not met:', {
-          shouldShow,
-          canSave: status.canSaveYesterdayStreak,
+        console.log('Not showing streak prompt - conditions not met:', {
+          isBroken,
           freezesAvailable: status.freezesAvailable,
-          currentStreak: status.currentStreak
+          currentStreak: status.currentStreak,
+          hadMeaningfulStreak
         });
       }
+    } catch (error) {
+      console.error('Error checking streak status:', error);
+    }
+  };
+  
+  // Listen for streak broken events
+  useEffect(() => {
+    // Check streak status on mount
+    checkStreak();
+    
+    // Subscribe to streak broken event
+    const handleStreakBroken = async (data: any) => {
+      // Simply call our centralized check function
+      await checkStreak();
     };
     
-    checkStreakOnMount();
+    streakManager.streakEvents.on(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
     
     // Cleanup listener
     return () => {
       streakManager.streakEvents.off(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
     };
-  }, [isPremium]); // Add isPremium to dependencies
+  }, []);
   
   // Get rotation transform
   const rotate = rotateAnim.interpolate({
@@ -418,10 +436,10 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     // Provide haptic feedback
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
-    // Save streak with freeze
-    const success = await streakManager.saveStreakWithFreeze();
+    // Save streak with freeze using the new implementation
+    const result = await streakManager.applyFreeze();
     
-    if (success) {
+    if (result.success) {
       console.log('Streak saved with freeze!');
       
       // Emit the streak saved event so other components can refresh
@@ -457,28 +475,18 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     }
   };
   
-  // Handle let streak break
+  // Handle let streak break (user declines using a freeze)
   const handleLetStreakBreak = async () => {
-    // Subtle shake animation
-    Animated.sequence([
+    // Animate out
+    Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: 10,
-        duration: 50,
+        toValue: 50,
+        duration: 300,
         useNativeDriver: true
       }),
-      Animated.timing(slideAnim, {
-        toValue: -10,
-        duration: 50,
-        useNativeDriver: true
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 5,
-        duration: 50,
-        useNativeDriver: true
-      }),
-      Animated.timing(slideAnim, {
+      Animated.timing(opacityAnim, {
         toValue: 0,
-        duration: 50,
+        duration: 200,
         useNativeDriver: true
       })
     ]).start();
@@ -486,25 +494,25 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     // Provide haptic feedback
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     
-    // Let streak break
-    await streakManager.letStreakBreak();
-    console.log('Streak reset.');
-    
-    // Emit event that the streak was intentionally broken
-    streakManager.streakEvents.emit(streakManager.STREAK_BROKEN_EVENT, {
-      currentStreak: 0,
-      userReset: true
-    });
-    
-    // Fade out animation
-    Animated.timing(opacityAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true
-    }).start(() => {
-      // Close the prompt
-      handleClose();
-    });
+    try {
+      // No need to call letStreakBreak anymore as we've optimized the flow
+      // The streak is already broken if this prompt is shown
+      console.log('User declined to use streak freeze');
+      
+      // Just emit an event for any listeners
+      streakManager.streakEvents.emit(streakManager.STREAK_BROKEN_EVENT, {
+        currentStreak: 0,
+        previousStreak: streakData.currentStreak
+      });
+      
+      setTimeout(() => {
+        setVisible(false);
+        if (onClose) onClose();
+      }, 300);
+    } catch (error) {
+      console.error('Error handling streak break:', error);
+      setVisible(false);
+    }
   };
   
   // Handle close
@@ -647,7 +655,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                 styles.buttonText,
                 { color: isDark ? 'rgba(255,255,255,0.7)' : '#757575' }
               ]}>
-                Reset Streak
+                No thanks
               </Text>
             </TouchableOpacity>
             

@@ -2,6 +2,9 @@ import { ProgressEntry } from '../../types';
 
 export type { ProgressEntry };
 
+// Streak state machine states
+export type StreakState = 'ACTIVE' | 'FROZEN' | 'BROKEN';
+
 // Challenge status enum
 export enum CHALLENGE_STATUS {
   ACTIVE = 'active',
@@ -85,6 +88,7 @@ export interface Reward {
   uses?: number; // Number of uses available (for streak freezes)
   lastRefill?: string; // Date of last refill (for streak freezes)
   lastUsed?: string; // Date when last used (for streak freezes)
+  appliedDates?: string[]; // Dates when streak freezes were applied
 }
 
 // Interface for level objects
@@ -120,6 +124,20 @@ export interface XpHistoryEntry {
   claimed: boolean;
 }
 
+// Interface for statistics in user progress
+export interface Statistics {
+  totalRoutines: number;
+  currentStreak: number;
+  bestStreak: number;
+  uniqueAreas: string[];
+  routinesByArea: Record<string, number>;
+  lastUpdated: string;
+  totalMinutes?: number;  // Make this optional for backward compatibility
+  streakState?: string;   // 'ACTIVE' | 'FROZEN' | 'BROKEN'
+  processedToday?: boolean; // Flag to prevent duplicate processing in a day
+  lastProcessedDate?: string; // Date when the streak was last processed
+}
+
 // Interface for the complete user progress object
 export interface UserProgress {
   totalXP: number;
@@ -127,19 +145,12 @@ export interface UserProgress {
   achievements: Record<string, Achievement>;
   challenges: Record<string, Challenge>;
   rewards: Record<string, Reward>;
-  statistics: {
-    totalRoutines: number;
-    currentStreak: number;
-    bestStreak: number;
-    uniqueAreas: string[];
-    routinesByArea: Record<string, number>;
-    lastUpdated: string;
-    totalMinutes?: number;  // Make this optional for backward compatibility
-  };
+  statistics: Statistics;
   lastUpdated: string;
   lastDailyChallengeCheck?: string; // Added for challenge management
   xpHistory?: XpHistoryEntry[];  // Optional for backward compatibility
   hasReceivedWelcomeBonus?: boolean; // Flag to track if user has received the first-time welcome bonus
+  _version?: number; // Version counter to prevent race conditions and detect stale data
 }
 
 // Interface for progress update result

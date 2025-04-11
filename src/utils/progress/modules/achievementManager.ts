@@ -1,5 +1,8 @@
 import { Achievement, UserProgress } from '../types';
 import { CORE_ACHIEVEMENTS } from '../constants';
+import * as storageService from '../../../services/storageService';
+import * as streakManager from './streakManager';
+import { calculateStreakWithFreezes } from './progressTracker';
 
 /**
  * Initialize achievements for a user progress object
@@ -30,14 +33,14 @@ export const initializeAchievements = (userProgress: UserProgress): void => {
  * @param userProgress The user progress object containing achievements and statistics
  * @returns The number of achievements that were updated
  */
-export const updateAchievements = (userProgress: UserProgress): number => {
+export const updateAchievements = async (userProgress: UserProgress): Promise<number> => {
   let updatedCount = 0;
   
   // Ensure achievements are initialized
   initializeAchievements(userProgress);
   
-  // Update achievement progress
-  Object.values(userProgress.achievements).forEach((achievement) => {
+  // Process all achievements sequentially
+  for (const achievement of Object.values(userProgress.achievements)) {
     if (!achievement.completed) {
       const stats = userProgress.statistics;
       const oldProgress = achievement.progress || 0; // Ensure progress is initialized
@@ -48,7 +51,29 @@ export const updateAchievements = (userProgress: UserProgress): number => {
           achievement.progress = stats.totalRoutines || 0; 
           break;
         case 'streak': 
-          achievement.progress = stats.currentStreak || 0; 
+          // Get streak from streak manager for consistency
+          const streakStatus = await streakManager.getStreakStatus();
+          achievement.progress = streakStatus.currentStreak;
+          
+          // Double check with calculateStreakWithFreezes
+          const routines = await storageService.getAllRoutines();
+          const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+          
+          // Extract routine dates
+          const routineDates = routines
+            .filter(r => r.date)
+            .map(r => r.date.split('T')[0]);
+          
+          // Calculate streak with freezes
+          const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
+          
+          if (calculatedStreak !== achievement.progress) {
+            console.log(`Streak discrepancy in achievement: ${achievement.progress} vs ${calculatedStreak}. Using calculated value.`);
+            achievement.progress = calculatedStreak;
+            
+            // Update streak in the streak manager to keep everything in sync
+            await streakManager.updateStoredStreak(calculatedStreak);
+          }
           break;
         case 'area_variety': 
           achievement.progress = stats.uniqueAreas?.length || 0; 
@@ -75,7 +100,7 @@ export const updateAchievements = (userProgress: UserProgress): number => {
         console.log(`Achievement "${achievement.title}" progress updated: ${oldProgress} → ${achievement.progress}`);
       }
     }
-  });
+  }
   
   if (updatedCount > 0) {
     console.log(`Updated ${updatedCount} achievements`);

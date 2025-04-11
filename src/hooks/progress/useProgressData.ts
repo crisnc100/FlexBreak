@@ -5,13 +5,17 @@ import { useRefresh } from '../../context/RefreshContext';
 import { useGamification } from './useGamification';
 import {
   calculateStreak,
+  calculateStreakWithFreezes,
   calculateWeeklyActivity,
   calculateDayOfWeekActivity,
   calculateActiveDays
 } from '../../utils/progress/modules/progressTracker';
 import * as storageService from '../../services/storageService';
+import * as streakManager from '../../utils/progress/modules/streakManager';
 import { UserProgress } from '../../utils/progress/types';
 import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import * as streakValidator from '../../utils/progress/modules/streakValidator';
+import * as dateUtils from '../../utils/progress/modules/utils/dateUtils';
 
 // Define progress stats interface
 export interface ProgressStats {
@@ -75,6 +79,9 @@ export function useProgressData() {
     const userProgress = await storageService.getUserProgress();
     const storedStreak = userProgress.statistics.currentStreak;
     
+    // Get the freeze dates to include in streak calculation
+    const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+    
     // Total routines
     const totalRoutines = data.length;
 
@@ -88,29 +95,60 @@ export function useProgressData() {
       return sum + (isNaN(duration) ? 0 : duration);
     }, 0);
 
-    // Calculate current streak
-    const calculatedStreak = calculateStreak(data);
+    // Extract routine dates for streak calculation
+    const routineDates = data
+      .filter(r => r.date)
+      .map(r => r.date!.split('T')[0]);
     
-    // IMPORTANT: Always use the stored streak from userProgress for consistent UI display
-    // This ensures multi-day gaps are properly handled according to the streak rules
-    // Previously used Math.max which could override the 0 value set by the streak manager
-    const displayStreak = storedStreak;
+    // Calculate current streak with and without freezes to compare
+    const calculatedStreakBasic = calculateStreak(data);
+    const calculatedStreakWithFreezes = calculateStreakWithFreezes(routineDates, freezeDates);
+    
+    // IMPORTANT: To avoid streak switching between 0 and 1, explicitly validate with streakValidator
+    let displayStreak = calculatedStreakWithFreezes;
+    
+    try {
+      // Validate through the streak validator which is the most reliable source of truth
+      const validationResult = await streakValidator.validateAndCorrectStreak();
+      
+      if (validationResult.success) {
+        displayStreak = validationResult.correctedStreak;
+        
+        // If we've made corrections, make sure they're saved
+        if (validationResult.corrections.length > 0) {
+          console.log('Streak validation corrections made:', validationResult.corrections);
+        }
+      }
+    } catch (error) {
+      console.error('Error validating streak, falling back to calculated value:', error);
+    }
+    
+    // Make sure we never flip-flop between 0 and 1 for single day activity
+    if (calculatedStreakWithFreezes === 1 && displayStreak === 0) {
+      // If there's activity today, a streak of 1 is more accurate than 0
+      const today = new Date();
+      const todayStr = dateUtils.formatDateYYYYMMDD(today);
+      
+      const hasTodayActivity = routineDates.includes(todayStr);
+      
+      if (hasTodayActivity) {
+        console.log('Override: Using streak=1 because there is activity today');
+        displayStreak = 1;
+      }
+    }
     
     console.log('Streak comparison:', {
-      calculatedStreak, 
+      calculatedStreak: calculatedStreakBasic, 
+      calculatedWithFreezes: calculatedStreakWithFreezes,
       storedStreak, 
       displayStreak
     });
 
     // Check if there's an activity today
     const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayStr = dateUtils.formatDateYYYYMMDD(today);
     
-    const isTodayComplete = data.some(entry => {
-      const entryDate = new Date(entry.date);
-      const entryDateStr = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`;
-      return entryDateStr === todayStr;
-    });
+    const isTodayComplete = routineDates.includes(todayStr);
     
     console.log(`Today's activity check (${todayStr}): ${isTodayComplete ? 'Complete' : 'Incomplete'}`);
 
@@ -130,6 +168,13 @@ export function useProgressData() {
     const activeRoutineDays = calculateActiveDays(data);
 
     console.log(`Stats calculated: ${totalRoutines} routines, ${totalMinutes} minutes, streak: ${displayStreak}, today complete: ${isTodayComplete}`);
+    
+    // Save the value back to userProgress to ensure consistency across the app
+    if (userProgress.statistics.currentStreak !== displayStreak) {
+      userProgress.statistics.currentStreak = displayStreak;
+      await storageService.saveUserProgress(userProgress);
+      console.log(`Updated UserProgress streak to ${displayStreak}`);
+    }
     
     setStats({
       totalRoutines,
@@ -186,13 +231,23 @@ export function useProgressData() {
         console.log('Using cached freeze count: ' + dataCache.freezeCount);
         setFreezeCount(dataCache.freezeCount);
       } else {
-        const count = await streakFreezeManager.getStreakFreezeCount();
+        // Check if user is premium before getting freeze count
+        const isPremium = await storageService.getIsPremium();
         
-        // Update freeze cache
-        dataCache.freezeCount = count;
-        dataCache.freezeLastUpdated = now;
-        
-        setFreezeCount(count);
+        if (isPremium) {
+          const count = await streakFreezeManager.getFreezesAvailable();
+          
+          // Update freeze cache
+          dataCache.freezeCount = count;
+          dataCache.freezeLastUpdated = now;
+          
+          setFreezeCount(count);
+        } else {
+          // Set to 0 for non-premium users
+          dataCache.freezeCount = 0;
+          dataCache.freezeLastUpdated = now;
+          setFreezeCount(0);
+        }
       }
     } catch (error) {
       console.error('Error loading progress data:', error);

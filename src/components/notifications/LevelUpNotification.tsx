@@ -13,6 +13,7 @@ interface LevelUpNotificationProps {
   challengeTitle?: string;
   xpEarned?: number;
   onDismiss: () => void;
+  showInRoutineScreen?: boolean;
 }
 
 const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({ 

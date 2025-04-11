@@ -154,7 +154,7 @@ export const processCompletedRoutine = async (routine: ProgressEntry): Promise<{
   console.log(`Found ${completedChallenges.length} newly completed challenges`);
 
   // Update achievements
-  achievementManager.updateAchievements(userProgress);
+  await achievementManager.updateAchievements(userProgress);
 
   const { level: newLevel } = calculateLevel(userProgress.totalXP);
   if (newLevel !== userProgress.level) {
@@ -305,9 +305,6 @@ export const recalculateStatistics = async (): Promise<UserProgress> => {
   let userProgress = await storageService.getUserProgress();
   userProgress = normalizeUserProgress(userProgress);
   const allRoutines = await cacheUtils.getCachedRoutines();
-  
-  // Setup monthly streak freezes if user qualifies
-  await streakManager.setupMonthlyStreakFreezes();
   
   // Reset statistics to zero values
   userProgress.statistics = {

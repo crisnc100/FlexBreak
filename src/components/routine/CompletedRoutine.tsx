@@ -19,12 +19,14 @@ import { createThemedStyles } from '../../utils/themeUtils';
 import { useRefresh } from '../../context/RefreshContext';
 import { Toast } from 'react-native-toast-notifications';
 
+
 // Import subcomponents from tabs
 import LevelUpDisplay from './tabs/LevelUpDisplay';
 import XpBreakdown from './tabs/XpBreakdown';
 import SimpleXpDisplay from './tabs/SimpleXpDisplay';
 import RoutineStats from './tabs/RoutineStats';
 import ActionButtons from './tabs/ActionButtons';
+
 
 // Import types - use type alias to avoid naming conflicts
 import { CompletedRoutineProps as CompletedRoutinePropsType, RewardItem } from './types/completedRoutine.types';
@@ -383,6 +385,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
               levelUpAnim,
               levelUpScale
             }}
+            showInRoutineScreen={false}
           />
         )}
         
