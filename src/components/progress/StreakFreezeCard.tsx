@@ -121,6 +121,13 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   // Screen dimensions for animations
   const { width } = Dimensions.get('window');
   
+  // Cache for streak status
+  const streakStatusCache = useRef({
+    lastChecked: 0,
+    data: null,
+    ttl: 10000 // 10 seconds cache TTL
+  });
+  
   // Check freeze data on mount
   useEffect(() => {
     loadFreezeData();
@@ -175,7 +182,8 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   
   // Create snowflake effect
   const createSnowflakeEffect = () => {
-    const numSnowflakes = 12;
+    // Reduce the number of snowflakes from 12 to 8 for better performance
+    const numSnowflakes = 8;
     const newSnowflakes = [];
     
     for (let i = 0; i < numSnowflakes; i++) {
@@ -184,8 +192,8 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         x: Math.random() * width * 0.8,
         y: -10 - Math.random() * 20,
         size: 14 + Math.random() * 10,
-        duration: 1500 + Math.random() * 1000,
-        delay: Math.random() * 500,
+        duration: 1800 + Math.random() * 1000, // Slightly slower for smoother animation
+        delay: Math.random() * 400,
         rotation: Math.random() * 360
       });
     }
@@ -196,7 +204,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     // Auto-hide after animation completes
     setTimeout(() => {
       setShowSnowflakes(false);
-    }, 3000);
+    }, 3500); // Give more time for animations to complete
   };
   
   // Load freeze data
@@ -253,11 +261,35 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   // Check if streak is broken and should be saved
   const checkStreakStatus = async () => {
     try {
+      // Check if we have a valid cache
+      const now = Date.now();
+      if (streakStatusCache.current.data && 
+          now - streakStatusCache.current.lastChecked < streakStatusCache.current.ttl) {
+        console.log('Using cached streak status');
+        const cachedStatus = streakStatusCache.current.data;
+        setIsStreakBroken(cachedStatus.streakBroken);
+        setCanSaveStreak(cachedStatus.canSaveYesterdayStreak);
+        
+        // Start animations if streak is at risk
+        if (cachedStatus.streakBroken && !recentlySaved) {
+          startPulseAnimation();
+          startRotateAnimation();
+        }
+        return;
+      }
+      
       // Get the legacy streak status for backward compatibility
       const status = await streakManager.getLegacyStreakStatus();
       
       // Also get the new streak status format for proper data
       const newStatus = await streakManager.getStreakStatus();
+      
+      // Cache the result
+      streakStatusCache.current = {
+        lastChecked: now,
+        data: status,
+        ttl: 10000
+      };
       
       // Update UI based on legacy status
       setIsStreakBroken(status.streakBroken);
@@ -396,54 +428,58 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         })
       ]).start();
       
-      // Apply the streak freeze
-      const result = await streakManager.applyFreeze();
-      
-      if (result.success) {
-        // Apply quick haptic feedback on success
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Apply the streak freeze with a small artificial delay
+      // to ensure animations have time to play smoothly
+      setTimeout(async () => {
+        const result = await streakManager.applyFreeze();
         
-        // Animate the freeze counter to show it decreased
-        Animated.sequence([
-          Animated.timing(freezeCounterAnim, {
-            toValue: 0.5,
-            duration: 200,
-            useNativeDriver: true
-          }),
-          Animated.timing(freezeCounterAnim, {
-            toValue: 1.2,
-            duration: 300,
-            useNativeDriver: true
-          }),
-          Animated.timing(freezeCounterAnim, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true
-          })
-        ]).start();
+        if (result.success) {
+          // Apply quick haptic feedback on success
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          // Animate the freeze counter to show it decreased - slower for smoother animation
+          Animated.sequence([
+            Animated.timing(freezeCounterAnim, {
+              toValue: 0.5,
+              duration: 300,
+              useNativeDriver: true
+            }),
+            Animated.timing(freezeCounterAnim, {
+              toValue: 1.2,
+              duration: 400,
+              useNativeDriver: true
+            }),
+            Animated.timing(freezeCounterAnim, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true
+            })
+          ]).start();
+          
+          // Set state to show saved message
+          setRecentlySaved(true);
+          
+          // Update the freeze count (force refresh from storage)
+          setTimeout(async () => {
+            const newCount = await streakFreezeManager.getFreezesAvailable();
+            console.log(`Updated freeze count after applying: ${newCount}/2`);
+            setFreezeCount(newCount);
+            setIsLoading(false);
+          }, 1000); // Give more time for storage to update and animations to complete
+          
+        } else {
+          console.error('Failed to apply streak freeze');
+          // Show error feedback
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          setIsLoading(false);
+        }
         
-        // Set state to show saved message
-        setRecentlySaved(true);
-        
-        // Update the freeze count (force refresh from storage)
-        setTimeout(async () => {
-          const newCount = await streakFreezeManager.getFreezesAvailable();
-          console.log(`Updated freeze count after applying: ${newCount}/2`);
-          setFreezeCount(newCount);
-        }, 800); // Give time for storage to update
-        
-      } else {
-        console.error('Failed to apply streak freeze');
-        // Show error feedback
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-      
-      // Reload streak status
-      await checkStreakStatus();
+        // Reload streak status
+        await checkStreakStatus();
+      }, 400); // Small delay for smoother animation sequence
       
     } catch (error) {
       console.error('Error applying streak freeze:', error);
-    } finally {
       setIsLoading(false);
     }
   };

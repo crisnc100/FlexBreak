@@ -349,6 +349,7 @@ export default function ProgressScreen({ navigation }) {
                 theme={theme}
                 isDark={isDark}
                 streakFreezeActive={streakFreezeActive}
+                userLevel={level}
               />
             )}
             

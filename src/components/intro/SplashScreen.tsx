@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as soundEffects from '../../utils/soundEffects';
+import * as streakManager from '../../utils/progress/modules/streakManager';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,17 +20,55 @@ interface SplashScreenProps {
   onComplete: () => void;
   userLevel: number;
   userStreak: number;
+  isMissedStreak?: boolean;
+  onSaveStreak?: () => void;
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({
   onComplete,
   userLevel = 1,
-  userStreak = 0
+  userStreak = 0,
+  isMissedStreak = false,
+  onSaveStreak
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const breatheAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [isStreakBroken, setIsStreakBroken] = useState(false);
+  const [validatedStreak, setValidatedStreak] = useState(userStreak);
+
+  // Validate streak status on mount
+  useEffect(() => {
+    const validateStreakStatus = async () => {
+      try {
+        // Initialize streak manager if needed
+        if (!streakManager.streakCache.initialized) {
+          await streakManager.initializeStreak();
+        }
+        
+        // Check if streak is broken
+        const isBroken = await streakManager.isStreakBroken();
+        setIsStreakBroken(isBroken);
+        
+        // Get validated streak from streak manager
+        const streakStatus = await streakManager.getStreakStatus();
+        setValidatedStreak(isBroken ? 0 : streakStatus.currentStreak);
+        
+        console.log('SplashScreen: Validated streak status', {
+          isStreakBroken: isBroken,
+          originalStreak: userStreak,
+          validatedStreak: isBroken ? 0 : streakStatus.currentStreak
+        });
+      } catch (error) {
+        console.error('Error validating streak:', error);
+        // Fall back to passed streak value
+        setValidatedStreak(userStreak);
+      }
+    };
+    
+    validateStreakStatus();
+  }, [userStreak]);
 
   // Start animations when component mounts
   useEffect(() => {
@@ -154,10 +193,17 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
         <Text style={styles.appName}>FlexBreak</Text>
         
         {/* User streak & level info */}
-        {userStreak > 0 && (
+        {validatedStreak > 0 && !isStreakBroken && (
           <View style={styles.streakContainer}>
             <Ionicons name="flame" size={24} color="#FF9500" />
-            <Text style={styles.streakText}>Day {userStreak} Streak</Text>
+            <Text style={styles.streakText}>Day {validatedStreak} Streak</Text>
+          </View>
+        )}
+        
+        {isStreakBroken && validatedStreak === 0 && userStreak > 0 && (
+          <View style={[styles.streakContainer, {backgroundColor: 'rgba(255, 87, 34, 0.2)'}]}>
+            <Ionicons name="flame-outline" size={24} color="#FF5722" />
+            <Text style={styles.streakText}>New Streak Starting</Text>
           </View>
         )}
         
@@ -229,6 +275,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '500',
+    marginLeft: 8,
+  },
+  missedStreakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  missedStreakText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
     marginLeft: 8,
   }
 });

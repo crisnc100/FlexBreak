@@ -20,6 +20,7 @@ interface StatsTabProps {
   theme: any;
   isDark: boolean;
   streakFreezeActive?: boolean;
+  userLevel?: number;
 }
 
 /**
@@ -34,7 +35,8 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   canAccessFeature,
   theme,
   isDark,
-  streakFreezeActive = false
+  streakFreezeActive = false,
+  userLevel = 1
 }) => {
   return (
     <>
@@ -46,6 +48,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         theme={theme}
         isDark={isDark}
         streakFreezeActive={streakFreezeActive}
+        userLevel={userLevel}
       />
       
       {/* Only show streak freeze card for premium users with level 6+ */}

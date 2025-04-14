@@ -192,11 +192,23 @@ function MainApp() {
   useEffect(() => {
     const initStreakSystem = async () => {
       try {
+        console.log('Initializing streak system...');
+        
         // First run a validation to ensure streak values are consistent
+        // This will force a refresh of the streak cache and emit an update event
         await streakValidator.runStartupStreakValidation();
+        
+        // Check if streak is broken and should be reset to 0 in the UI
+        const isStreakBroken = await streakManager.isStreakBroken();
+        if (isStreakBroken) {
+          console.log('Streak is broken due to multiple missed days. UI will show 0.');
+        }
         
         // Check for streak freezes to refill monthly
         await streakFreezeManager.refillMonthlyStreakFreezes();
+        
+        // Force streak manager to emit an update event to refresh all UI components
+        streakManager.streakEvents.emit('streak_updated');
         
         // Check if a streak is broken and show notification if needed
         const streakStatus = await streakManager.checkStreakStatus();

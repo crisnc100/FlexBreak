@@ -41,6 +41,7 @@ import {
   calculateLevelDisplay
 } from './utils/xpUtils';
 import { useStreakChecker } from '../../hooks/progress/useStreakChecker';
+import * as streakManager from '../../utils/progress/modules/streakManager';
 
 // Redefine the props interface as a type that extends the imported type
 type CompletedRoutineProps = CompletedRoutinePropsType;
@@ -70,6 +71,25 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   // Use streak checker to ensure streak achievements are properly updated
   useStreakChecker();
+  
+  // Add a direct streak manager listener to force UI updates
+  useEffect(() => {
+    console.log('CompletedRoutine mounted - setting up streak event listener');
+    
+    // Set up streakEvents listener to update when streak changes
+    const handleStreakChange = () => {
+      console.log('Streak update received in CompletedRoutine - refreshing data');
+      triggerRefresh();
+    };
+    
+    // Add event listener
+    streakManager.streakEvents.on('streak_updated', handleStreakChange);
+    
+    // Clean up
+    return () => {
+      streakManager.streakEvents.off('streak_updated', handleStreakChange);
+    };
+  }, [triggerRefresh]);
   
   // Trigger a refresh of progress data when component mounts
   useEffect(() => {
@@ -329,7 +349,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
 
   return (
     <View style={styles.container}>
-      <XpNotificationManager />
+      <XpNotificationManager showLevelUpInRoutine={!showAnyLevelUp} />
       
       {/* Saving Animation Overlay - with improved styling */}
       {isSaving && (
@@ -385,7 +405,6 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
               levelUpAnim,
               levelUpScale
             }}
-            showInRoutineScreen={false}
           />
         )}
         

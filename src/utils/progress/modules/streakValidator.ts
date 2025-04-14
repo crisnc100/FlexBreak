@@ -173,8 +173,44 @@ export const runStartupStreakValidation = async (): Promise<void> => {
     } else {
       console.log(`Freeze count validation completed: Count is correct (${freezeResult.correctedCount})`);
     }
+    
+    // Check if streak is actually broken (missed multiple days)
+    const isStreakBroken = await streakManager.isStreakBroken();
+    
+    if (isStreakBroken) {
+      console.log('Streak is completely broken (multiple days missed). UI will show as 0.');
+      // Note: We don't actually reset the stored streak here
+      // This is handled by the UI layer showing 0 instead of the stored value
+      // When the user completes their next routine, the streak will restart from 1
+    }
+
+    // Force refresh of the streak cache to ensure UI components have latest data
+    await forceStreakRefresh();
   } catch (error) {
     console.error('Error in startup streak validation:', error);
+  }
+};
+
+/**
+ * Forces a complete refresh of the streak cache by clearing and re-initializing it
+ * Used to ensure all UI components have the most up-to-date streak data
+ */
+export const forceStreakRefresh = async (): Promise<void> => {
+  try {
+    console.log('Forcing streak cache refresh...');
+    
+    // Clear initialized flag to force a complete refresh
+    streakManager.streakCache.initialized = false;
+    
+    // Re-initialize from scratch
+    await streakManager.initializeStreak();
+    
+    // Emit streak_updated event to trigger UI updates
+    streakManager.streakEvents.emit('streak_updated');
+    
+    console.log('Streak cache refresh complete');
+  } catch (error) {
+    console.error('Error forcing streak refresh:', error);
   }
 };
 

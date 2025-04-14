@@ -31,13 +31,17 @@ const IntroManager: React.FC<IntroManagerProps> = ({ onComplete }) => {
         // Check if the user has opened the app before
         const firstTimeFlag = await AsyncStorage.getItem(FIRST_TIME_USER_KEY);
         
-        // Get streak status using the new API
-        const legacyStatus = await streakManager.getLegacyStreakStatus();
-        const streakStatus = await streakManager.getStreakStatus();
+        // Make sure streak manager is fully initialized with validated data
+        if (!streakManager.streakCache.initialized) {
+          await streakManager.initializeStreak();
+        }
         
+        // Force a fresh streak status check to ensure accuracy
+        const streakStatus = await streakManager.getStreakStatus();
         setUserStreak(streakStatus.currentStreak);
         
         // Check if streak is broken and can be saved
+        const legacyStatus = await streakManager.getLegacyStreakStatus();
         setIsMissedStreak(legacyStatus.canSaveYesterdayStreak);
         
         // If first time flag doesn't exist, this is a first-time user
@@ -50,6 +54,24 @@ const IntroManager: React.FC<IntroManagerProps> = ({ onComplete }) => {
     };
     
     checkFirstTimeUser();
+    
+    // Listen for streak updates
+    const handleStreakUpdate = async () => {
+      try {
+        const updatedStatus = await streakManager.getStreakStatus();
+        setUserStreak(updatedStatus.currentStreak);
+      } catch (error) {
+        console.error('Error updating streak:', error);
+      }
+    };
+    
+    // Subscribe to streak updates
+    streakManager.streakEvents.on('streak_updated', handleStreakUpdate);
+    
+    // Cleanup
+    return () => {
+      streakManager.streakEvents.off('streak_updated', handleStreakUpdate);
+    };
   }, []);
 
   // Perform the fade out and transition to main app

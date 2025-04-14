@@ -14,6 +14,7 @@ export const streakEvents = new EventEmitter();
 export const STREAK_BROKEN_EVENT = 'streak_broken';
 export const STREAK_SAVED_EVENT = 'streak_saved';
 export const STREAK_MAINTAINED_EVENT = 'streak_maintained';
+export const STREAK_UPDATED_EVENT = 'streak_updated';
 
 // Simple cache with just the essential data
 export let streakCache = {
@@ -290,13 +291,16 @@ export const completeRoutine = async (routineDate?: string): Promise<{
     // Update storage
     await updateStorage(newStreak, updatedRoutineDates, streakCache.freezeDates, streakCache.freezesAvailable);
     
-    // Emit event
+    // Emit specific event for streak maintained
     if (streakIncremented) {
       streakEvents.emit(STREAK_MAINTAINED_EVENT, {
         currentStreak: newStreak,
         increment: true
       });
     }
+    
+    // Always emit general streak_updated event to refresh all UI components
+    streakEvents.emit(STREAK_UPDATED_EVENT);
     
     return {
       currentStreak: newStreak,
@@ -783,4 +787,40 @@ export const forceUpdateStreakChallenges = async (): Promise<boolean> => {
   
   // Return true to indicate "success"
   return true;
+};
+
+/**
+ * Check if the streak is broken (more than 2 consecutive days missed)
+ * 
+ * @returns True if the streak is broken and should reset to 0
+ */
+export const isStreakBroken = async (): Promise<boolean> => {
+  if (!streakCache.initialized) {
+    await initializeStreak();
+  }
+  
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const twoDaysAgo = new Date(today);
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+  
+  const todayStr = dateUtils.formatDateYYYYMMDD(today);
+  const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
+  const twoDaysAgoStr = dateUtils.formatDateYYYYMMDD(twoDaysAgo);
+  
+  // Check if any of the recent days have routines or freezes
+  const hasToday = streakCache.routineDates.includes(todayStr);
+  const hasYesterday = streakCache.routineDates.includes(yesterdayStr) || 
+                      streakCache.freezeDates.includes(yesterdayStr);
+  const hasTwoDaysAgo = streakCache.routineDates.includes(twoDaysAgoStr) || 
+                        streakCache.freezeDates.includes(twoDaysAgoStr);
+  
+  // The streak is broken if:
+  // 1. Today is not completed AND
+  // 2. Yesterday is not completed (with no freeze) AND
+  // 3. Two days ago is not completed (with no freeze)
+  const isStreakBroken = !hasToday && !hasYesterday && !hasTwoDaysAgo;
+  
+  return isStreakBroken;
 }; 

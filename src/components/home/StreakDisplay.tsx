@@ -1,15 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TouchableOpacity,
-  ActivityIndicator
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Vibration,
+  Platform
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { usePremium } from '../../context/PremiumContext';
+import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as storageService from '../../services/storageService';
+import * as featureAccessUtils from '../../utils/featureAccessUtils';
+import * as Haptics from 'expo-haptics';
+
+// Helper function for consistent haptic feedback
+const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error') => {
+  try {
+    // Use expo-haptics when available (most devices)
+    if (Platform.OS === 'ios') {
+      switch (type) {
+        case 'light':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case 'medium':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          break;
+        case 'heavy':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          break;
+        case 'success':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+        case 'warning':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          break;
+        case 'error':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          break;
+      }
+    } else if (Platform.OS === 'android') {
+      // Android pattern durations
+      switch (type) {
+        case 'light':
+          Vibration.vibrate(10);
+          break;
+        case 'medium':
+          Vibration.vibrate(20);
+          break;
+        case 'heavy':
+          Vibration.vibrate(30);
+          break;
+        case 'success':
+          Vibration.vibrate([0, 50, 50, 50]);
+          break;
+        case 'warning':
+          Vibration.vibrate([0, 50, 100, 50]);
+          break;
+        case 'error':
+          Vibration.vibrate([0, 50, 30, 50, 30, 50]);
+          break;
+      }
+    }
+  } catch (error) {
+    // Fallback to basic vibration if haptics fail
+    Vibration.vibrate(15);
+  }
+};
 
 interface StreakDisplayProps {
   currentStreak: number;
@@ -25,26 +86,172 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
   const [streak, setStreak] = useState(currentStreak);
   const [freezeCount, setFreezeCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [userLevel, setUserLevel] = useState(1);
+  const [canUseStreakFreeze, setCanUseStreakFreeze] = useState(false);
+  const [focusedMilestone, setFocusedMilestone] = useState<number | null>(null);
+  const [progressPulse, setProgressPulse] = useState(false);
+  const [isStreakBroken, setIsStreakBroken] = useState(false);
   
-  // Load streak directly from storage - no complex calculations
+  // Animation values
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const tapAnimations = useRef<{ [key: number]: Animated.Value }>({}).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  
+  // Start animations
   useEffect(() => {
-    const loadStreak = async () => {
+    // Pulsing animation for the flame
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        })
+      ])
+    ).start();
+    
+    // Glow animation for the streak path
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false
+        })
+      ])
+    ).start();
+    
+    // Progress animation
+    startProgressAnimation();
+  }, []);
+  
+  // Start progress animation
+  const startProgressAnimation = () => {
+    setProgressPulse(true);
+    Animated.sequence([
+      Animated.timing(progressAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false
+      }),
+      Animated.timing(progressAnim, {
+        toValue: 0.6,
+        duration: 700,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: false
+      })
+    ]).start(() => {
+      setTimeout(() => {
+        setProgressPulse(false);
+      }, 3000);
+    });
+  };
+  
+  // Handle milestone tap
+  const handleMilestoneTap = (milestone: number, isCompleted: boolean, isCurrent: boolean) => {
+    // Don't animate if tapping on an already focused milestone
+    if (focusedMilestone === milestone) {
+      setFocusedMilestone(null);
+      triggerHaptic('light');
+      return;
+    }
+    
+    setFocusedMilestone(milestone);
+    
+    // Create animation for this milestone if it doesn't exist yet
+    if (!tapAnimations[milestone]) {
+      tapAnimations[milestone] = new Animated.Value(1);
+    }
+    
+    // Enhanced haptic feedback based on milestone status
+    if (isCompleted) {
+      triggerHaptic('success');
+    } else if (isCurrent) {
+      triggerHaptic('medium');
+    } else {
+      triggerHaptic('light');
+    }
+    
+    // Animate the tap effect
+    Animated.sequence([
+      Animated.timing(tapAnimations[milestone], {
+        toValue: 1.5,
+        duration: 200,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true
+      }),
+      Animated.timing(tapAnimations[milestone], {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.in(Easing.bounce),
+        useNativeDriver: true
+      })
+    ]).start();
+    
+    // If this is the current goal, also animate the progress bar
+    if (isCurrent) {
+      startProgressAnimation();
+    }
+  };
+  
+  // Load streak data from streakManager instead of directly from storage
+  useEffect(() => {
+    const loadStreakData = async () => {
       try {
         setLoading(true);
         
-        // Get direct value from storage
+        // Initialize streak manager if needed
+        if (!streakManager.streakCache.initialized) {
+          await streakManager.initializeStreak();
+        }
+        
+        // Get streak status from streak manager
+        const streakStatus = await streakManager.getStreakStatus();
+        
+        // Check if streak is broken (more than 2 days missed)
+        const isBroken = await streakManager.isStreakBroken();
+        
+        // Check if this is the first time user is using the app
+        const isFirstTime = streakManager.streakCache.routineDates.length === 0;
+        
+        setIsStreakBroken(isBroken && !isFirstTime);
+        
+        // Only show the user's previous streak value if the streak isn't broken
+        // Otherwise show the corrected value (which is 0)
+        setStreak(isBroken ? 0 : streakStatus.currentStreak);
+        
+        // Get user's level for streak freeze access
         const userProgress = await storageService.getUserProgress();
+        const level = userProgress.level || 1;
+        setUserLevel(level);
         
-        // Use streak directly from storage
-        const storedStreak = userProgress.statistics?.currentStreak || 0;
-        setStreak(storedStreak);
+        // Check if user meets level requirement for streak freezes
+        const requiredLevel = featureAccessUtils.getRequiredLevel('streak_freezes');
+        const meetsLevelRequirement = level >= requiredLevel;
+        setCanUseStreakFreeze(meetsLevelRequirement);
         
-        // Get freeze count if premium
-        if (isPremium && userProgress.rewards?.streak_freezes?.uses !== undefined) {
-          setFreezeCount(userProgress.rewards.streak_freezes.uses);
+        // Get freeze count directly from streak manager
+        if (isPremium && meetsLevelRequirement) {
+          setFreezeCount(streakStatus.freezesAvailable);
         }
       } catch (error) {
-        console.error('Simple streak load error:', error);
+        console.error('Error loading streak data:', error);
         // Fall back to prop value
         setStreak(currentStreak);
       } finally {
@@ -52,12 +259,21 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
       }
     };
     
-    loadStreak();
+    loadStreakData();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(loadStreak, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    // Set up streakEvents listener to update when streak changes
+    const handleStreakChange = () => {
+      loadStreakData();
+    };
+    
+    // Add event listener
+    streakManager.streakEvents.on('streak_updated', handleStreakChange);
+    
+    // Clean up
+    return () => {
+      streakManager.streakEvents.off('streak_updated', handleStreakChange);
+    };
+  }, [isPremium, currentStreak]);
   
   // Show loading indicator while data is loading
   if (loading) {
@@ -69,86 +285,344 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
     );
   }
   
+  // Create milestone data for streak path
+  const milestones = [
+    { days: 1, label: "START" },
+    { days: 3, label: "3" },
+    { days: 7, label: "WEEK" },
+    { days: 14, label: "14" },
+    { days: 30, label: "MONTH" },
+    { days: 90, label: "90" },
+    { days: 180, label: "180" },
+    { days: 365, label: "YEAR" }
+  ];
+  
+  // Find the current milestone and next milestone
+  const currentMilestoneIndex = milestones.findIndex(m => streak < m.days) - 1;
+  const currentMilestone = currentMilestoneIndex >= 0 ? milestones[currentMilestoneIndex] : { days: 0, label: "" };
+  const nextMilestone = currentMilestoneIndex < milestones.length - 1 ? milestones[currentMilestoneIndex + 1] : null;
+  
+  // Calculate progress to next milestone
+  const progress = nextMilestone 
+    ? (streak - currentMilestone.days) / (nextMilestone.days - currentMilestone.days) 
+    : 1;
+  
+  // Get days to next milestone
+  const daysToNextMilestone = nextMilestone ? nextMilestone.days - streak : 0;
+  
+  // Haptic feedback for main flame icon when tapped
+  const handleFlamePress = () => {
+    triggerHaptic('heavy');
+    
+    // Start flame animation again
+    Animated.sequence([
+      Animated.timing(pulseAnim, {
+        toValue: 1.4,
+        duration: 300,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true
+      }),
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 300,
+        easing: Easing.inOut(Easing.elastic(1.5)),
+        useNativeDriver: true
+      })
+    ]).start();
+  };
+  
   return (
     <View style={[styles.container, {backgroundColor: isDark ? theme.cardBackground : '#FFF'}]}>
-      <View style={styles.upperContainer}>
-        <View style={[
-          styles.streakBadge,
-          { backgroundColor: isDark ? 'rgba(255, 152, 0, 0.2)' : 'rgba(255, 152, 0, 0.1)' }
-        ]}>
-          <Ionicons 
-            name="flame" 
-            size={30} 
-            color={isDark ? '#FFB74D' : '#FF9800'} 
-            style={styles.fireIcon}
-          />
-          <View>
-            <Text style={[styles.streakText, { color: theme.text }]}>
-              {streak} Day{streak !== 1 ? 's' : ''} Streak
+      {/* Header with streak count and freeze info */}
+      <View style={styles.header}>
+        <View style={styles.streakTitleContainer}>
+          <TouchableOpacity onPress={handleFlamePress} activeOpacity={0.7}>
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Ionicons 
+                name={isStreakBroken ? "flame-outline" : (streak === 0 ? "star-outline" : "flame")} 
+                size={32} 
+                color={isStreakBroken ? "#9E9E9E" : 
+                       (streak === 0 ? "#90CAF9" :
+                        (streak > 30 ? "#FF6D00" : (streak > 7 ? "#FF9800" : "#FFB74D")))} 
+              />
+            </Animated.View>
+          </TouchableOpacity>
+          <View style={styles.streakTextContainer}>
+            <Text style={[styles.streakCount, { 
+              color: isStreakBroken ? theme.textSecondary : theme.text 
+            }]}>
+              {streak}
             </Text>
-            <Text style={[styles.streakSubtext, { color: isDark ? theme.textSecondary : '#757575' }]}>
-              Keep going strong!
+            <Text style={[styles.streakLabel, { color: theme.textSecondary }]}>
+              {isStreakBroken ? "STREAK BROKEN" : 
+               (streak === 0 ? "READY TO START" : `DAY${streak !== 1 ? 'S' : ''} STREAK`)}
             </Text>
           </View>
         </View>
         
-        {/* Freeze count display for premium users */}
-        {isPremium && (
-          <View style={styles.freezeCountContainer}>
-            <View style={[
-              styles.freezeBadge,
-              { backgroundColor: isDark ? 'rgba(144, 202, 249, 0.2)' : 'rgba(144, 202, 249, 0.1)' }
-            ]}>
-              <Ionicons name="snow" size={16} color={isDark ? '#90CAF9' : '#2196F3'} />
-              <Text 
-                style={[
-                  styles.freezeCount, 
-                  { color: freezeCount > 0 ? (isDark ? '#90CAF9' : '#2196F3') : (isDark ? '#EF5350' : '#F44336') }
-                ]}
-              >
-                {freezeCount}
-              </Text>
-            </View>
-          </View>
-        )}
-        
-        {/* Premium button for non-premium users */}
-        {!isPremium && (
+        {/* Premium freeze display */}
+        {isPremium && canUseStreakFreeze ? (
           <TouchableOpacity 
-            style={[
-              styles.premiumButton,
-              { backgroundColor: isDark ? 'rgba(144, 202, 249, 0.2)' : 'rgba(144, 202, 249, 0.1)' }
-            ]}
-            onPress={onPremiumPress}
+            style={[styles.freezeContainer, { 
+              backgroundColor: isDark ? 'rgba(144, 202, 249, 0.15)' : 'rgba(144, 202, 249, 0.1)' 
+            }]}
+            onPress={() => triggerHaptic('medium')}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.premiumText, { color: isDark ? '#90CAF9' : '#2196F3' }]}>
-              Premium
+            <Ionicons name="snow" size={16} color={isDark ? '#90CAF9' : '#2196F3'} />
+            <Text style={[styles.freezeCount, { 
+              color: freezeCount > 0 ? (isDark ? '#90CAF9' : '#2196F3') : '#EF5350' 
+            }]}>
+              {freezeCount}
             </Text>
-            <Ionicons 
-              name="lock-closed" 
-              size={12} 
-              color={isDark ? '#90CAF9' : '#2196F3'} 
-              style={styles.lockIcon}
-            />
+          </TouchableOpacity>
+        ) : !isPremium ? (
+          <TouchableOpacity 
+            style={[styles.premiumBadge, {
+              backgroundColor: isDark ? 'rgba(255, 167, 38, 0.15)' : 'rgba(255, 167, 38, 0.1)'
+            }]}
+            onPress={() => {
+              triggerHaptic('medium');
+              if (onPremiumPress) onPremiumPress();
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="shield" size={14} color="#FFA726" />
+            <Text style={styles.premiumText}>PROTECT</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.levelBadge, {
+              backgroundColor: isDark ? 'rgba(149, 117, 205, 0.15)' : 'rgba(149, 117, 205, 0.1)'
+            }]}
+            onPress={() => triggerHaptic('light')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.levelText}>LVL 6 UNLOCKS</Text>
           </TouchableOpacity>
         )}
       </View>
       
-      {/* Simple streak visualization */}
-      <View style={styles.streakCircleContainer}>
-        {[...Array(7)].map((_, i) => (
-          <View 
-            key={i} 
-            style={[
-              styles.streakCircle,
-              { 
-                backgroundColor: i < Math.min(streak, 7) 
-                  ? (isDark ? '#81C784' : '#4CAF50') 
-                  : (isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0')
-              }
-            ]}
-          />
-        ))}
+      {/* Streak path visualization */}
+      <View style={styles.streakPathContainer}>
+        {/* Streak path track */}
+        <View style={styles.streakTrack}>
+          {milestones.map((milestone, index) => {
+            const isCompleted = streak >= milestone.days;
+            const isCurrent = nextMilestone?.days === milestone.days;
+            const isFocused = focusedMilestone === milestone.days;
+            
+            // Create animation for this milestone if it doesn't exist yet
+            if (!tapAnimations[milestone.days]) {
+              tapAnimations[milestone.days] = new Animated.Value(1);
+            }
+            
+            // Determine colors based on completion and theme
+            const dotColor = isCompleted 
+              ? (isDark ? '#FFB74D' : '#FF9800') 
+              : (isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0');
+            
+            // Enhanced glow effect for the current milestone and focused milestones
+            const glowOpacity = isCurrent 
+              ? glowAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.4, 0.8]
+                }) 
+              : isFocused ? 0.6 : 0;
+            
+            // Line to next milestone (except for last one)
+            const showLine = index < milestones.length - 1;
+            
+            return (
+              <TouchableOpacity 
+                key={milestone.days} 
+                style={styles.milestoneContainer}
+                onPress={() => handleMilestoneTap(milestone.days, isCompleted, isCurrent)}
+                activeOpacity={0.7}
+              >
+                {/* Milestone dot */}
+                <Animated.View 
+                  style={[
+                    styles.dotContainer,
+                    {
+                      transform: [{ scale: tapAnimations[milestone.days] }],
+                      zIndex: isFocused ? 10 : 2
+                    }
+                  ]}
+                >
+                  {/* Glow effect */}
+                  {(isCurrent || isFocused) && (
+                    <Animated.View style={[
+                      styles.glowDot,
+                      { 
+                        backgroundColor: isCurrent 
+                          ? (isDark ? '#FF9800' : '#FF9800')
+                          : (isCompleted ? '#81C784' : '#90CAF9'),
+                        opacity: isFocused ? 0.7 : glowOpacity,
+                        width: isFocused ? 30 : 24,
+                        height: isFocused ? 30 : 24,
+                      }
+                    ]} />
+                  )}
+                  <View style={[
+                    styles.milestoneDot, 
+                    { 
+                      backgroundColor: isFocused && !isCompleted ? '#90CAF9' : dotColor,
+                      borderColor: isCompleted 
+                        ? (isDark ? '#FF9800' : '#FF9800') 
+                        : isFocused ? '#90CAF9' : 'transparent',
+                      width: (isCurrent || isFocused) ? 16 : 12,
+                      height: (isCurrent || isFocused) ? 16 : 12,
+                    }
+                  ]}>
+                    {isCompleted && (
+                      <Ionicons name="checkmark" size={8} color="#FFF" />
+                    )}
+                  </View>
+                </Animated.View>
+                
+                {/* Label */}
+                <Text style={[
+                  styles.milestoneLabel, 
+                  { 
+                    color: isFocused
+                      ? (isCompleted ? '#FF9800' : '#2196F3')
+                      : isCompleted 
+                        ? (isDark ? '#FFB74D' : '#FF9800') 
+                        : (isDark ? theme.textSecondary : '#9E9E9E'),
+                    fontWeight: (isCurrent || isFocused) ? '700' : (isCompleted ? '600' : 'normal'),
+                    fontSize: isFocused ? 12 : 10
+                  }
+                ]}>
+                  {milestone.label}
+                </Text>
+                
+                {/* Line to next milestone */}
+                {showLine && (
+                  <View style={styles.lineContainer}>
+                    <View style={[
+                      styles.milestoneLine,
+                      {
+                        backgroundColor: index < currentMilestoneIndex + 1 
+                          ? (isDark ? '#FFB74D' : '#FF9800') 
+                          : (isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0')
+                      }
+                    ]} />
+                    {/* Progress line for current segment */}
+                    {index === currentMilestoneIndex && nextMilestone && (
+                      <Animated.View 
+                        style={[
+                          styles.progressLine,
+                          {
+                            backgroundColor: progressPulse 
+                              ? progressAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: ['#FF9800', '#FFC107']
+                                })
+                              : (isDark ? '#FFB74D' : '#FF9800'),
+                            width: progressPulse 
+                              ? progressAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [`${progress * 100}%`, `${(progress * 100) + 5}%`]
+                                })
+                              : `${progress * 100}%`,
+                            shadowOpacity: progressPulse ? 0.8 : 0
+                          }
+                        ]}
+                      />
+                    )}
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+      
+      {/* Focused milestone info or motivation */}
+      <View style={styles.motivationContainer}>
+        {focusedMilestone !== null ? (
+          <>
+            <View style={styles.focusedMilestoneInfo}>
+              <MaterialCommunityIcons 
+                name={
+                  focusedMilestone <= streak 
+                    ? "trophy" 
+                    : focusedMilestone === nextMilestone?.days 
+                      ? "target" 
+                      : "calendar-clock"
+                } 
+                size={20} 
+                color={
+                  focusedMilestone <= streak 
+                    ? "#FF9800" 
+                    : focusedMilestone === nextMilestone?.days 
+                      ? "#2196F3" 
+                      : "#9E9E9E"
+                }
+              />
+              <Text style={[styles.focusedMilestoneText, { 
+                color: theme.text,
+                fontWeight: '600'
+              }]}>
+                {focusedMilestone <= streak 
+                  ? `${focusedMilestone} day milestone achieved!` 
+                  : focusedMilestone === nextMilestone?.days
+                    ? `${daysToNextMilestone} more day${daysToNextMilestone !== 1 ? 's' : ''} to reach ${focusedMilestone}!`
+                    : `${focusedMilestone - streak} more days to reach ${focusedMilestone}`
+                }
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.closeFocusButton}
+              onPress={() => {
+                triggerHaptic('light');
+                setFocusedMilestone(null);
+              }}
+            >
+              <Text style={styles.closeFocusText}>Close</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <MaterialCommunityIcons 
+              name={streak > 30 ? "fire" : (streak > 7 ? "run-fast" : "star-shooting")} 
+              size={18} 
+              color={isDark ? '#FFB74D' : '#FF9800'} 
+            />
+            <Text style={[styles.motivationText, { color: theme.textSecondary }]}>
+              {isStreakBroken ? "Start a new streak today!" :
+               streak === 0 ? "Begin your fitness journey today!" :
+               streak < 3 ? "Great start! Keep going!" :
+               streak < 7 ? "You're building momentum!" :
+               streak < 14 ? "One week down! You're on fire!" :
+               streak < 30 ? "Amazing dedication!" :
+               streak < 90 ? "You're a stretching champion!" :
+               streak < 180 ? "Incredible consistency!" :
+               "You're legendary! Keep that streak alive!"}
+            </Text>
+            
+            {/* Streak freeze message for non-premium */}
+            {!isPremium && streak > 3 && canUseStreakFreeze && !isStreakBroken && (
+              <TouchableOpacity 
+                style={styles.freezePromptContainer}
+                onPress={() => {
+                  triggerHaptic('warning');
+                  if (onPremiumPress) onPremiumPress();
+                }}
+              >
+                <Text style={styles.freezePromptText}>
+                  Get Premium to protect your {streak} day streak!
+                </Text>
+              </TouchableOpacity>
+            )}
+            
+            {/* Tap instruction hint */}
+            <Text style={styles.tapHintText}>
+              Tap milestones to explore your journey
+            </Text>
+          </>
+        )}
       </View>
     </View>
   );
@@ -170,71 +644,187 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center'
   },
-  upperContainer: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  streakBadge: {
+  streakTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
   },
-  fireIcon: {
-    marginRight: 10,
+  streakTextContainer: {
+    marginLeft: 10,
   },
-  streakText: {
-    fontSize: 18,
+  streakCount: {
+    fontSize: 28,
     fontWeight: 'bold',
+    lineHeight: 32,
   },
-  streakSubtext: {
-    fontSize: 14,
-    marginTop: 2,
+  streakLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    textTransform: 'uppercase',
   },
-  freezeCountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  freezeBadge: {
+  freezeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   freezeCount: {
     fontSize: 14,
     fontWeight: 'bold',
-    marginLeft: 4,
+    marginLeft: 6,
   },
-  premiumButton: {
+  premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   premiumText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  lockIcon: {
+    color: '#FFA726',
     marginLeft: 4,
   },
-  streakCircleContainer: {
+  levelBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+  },
+  levelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9575CD',
+  },
+  streakPathContainer: {
+    marginVertical: 16,
+  },
+  streakTrack: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 8,
+    height: 60,
+    position: 'relative',
   },
-  streakCircle: {
+  milestoneContainer: {
+    alignItems: 'center',
+    flex: 1,
+    position: 'relative',
+    paddingVertical: 10, // Makes tap target larger
+  },
+  dotContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 20,
+    width: 20,
+    marginBottom: 6,
+  },
+  glowDot: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    zIndex: 1,
+  },
+  milestoneDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    zIndex: 2,
   },
+  milestoneLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  lineContainer: {
+    position: 'absolute',
+    height: 3,
+    left: '50%',
+    right: -'50%',
+    top: 10,
+    zIndex: 0,
+  },
+  milestoneLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  progressLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: 3,
+    borderRadius: 1.5,
+    shadowColor: '#FF9800',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 5,
+  },
+  motivationContainer: {
+    marginTop: 8,
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  motivationText: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  freezePromptContainer: {
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 167, 38, 0.15)',
+    borderRadius: 12,
+  },
+  freezePromptText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF9800',
+    textAlign: 'center',
+  },
+  tapHintText: {
+    fontSize: 11,
+    color: '#9E9E9E',
+    marginTop: 14,
+    opacity: 0.8,
+  },
+  focusedMilestoneInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  focusedMilestoneText: {
+    fontSize: 13,
+    marginLeft: 8,
+  },
+  closeFocusButton: {
+    marginTop: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  closeFocusText: {
+    fontSize: 12,
+    color: '#9E9E9E',
+  }
 });
 
 export default StreakDisplay; 

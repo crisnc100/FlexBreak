@@ -56,8 +56,23 @@ export function useStreakChecker() {
       }
     };
     
+    // Run check when screen is focused
     if (isFocused) {
       checkStreakStatus();
     }
+    
+    // Set up listener for streak updates
+    const handleStreakUpdate = () => {
+      console.log('Streak updated event received in useStreakChecker');
+      checkStreakStatus();
+    };
+    
+    // Listen for general streak updates
+    streakManager.streakEvents.on(streakManager.STREAK_UPDATED_EVENT, handleStreakUpdate);
+    
+    // Cleanup
+    return () => {
+      streakManager.streakEvents.off(streakManager.STREAK_UPDATED_EVENT, handleStreakUpdate);
+    };
   }, [refreshData, isFocused]);
 } 

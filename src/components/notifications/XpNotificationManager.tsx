@@ -9,7 +9,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Key for storing notified achievements
 const NOTIFIED_ACHIEVEMENTS_KEY = 'notifiedAchievements';
 
-const XpNotificationManager: React.FC = () => {
+interface XpNotificationManagerProps {
+  // Controls whether to show level-up notifications when already shown in the routine screen
+  showLevelUpInRoutine?: boolean;
+}
+
+const XpNotificationManager: React.FC<XpNotificationManagerProps> = ({ 
+  showLevelUpInRoutine = true 
+}) => {
   const { 
     recentlyUnlockedAchievements,
     dismissNotifications
@@ -249,7 +256,11 @@ const XpNotificationManager: React.FC = () => {
                 oldLevel={data.oldLevel}
                 newLevel={data.newLevel}
                 source={data.source}
+                details={data.details}
+                challengeTitle={data.challengeTitle}
+                xpEarned={data.xpEarned}
                 onDismiss={() => handleDismiss(id)}
+                showInRoutineScreen={showLevelUpInRoutine}
               />
             </View>
           );

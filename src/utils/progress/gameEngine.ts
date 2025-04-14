@@ -147,7 +147,15 @@ export const processCompletedRoutine = async (routine: ProgressEntry): Promise<{
   const { xp: routineXp, breakdown } = await calculateXpRewards(routine, allRoutines, userProgress);
   userProgress.totalXP += routineXp;
   
+  // Update streak - first with local calculation
   handleStreakChanges(userProgress, allRoutines);
+  
+  // Also directly use streakManager to ensure events are triggered
+  if (routine.date) {
+    const routineDate = routine.date.split('T')[0];
+    await streakManager.completeRoutine(routineDate);
+    console.log(`Completed routine for date ${routineDate} through streakManager`);
+  }
   
   // Update challenges and capture newly completed ones
   const completedChallenges = await challengeManager.updateUserChallenges(userProgress);
@@ -220,6 +228,12 @@ const handleStreakChanges = async (userProgress: UserProgress, allRoutines: Prog
     // Instead we'll show a prompt to the user to manually use streak freeze
     // This is handled by the streakManager module during app start and routine checks
   }
+  
+  // Ensure the streakManager is updated with the latest streak value
+  await streakManager.updateStoredStreak(userProgress.statistics.currentStreak);
+  
+  // Force emit a streak_updated event to refresh all streak displays
+  streakManager.streakEvents.emit('streak_updated');
 };
 
 /**

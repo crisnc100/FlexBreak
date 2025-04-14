@@ -23,11 +23,28 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
   details,
   challengeTitle,
   xpEarned,
-  onDismiss 
+  onDismiss,
+  showInRoutineScreen = true
 }) => {
   const [animation] = useState(new Animated.Value(0));
   const { theme, isDark } = useTheme();
   const styles = themedStyles(theme, isDark);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isFullyMounted, setIsFullyMounted] = useState(false);
+  
+  // Only show notification for challenges
+  // Skip rendering for any other sources
+  if (source !== 'challenge') {
+    console.log(`LevelUpNotification: Skipping notification for source '${source}'`);
+    
+    // Immediately dismiss without rendering
+    setTimeout(() => {
+      onDismiss();
+    }, 100);
+    
+    // Return null instead of rendering the component
+    return null;
+  }
   
   // Detailed console logging for debugging
   useEffect(() => {
@@ -36,31 +53,44 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
     
     // Play level up sound when component mounts
     soundEffects.playLevelUpSound();
+    
+    // First mark as fully mounted (layout complete)
+    // This ensures all styles are properly applied before animation
+    setTimeout(() => {
+      setIsFullyMounted(true);
+      
+      // Then after a tiny delay, trigger animation
+      setTimeout(() => {
+        setIsVisible(true);
+      }, 100);
+    }, 100);
   }, []);
 
   useEffect(() => {
-    // Animate in
-    Animated.timing(animation, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-      easing: Easing.out(Easing.elastic(1.2))
-    }).start();
-    
-    // Auto dismiss after 5 seconds (longer than regular notifications)
-    const timer = setTimeout(() => {
+    if (isVisible && isFullyMounted) {
+      // Animate in only after we're fully ready
       Animated.timing(animation, {
-        toValue: 0,
-        duration: 300,
+        toValue: 1,
+        duration: 400,
         useNativeDriver: true,
-        easing: Easing.in(Easing.ease)
-      }).start(() => {
-        onDismiss();
-      });
-    }, 5000);
-    
-    return () => clearTimeout(timer);
-  }, []);
+        easing: Easing.out(Easing.elastic(1.2))
+      }).start();
+      
+      // Auto dismiss after 5 seconds (longer than regular notifications)
+      const timer = setTimeout(() => {
+        Animated.timing(animation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease)
+        }).start(() => {
+          onDismiss();
+        });
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, isFullyMounted]);
   
   // Get source description
   const getSourceText = () => {
@@ -75,17 +105,66 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
     }
     
     // Fall back to default source-based text
-    switch (source) {
-      case 'challenge':
-        return 'from completing a challenge!';
-      case 'routine':
-        return 'from completing a routine!';
-      case 'achievement':
-        return 'from unlocking an achievement!';
-      default:
-        return '';
-    }
+    return 'from completing a challenge!';
   };
+  
+  // Render a fully transparent placeholder to establish layout before animation
+  if (!isFullyMounted) {
+    return (
+      <View style={[styles.container, { opacity: 0 }]}>
+        <View style={styles.contentWrapper}>
+          {/* Same content structure but not visible */}
+          <View style={styles.headerContainer}>
+            <View style={styles.iconContainer} />
+            <Text style={styles.title}>LEVEL UP!</Text>
+          </View>
+          <View style={styles.contentContainer}>
+            <View style={styles.levelContainer}>
+              <View style={styles.levelBadge} />
+              <View style={styles.arrow} />
+              <View style={[styles.levelBadge, styles.newLevelBadge]} />
+            </View>
+            <Text style={styles.description}>Placeholder</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+  
+  // Don't animate until we're ready
+  if (!isVisible) {
+    return (
+      <View style={[styles.container, { opacity: 0 }]}>
+        <TouchableOpacity style={styles.dismissButton} onPress={onDismiss}>
+          <Ionicons name="close" size={16} color={isDark ? "#999" : "#ccc"} />
+        </TouchableOpacity>
+        
+        <View style={styles.contentWrapper}>
+          <View style={styles.headerContainer}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="trophy" size={24} color="#FFD700" />
+            </View>
+            <Text style={styles.title}>LEVEL UP!</Text>
+          </View>
+          
+          <View style={styles.contentContainer}>
+            <View style={styles.levelContainer}>
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelText}>{oldLevel}</Text>
+              </View>
+              <Ionicons name="arrow-forward" size={18} color={isDark ? theme.text : "#FFF"} style={styles.arrow} />
+              <View style={[styles.levelBadge, styles.newLevelBadge]}>
+                <Text style={styles.levelText}>{newLevel}</Text>
+              </View>
+            </View>
+            <Text style={styles.description}>
+              You've reached level {newLevel} {getSourceText()}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
   
   return (
     <Animated.View 
@@ -97,13 +176,13 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
             { 
               translateY: animation.interpolate({
                 inputRange: [0, 1],
-                outputRange: [-50, 0]
+                outputRange: [-20, 0] // Reduced movement to avoid layout issues
               })
             },
             {
               scale: animation.interpolate({
                 inputRange: [0, 0.5, 1],
-                outputRange: [0.8, 1.1, 1]
+                outputRange: [0.95, 1.05, 1] // Gentler scale changes
               })
             }
           ]
@@ -163,6 +242,8 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
     elevation: 6,
     borderWidth: 1,
     borderColor: isDark ? 'rgba(255,215,0,0.3)' : 'rgba(255,215,0,0.5)',
+    // Ensure the component has enough height
+    minHeight: 120,
   },
   dismissButton: {
     position: 'absolute',
@@ -244,6 +325,7 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     marginVertical: 2,
+    paddingBottom: 4,
   }
 });
 
