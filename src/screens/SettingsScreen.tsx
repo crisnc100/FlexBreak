@@ -12,6 +12,8 @@ import SubscriptionModal from '../components/SubscriptionModal';
 import { ThemedText, ThemedCard } from '../components/common';
 import GamificationSimulator, { runSimulations } from '../utils/progress/testing';
 import { Toast } from 'react-native-toast-notifications';
+import FitnessDisclaimer from '../components/notices/FitnessDisclaimer';
+import NonMedicalNotice from '../components/notices/NonMedicalNotice';
 
 const { width } = Dimensions.get('window');
 
@@ -72,6 +74,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const [testResults, setTestResults] = useState<string[]>([]);
   const hasSeenDarkModeUnlock = useRef(false);
   const appVersion = "1.0.0";
+  const [fitnessDisclaimerModalVisible, setFitnessDisclaimerModalVisible] = useState(false);
+  const [nonMedicalNoticeModalVisible, setNonMedicalNoticeModalVisible] = useState(false);
   
   const handleGoBack = () => {
     if (onClose) {
@@ -564,6 +568,49 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           </TouchableOpacity>
         </View>
         
+        {/* Legal Information Section */}
+        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
+          <Text style={[styles.sectionTitle, {color: theme.text}]}>Legal Information</Text>
+          
+          {/* Fitness Disclaimer */}
+          <TouchableOpacity 
+            style={styles.settingItem} 
+            onPress={() => setFitnessDisclaimerModalVisible(true)}
+          >
+            <View style={styles.settingContent}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                <Ionicons name="fitness-outline" size={22} color={theme.accent} />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.settingTitle, {color: theme.text}]}>Fitness Disclaimer</Text>
+                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
+                  View important health and safety information
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+          </TouchableOpacity>
+          
+          {/* Non-Medical Notice */}
+          <TouchableOpacity 
+            style={[styles.settingItem, styles.lastItem]} 
+            onPress={() => setNonMedicalNoticeModalVisible(true)}
+          >
+            <View style={styles.settingContent}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                <Ionicons name="information-circle-outline" size={22} color={theme.accent} />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.settingTitle, {color: theme.text}]}>Non-Medical Notice</Text>
+                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
+                  Information regarding wellness content
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+          </TouchableOpacity>
+        </View>
+        
         {/* Developer Section - Only visible in development mode */}
         {__DEV__ && (
           <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
@@ -853,6 +900,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
         onSubscribe={handleSubscriptionComplete}
+      />
+      
+      {/* Fitness Disclaimer Modal */}
+      <FitnessDisclaimer
+        visible={fitnessDisclaimerModalVisible}
+        onAccept={() => setFitnessDisclaimerModalVisible(false)}
+        viewOnly={true}
+      />
+      
+      {/* Non-Medical Notice Modal */}
+      <NonMedicalNotice
+        isModal={true}
+        visible={nonMedicalNoticeModalVisible}
+        onAcknowledge={() => setNonMedicalNoticeModalVisible(false)}
       />
     </SafeAreaView>
   );
@@ -1261,6 +1322,55 @@ const styles = StyleSheet.create({
     padding: 10,
     marginRight: 10,
     borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  legalModalContainer: {
+    flex: 1,
+    marginTop: 60,
+    marginBottom: 40,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  legalModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  legalModalCloseButton: {
+    padding: 8,
+  },
+  legalModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  legalModalContent: {
+    flex: 1,
+  },
+  legalContentWrapper: {
+    padding: 20,
+  },
+  legalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  legalText: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  helperDemoCard: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
 });

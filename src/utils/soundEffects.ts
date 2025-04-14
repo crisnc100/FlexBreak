@@ -2,7 +2,7 @@ import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types
-type SoundEffect = 'success' | 'failure' | 'start' | 'complete' | 'levelUp' | 'click' | 'timerTick' | 'streakFreeze' | 'xpBoost' | 'intro' | 'premiumUnlocked';
+type SoundEffect = 'success' | 'failure' | 'start' | 'complete' | 'levelUp' | 'click' | 'timerTick' | 'streakFreeze' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge';
 
 // Define the cache to store loaded sounds
 const soundCache: Record<SoundEffect, Audio.Sound | null> = {
@@ -16,7 +16,8 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   streakFreeze: null,
   xpBoost: null,
   intro: null,
-  premiumUnlocked: null
+  premiumUnlocked: null,
+  redeemingChallenge: null
 };
 
 // Sound settings key in AsyncStorage
@@ -37,7 +38,8 @@ const soundUris: Record<SoundEffect, any> = {
   streakFreeze: require('../../assets/sounds/freeze_xboost.mp3'),
   xpBoost: require('../../assets/sounds/freeze_xboost.mp3'),
   intro: require('../../assets/sounds/intro2.mp3'),
-  premiumUnlocked: require('../../assets/sounds/unlockedPremium.mp3')
+  premiumUnlocked: require('../../assets/sounds/unlockedPremium.mp3'),
+  redeemingChallenge: require('../../assets/sounds/redeemingChallenge.mp3')
 };
 
 /**
@@ -180,9 +182,6 @@ export const playLevelUpSound = async (): Promise<void> => {
 };
 
 /**
-
-
-/**
  * Play timer tick sound - for countdown timers
  */
 export const playTimerTickSound = async (): Promise<void> => {
@@ -249,6 +248,13 @@ export const playSlowIntroSound = async (): Promise<void> => {
  */
 export const playPremiumUnlockedSound = async (): Promise<void> => {
   await playSound('premiumUnlocked', 1.0);
+};
+
+/**
+ * Play challenge redeeming sound with reduced volume
+ */
+export const playRedeemingChallengeSound = async (): Promise<void> => {
+  await playSound('redeemingChallenge', 0.4); // Use lower volume (40%)
 };
 
 /**

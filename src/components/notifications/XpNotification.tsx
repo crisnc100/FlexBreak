@@ -34,17 +34,17 @@ const XpNotification: React.FC<XpNotificationProps> = ({
       easing: Easing.out(Easing.ease)
     }).start();
     
-    // Auto dismiss after 3 seconds
+    // Auto dismiss after 2 seconds
     const timer = setTimeout(() => {
       Animated.timing(animation, {
         toValue: 0,
-        duration: 300,
+        duration: 200,
         useNativeDriver: true,
         easing: Easing.in(Easing.ease)
       }).start(() => {
         onDismiss();
       });
-    }, 3000);
+    }, 2000);
     
     return () => clearTimeout(timer);
   }, []);

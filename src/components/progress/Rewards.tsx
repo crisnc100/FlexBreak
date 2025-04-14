@@ -197,10 +197,16 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
         break;
         
       case 'desk_break_boost':
+        Alert.alert(
+          reward.title, // e.g., "Desk Break Boost"
+          `${reward.description} Try it now in homescreen.`,
+          [{ text: 'OK' }]
+        );
+        break;
       case 'focus_area_mastery':
         Alert.alert(
-          reward.title,
-          `${reward.description} This feature will be available soon!`,
+          reward.title, // e.g., "Focus Area Mastery"
+          `${reward.description} Available in its own tab next to favorites.`,
           [{ text: 'OK' }]
         );
         break;

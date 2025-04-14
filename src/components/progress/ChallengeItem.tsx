@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Animated } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import * as xpBoostManager from '../../utils/progress/modules/xpBoostManager';
+import * as soundEffects from '../../utils/soundEffects';
 
 interface ChallengeItemProps {
   challenge: Challenge;
@@ -90,6 +91,9 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
       const result = await claimChallenge(challenge.id);
       
       if (result.success) {
+        // Play the redeeming challenge sound effect at reduced volume
+        soundEffects.playRedeemingChallengeSound();
+        
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         // Play highlight animation first

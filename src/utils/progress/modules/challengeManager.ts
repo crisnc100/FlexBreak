@@ -198,6 +198,73 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         }
         break;
         
+      case 'time_of_day':
+        // Get the time range from the challenge data
+        const timeRange = challenge.timeRange || { start: 0, end: 24 };
+        
+        // Check if we have enough routines within the specified time range
+        challenge.progress = checkTimeSpecificRoutines(allRoutines, timeRange);
+        
+        console.log(`Time of day challenge "${challenge.title}": ${challenge.progress}/${challenge.requirement} routines within time range ${timeRange.start}-${timeRange.end}`);
+        break;
+
+      case 'morning_streak':
+        // Get the time range for morning routines
+        const morningTimeRange = challenge.timeRange || { start: 5, end: 10 };
+        
+        // Group routines by date to check for consecutive days
+        const morningRoutinesByDay = {};
+        
+        // Find all morning routines
+        allRoutines.forEach(routine => {
+          if (!routine.date) return;
+          
+          const routineDate = new Date(routine.date);
+          const routineHour = routineDate.getHours();
+          
+          // Check if routine is within the morning time range
+          if (routineHour >= morningTimeRange.start && routineHour < morningTimeRange.end) {
+            const dateString = dateUtils.toDateString(routineDate);
+            morningRoutinesByDay[dateString] = (morningRoutinesByDay[dateString] || 0) + 1;
+          }
+        });
+        
+        // Get dates with morning routines, sorted chronologically
+        const datesWithMorningRoutines = Object.keys(morningRoutinesByDay).sort();
+        
+        // Find the longest streak of consecutive dates
+        let currentStreak = 0;
+        let maxStreak = 0;
+        
+        for (let i = 0; i < datesWithMorningRoutines.length; i++) {
+          if (i === 0) {
+            // First date in the sequence
+            currentStreak = 1;
+          } else {
+            // Check if consecutive with previous date
+            const currentDate = new Date(datesWithMorningRoutines[i]);
+            const prevDate = new Date(datesWithMorningRoutines[i-1]);
+            
+            // Calculate difference in days
+            const diffTime = currentDate.getTime() - prevDate.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 1) {
+              // Consecutive day
+              currentStreak++;
+            } else {
+              // Break in streak
+              currentStreak = 1;
+            }
+          }
+          
+          maxStreak = Math.max(maxStreak, currentStreak);
+        }
+        
+        challenge.progress = maxStreak;
+        console.log(`Morning streak challenge "${challenge.title}": ${challenge.progress}/${challenge.requirement} consecutive days with morning routines`);
+        break;
+        
       case 'daily_minutes':
         // Basic total minutes challenge
         challenge.progress = stats.totalMinutes || 0;
@@ -298,6 +365,27 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
           // Fall back to current streak as a proxy if calculation fails
           challenge.progress = Math.min(7, stats.currentStreak || 0);
         }
+        break;
+        
+      case 'weekend_days':
+        // For weekend warrior challenge - count routines completed on Saturday and Sunday
+        const weekendDays = new Set();
+        
+        allRoutines.forEach(routine => {
+          if (!routine.date) return;
+          
+          const routineDate = new Date(routine.date);
+          const dayOfWeek = routineDate.getDay();
+          
+          // 0 = Sunday, 6 = Saturday
+          if (dayOfWeek === 0 || dayOfWeek === 6) {
+            // Add the day to our set (0 or 6)
+            weekendDays.add(dayOfWeek);
+          }
+        });
+        
+        challenge.progress = weekendDays.size;
+        console.log(`Weekend warrior challenge: ${challenge.progress}/${challenge.requirement} weekend days with routines`);
         break;
         
       case 'area_variety':

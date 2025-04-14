@@ -7,12 +7,15 @@ import {
   Easing,
   Dimensions,
   StatusBar,
-  TouchableOpacity
+  TouchableOpacity,
+  Platform,
+  Vibration
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as soundEffects from '../../utils/soundEffects';
 import * as streakManager from '../../utils/progress/modules/streakManager';
+import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,6 +26,60 @@ interface SplashScreenProps {
   isMissedStreak?: boolean;
   onSaveStreak?: () => void;
 }
+
+// Helper function for haptic feedback
+const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error') => {
+  try {
+    // Use expo-haptics when available (most devices)
+    if (Platform.OS === 'ios') {
+      switch (type) {
+        case 'light':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case 'medium':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          break;
+        case 'heavy':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          break;
+        case 'success':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+        case 'warning':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          break;
+        case 'error':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          break;
+      }
+    } else if (Platform.OS === 'android') {
+      // Android pattern durations
+      switch (type) {
+        case 'light':
+          Vibration.vibrate(10);
+          break;
+        case 'medium':
+          Vibration.vibrate(20);
+          break;
+        case 'heavy':
+          Vibration.vibrate(30);
+          break;
+        case 'success':
+          Vibration.vibrate([0, 50, 50, 50]);
+          break;
+        case 'warning':
+          Vibration.vibrate([0, 50, 100, 50]);
+          break;
+        case 'error':
+          Vibration.vibrate([0, 50, 30, 50, 30, 50]);
+          break;
+      }
+    }
+  } catch (error) {
+    // Fallback to basic vibration if haptics fail
+    Vibration.vibrate(15);
+  }
+};
 
 const SplashScreen: React.FC<SplashScreenProps> = ({
   onComplete,
@@ -72,6 +129,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
 
   // Start animations when component mounts
   useEffect(() => {
+    // Provide a gentle haptic feedback on app startup
+    setTimeout(() => {
+      triggerHaptic('medium');
+    }, 100);
+
     // Intro animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -148,6 +210,17 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
     });
   };
 
+  // If onSaveStreak is included, add haptic feedback there too
+  const handleSaveStreak = () => {
+    // Provide confirmation haptic feedback
+    triggerHaptic('success');
+    
+    // Call the provided handler
+    if (onSaveStreak) {
+      onSaveStreak();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -206,6 +279,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
             <Text style={styles.streakText}>New Streak Starting</Text>
           </View>
         )}
+        
+    
         
         <View style={styles.levelContainer}>
           <Ionicons name="trophy" size={20} color="#FFD700" />

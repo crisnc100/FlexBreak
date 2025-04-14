@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -25,6 +25,7 @@ import * as streakManager from './src/utils/progress/modules/streakManager';
 import StreakFreezePrompt from './src/components/notifications/StreakFreezePrompt';
 import * as rewardManager from './src/utils/progress/modules/rewardManager';
 import { useFeatureAccess } from './src/hooks/progress/useFeatureAccess';
+import { useGamification, gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT } from './src/hooks/progress/useGamification';
 import * as soundEffects from './src/utils/soundEffects';
 import IntroManager from './src/components/intro/IntroManager';
 import * as streakValidator from './src/utils/progress/modules/streakValidator';
@@ -83,15 +84,41 @@ const TabNavigator = () => {
   const { canAccessFeature } = useFeatureAccess();
   const [hasPlaylistAccess, setHasPlaylistAccess] = useState(false);
   
-  // Check if user has access to playlists feature
+  // Check if user has access to playlists feature - using useCallback to memoize
+  const checkPlaylistAccess = useCallback(async () => {
+    console.log('Checking playlist access...');
+    const hasAccess = await rewardManager.isRewardUnlocked('focus_area_mastery');
+    console.log(`Playlist access check result: ${hasAccess}`);
+    setHasPlaylistAccess(isPremium && hasAccess);
+  }, [isPremium]);
+  
+  // Initial check for playlist access
   useEffect(() => {
-    const checkPlaylistAccess = async () => {
-      const hasAccess = await rewardManager.isRewardUnlocked('focus_area_mastery');
-      setHasPlaylistAccess(isPremium && hasAccess);
+    checkPlaylistAccess();
+  }, [checkPlaylistAccess]);
+  
+  // Listen for level up and reward unlocked events to refresh playlist access
+  useEffect(() => {
+    const handleLevelUp = () => {
+      console.log('LEVEL_UP_EVENT received in TabNavigator, refreshing playlist access...');
+      checkPlaylistAccess();
     };
     
-    checkPlaylistAccess();
-  }, [isPremium]);
+    const handleRewardUnlocked = () => {
+      console.log('REWARD_UNLOCKED_EVENT received in TabNavigator, refreshing playlist access...');
+      checkPlaylistAccess();
+    };
+    
+    // Add event listeners from the gamification system
+    gamificationEvents.on(LEVEL_UP_EVENT, handleLevelUp);
+    gamificationEvents.on(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
+    
+    // Clean up event listeners
+    return () => {
+      gamificationEvents.off(LEVEL_UP_EVENT, handleLevelUp);
+      gamificationEvents.off(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
+    };
+  }, [checkPlaylistAccess]);
   
   const tabBarStyle = {
     backgroundColor: theme.cardBackground,

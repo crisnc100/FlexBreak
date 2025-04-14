@@ -37,6 +37,10 @@ export const KEYS = {
     USER_SETTINGS: '@userSettings',
     CUSTOM_ROUTINES: '@customRoutines',
     ROUTINE_HISTORY: '@routineHistory',
+  },
+  USER_AGREEMENTS: {
+    FITNESS_DISCLAIMER_ACCEPTED: 'fitness_disclaimer_accepted',
+    NON_MEDICAL_NOTICE_SHOWN: 'non_medical_notice_shown',
   }
 };
 
@@ -749,7 +753,8 @@ export const clearAllData = async (): Promise<boolean> => {
       ...Object.values(KEYS.ROUTINES),
       ...Object.values(KEYS.SETTINGS),
       ...Object.values(KEYS.UI),
-      ...Object.values(KEYS.CUSTOM)
+      ...Object.values(KEYS.CUSTOM),
+      ...Object.values(KEYS.USER_AGREEMENTS)
     ];
     
     // Explicitly add routine data keys to ensure they get cleared

@@ -142,28 +142,19 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
   
   // Start progress animation
   const startProgressAnimation = () => {
-    setProgressPulse(true);
-    Animated.sequence([
-      Animated.timing(progressAnim, {
-        toValue: 1,
-        duration: 1000,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: false
-      }),
-      Animated.timing(progressAnim, {
-        toValue: 0.6,
-        duration: 700,
-        easing: Easing.in(Easing.ease),
-        useNativeDriver: false
-      })
-    ]).start(() => {
-      setTimeout(() => {
-        setProgressPulse(false);
-      }, 3000);
-    });
+    // Simple progress animation without pulsing
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 800,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false
+    }).start();
+    
+    // Set progressPulse to false as we're removing this effect
+    setProgressPulse(false);
   };
   
-  // Handle milestone tap
+  // Handle milestone tap - simplify animation for better performance
   const handleMilestoneTap = (milestone: number, isCompleted: boolean, isCurrent: boolean) => {
     // Don't animate if tapping on an already focused milestone
     if (focusedMilestone === milestone) {
@@ -188,21 +179,20 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
       triggerHaptic('light');
     }
     
-    // Animate the tap effect
-    Animated.sequence([
-      Animated.timing(tapAnimations[milestone], {
-        toValue: 1.5,
-        duration: 200,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true
-      }),
+    // Simple scale animation
+    Animated.timing(tapAnimations[milestone], {
+      toValue: 1.3,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true
+    }).start(() => {
       Animated.timing(tapAnimations[milestone], {
         toValue: 1,
         duration: 200,
-        easing: Easing.in(Easing.bounce),
+        easing: Easing.inOut(Easing.ease),
         useNativeDriver: true
-      })
-    ]).start();
+      }).start();
+    });
     
     // If this is the current goal, also animate the progress bar
     if (isCurrent) {
@@ -291,8 +281,8 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
     { days: 3, label: "3" },
     { days: 7, label: "WEEK" },
     { days: 14, label: "14" },
-    { days: 30, label: "MONTH" },
-    { days: 90, label: "90" },
+    { days: 30, label: "30D" },
+    { days: 90, label: "90D" },
     { days: 180, label: "180" },
     { days: 365, label: "YEAR" }
   ];
@@ -514,19 +504,9 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
                         style={[
                           styles.progressLine,
                           {
-                            backgroundColor: progressPulse 
-                              ? progressAnim.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: ['#FF9800', '#FFC107']
-                                })
-                              : (isDark ? '#FFB74D' : '#FF9800'),
-                            width: progressPulse 
-                              ? progressAnim.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [`${progress * 100}%`, `${(progress * 100) + 5}%`]
-                                })
-                              : `${progress * 100}%`,
-                            shadowOpacity: progressPulse ? 0.8 : 0
+                            backgroundColor: isDark ? '#FFB74D' : '#FF9800',
+                            width: `${progress * 100}%`,
+                            shadowOpacity: 0.4
                           }
                         ]}
                       />
@@ -566,10 +546,10 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
                 fontWeight: '600'
               }]}>
                 {focusedMilestone <= streak 
-                  ? `${focusedMilestone} day milestone achieved!` 
+                  ? `${focusedMilestone}-day streak achieved!` 
                   : focusedMilestone === nextMilestone?.days
-                    ? `${daysToNextMilestone} more day${daysToNextMilestone !== 1 ? 's' : ''} to reach ${focusedMilestone}!`
-                    : `${focusedMilestone - streak} more days to reach ${focusedMilestone}`
+                    ? `${daysToNextMilestone} day${daysToNextMilestone !== 1 ? 's' : ''} until ${focusedMilestone}-day streak`
+                    : `${focusedMilestone - streak} more days to reach ${focusedMilestone}-day streak`
                 }
               </Text>
             </View>
@@ -717,13 +697,14 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     paddingVertical: 10, // Makes tap target larger
+    marginHorizontal: 2, // Add a bit of space between milestone containers
   },
   dotContainer: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 20,
-    width: 20,
+    height: 24,
+    width: 24,
     marginBottom: 6,
   },
   glowDot: {
@@ -743,9 +724,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   milestoneLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '500',
     marginTop: 4,
+    textAlign: 'center',
+    width: 36, // Wider fixed width to fit text labels
+    flexShrink: 0, // Prevent text from shrinking/wrapping
   },
   lineContainer: {
     position: 'absolute',
@@ -811,10 +795,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     marginTop: 4,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   focusedMilestoneText: {
     fontSize: 13,
     marginLeft: 8,
+    flexShrink: 1,
   },
   closeFocusButton: {
     marginTop: 10,

@@ -284,6 +284,9 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       // Also get the new streak status format for proper data
       const newStatus = await streakManager.getStreakStatus();
       
+      // Check if streak is truly broken by checking the last 3 days
+      const isTrulyBroken = await streakManager.isStreakBroken();
+      
       // Cache the result
       streakStatusCache.current = {
         lastChecked: now,
@@ -293,15 +296,18 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       
       // Update UI based on legacy status
       setIsStreakBroken(status.streakBroken);
-      setCanSaveStreak(status.canSaveYesterdayStreak);
       
-      // Start animations if streak is at risk
-      if (status.streakBroken && !recentlySaved) {
+      // Only allow saving if it's technically savable AND we haven't missed more than 2 days
+      // This prevents users from thinking they can apply a freeze after a long absence
+      setCanSaveStreak(status.canSaveYesterdayStreak && !isTrulyBroken);
+      
+      // Start animations only if streak can actually be saved
+      if (status.streakBroken && !recentlySaved && status.canSaveYesterdayStreak && !isTrulyBroken) {
         startPulseAnimation();
         startRotateAnimation();
       }
       
-      console.log(`StreakFreezeCard: Retrieved streak status: ${status.streakBroken ? 'BROKEN' : 'ACTIVE'}, streak=${newStatus.currentStreak}`);
+      console.log(`StreakFreezeCard: Retrieved streak status: ${status.streakBroken ? 'BROKEN' : 'ACTIVE'}, streak=${newStatus.currentStreak}, truly broken=${isTrulyBroken}`);
     } catch (error) {
       console.error('Error checking streak status in StreakFreezeCard:', error);
     }
@@ -644,9 +650,15 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
               Missing a day won't break your streak! Your streak freezes reset at the beginning of each month.
             </Text>
             
-            {currentStreak >= 1 && (
+            {currentStreak >= 1 && !isStreakBroken && (
               <Text style={[styles.streakText, { color: isDark ? '#81C784' : '#4CAF50' }]}>
                 Current streak: {currentStreak} days
+              </Text>
+            )}
+            
+            {currentStreak >= 1 && isStreakBroken && (
+              <Text style={[styles.streakText, { color: isDark ? '#FF5722' : '#FF5722', fontStyle: 'italic' }]}>
+                Previous streak: {currentStreak} days (inactive)
               </Text>
             )}
             
@@ -676,6 +688,15 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
                 <Ionicons name="alert-circle-outline" size={18} color={isDark ? '#FFB74D' : '#FF9800'} style={{ marginRight: 6 }} />
                 <Text style={[styles.warningText, { color: isDark ? '#FFB74D' : '#FF9800' }]}>
                   Streak reset: You missed 2+ days. Streak freezes only work for 1-day gaps.
+                </Text>
+              </View>
+            )}
+            
+            {isStreakBroken && !canSaveStreak && currentStreak > 0 && (
+              <View style={styles.warningContainer}>
+                <Ionicons name="alert-circle-outline" size={18} color={isDark ? '#FF5722' : '#FF5722'} style={{ marginRight: 6 }} />
+                <Text style={[styles.warningText, { color: isDark ? '#FF5722' : '#FF5722' }]}>
+                  Streak broken: It's been more than 2 days since your last activity. Your streak will reset when you next complete a routine.
                 </Text>
               </View>
             )}

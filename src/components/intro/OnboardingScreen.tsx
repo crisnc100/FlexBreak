@@ -10,12 +10,15 @@ import {
   Platform,
   GestureResponderEvent,
   PanResponder,
-  Easing
+  Easing,
+  Vibration
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as soundEffects from '../../utils/soundEffects';
+import * as Haptics from 'expo-haptics';
+import FitnessDisclaimer, { checkDisclaimerAccepted } from '../notices/FitnessDisclaimer';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,9 +26,64 @@ interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
+// Helper function for haptic feedback that gracefully falls back
+const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error') => {
+  try {
+    // Use expo-haptics when available (most devices)
+    if (Platform.OS === 'ios') {
+      switch (type) {
+        case 'light':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case 'medium':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          break;
+        case 'heavy':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          break;
+        case 'success':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+        case 'warning':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          break;
+        case 'error':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          break;
+      }
+    } else if (Platform.OS === 'android') {
+      // Android pattern durations
+      switch (type) {
+        case 'light':
+          Vibration.vibrate(10);
+          break;
+        case 'medium':
+          Vibration.vibrate(20);
+          break;
+        case 'heavy':
+          Vibration.vibrate(30);
+          break;
+        case 'success':
+          Vibration.vibrate([0, 50, 50, 50]);
+          break;
+        case 'warning':
+          Vibration.vibrate([0, 50, 100, 50]);
+          break;
+        case 'error':
+          Vibration.vibrate([0, 50, 30, 50, 30, 50]);
+          break;
+      }
+    }
+  } catch (error) {
+    // Fallback to basic vibration if haptics fail
+    Vibration.vibrate(15);
+  }
+};
+
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [showLoader, setShowLoader] = useState(false);
+  const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const autoAdvanceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -182,6 +240,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     // Don't advance beyond the last page
     if (currentPage >= pages.length - 1) return;
     
+    // Provide haptic feedback
+    triggerHaptic('light');
+    
     // Play click sound when changing pages
     soundEffects.playClickSound();
     
@@ -218,6 +279,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     // Don't go back from first page
     if (currentPage <= 0) return;
     
+    // Provide haptic feedback
+    triggerHaptic('light');
+    
     // Play click sound when changing pages
     soundEffects.playClickSound();
     
@@ -250,8 +314,22 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     });
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // Provide haptic feedback
+    triggerHaptic('medium');
+    
     soundEffects.playClickSound();
+    
+    // Check if disclaimer has been accepted
+    const isDisclaimerAccepted = await checkDisclaimerAccepted();
+    
+    if (!isDisclaimerAccepted) {
+      // Show disclaimer modal if not yet accepted
+      setShowDisclaimerModal(true);
+      return;
+    }
+    
+    // If disclaimer is accepted, proceed with completion
     handleComplete();
   };
 
@@ -266,7 +344,19 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     });
   };
 
-  const handleStartStretching = () => {
+  const handleStartStretching = async () => {
+    // Provide haptic feedback - stronger for main action
+    triggerHaptic('success');
+    
+    // Check if disclaimer has been accepted
+    const isDisclaimerAccepted = await checkDisclaimerAccepted();
+    
+    if (!isDisclaimerAccepted) {
+      // Show disclaimer modal if not yet accepted
+      setShowDisclaimerModal(true);
+      return;
+    }
+    
     // Play intro sound when user clicks Start Stretching
     soundEffects.playIntroSound();
     
@@ -280,6 +370,23 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     setTimeout(() => {
       handleComplete();
     }, 1000); // Adjust timing to match the sound effect duration
+  };
+
+  // Handle disclaimer acceptance
+  const handleDisclaimerAccepted = () => {
+    // Provide haptic feedback for acceptance
+    triggerHaptic('success');
+    
+    setShowDisclaimerModal(false);
+    
+    // Proceed with the normal flow after acceptance
+    soundEffects.playIntroSound();
+    setShowLoader(true);
+    startLoadingAnimations();
+    
+    setTimeout(() => {
+      handleComplete();
+    }, 1000);
   };
 
   // Current page content
@@ -437,6 +544,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
           />
         ))}
       </View>
+      
+      {/* Fitness Disclaimer Modal */}
+      <FitnessDisclaimer
+        visible={showDisclaimerModal}
+        onAccept={handleDisclaimerAccepted}
+      />
     </View>
   );
 };
