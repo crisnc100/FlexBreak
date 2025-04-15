@@ -10,10 +10,10 @@ import { usePremium } from '../context/PremiumContext';
 import ThemePreview from '../components/ThemePreview';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { ThemedText, ThemedCard } from '../components/common';
-import GamificationSimulator, { runSimulations } from '../utils/progress/testing';
 import { Toast } from 'react-native-toast-notifications';
 import FitnessDisclaimer from '../components/notices/FitnessDisclaimer';
 import NonMedicalNotice from '../components/notices/NonMedicalNotice';
+import { TestingModal } from '../components/testing';
 
 const { width } = Dimensions.get('window');
 
@@ -76,6 +76,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const appVersion = "1.0.0";
   const [fitnessDisclaimerModalVisible, setFitnessDisclaimerModalVisible] = useState(false);
   const [nonMedicalNoticeModalVisible, setNonMedicalNoticeModalVisible] = useState(false);
+  const [testingModalVisible, setTestingModalVisible] = useState(false);
   
   const handleGoBack = () => {
     if (onClose) {
@@ -230,120 +231,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     );
   };
   
-  // Add a function to run simulations
-  const handleRunSimulations = async () => {
-    setIsRunningSimulation(true);
-    setTestResults([]);
-    
-    try {
-      // Capture console.log messages
-      const originalConsoleLog = console.log;
-      const logs: string[] = [];
-      
-      console.log = (...args) => {
-        // Call the original console.log
-        originalConsoleLog(...args);
-        
-        // Store the log
-        const log = args.map(arg => 
-          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-        ).join(' ');
-        
-        logs.push(log);
-        setTestResults(prev => [...prev, log]);
-      };
-      
-      // Run the simulations
-      await runSimulations();
-      
-      // Restore console.log
-      console.log = originalConsoleLog;
-    } catch (error) {
-      console.error('Error running simulations:', error);
-      setTestResults(prev => [...prev, `ERROR: ${error.message}`]);
-    } finally {
-      setIsRunningSimulation(false);
-    }
-  };
-
-  // Add a function to run a single test
-  const handleRunSingleTest = async (testType: string) => {
-    setIsRunningSimulation(true);
-    setTestResults([]);
-    
-    try {
-      // Capture console.log messages
-      const originalConsoleLog = console.log;
-      const logs: string[] = [];
-      
-      console.log = (...args) => {
-        // Call the original console.log
-        originalConsoleLog(...args);
-        
-        // Store the log
-        const log = args.map(arg => 
-          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-        ).join(' ');
-        
-        logs.push(log);
-        setTestResults(prev => [...prev, log]);
-      };
-      
-      // Create a simulator instance
-      const simulator = new GamificationSimulator();
-      await simulator.initialize(true);
-      
-      try {
-        // Run the selected test
-        switch (testType) {
-          case 'routine':
-            await simulator.simulateRoutine({
-              duration: 5,
-              area: 'Neck',
-              time: { hours: 10, minutes: 30 }
-            });
-            break;
-            
-          case 'streak':
-            await simulator.simulateStreak(3, {
-              routinesPerDay: 1,
-              claimAllChallenges: true
-            });
-            break;
-            
-          case 'daily':
-            await simulator.simulateDailyCycle({
-              routineCount: 2,
-              claimAllChallenges: true
-            });
-            break;
-            
-          case 'weekly':
-            // Simulate a week with one routine per day
-            for (let i = 0; i < 7; i++) {
-              await simulator.simulateDailyCycle({
-                skipToNextDay: i > 0,
-                routineCount: 1,
-                claimAllChallenges: true
-              });
-            }
-            break;
-        }
-      } finally {
-        // Always clean up the simulator
-        simulator.cleanup();
-      }
-      
-      // Restore console.log
-      console.log = originalConsoleLog;
-    } catch (error) {
-      console.error('Error running test:', error);
-      setTestResults(prev => [...prev, `ERROR: ${error.message}`]);
-    } finally {
-      setIsRunningSimulation(false);
-    }
-  };
-
+  
   return (
     <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
@@ -661,25 +549,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           {showTestingSection && (
             <View style={styles.testingContainer}>
               <Text style={[styles.sectionDescription, {color: theme.textSecondary}]}>
-                Gamification System Testing Tools
+                Use these tools to test app features and provide feedback to our development team.
               </Text>
-              
-
               
               <TouchableOpacity 
                 style={[
-                  styles.bobSimulatorButton,
-                  {backgroundColor: '#4CAF50', marginTop: 12}
+                  styles.testingButton,
+                  {backgroundColor: '#4A90E2', marginTop: 16}
                 ]}
-                onPress={() => navigation.navigate('BobSimulator')}
+                onPress={() => setTestingModalVisible(true)}
               >
-                <Ionicons name="person-outline" size={20} color="#FFF" style={styles.simulationButtonIcon} />
-                <Text style={styles.simulationButtonText}>Bob's Day-by-Day Simulator</Text>
+                <Ionicons name="clipboard-outline" size={20} color="#FFF" style={styles.buttonIcon} />
+                <Text style={styles.buttonText}>Access Testing Suite</Text>
               </TouchableOpacity>
               
-              <Text style={[styles.simulationDescription, {color: theme.textSecondary}]}>
-                Easily simulate day-by-day progression through the gamification system to test
-                level advancement, challenge completion, and reward unlocking.
+              <Text style={[styles.testDescription, {color: theme.textSecondary}]}>
+                Complete guided testing for core app features and provide structured feedback.
               </Text>
             </View>
           )}
@@ -914,6 +799,16 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         isModal={true}
         visible={nonMedicalNoticeModalVisible}
         onAcknowledge={() => setNonMedicalNoticeModalVisible(false)}
+      />
+      
+      {/* Testing Modal */}
+      <TestingModal 
+        visible={testingModalVisible}
+        onClose={() => setTestingModalVisible(false)}
+        navigateToPart2={() => {
+          setTestingModalVisible(false);
+          navigation.navigate('BobSimulator');
+        }}
       />
     </SafeAreaView>
   );
@@ -1372,6 +1267,90 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  welcomeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  testingCard: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  testCardHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  testCardText: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  testingHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 20,
+  },
+  testingChecklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  testingChecklistNumber: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  testingChecklistContent: {
+    flex: 1,
+  },
+  testingNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  testingTaskTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  testingTaskDesc: {
+    fontSize: 14,
+  },
+  feedbackCard: {
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  feedbackHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  feedbackText: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  testingButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  testDescription: {
+    marginBottom: 16,
   },
 });
 

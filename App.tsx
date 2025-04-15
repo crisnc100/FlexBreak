@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,7 +35,19 @@ let introSoundPlayed = false;
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
-const navigationRef = createNavigationContainerRef();
+
+// Define navigation types properly
+type RootStackParamList = {
+  MainTabs: undefined;
+  BobSimulator: {
+    fromTesting?: boolean;
+    testingAccessGranted?: boolean;
+    returnToTesting?: boolean;
+  } | undefined;
+};
+
+// Create a navigation ref that can be used outside of React components
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 // Configure notification behavior when app is in foreground
 Notifications.setNotificationHandler({
@@ -46,12 +58,34 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Helper function to navigate from outside a navigation component
-function navigate(name, params) {
+// Function to navigate from anywhere
+export function navigateFromAnywhere(name: keyof RootStackParamList, params?: any) {
   if (navigationRef.isReady()) {
-    // @ts-ignore: Ignore the type-checking error for now
     navigationRef.navigate(name, params);
+    console.log(`[Global Navigation] Navigating to ${name}`, params);
+  } else {
+    console.error('[Global Navigation] Navigation not initialized yet');
   }
+}
+
+// Function to force navigation by resetting the stack
+export function forceNavigate(name: keyof RootStackParamList, params?: any) {
+  if (navigationRef.isReady()) {
+    navigationRef.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name, params }],
+      })
+    );
+    console.log(`[Global Navigation] Force navigating to ${name}`, params);
+  } else {
+    console.error('[Global Navigation] Navigation not initialized yet');
+  }
+}
+
+// Helper function to navigate from outside a navigation component (for compatibility)
+function navigate(name: keyof RootStackParamList, params?: any) {
+  navigateFromAnywhere(name, params);
 }
 
 // Main entry point for the app
@@ -83,6 +117,26 @@ const TabNavigator = () => {
   const { isPremium } = usePremium();
   const { canAccessFeature } = useFeatureAccess();
   const [hasPlaylistAccess, setHasPlaylistAccess] = useState(false);
+  
+  // Check for reopen_settings flag
+  useEffect(() => {
+    const checkReopenSettings = async () => {
+      try {
+        const shouldReopenSettings = await AsyncStorage.getItem('@deskstretch:reopen_settings');
+        if (shouldReopenSettings === 'true') {
+          // Clear the flag to prevent it from re-opening again next time
+          await AsyncStorage.removeItem('@deskstretch:reopen_settings');
+          // Open settings modal
+          setSettingsModalVisible(true);
+          console.log('[TabNavigator] Auto-reopening settings from flag');
+        }
+      } catch (error) {
+        console.error('Error checking reopen_settings flag:', error);
+      }
+    };
+    
+    checkReopenSettings();
+  }, []);
   
   // Check if user has access to playlists feature - using useCallback to memoize
   const checkPlaylistAccess = useCallback(async () => {
@@ -199,7 +253,7 @@ const TabNavigator = () => {
           <SettingsScreen 
             navigation={{ 
               goBack: () => setSettingsModalVisible(false),
-              navigate: navigate 
+              navigate: navigateFromAnywhere 
             }}
             onClose={() => setSettingsModalVisible(false)}
           />

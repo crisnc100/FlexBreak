@@ -768,6 +768,18 @@ export const clearAllData = async (): Promise<boolean> => {
       '@challenges'
     );
     
+    // Define testing-related keys to preserve
+    const testingKeys = [
+      '@deskstretch:testing_phase',
+      '@deskstretch:testing_access',
+      '@deskstretch:bob_simulator_access',
+      '@deskstretch:testing_return_phase',
+      '@deskstretch:simulator_scenario',
+      '@deskstretch:testing_feedback',
+      'testing_access_granted',
+      'testing_current_stage'
+    ];
+    
     // Get all keys from AsyncStorage
     try {
       const allKeys = await AsyncStorage.getAllKeys();
@@ -776,9 +788,12 @@ export const clearAllData = async (): Promise<boolean> => {
       // Merge with our known keys list
       const uniqueKeys = [...new Set([...knownKeys, ...allKeys])] as string[];
       
-      // Clear all keys
-      await AsyncStorage.multiRemove(uniqueKeys);
-      console.log('All app data cleared successfully. Cleared keys:', uniqueKeys);
+      // Filter out testing keys
+      const keysToRemove = uniqueKeys.filter(key => !testingKeys.includes(key));
+      
+      // Clear all keys except testing keys
+      await AsyncStorage.multiRemove(keysToRemove);
+      console.log('App data cleared successfully, preserving testing data. Cleared keys:', keysToRemove);
       
       // Additional check - verify data has been cleared
       const routines = await getAllRoutines();
@@ -789,8 +804,9 @@ export const clearAllData = async (): Promise<boolean> => {
     } catch (innerError) {
       // If getAllKeys fails, fall back to our predefined list
       console.warn('Error getting all keys, falling back to predefined list:', innerError);
-      await AsyncStorage.multiRemove(knownKeys);
-      console.log('Cleared predefined keys:', knownKeys);
+      const keysToRemove = knownKeys.filter(key => !testingKeys.includes(key));
+      await AsyncStorage.multiRemove(keysToRemove);
+      console.log('Cleared predefined keys (preserving testing data):', keysToRemove);
     }
     
     // Re-initialize user progress with defaults

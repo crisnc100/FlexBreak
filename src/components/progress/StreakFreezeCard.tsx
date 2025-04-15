@@ -718,14 +718,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
               </View>
             )}
             
-            {!canSaveStreak && !isStreakBroken && hasTodayActivity && currentStreak > 0 && (
-              <View style={styles.newStreakContainer}>
-                <Ionicons name="refresh-circle-outline" size={18} color={isDark ? '#81C784' : '#4CAF50'} style={{ marginRight: 6 }} />
-                <Text style={[styles.newStreakText, { color: isDark ? '#81C784' : '#4CAF50' }]}>
-                  You've started a new streak today! Keep it going with daily routines.
-                </Text>
-              </View>
-            )}
+          
             
             {!canSaveStreak && !isStreakBroken && !hasTodayActivity && currentStreak > 0 && (
               <Text style={[styles.explainerText, { color: isDark ? theme.textSecondary : '#666' }]}>

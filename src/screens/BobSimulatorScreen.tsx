@@ -9,7 +9,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  Modal
+  Modal,
+  BackHandler
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -21,6 +22,19 @@ import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as dateUtils from '../utils/progress/modules/utils/dateUtils';
 import { CORE_CHALLENGES } from '../utils/progress/constants';
 import * as cacheUtils from '../utils/progress/modules/utils/cacheUtils';
+import { clearAllData } from '../services/storageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, CommonActions } from '@react-navigation/native';
+
+// Import our custom components
+import {
+  AuthModal,
+  DateSelectionModal,
+  StretchConfigModal,
+  ConfirmationModal,
+  SimulationResult,
+  StretchConfig
+} from '../components/simulator';
 
 // Constants
 const BOB_NAME = "Bob";
@@ -40,22 +54,103 @@ const BODY_AREAS = ['Neck', 'Lower Back', 'Upper Back & Chest', 'Shoulders & Arm
 const DURATION_TYPES = ['5', '10', '15'];
 const DIFFICULTY_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 
-const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
+const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any }) => {
   const { theme, isDark } = useTheme();
+  
+  // Check if coming from testing flow
+  const fromTesting = route.params?.fromTesting === true;
+  const testingAccessGranted = route.params?.testingAccessGranted === true;
+  const returnToTesting = route.params?.returnToTesting === true;
+  
+  // Get scenario data if provided
+  const scenarioData = route.params?.scenarioData;
+  
+  // State for scenario instructions
+  const [scenarioInstructions, setScenarioInstructions] = useState<{
+    id: string;
+    title: string;
+    setup: string;
+    verification: string[];
+  } | null>(null);
+  
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(fromTesting && testingAccessGranted);
+  const [showAuthModal, setShowAuthModal] = useState(!fromTesting || !testingAccessGranted);
+  
+  // Add new state variables for improved simulation
+  const [lastBatchEndDate, setLastBatchEndDate] = useState<Date | null>(null);
+  const [lastConfig, setLastConfig] = useState<StretchConfig | null>(null);
+  const [lastSimulatedDate, setLastSimulatedDate] = useState<Date | null>(null);
+  const [consecutiveDaysCount, setConsecutiveDaysCount] = useState<number>(0);
+  
+  // Check if we have authentication from testing flow stored in AsyncStorage
+  useEffect(() => {
+    const checkTestingAccess = async () => {
+      try {
+        const testingAccess = await AsyncStorage.getItem('@deskstretch:bob_simulator_access');
+        if (testingAccess === 'true') {
+          setIsAuthenticated(true);
+          setShowAuthModal(false);
+        }
+      } catch (error) {
+        console.error('Error checking simulator access:', error);
+      }
+    };
+    
+    // Only check if we're not already authenticated from route params
+    if (!isAuthenticated) {
+      checkTestingAccess();
+    }
+  }, [isAuthenticated]);
+  
+  // Load scenario data when the component mounts
+  useEffect(() => {
+    const loadScenarioData = async () => {
+      // Check for scenario data in route params
+      if (scenarioData) {
+        setScenarioInstructions({
+          id: scenarioData.scenarioId || '',
+          title: scenarioData.scenarioTitle || '',
+          setup: scenarioData.scenarioSetup || '',
+          verification: scenarioData.scenarioVerification || []
+        });
+      } else {
+        // Check for scenario data in AsyncStorage as fallback
+        try {
+          const storedScenario = await AsyncStorage.getItem('@deskstretch:simulator_scenario');
+          if (storedScenario) {
+            const parsedScenario = JSON.parse(storedScenario);
+            setScenarioInstructions(parsedScenario);
+          }
+        } catch (error) {
+          console.error('Error loading scenario data:', error);
+        }
+      }
+    };
+    
+    if (fromTesting && isAuthenticated) {
+      loadScenarioData();
+    }
+  }, [fromTesting, isAuthenticated, scenarioData]);
   
   // Bob's user progress
   const [bobProgress, setBobProgress] = useState<any>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Simulation date and time
-  const [currentDate, setCurrentDate] = useState<Date>(() => {
-    // Get the actual current date instead of a hardcoded date
-    const today = new Date();
-    console.log(`Initial simulation date set to today: ${today.toISOString()}`);
-    return today;
-  });
-  const [selectedDuration, setSelectedDuration] = useState(10);
+  // Modal visibility states
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showBatchConfigModal, setShowBatchConfigModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  
+  // Simulation state
+  const [simulatedDates, setSimulatedDates] = useState<string[]>([]);
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  
+  // Simulation results
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
   
   // Current stats to display
   const [stats, setStats] = useState({
@@ -82,10 +177,12 @@ const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
   // Add a state for difficulty selection
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('Beginner');
   
-  // Initialize Bob's progress
+  // Initialize Bob's progress when authenticated
   useEffect(() => {
+    if (isAuthenticated && !isInitialized) {
     initializeBob();
-  }, []);
+    }
+  }, [isAuthenticated, isInitialized]);
   
   // Add log entry with current date
   const addLog = (message: string) => {
@@ -124,8 +221,10 @@ const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
       freshProgress.level = 1;
       freshProgress.hasReceivedWelcomeBonus = false;
       
-      // Override Date for simulation
-      patchDateForSimulation(currentDate);
+      // Override Date for simulation if a specific date is selected
+      if (selectedDate) {
+        patchDateForSimulation(selectedDate);
+      }
       
       // Save fresh progress
       await storageService.saveUserProgress(freshProgress);
@@ -239,6 +338,9 @@ const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
     const newDate = new Date();
     const realDate = (Date as any).getRealCurrentDate();
     console.log(`Simulation date: ${newDate.toLocaleDateString()}, Real date: ${realDate.toLocaleDateString()}`);
+    
+    // Set the current date for the component state
+    setCurrentDate(targetDate);
   };
   
   // Refresh Bob's stats
@@ -259,397 +361,287 @@ const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
     return progress;
   };
   
-  // Add a method to make handleNextDay also check for challenge cycles
-  const handleNextDay = async () => {
-    const nextDate = new Date(currentDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    setCurrentDate(nextDate);
+  // Handle simulation for a single day
+  const handleSingleDaySimulation = async (config: StretchConfig) => {
+    if (!selectedDate) {
+      Alert.alert('Error', 'No date selected for simulation');
+      return;
+    }
     
-    // Update the simulated date
-    patchDateForSimulation(nextDate);
+    setIsLoading(true);
     
-    // Get the current state before the day change
-    const prevDateString = currentDate.toISOString().split('T')[0];
-    
-    // Log the change
-    addLog(`Advanced to ${nextDate.toLocaleDateString()}`);
-    
-    // Check for day/week/month transitions to refresh challenges
     try {
-      setIsLoading(true);
+      // Use the selected date for simulation
+      patchDateForSimulation(selectedDate);
       
-      const newDateString = nextDate.toISOString().split('T')[0];
-      const progress = await storageService.getUserProgress();
+      // Get initial state for comparison
+      const initialProgress = await storageService.getUserProgress();
+      const initialXP = initialProgress.totalXP || 0;
+      const initialStreak = initialProgress.statistics?.currentStreak || 0;
       
-      // Check for day change
-      if (prevDateString !== newDateString) {
-        // Update the streak info in the progress statistics
-        if (progress.statistics) {
-          // Only update streak info if there's an actual streak to track
-          if (progress.statistics.totalRoutines > 0) {
-            // Check if there was an activity in the previous day (to maintain streak)
-            const hadActivityYesterday = await hadActivityOnDate(prevDateString, progress);
-            
-            if (hadActivityYesterday) {
-              // Maintain streak
-              addLog(`🔥 Streak maintained: ${progress.statistics.currentStreak} day(s)`);
-            } else {
-              // Reset streak
-              progress.statistics.currentStreak = 0;
-              addLog(`❄️ Streak reset: No activity on ${prevDateString}`);
-            }
-            
-            // Update the last updated date
-            progress.statistics.lastUpdated = new Date().toISOString();
-            
-            // Save the updated statistics
-            await storageService.saveUserProgress(progress);
-          }
-        }
-        
-        // Check if a new week started (Monday = 1)
-        const isNewWeek = 
-          (currentDate.getDay() !== 1 && nextDate.getDay() === 1) || 
-          (nextDate.getDate() === 1 && nextDate.getDay() === 1);
-          
-        // Check if a new month started
-        const isNewMonth = currentDate.getMonth() !== nextDate.getMonth();
-        
-        // Always check for challenges updates on day change
-        const completedChallenges = await challengeManager.updateUserChallenges(progress);
-        
-        // Log completed challenges
-        if (completedChallenges.length > 0) {
-          addLog(`Completed ${completedChallenges.length} challenges with the day change`);
-          completedChallenges.forEach(challenge => {
-            addLog(`  ✅ Completed: ${challenge.title}`);
-          });
-        }
-        
-        if (isNewWeek) {
-          addLog(`📅 New week started. Weekly challenges updated.`);
-          // Weekly challenges are handled by updateUserChallenges
-        }
-        
-        if (isNewMonth) {
-          addLog(`📅 New month started. Monthly challenges updated.`);
-          // Monthly challenges are handled by updateUserChallenges
-        }
-        
-        // Save updated progress
-        await storageService.saveUserProgress(progress);
-        
-        // Update stats
-        await refreshBobStats();
+      // Create the routine with proper types
+      const routine = {
+        id: `simulated-stretch-${Date.now()}`,
+        date: new Date().toISOString(),
+        duration: config.duration.toString() as any,
+        area: config.bodyArea as any,
+        difficulty: config.difficulty as any,
+        stretches: ["Neck Rotation", "Shoulder Stretch"], // Placeholder stretches
+        status: "completed"
+      } as any;
+      
+      // Process the routine
+      console.log(`Processing simulated routine for ${selectedDate.toLocaleDateString()}`);
+      const result = await gamificationManager.processCompletedRoutine(routine);
+      
+      // Calculate XP gained
+      const afterProgress = await storageService.getUserProgress();
+      const xpGained = afterProgress.totalXP - initialXP;
+      
+      // Check for completed challenges
+      let completedChallenges: any[] = result.completedChallenges || [];
+      
+      // Explicitly claim each challenge to ensure XP is awarded
+      for (const challenge of completedChallenges) {
+        await gamificationManager.claimChallenge(challenge.id);
       }
+      
+      // Force check for additional challenges that might be completed
+      const additionalChallenges = await challengeManager.updateUserChallenges(afterProgress);
+      completedChallenges = [...completedChallenges, ...additionalChallenges];
+      
+      // Claim each additional challenge
+      for (const challenge of additionalChallenges) {
+        await gamificationManager.claimChallenge(challenge.id);
+      }
+      
+      // Check for newly completed achievements
+      const achievements = Object.values(afterProgress.achievements || {});
+      const newlyCompleted = achievements.filter(a => 
+        a.completed && a.dateCompleted === new Date().toISOString().split('T')[0]
+      );
+      
+      // Get final progress after all operations
+      await refreshBobStats();
+      const finalProgress = await storageService.getUserProgress();
+      
+      // Add date to simulated dates
+      const dateStr = selectedDate.toISOString();
+      setSimulatedDates(prev => [...prev, dateStr]);
+      
+      // Store the last configuration and date for quick simulation
+      setLastConfig(config);
+      setLastSimulatedDate(selectedDate);
+      
+      // If this is a sequential day after the last one, increment the counter
+      if (consecutiveDaysCount > 0 && 
+          lastSimulatedDate && 
+          Math.abs(selectedDate.getTime() - lastSimulatedDate.getTime()) < 86400000 * 2) {
+        setConsecutiveDaysCount(prev => prev + 1);
+      } else {
+        setConsecutiveDaysCount(1);
+      }
+      
+      // Prepare simulation result for confirmation modal
+      const simulationResult: SimulationResult = {
+        date: dateStr,
+        bodyArea: config.bodyArea,
+        difficulty: config.difficulty,
+        duration: config.duration,
+        xpEarned: xpGained,
+        totalXp: finalProgress.totalXP,
+        level: finalProgress.level,
+        percentToNextLevel: stats.percentToNextLevel,
+        streakDays: finalProgress.statistics?.currentStreak || 0,
+        completedChallenges: completedChallenges.map(c => ({
+          title: c.title,
+          xp: c.xp
+        })),
+        achievements: newlyCompleted.map(a => ({
+          title: a.title
+        }))
+      };
+      
+      // Show the confirmation modal
+      setSimulationResult(simulationResult);
+      setShowConfirmationModal(true);
+      
+      // Reset selected date
+      setSelectedDate(null);
     } catch (error) {
-      console.error('Error handling day change:', error);
+      console.error('Error in single day simulation:', error);
+      Alert.alert('Simulation Error', 'An error occurred during simulation');
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Helper to check if there was activity on a specific date
-  const hadActivityOnDate = async (dateString: string, progress: any): Promise<boolean> => {
-    try {
-      // Get all routines from storage
-      const allEntries = await storageService.getAllRoutines();
-      
-      // Find any entry with that date
-      return allEntries.some(entry => {
-        const entryDate = new Date(entry.date);
-        const entryDateStr = entryDate.toISOString().split('T')[0];
-        return entryDateStr === dateString;
-      });
-    } catch (error) {
-      console.error('Error checking for activity on date:', error);
-      return false;
+  // Handle quick simulation of the previous day
+  const handleQuickSimulation = () => {
+    if (!lastSimulatedDate || !lastConfig) {
+      Alert.alert('Error', 'No previous simulation data available');
+      return;
     }
-  };
-  
-  // Debug streak calculation for more insight
-  const debugStreakCalculation = async () => {
-    try {
-      const allRoutines = await storageService.getAllRoutines();
-      console.log(`DEBUG STREAK: Found ${allRoutines.length} total routines`);
-      
-      // Group routines by date
-      const routinesByDate: Record<string, any[]> = {};
-      allRoutines.forEach(routine => {
-        const date = new Date(routine.date);
-        const dateStr = date.toISOString().split('T')[0];
-        if (!routinesByDate[dateStr]) {
-          routinesByDate[dateStr] = [];
+    
+    // Calculate the previous day
+    const previousDay = new Date(lastSimulatedDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    
+    // Set as selected date and use lastConfig
+    setSelectedDate(previousDay);
+    
+    // Show a confirmation with the date
+    Alert.alert(
+      'Quick Simulate Previous Day',
+      `Simulate ${previousDay.toLocaleDateString()} with the same configuration?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Simulate', 
+          onPress: () => handleSingleDaySimulation(lastConfig)
         }
-        routinesByDate[dateStr].push(routine);
-      });
-      
-      // Log the dates with routines
-      const dates = Object.keys(routinesByDate);
-      console.log(`DEBUG STREAK: Routines found on ${dates.length} distinct dates:`, dates);
-      
-      if (dates.length === 0) {
-        console.log("DEBUG STREAK: No routines, streak should be 0");
-        return;
-      }
-      
-      // Sort dates in descending order (newest first)
-      dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-      console.log(`DEBUG STREAK: Most recent date with activity: ${dates[0]}`);
-      
-      // Get today's date
-      const today = new Date().toISOString().split('T')[0];
-      console.log(`DEBUG STREAK: Today's date: ${today}`);
-      
-      // Check if today has activity
-      const hasTodayActivity = dates.includes(today);
-      console.log(`DEBUG STREAK: Activity today? ${hasTodayActivity}`);
-      
-      // If no activity today, streak should be 0 unless yesterday had activity
-      if (!hasTodayActivity) {
-        console.log("DEBUG STREAK: No activity today, streak calculation requires yesterday's activity");
-        return;
-      }
-      
-      // Calculate the streak
-      let streak = 1; // Start with 1 for today
-      let currentDate = new Date(today);
-      
-      while (true) {
-        // Move to previous day
-        currentDate.setDate(currentDate.getDate() - 1);
-        const prevDateStr = currentDate.toISOString().split('T')[0];
-        
-        // Check if previous day has activity
-        if (dates.includes(prevDateStr)) {
-          streak++;
-          console.log(`DEBUG STREAK: Found activity on ${prevDateStr}, streak = ${streak}`);
-        } else {
-          console.log(`DEBUG STREAK: No activity on ${prevDateStr}, streak ends`);
-          break;
-        }
-      }
-      
-      console.log(`DEBUG STREAK: Final calculated streak: ${streak}`);
-      
-      // Compare with stored streak value
-      const progress = await storageService.getUserProgress();
-      console.log(`DEBUG STREAK: Stored streak value: ${progress.statistics.currentStreak}`);
-      
-      if (progress.statistics.currentStreak !== streak) {
-        console.log(`DEBUG STREAK: Mismatch between calculated (${streak}) and stored (${progress.statistics.currentStreak}) streak values!`);
-      }
-    } catch (error) {
-      console.error('Error in debug streak calculation:', error);
-    }
+      ]
+    );
   };
   
-  // Jump to a specific date
-  const handleJumpToDate = (days: number) => {
-    const jumpDate = new Date(currentDate);
-    jumpDate.setDate(jumpDate.getDate() + days);
-    setCurrentDate(jumpDate);
-    
-    // Update the simulated date
-    patchDateForSimulation(jumpDate);
-    
-    addLog(`Jumped ${days} days to ${jumpDate.toLocaleDateString()}`);
-  };
-  
-  // Add a stretch for Bob
-  const handleAddStretch = async () => {
-    if (!isInitialized || isLoading) return;
-    
+  // Handle batch simulation for 7 consecutive days
+  const handleBatchSimulation = async (config: StretchConfig) => {
     setIsLoading(true);
     
     try {
-      // Debug streak before adding
-      console.log("Checking streak before adding stretch:");
-      await debugStreakCalculation();
+      // Calculate date range based on lastBatchEndDate
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
       
-      // Get current user progress first to check current state
-      const userProgress = await storageService.getUserProgress();
-      const initialRoutineCount = userProgress.statistics?.totalRoutines || 0;
-      const initialXP = userProgress.totalXP || 0;
+      let endDate: Date;
+      let startDate: Date;
       
-      // Log the starting state
-      console.log(`Before adding stretch - Routine count: ${initialRoutineCount}, XP: ${initialXP}, Streak: ${userProgress.statistics?.currentStreak || 0}`);
-      
-      // Clear storage caches to ensure fresh data
-      cacheUtils.invalidateRoutineCache();
-      
-      // Create the routine with type assertions for type safety
-      const routine = {
-        id: `bob-stretch-${Date.now()}`,
-        date: new Date().toISOString(),
-        duration: selectedDuration.toString() as any, // Cast to any to bypass Duration type check
-        area: selectedArea as any, // Cast to any to bypass BodyArea type check
-        difficulty: selectedDifficulty as any, // Add difficulty
-        stretches: ["Neck Rotation", "Chin Tucks"],
-        status: "completed"
-      } as any; // Final cast to ProgressEntry
-      
-      // Debug the date to confirm it's correct
-      const routineDate = new Date(routine.date);
-      console.log(`Created routine with date: ${routine.date}`);
-      console.log(`Parsed routine date: ${routineDate.toLocaleDateString()}, current sim date: ${currentDate.toLocaleDateString()}`);
-      
-      // Log the stretch
-      addLog(`${BOB_NAME} completed a ${selectedDuration}-minute ${selectedDifficulty} ${selectedArea} stretch on ${routineDate.toLocaleDateString()}`);
-      
-      // Calculate expected XP
-      const expectedXP = XP_RATES[selectedDuration as keyof typeof XP_RATES] || 0;
-      const isFirstStretch = initialRoutineCount === 0;
-      const expectedTotalXP = expectedXP + (isFirstStretch ? WELCOME_BONUS : 0);
-      
-      if (isFirstStretch) {
-        addLog(`First stretch ever! ${WELCOME_BONUS} XP welcome bonus will be applied`);
-        addLog(`Expected base XP: ${expectedXP} + ${WELCOME_BONUS} welcome bonus = ${expectedTotalXP} XP`);
+      if (!lastBatchEndDate) {
+        // First batch: use yesterday as end date
+        endDate = yesterday;
       } else {
-        addLog(`Expected base XP: ${expectedXP} XP`);
+        // Subsequent batches: use 7 days before the last end date
+        endDate = new Date(lastBatchEndDate);
+        endDate.setDate(endDate.getDate() - 1);
       }
       
-      // Process the routine
-      console.log(`Processing routine: ${routine.id} (${routine.duration} minutes, ${routine.area})`);
-      const result = await gamificationManager.processCompletedRoutine(routine);
-      console.log(`Routine processed. Result:`, result);
+      // Start date is always 7 days before end date
+      startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 6);
       
-      // Log the actual XP after processing
-      const currentProgress = await storageService.getUserProgress();
-      const xpGained = currentProgress.totalXP - initialXP;
-      console.log(`XP gained after routine processing: ${xpGained} (from ${initialXP} to ${currentProgress.totalXP})`);
+      console.log(`Batch simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
       
-      // Log XP breakdown in detail
-      if (result.xpBreakdown) {
-        const xpBreakdown = Array.isArray(result.xpBreakdown) ? 
-          result.xpBreakdown : 
-          (typeof result.xpBreakdown === 'object' ? [result.xpBreakdown] : []);
-          
-        addLog(`XP Breakdown from routine:`);
-        xpBreakdown.forEach((item: any) => {
-          if (item && typeof item === 'object') {
-            addLog(`  - ${item.description || 'Unknown'}: ${item.amount || 0} XP`);
-          }
-        });
+      // Keep track of total XP earned
+      let totalXpEarned = 0;
+      let allCompletedChallenges: any[] = [];
+      let allCompletedAchievements: any[] = [];
+      
+      // Get initial state for comparison
+      const initialProgress = await storageService.getUserProgress();
+      const initialXP = initialProgress.totalXP || 0;
+      
+      // Simulate each day in the range
+      const batchDates: string[] = [];
+      
+      // Simulate from start date to end date (inclusive)
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        // Patch date for simulation
+        patchDateForSimulation(currentDate);
         
-        // Calculate total from breakdown if available
-        const totalXp = xpBreakdown.reduce((sum: number, item: any) => 
-          sum + (item && typeof item === 'object' ? (item.amount || 0) : 0), 0);
-          
-        addLog(`Total XP earned from routine: ${totalXp}`);
-      }
-      
-      // Process any completed challenges immediately after the routine
-      let totalChallengeXP = 0;
-      const completedChallenges = result.completedChallenges || [];
-      
-      if (completedChallenges.length > 0) {
-        addLog(`Completed ${completedChallenges.length} challenges!`);
+        // Create routine for this day
+        const routine = {
+          id: `batch-stretch-${Date.now()}-${currentDate.getTime()}`,
+          date: new Date().toISOString(),
+          duration: config.duration.toString() as any,
+          area: config.bodyArea as any,
+          difficulty: config.difficulty as any,
+          stretches: ["Batch Simulation Stretch"],
+          status: "completed"
+        } as any;
         
-        // Explicitly claim each challenge to ensure XP is awarded
-        for (const challenge of completedChallenges) {
-          console.log(`Claiming challenge: ${challenge.id} - ${challenge.title} (+${challenge.xp} XP)`);
-          const claimResult = await gamificationManager.claimChallenge(challenge.id);
-          
-          if (claimResult.success) {
-            addLog(`💰 Claimed: ${challenge.title} (+${challenge.xp} XP)`);
-            totalChallengeXP += challenge.xp;
-          } else {
-            addLog(`❌ Failed to claim: ${challenge.title} - ${claimResult.message}`);
+        // Process the routine
+        const result = await gamificationManager.processCompletedRoutine(routine);
+        
+        // Claim any completed challenges
+        if (result.completedChallenges && result.completedChallenges.length > 0) {
+          for (const challenge of result.completedChallenges) {
+            await gamificationManager.claimChallenge(challenge.id);
+            allCompletedChallenges.push(challenge);
           }
         }
         
-        // Log total XP from challenges
-        if (totalChallengeXP > 0) {
-          addLog(`Total XP from challenges: ${totalChallengeXP}`);
-        }
-      } else {
-        console.log(`No completed challenges found after processing routine`);
+        // Add date to batch
+        batchDates.push(currentDate.toISOString());
         
-        // Force check for challenges that might be completed now
+        // Check for additional challenges
         const progress = await storageService.getUserProgress();
         const additionalChallenges = await challengeManager.updateUserChallenges(progress);
         
         if (additionalChallenges.length > 0) {
-          addLog(`Found ${additionalChallenges.length} additional completed challenges!`);
-          
-          // Claim each additional challenge
           for (const challenge of additionalChallenges) {
-            console.log(`Claiming additional challenge: ${challenge.id} - ${challenge.title} (+${challenge.xp} XP)`);
-            const claimResult = await gamificationManager.claimChallenge(challenge.id);
-            
-            if (claimResult.success) {
-              addLog(`💰 Claimed: ${challenge.title} (+${challenge.xp} XP)`);
-              totalChallengeXP += challenge.xp;
-            }
+            await gamificationManager.claimChallenge(challenge.id);
+            allCompletedChallenges.push(challenge);
           }
         }
+        
+        // Move to next day
+        currentDate = new Date(currentDate);
+        currentDate.setDate(currentDate.getDate() + 1);
       }
       
-      // Get final progress after all operations
-      const finalProgress = await storageService.getUserProgress();
-      const totalXpAfterAll = finalProgress.totalXP;
-      const totalXpGained = totalXpAfterAll - initialXP;
+      // Store the last batch end date for subsequent simulations
+      setLastBatchEndDate(startDate);
       
-      addLog(`Total XP gained: ${totalXpGained} (Routine: ${xpGained}, Challenges: ${totalChallengeXP})`);
+      // Update simulated dates
+      setSimulatedDates(prev => [...prev, ...batchDates]);
       
-      // Refresh stats after the stretch and challenges
+      // Get final state after all simulations
       await refreshBobStats();
+      const finalProgress = await storageService.getUserProgress();
       
-      // Get level info for logging
-      const levelInfo = await gamificationManager.getUserLevelInfo();
-      
-      // Check for level up
-      if (levelInfo.level > userProgress.level) {
-        addLog(`🎉 LEVEL UP! ${BOB_NAME} reached level ${levelInfo.level}!`);
-        
-        // Check for newly unlocked rewards
-        const allRewards = await rewardManager.getAllRewards();
-        const newRewards = allRewards.filter(r => 
-          r.unlocked && r.levelRequired === levelInfo.level
-        );
-        
-        if (newRewards.length > 0) {
-          newRewards.forEach(reward => {
-            addLog(`🎁 New reward unlocked: ${reward.title}`);
-          });
-        }
-      }
-      
-      // Verify the routine count after adding
-      const finalRoutineCount = finalProgress.statistics?.totalRoutines || 0;
-      console.log(`After adding stretch - Routine count: ${finalRoutineCount}, XP: ${finalProgress.totalXP}, Streak: ${finalProgress.statistics?.currentStreak || 0}`);
-      
-      if (finalRoutineCount !== initialRoutineCount + 1) {
-        addLog(`⚠️ Warning: Routine count incorrect! Expected ${initialRoutineCount + 1}, got ${finalRoutineCount}`);
-        
-        // Force fix the routine count if it's incorrect
-        finalProgress.statistics.totalRoutines = initialRoutineCount + 1;
-        await storageService.saveUserProgress(finalProgress);
-        addLog(`✅ Fixed routine count to ${initialRoutineCount + 1}`);
-      }
+      // Calculate total XP earned
+      totalXpEarned = finalProgress.totalXP - initialXP;
       
       // Check for newly completed achievements
       const achievements = Object.values(finalProgress.achievements || {});
-      const newlyCompleted = achievements.filter(a => 
-        a.completed && a.dateCompleted === new Date().toISOString().split('T')[0]
+      allCompletedAchievements = achievements.filter(a => 
+        a.completed && batchDates.some(dateStr => {
+          const batchDate = new Date(dateStr).toISOString().split('T')[0];
+          return a.dateCompleted === batchDate;
+        })
       );
       
-      if (newlyCompleted.length > 0) {
-        newlyCompleted.forEach(achievement => {
-          addLog(`🏆 Achievement unlocked: ${achievement.title}`);
-        });
-      }
+      // Prepare simulation result for confirmation modal
+      const simulationResult: SimulationResult = {
+        date: batchDates[0], // Use first date for reference
+        bodyArea: config.bodyArea,
+        difficulty: config.difficulty,
+        duration: config.duration,
+        xpEarned: totalXpEarned,
+        totalXp: finalProgress.totalXP,
+        level: finalProgress.level,
+        percentToNextLevel: stats.percentToNextLevel,
+        streakDays: finalProgress.statistics?.currentStreak || 0,
+        completedChallenges: allCompletedChallenges.map(c => ({
+          title: c.title,
+          xp: c.xp
+        })),
+        achievements: allCompletedAchievements.map(a => ({
+          title: a.title
+        })),
+        isBatchMode: true,
+        daysSimulated: batchDates.length
+      };
       
-      // Log summary of the current state
-      addLog(`Summary: Level ${levelInfo.level}, XP: ${levelInfo.totalXP}, Routines: ${finalRoutineCount}, Streak: ${finalProgress.statistics?.currentStreak || 0}`);
-      
-      // After all processing
-      console.log("Checking streak after adding stretch:");
-      await debugStreakCalculation();
+      // Show the confirmation modal
+      setSimulationResult(simulationResult);
+      setShowConfirmationModal(true);
     } catch (error) {
-      console.error('Error adding stretch:', error);
-      Alert.alert('Error', 'Failed to add stretch');
+      console.error('Error in batch simulation:', error);
+      Alert.alert('Batch Simulation Error', 'An error occurred during batch simulation');
     } finally {
       setIsLoading(false);
     }
@@ -743,7 +735,15 @@ const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
             const resetDate = new Date();
             setCurrentDate(resetDate);
             console.log(`Reset simulation date to today: ${resetDate.toISOString()}`);
+            
+            // Reset all the tracking states
             setActivityLog([]);
+            setLastBatchEndDate(null);
+            setLastConfig(null);
+            setLastSimulatedDate(null);
+            setConsecutiveDaysCount(0);
+            
+            // Initialize fresh state
             initializeBob();
           }
         }
@@ -757,7 +757,7 @@ const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
       <View style={styles.progressBarContainer}>
         <View 
           style={[
-            styles.progressBar, 
+            styles.progressBarFill, 
             { width: `${Math.min(100, Math.max(0, stats.percentToNextLevel))}%`, backgroundColor: theme.accent }
           ]} 
         />
@@ -850,314 +850,383 @@ const BobSimulatorScreen = ({ navigation }: { navigation: any }) => {
     );
   };
   
+  // Add cleanup when leaving the screen
+  useEffect(() => {
+    return () => {
+      // Clean up when component unmounts
+      try {
+        AsyncStorage.removeItem('@deskstretch:bob_simulator_access');
+      } catch (error) {
+        console.error('Error removing simulator access:', error);
+      }
+    };
+  }, []);
+  
+  // Add an effect to handle back button press
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (fromTesting) {
+          // Just go back normally if coming from testing
+          return false;
+        }
+        return false;
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }, [fromTesting])
+  );
+  
+  // Add a special check to log navigation params for debugging
+  console.log("[BobSimulator] Navigation params:", route?.params);
+  
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border, backgroundColor: theme.cardBackground }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>{BOB_NAME} Simulator</Text>
-        <TouchableOpacity onPress={handleReset} style={styles.resetButton}>
-          <Ionicons name="refresh" size={24} color={theme.text} />
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* Date & Controls */}
-        <View style={[styles.dateControlsContainer, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.currentDate, { color: theme.text }]}>
-            Current Date: {currentDate.toLocaleDateString()}
-          </Text>
-          
-          <View style={styles.controlsRow}>
-            <TouchableOpacity 
-              style={[styles.controlButton, { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }]}
-              onPress={handlePreviousDay}
-              disabled={isLoading}
-            >
-              <Ionicons name="chevron-back" size={24} color={theme.accent} />
-              <Text style={[styles.controlButtonText, { color: theme.text }]}>Previous Day</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.controlButton, { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }]}
-              onPress={handleNextDay}
-              disabled={isLoading}
-            >
-              <Text style={[styles.controlButtonText, { color: theme.text }]}>Next Day</Text>
-              <Ionicons name="chevron-forward" size={24} color={theme.accent} />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.jumpControlsRow}>
-            <TouchableOpacity 
-              style={[styles.jumpButton, { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }]}
-              onPress={() => handleJumpToDate(-7)}
-              disabled={isLoading}
-            >
-              <Text style={[styles.jumpButtonText, { color: theme.text }]}>-7 Days</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.jumpButton, { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }]}
-              onPress={() => handleJumpToDate(-30)}
-              disabled={isLoading}
-            >
-              <Text style={[styles.jumpButtonText, { color: theme.text }]}>-30 Days</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.jumpButton, { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }]}
-              onPress={() => handleJumpToDate(7)}
-              disabled={isLoading}
-            >
-              <Text style={[styles.jumpButtonText, { color: theme.text }]}>+7 Days</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.jumpButton, { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }]}
-              onPress={() => handleJumpToDate(30)}
-              disabled={isLoading}
-            >
-              <Text style={[styles.jumpButtonText, { color: theme.text }]}>+30 Days</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* Bob's Stats */}
-        {renderBobStats()}
-        
-        {/* Game Data Controls */}
-        <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Game Data</Text>
-          <View style={styles.gameDataRow}>
-            <TouchableOpacity 
-              style={[styles.gameDataButton, { backgroundColor: isDark ? '#2D2D2D' : '#E8F5E9' }]}
-              onPress={handleShowChallenges}
-            >
-              <Ionicons name="trophy-outline" size={20} color="#4CAF50" />
-              <Text style={[styles.gameDataButtonText, { color: isDark ? '#81C784' : '#2E7D32' }]}>
-                View Challenges
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.gameDataButton, { backgroundColor: isDark ? '#2D2D2D' : '#E8F5E9' }]}
-              onPress={handleShowRewards}
-            >
-              <Ionicons name="gift-outline" size={20} color="#4CAF50" />
-              <Text style={[styles.gameDataButtonText, { color: isDark ? '#81C784' : '#2E7D32' }]}>
-                View Rewards
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.gameDataButton, { backgroundColor: isDark ? '#2D2D2D' : '#E8F5E9' }]}
-              onPress={handleShowAchievements}
-            >
-              <Ionicons name="ribbon-outline" size={20} color="#4CAF50" />
-              <Text style={[styles.gameDataButtonText, { color: isDark ? '#81C784' : '#2E7D32' }]}>
-                View Achievements
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* Add Stretch Section */}
-        <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Add a Stretch</Text>
-          
-          <Text style={[styles.durationLabel, { color: theme.textSecondary }]}>
-            Body Area:
-          </Text>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.areaScrollView}>
-            <View style={styles.areaButtonsRow}>
-              {BODY_AREAS.map(area => (
-                <TouchableOpacity 
-                  key={area}
-                  style={[
-                    styles.areaButton, 
-                    selectedArea === area ? 
-                      { backgroundColor: theme.accent } : 
-                      { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }
-                  ]}
-                  onPress={() => setSelectedArea(area)}
-                >
-                  <Text 
-                    style={[
-                      styles.areaButtonText, 
-                      { color: selectedArea === area ? '#FFF' : theme.text }
-                    ]}
-                  >
-                    {area}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-          
-          <Text style={[styles.durationLabel, { color: theme.textSecondary }]}>
-            Difficulty:
-          </Text>
-          
-          <View style={styles.difficultyButtonsRow}>
-            {DIFFICULTY_LEVELS.map(difficulty => (
-              <TouchableOpacity 
-                key={difficulty}
-                style={[
-                  styles.difficultyButton, 
-                  selectedDifficulty === difficulty ? 
-                    { backgroundColor: theme.accent } : 
-                    { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }
-                ]}
-                onPress={() => setSelectedDifficulty(difficulty)}
-              >
-                <Text 
-                  style={[
-                    styles.difficultyButtonText, 
-                    { color: selectedDifficulty === difficulty ? '#FFF' : theme.text }
-                  ]}
-                >
-                  {difficulty}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          
-          <Text style={[styles.durationLabel, { color: theme.textSecondary }]}>
-            Duration (minutes):
-          </Text>
-          
-          <View style={styles.durationButtonsRow}>
-            {DURATIONS.map(duration => (
-              <TouchableOpacity 
-                key={duration}
-                style={[
-                  styles.durationButton, 
-                  selectedDuration === duration ? 
-                    { backgroundColor: theme.accent } : 
-                    { backgroundColor: isDark ? '#2D2D2D' : '#f0f0f0' }
-                ]}
-                onPress={() => setSelectedDuration(duration)}
-              >
-                <Text 
-                  style={[
-                    styles.durationButtonText, 
-                    { color: selectedDuration === duration ? '#FFF' : theme.text }
-                  ]}
-                >
-                  {duration} min ({XP_RATES[duration as keyof typeof XP_RATES]} XP)
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          
+        <View style={styles.headerLeft}>
           <TouchableOpacity 
-            style={[
-              styles.addStretchButton, 
-              isLoading ? styles.disabledButton : { backgroundColor: theme.accent }
-            ]}
-            onPress={handleAddStretch}
-            disabled={isLoading}
+            onPress={() => {
+              console.log("[BobSimulator] Back button pressed, fromTesting:", fromTesting);
+              // If returning to testing, use a custom navigation reset to restore stack
+              if (fromTesting || returnToTesting) {
+                console.log("[BobSimulator] Returning to Testing flow");
+                
+                // Instead of just going back (which fails), dispatch a reset action to get back to MainTabs
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'MainTabs' }],
+                  })
+                );
+                
+                // Store a flag to indicate that we need to re-open settings with the testing modal
+                // This will be picked up by TabNavigator
+                AsyncStorage.setItem('@deskstretch:reopen_settings', 'true')
+                  .then(() => {
+                    console.log('[BobSimulator] Set reopen_settings flag');
+                  })
+                  .catch(error => {
+                    console.error('Error setting reopen_settings flag:', error);
+                  });
+                  
+                // Make sure we keep our testing access
+                AsyncStorage.setItem('@deskstretch:testing_access', 'true')
+                  .catch(error => {
+                    console.error('Error preserving testing access:', error);
+                  });
+              } else {
+                // Regular back navigation for non-testing flow
+                navigation.goBack();
+              }
+            }}
+            style={styles.backButton}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#FFF" size="small" />
-            ) : (
-              <>
-                <Ionicons name="fitness" size={20} color="#FFF" />
-                <Text style={styles.addStretchButtonText}>Add Stretch for {BOB_NAME}</Text>
-              </>
-            )}
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
         </View>
         
-        {/* Activity Log */}
-        <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-          <View style={styles.logHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Activity Log</Text>
-            
-            <TouchableOpacity 
-              style={styles.clearButton}
-              onPress={() => setActivityLog([])}
-              disabled={isLoading}
-            >
-              <Text style={[styles.clearButtonText, { color: theme.accent }]}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={[styles.logContainer, { backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5' }]}>
-            {activityLog.length === 0 ? (
-              <Text style={[styles.emptyLogText, { color: theme.textSecondary }]}>
-                No activity yet. Start by adding a stretch!
-              </Text>
-            ) : (
-              activityLog.map((log, index) => (
-                <Text 
-                  key={index} 
-                  style={[
-                    styles.logText, 
-                    { 
-                      color: log.includes('LEVEL UP') || log.includes('unlocked') ? 
-                        '#4CAF50' : theme.text 
-                    }
-                  ]}
-                >
-                  {log}
-                </Text>
-              ))
-            )}
-          </View>
-        </View>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          {scenarioInstructions ? `Testing: Scenario #${scenarioInstructions.id}` : 'Bob Simulator'}
+        </Text>
         
-        {/* Details Modal */}
-        <Modal
-          visible={detailsModal.visible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setDetailsModal({...detailsModal, visible: false})}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: theme.text }]}>{detailsModal.title}</Text>
+        <View style={styles.headerRight} />
+      </View>
+      
+      {/* Main content */}
+      {isAuthenticated ? (
+        <ScrollView style={styles.container}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.accent} />
+              <Text style={[styles.loadingText, { color: theme.text }]}>
+                Processing simulation...
+              </Text>
+            </View>
+          ) : (
+            <>
+              {/* Testing Scenario Card - Only show if scenario data exists */}
+              {scenarioInstructions && (
+                <View style={[styles.scenarioCard, { backgroundColor: theme.cardBackground }]}>
+                  <View style={styles.scenarioCardHeader}>
+                    <Ionicons name="flask-outline" size={24} color={theme.accent} />
+                    <Text style={[styles.scenarioCardTitle, { color: theme.text }]}>
+                      Scenario #{scenarioInstructions.id}: {scenarioInstructions.title}
+                    </Text>
+                  </View>
+                  
+                  <View style={[styles.scenarioSetupContainer, { backgroundColor: theme.backgroundLight }]}>
+                    <Text style={[styles.scenarioSetupLabel, { color: theme.accent }]}>Setup Instructions:</Text>
+                    <Text style={[styles.scenarioSetupText, { color: theme.text }]}>
+                      {scenarioInstructions.setup}
+                    </Text>
+                  </View>
+                  
+                  <Text style={[styles.verificationLabel, { color: theme.text }]}>
+                    Verification Points:
+                  </Text>
+                  
+                  {scenarioInstructions.verification.map((point, index) => (
+                    <View key={index} style={styles.verificationItem}>
+                      <Ionicons name="checkmark-circle" size={20} color={theme.accent} style={{ marginRight: 8 }} />
+                      <Text style={[styles.verificationText, { color: theme.text }]}>
+                        {point}
+                      </Text>
+                    </View>
+                  ))}
+                  
+                  <View style={styles.scenarioFooter}>
+                    <Text style={[styles.scenarioFooterText, { color: theme.textSecondary }]}>
+                      Complete this scenario and return to the testing screen to provide feedback.
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {/* Welcome and Instructions Card */}
+              <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="information-circle" size={24} color={theme.accent} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>
+                    Stretching Simulator
+                  </Text>
+                </View>
+                
+                <Text style={[styles.instructionsText, { color: theme.textSecondary }]}>
+                  This tool lets you simulate stretching routines for testing purposes. Simulated routines 
+                  will affect XP, levels, and unlock achievements just like real routines.
+                </Text>
+                
+                <View style={styles.stepsContainer}>
+                  <View style={styles.stepItem}>
+                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
+                      <Text style={styles.stepNumberText}>1</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: theme.text }]}>
+                      Choose a date to simulate a routine
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.stepItem}>
+                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
+                      <Text style={styles.stepNumberText}>2</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: theme.text }]}>
+                      Configure the routine details (area, difficulty, duration)
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.stepItem}>
+                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
+                      <Text style={styles.stepNumberText}>3</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: theme.text }]}>
+                      Review the results and continue simulating
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
+              {/* Stats Overview Card */}
+              {bobProgress && (
+                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="stats-chart" size={24} color={theme.accent} />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      Current Stats
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: theme.text }]}>{stats.level}</Text>
+                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Level</Text>
+                    </View>
+                    
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: theme.text }]}>{stats.totalXP}</Text>
+                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total XP</Text>
+                    </View>
+                    
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: theme.text }]}>{stats.currentStreak}</Text>
+                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Streak</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.progressBarContainer}>
+                    <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>
+                      Progress to Level {stats.level + 1}
+                    </Text>
+                    <View style={[styles.progressBarBg, { backgroundColor: isDark ? '#333' : '#e0e0e0' }]}>
+                      <View 
+                        style={[
+                          styles.progressBarFill, 
+                          { 
+                            width: `${Math.min(100, Math.max(0, stats.percentToNextLevel))}%`, 
+                            backgroundColor: theme.accent 
+                          }
+                        ]} 
+                      />
+                    </View>
+                    <Text style={[styles.progressText, { color: theme.textSecondary }]}>
+                      {stats.totalXP} / {stats.totalXP + stats.xpToNextLevel} XP
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {/* Simulation Actions Card */}
+              <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="fitness" size={24} color={theme.accent} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>
+                    Simulation Actions
+                  </Text>
+                </View>
+                
                 <TouchableOpacity 
-                  onPress={() => setDetailsModal({...detailsModal, visible: false})}
-                  style={styles.modalCloseButton}
+                  style={[styles.actionButton, { backgroundColor: theme.accent }]}
+                  onPress={() => setShowDateModal(true)}
                 >
-                  <Ionicons name="close" size={24} color={theme.text} />
+                  <Ionicons name="calendar" size={20} color="#FFF" />
+                  <Text style={styles.actionButtonText}>Simulate Single Day</Text>
+                </TouchableOpacity>
+                
+                {/* Add Quick Simulate Button if we have a last config */}
+                {lastConfig && lastSimulatedDate && (
+                  <TouchableOpacity 
+                    style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+                    onPress={handleQuickSimulation}
+                  >
+                    <Ionicons name="time" size={20} color="#FFF" />
+                    <Text style={styles.actionButtonText}>
+                      Quick Simulate Previous Day 
+                      {consecutiveDaysCount > 0 ? ` (Day ${consecutiveDaysCount + 1})` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
+                  onPress={() => setShowBatchConfigModal(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color={theme.accent} />
+                  <Text style={[styles.actionButtonText, { color: theme.text }]}>
+                    Simulate 7 Days 
+                    {lastBatchEndDate ? 
+                      ` (${new Date(lastBatchEndDate.getTime() - 6 * 86400000).toLocaleDateString()} - ${new Date(lastBatchEndDate).toLocaleDateString()})` : 
+                      ' Before Today'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.resetButtonStyle, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
+                  onPress={handleReset}
+                >
+                  <Ionicons name="refresh" size={20} color="#F44336" />
+                  <Text style={[styles.resetButtonText, { color: '#F44336' }]}>
+                    Reset Simulation Data
+                  </Text>
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalScrollView}>
-                {detailsModal.content.map((item, index) => (
-                  <View key={index} style={styles.modalItem}>
-                    <Text style={[styles.modalItemTitle, { color: theme.text }]}>{item.title}</Text>
-                    <Text style={[styles.modalItemDescription, { color: theme.textSecondary }]}>
-                      {item.description}
+              {/* Simulated Dates Card (if any) */}
+              {simulatedDates.length > 0 && (
+                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="checkmark-circle" size={24} color={theme.accent} />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      Simulated Dates
                     </Text>
-                    {item.progress && (
-                      <Text 
-                        style={[
-                          styles.modalItemProgress, 
-                          { 
-                            color: item.progress.includes('COMPLETED') || 
-                                  item.progress.includes('UNLOCKED') ? 
-                              '#4CAF50' : theme.accent 
-                          }
-                        ]}
-                      >
-                        {item.progress}
+                  </View>
+                  
+                  <ScrollView style={styles.datesContainer}>
+                    {simulatedDates.slice(0, 10).map((dateStr, index) => (
+                      <View key={index} style={styles.dateItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
+                        <Text style={[styles.dateText, { color: theme.text }]}>
+                          {new Date(dateStr).toLocaleDateString(undefined, {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    ))}
+                    
+                    {simulatedDates.length > 10 && (
+                      <Text style={[styles.moreDatesText, { color: theme.textSecondary }]}>
+                        +{simulatedDates.length - 10} more dates simulated
                       </Text>
                     )}
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      </ScrollView>
+                  </ScrollView>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      ) : null}
+      
+      {/* Authentication Modal */}
+      <AuthModal 
+        visible={showAuthModal}
+        onSuccess={() => {
+          setIsAuthenticated(true);
+          setShowAuthModal(false);
+        }}
+        onClose={() => {
+          // If the user closes without authenticating, go back
+          navigation.goBack();
+        }}
+        fromTesting={fromTesting}
+      />
+      
+      {/* Date Selection Modal */}
+      <DateSelectionModal
+        visible={showDateModal}
+        onClose={() => setShowDateModal(false)}
+        onDateSelected={(date) => {
+          setSelectedDate(date);
+          setShowDateModal(false);
+          setShowConfigModal(true);
+        }}
+        simulatedDates={simulatedDates}
+      />
+      
+      {/* Stretch Config Modal */}
+      <StretchConfigModal
+        visible={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        onConfirm={(config) => {
+          setShowConfigModal(false);
+          handleSingleDaySimulation(config);
+        }}
+        title="Configure Stretch Routine"
+      />
+      
+      {/* Batch Config Modal */}
+      <StretchConfigModal
+        visible={showBatchConfigModal}
+        onClose={() => setShowBatchConfigModal(false)}
+        onConfirm={(config) => {
+          setShowBatchConfigModal(false);
+          handleBatchSimulation(config);
+        }}
+        title="Configure 7-Day Simulation"
+        isBatchMode={true}
+      />
+      
+      {/* Confirmation Modal */}
+      {simulationResult && (
+        <ConfirmationModal
+          visible={showConfirmationModal}
+          onClose={() => setShowConfirmationModal(false)}
+          result={simulationResult}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -1168,6 +1237,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
@@ -1181,51 +1251,79 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   backButton: {
     padding: 8,
   },
   resetButton: {
     padding: 8,
   },
-  section: {
-    marginTop: 16,
-    marginHorizontal: 16,
-    borderRadius: 8,
+  card: {
+    borderRadius: 12,
+    marginBottom: 16,
     overflow: 'hidden',
-    marginBottom: 8,
-    elevation: 1,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 1,
+    shadowRadius: 2,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    padding: 16,
-    paddingBottom: 8,
-  },
-  dateText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingBottom: 16,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingBottom: 16,
-  },
-  controlButton: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
-  controlButtonText: {
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginLeft: 8,
-    fontWeight: '500',
+  },
+  instructionsText: {
+    padding: 16,
+    paddingTop: 8,
+    lineHeight: 20,
+    fontSize: 14,
+  },
+  stepsContainer: {
+    padding: 16,
+    paddingTop: 0,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  stepNumberText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  stepText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingBottom: 8,
   },
   statItem: {
     alignItems: 'center',
@@ -1238,235 +1336,82 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-  levelProgressContainer: {
-    marginHorizontal: 16,
-    marginTop: 16,
-  },
-  levelProgressLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  levelProgressLabel: {
-    fontSize: 14,
-  },
-  levelProgressValue: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
   progressBarContainer: {
-    height: 8,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  progressBar: {
-    height: '100%',
-  },
-  gameDataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  gameDataButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-  },
-  gameDataButtonText: {
-    marginLeft: 6,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  durationLabel: {
-    fontSize: 14,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  durationButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  durationButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  durationButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  addStretchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  disabledButton: {
-    backgroundColor: '#999',
-  },
-  addStretchButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  logHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingRight: 16,
-  },
-  clearButton: {
-    padding: 8,
-  },
-  clearButtonText: {
-    fontSize: 14,
-  },
-  logContainer: {
-    margin: 16,
-    marginTop: 0,
-    padding: 12,
-    borderRadius: 8,
-    maxHeight: 300,
-  },
-  emptyLogText: {
-    textAlign: 'center',
-    fontStyle: 'italic',
     padding: 16,
+    paddingTop: 8,
   },
-  logText: {
-    fontFamily: 'monospace',
+  progressLabel: {
     fontSize: 12,
-    marginBottom: 6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalScrollView: {
-    maxHeight: 400,
-  },
-  modalItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  modalItemTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
     marginBottom: 4,
   },
-  modalItemDescription: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  modalItemProgress: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  areaScrollView: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-  },
-  areaButtonsRow: {
-    flexDirection: 'row',
-    paddingRight: 16, // extra space for scroll
-  },
-  areaButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  areaButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  difficultyButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  difficultyButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  difficultyButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  dateControlsContainer: {
-    marginTop: 16,
-    marginHorizontal: 16,
-    borderRadius: 8,
+  progressBarBg: {
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
+  },
+  progressBarFill: {
+    height: '100%',
+  },
+  progressText: {
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 16,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: 8,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  resetButtonStyle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 16,
+    marginTop: 8,
+    padding: 14,
+    borderRadius: 8,
+  },
+  resetButtonText: {
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+  },
+  datesContainer: {
+    maxHeight: 200,
     padding: 16,
   },
-  currentDate: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingBottom: 16,
-  },
-  jumpControlsRow: {
+  dateItem: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingBottom: 16,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  jumpButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  jumpButtonText: {
+  dateText: {
+    marginLeft: 8,
     fontSize: 14,
-    fontWeight: '500',
+  },
+  moreDatesText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   statsCard: {
     marginTop: 16,
@@ -1486,10 +1431,72 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
   },
-  statsRow: {
+  scenarioCard: {
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    padding: 16,
+  },
+  scenarioCardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    paddingBottom: 12,
+  },
+  scenarioCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+    flex: 1,
+  },
+  scenarioSetupContainer: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  scenarioSetupLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  scenarioSetupText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  verificationLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  verificationItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  verificationText: {
+    fontSize: 14,
+    lineHeight: 20,
+    flex: 1,
+  },
+  scenarioFooter: {
+    marginTop: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    paddingBottom: 8,
+  },
+  scenarioFooterText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });
 
