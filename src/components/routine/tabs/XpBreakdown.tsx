@@ -164,29 +164,32 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
       // Add a subtle border when XP boost is active for better light mode visibility
       hasXpBoost && {
         borderWidth: 1, 
-        borderColor: 'rgba(255, 193, 7, 0.5)'
+        borderColor: theme.isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.2)'
       }
     ]}>
       {hasXpBoost && (
-        <View style={styles.xpBoostHeader}>
-          <Ionicons name="flash" size={18} color="#FF8F00" />
-          <Text style={styles.xpBoostHeaderText}>XP BOOST APPLIED</Text>
-          <Animated.View 
-            style={[
-              styles.shineEffect,
-              {
-                transform: [{ translateX: animValues.shineAnim }]
-              }
-            ]} 
-          />
+        <View style={[styles.xpBoostHeader, {
+          backgroundColor: theme.isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 152, 0, 0.07)',
+          borderColor: theme.isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.15)'
+        }]}>
+          <Ionicons name="flash" size={16} color={theme.isDark ? "#FF8F00" : "#FF6F00"} />
+          <Text style={[styles.xpBoostHeaderText, {
+            color: theme.isDark ? '#FF8F00' : '#FF6F00',
+            textShadowColor: 'transparent'
+          }]}>XP BOOST</Text>
         </View>
       )}
       
       {/* First show achievement XP at the top if any */}
       {(achievementXp.length > 0 || unlockedAchievements.length > 0) && (
-        <View style={styles.achievementSection}>
-          <Text style={styles.achievementSectionTitle}>
-            <Ionicons name="trophy" size={16} color="#3F51B5" /> Achievement Bonus XP
+        <View style={[styles.achievementSection, {
+          backgroundColor: theme.isDark ? 'rgba(121, 134, 203, 0.05)' : 'rgba(63, 81, 181, 0.04)',
+          borderColor: theme.isDark ? 'rgba(121, 134, 203, 0.2)' : 'rgba(63, 81, 181, 0.1)'
+        }]}>
+          <Text style={[styles.achievementSectionTitle, {
+            color: theme.isDark ? '#3F51B5' : '#303F9F'
+          }]}>
+            <Ionicons name="trophy" size={16} color={theme.isDark ? "#3F51B5" : "#303F9F"} /> Achievement Bonus XP
           </Text>
           
           {/* Show unlocked achievements first */}
@@ -194,27 +197,29 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
             <View key={`unlocked-${achievement.id}`} style={[
               styles.xpBreakdownItem,
               {
-                backgroundColor: 'rgba(121, 134, 203, 0.1)',
+                backgroundColor: theme.isDark ? 'rgba(121, 134, 203, 0.1)' : 'rgba(63, 81, 181, 0.06)',
                 borderRadius: 6,
                 padding: 6,
                 marginVertical: 2,
                 borderLeftWidth: 2,
-                borderLeftColor: '#3F51B5',
+                borderLeftColor: theme.isDark ? '#3F51B5' : '#303F9F',
                 marginBottom: 4
               }
             ]}>
-              <View style={styles.achievementBadge}>
+              <View style={[styles.achievementBadge, {
+                backgroundColor: theme.isDark ? '#3F51B5' : '#303F9F'
+              }]}>
                 <Ionicons name="trophy" size={showAnyLevelUp ? 10 : 12} color="#FFFFFF" />
               </View>
               <Ionicons 
                 name={(achievement.icon as any) || "trophy-outline"} 
                 size={showAnyLevelUp ? 14 : 16} 
-                color="#3F51B5" 
+                color={theme.isDark ? "#3F51B5" : "#303F9F"} 
               />
               <Text style={{
                 fontSize: 13,
                 fontWeight: 'bold',
-                color: '#3F51B5',
+                color: theme.isDark ? '#3F51B5' : '#303F9F',
               }}>
                 <Text style={styles.achievementXpValue}>+{achievement.xp} XP</Text>
                 {" "}{achievement.title}

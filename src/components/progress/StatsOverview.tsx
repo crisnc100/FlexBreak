@@ -258,7 +258,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
              + (streakFreezeActive ? " (Protected)" : 
                 (streakAtRisk && canUseStreakFreeze ? " (At Risk)" : 
                  (showWarning ? " (at risk)" : 
-                  (meetsLevelRequirement && !streakAtRisk ? " (Freeze Ready)" : ""))))}
+                  "")))}
           </Text>
           
           {isStreakBroken && (

@@ -108,6 +108,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   const [canSaveStreak, setCanSaveStreak] = useState(false);
   const [showSnowflakes, setShowSnowflakes] = useState(false);
   const [snowflakes, setSnowflakes] = useState([]);
+  const [hasTodayActivity, setHasTodayActivity] = useState(false);
   const { canAccessFeature, meetsLevelRequirement, getRequiredLevel } = useFeatureAccess();
   const { isPremium } = usePremium();
   
@@ -286,6 +287,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       
       // Check if streak is truly broken by checking the last 3 days
       const isTrulyBroken = await streakManager.isStreakBroken();
+      console.log('Streak freeze card - isTrulyBroken check:', isTrulyBroken);
       
       // Cache the result
       streakStatusCache.current = {
@@ -297,17 +299,32 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       // Update UI based on legacy status
       setIsStreakBroken(status.streakBroken);
       
-      // Only allow saving if it's technically savable AND we haven't missed more than 2 days
+      // Check if user has completed a routine today
+      const todayActivity = newStatus.maintainedToday;
+      setHasTodayActivity(todayActivity);
+      
+      // Only allow saving if:
+      // 1. It's technically savable based on legacy status (missed only 1 day)
+      // 2. AND we haven't missed more than 2 days (not truly broken)
+      // 3. AND the user hasn't completed a routine today (which would start a new streak)
       // This prevents users from thinking they can apply a freeze after a long absence
-      setCanSaveStreak(status.canSaveYesterdayStreak && !isTrulyBroken);
+      // or after they have already started a new streak
+      
+      // When a streak is truly broken, we don't want to show the apply button
+      // If they've already completed a routine today, they're starting a new streak
+      setCanSaveStreak(
+        status.canSaveYesterdayStreak && 
+        !isTrulyBroken && 
+        !todayActivity
+      );
       
       // Start animations only if streak can actually be saved
-      if (status.streakBroken && !recentlySaved && status.canSaveYesterdayStreak && !isTrulyBroken) {
+      if (status.streakBroken && !recentlySaved && status.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity) {
         startPulseAnimation();
         startRotateAnimation();
       }
       
-      console.log(`StreakFreezeCard: Retrieved streak status: ${status.streakBroken ? 'BROKEN' : 'ACTIVE'}, streak=${newStatus.currentStreak}, truly broken=${isTrulyBroken}`);
+      console.log(`StreakFreezeCard: Retrieved streak status: ${status.streakBroken ? 'BROKEN' : 'ACTIVE'}, streak=${newStatus.currentStreak}, truly broken=${isTrulyBroken}, today activity=${todayActivity}`);
     } catch (error) {
       console.error('Error checking streak status in StreakFreezeCard:', error);
     }
@@ -701,7 +718,16 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
               </View>
             )}
             
-            {!canSaveStreak && !isStreakBroken && currentStreak > 0 && (
+            {!canSaveStreak && !isStreakBroken && hasTodayActivity && currentStreak > 0 && (
+              <View style={styles.newStreakContainer}>
+                <Ionicons name="refresh-circle-outline" size={18} color={isDark ? '#81C784' : '#4CAF50'} style={{ marginRight: 6 }} />
+                <Text style={[styles.newStreakText, { color: isDark ? '#81C784' : '#4CAF50' }]}>
+                  You've started a new streak today! Keep it going with daily routines.
+                </Text>
+              </View>
+            )}
+            
+            {!canSaveStreak && !isStreakBroken && !hasTodayActivity && currentStreak > 0 && (
               <Text style={[styles.explainerText, { color: isDark ? theme.textSecondary : '#666' }]}>
                 Streak freezes apply when you've missed a day of activity.
               </Text>
@@ -873,6 +899,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   warningText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  newStreakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  newStreakText: {
     fontSize: 13,
     fontStyle: 'italic',
   },

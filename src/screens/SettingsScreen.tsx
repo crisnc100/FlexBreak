@@ -505,7 +505,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           
           <TouchableOpacity 
             style={styles.settingItem}
-            onPress={() => setPrivacyPolicyModalVisible(true)}
+            onPress={() => Linking.openURL('https://flexbreak-privacy-app.netlify.app/')}
           >
             <View style={styles.settingContent}>
               <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
@@ -513,7 +513,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               </View>
               <View style={styles.textContainer}>
                 <Text style={[styles.settingTitle, {color: theme.text}]}>Privacy Policy</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>View our privacy policy</Text>
+                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>View our privacy policy website</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
@@ -739,7 +739,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               FlexBreak Privacy Policy
             </ThemedText>
             <ThemedText style={styles.policyDate} type="secondary">
-              Last Updated: May 15, 2025
+              Last Updated: April 14, 2025
             </ThemedText>
             
             <ThemedText style={styles.policySection} bold size={18}>

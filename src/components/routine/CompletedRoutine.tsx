@@ -159,27 +159,27 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   useEffect(() => {
     if (hasXpBoost) {
-      // Start boost pulse animation
+      // Start boost pulse animation - make it more subtle
       Animated.loop(
         Animated.sequence([
           Animated.timing(boostPulseAnim, {
-            toValue: 1.2,
-            duration: 800,
+            toValue: 1.1, // Reduced intensity from 1.2
+            duration: 1200, // Increased duration for smoother effect
             useNativeDriver: true,
           }),
           Animated.timing(boostPulseAnim, {
             toValue: 1,
-            duration: 800,
+            duration: 1200, // Increased duration
             useNativeDriver: true,
           }),
         ])
       ).start();
   
-      // Start shine animation
+      // Start shine animation - slower for less distraction
       Animated.loop(
         Animated.timing(shineAnim, {
           toValue: 400,
-          duration: 3000,
+          duration: 5000, // Slower animation (was 3000)
           useNativeDriver: true,
         })
       ).start();
