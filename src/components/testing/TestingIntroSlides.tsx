@@ -3,10 +3,9 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
   Dimensions, 
   TouchableOpacity,
-  Animated 
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -33,7 +32,7 @@ const slides = [
   {
     id: '3',
     title: 'Two-Part Testing Process',
-    description: 'Part 1: Test core app features including routines, challenges, and user experience.\n\nPart 2: Use our simulation tool to test the gamification system without waiting for real-time progression.',
+    description: 'Part 1: Test core app features including routines, challenges, and user experience as a level 1 user.\n\nPart 2: Use our simulation tool to test the gamification system without waiting for real-time progression.',
     icon: 'layers-outline'
   },
   {
@@ -44,6 +43,12 @@ const slides = [
   },
   {
     id: '5',
+    title: 'Premium Features Enabled',
+    description: 'As a tester, you have been granted PREMIUM access to all features! IMPORTANT: You may need to RESTART the app (close and reopen) for premium features to be fully activated.',
+    icon: 'diamond-outline'
+  },
+  {
+    id: '6',
     title: 'Ready to Begin?',
     description: "You'll find a checklist of features to test in Part 1. Take your time with each item and provide feedback as you complete them.",
     icon: 'play-outline'
@@ -53,24 +58,9 @@ const slides = [
 const TestingIntroSlides: React.FC<TestingIntroSlidesProps> = ({ onComplete }) => {
   const { theme, isDark } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
-
-  const renderItem = ({ item, index }: { item: typeof slides[0], index: number }) => {
-    return (
-      <View style={[styles.slide, { backgroundColor: theme.cardBackground, width }]}>
-        <View style={[styles.iconContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-          <Ionicons name={item.icon as any} size={60} color={theme.accent} />
-        </View>
-        <Text style={[styles.title, { color: theme.text }]}>{item.title}</Text>
-        <Text style={[styles.description, { color: theme.textSecondary }]}>{item.description}</Text>
-      </View>
-    );
-  };
-
+  
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
       setCurrentIndex(currentIndex + 1);
     } else {
       onComplete();
@@ -79,80 +69,46 @@ const TestingIntroSlides: React.FC<TestingIntroSlidesProps> = ({ onComplete }) =
 
   const handleBack = () => {
     if (currentIndex > 0) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex - 1, animated: true });
       setCurrentIndex(currentIndex - 1);
     }
   };
-
-  const handleSkip = () => {
-    onComplete();
-  };
-
-  const renderDots = () => {
-    return (
-      <View style={styles.dotContainer}>
-        {slides.map((_, index) => {
-          const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
-          
-          const dotWidth = scrollX.interpolate({
-            inputRange,
-            outputRange: [10, 20, 10],
-            extrapolate: 'clamp'
-          });
-          
-          const opacity = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.3, 1, 0.3],
-            extrapolate: 'clamp'
-          });
-          
-          return (
-            <Animated.View 
-              key={index} 
-              style={[
-                styles.dot, 
-                { 
-                  width: dotWidth,
-                  opacity,
-                  backgroundColor: theme.accent 
-                }
-              ]} 
-            />
-          );
-        })}
-      </View>
-    );
-  };
-
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems[0]) {
-      setCurrentIndex(viewableItems[0].index);
-    }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50
-  }).current;
+  
+  // Render current slide based on index
+  const currentSlide = slides[currentIndex];
 
   return (
     <View style={styles.container}>
-      <Animated.FlatList
-        ref={flatListRef}
-        data={slides}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
-        )}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-      />
+      <View style={styles.progressContainer}>
+        <Text style={[styles.progressText, { color: theme.textSecondary }]}>
+          Slide {currentIndex + 1} of {slides.length}
+        </Text>
+      </View>
       
-      {renderDots()}
+      <View style={[styles.slideContainer, { backgroundColor: theme.cardBackground }]}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={[styles.iconContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+            <Ionicons name={currentSlide.icon as any} size={60} color={theme.accent} />
+          </View>
+          <Text style={[styles.title, { color: theme.text }]}>{currentSlide.title}</Text>
+          <Text style={[styles.description, { color: theme.textSecondary }]}>{currentSlide.description}</Text>
+        </ScrollView>
+      </View>
+      
+      <View style={styles.dotsContainer}>
+        {slides.map((_, index) => (
+          <View 
+            key={index} 
+            style={[
+              styles.dot, 
+              { 
+                width: currentIndex === index ? 20 : 10,
+                opacity: currentIndex === index ? 1 : 0.3,
+                backgroundColor: theme.accent 
+              }
+            ]} 
+          />
+        ))}
+      </View>
       
       <View style={styles.buttonContainer}>
         {currentIndex > 0 ? (
@@ -163,12 +119,7 @@ const TestingIntroSlides: React.FC<TestingIntroSlidesProps> = ({ onComplete }) =
             <Text style={[styles.buttonText, { color: theme.text }]}>Back</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            style={[styles.button, styles.skipButton, { borderColor: theme.border }]}
-            onPress={handleSkip}
-          >
-            <Text style={[styles.buttonText, { color: theme.text }]}>Skip</Text>
-          </TouchableOpacity>
+          <View style={styles.emptyButtonSpace} />
         )}
         
         <TouchableOpacity
@@ -187,15 +138,37 @@ const TestingIntroSlides: React.FC<TestingIntroSlidesProps> = ({ onComplete }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: 'transparent',
+    paddingVertical: 20,
   },
-  slide: {
+  progressContainer: {
+    alignSelf: 'flex-end',
+    paddingRight: 20,
+    paddingTop: 10,
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  slideContainer: {
     flex: 1,
+    width: width - 40,
+    borderRadius: 16,
+    marginVertical: 20,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 30,
   },
   iconContainer: {
     width: 120,
@@ -203,7 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
   },
   title: {
     fontSize: 24,
@@ -216,7 +189,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  dotContainer: {
+  dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginVertical: 20,
@@ -231,37 +204,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 40,
-    marginBottom: 40,
+    marginBottom: 20,
   },
   button: {
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 8,
-    minWidth: 100,
+    minWidth: 120,
     justifyContent: 'center',
     alignItems: 'center',
   },
   backButton: {
     borderWidth: 1,
   },
-  skipButton: {
-    borderWidth: 1,
+  emptyButtonSpace: {
+    minWidth: 120,
   },
   nextButton: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   nextButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    color: 'white',
   },
 });
 

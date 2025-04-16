@@ -22,7 +22,7 @@ import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as dateUtils from '../utils/progress/modules/utils/dateUtils';
 import { CORE_CHALLENGES } from '../utils/progress/constants';
 import * as cacheUtils from '../utils/progress/modules/utils/cacheUtils';
-import { clearAllData } from '../services/storageService';
+import { resetSimulationData } from '../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, CommonActions } from '@react-navigation/native';
 
@@ -171,11 +171,6 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   // Activity log
   const [activityLog, setActivityLog] = useState<string[]>([]);
   
-  // Add a state for body area selection
-  const [selectedArea, setSelectedArea] = useState<string>('Neck');
-  
-  // Add a state for difficulty selection
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('Beginner');
   
   // Initialize Bob's progress when authenticated
   useEffect(() => {
@@ -199,8 +194,6 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       await storageService.clearRoutines();
       console.log("Cleared existing routines before initialization");
       
-      // First backup the current user data
-      const currentUserData = await storageService.getUserProgress();
       
       // Create a fresh progress for Bob
       const freshProgress = await gamificationManager.initializeUserProgress();
@@ -362,8 +355,11 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   };
   
   // Handle simulation for a single day
-  const handleSingleDaySimulation = async (config: StretchConfig) => {
-    if (!selectedDate) {
+  const handleSingleDaySimulation = async (config: StretchConfig, simulationDate?: Date) => {
+    // Use either the passed date or the selected date from state
+    const dateToSimulate = simulationDate || selectedDate;
+    
+    if (!dateToSimulate) {
       Alert.alert('Error', 'No date selected for simulation');
       return;
     }
@@ -372,7 +368,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     
     try {
       // Use the selected date for simulation
-      patchDateForSimulation(selectedDate);
+      patchDateForSimulation(dateToSimulate);
       
       // Get initial state for comparison
       const initialProgress = await storageService.getUserProgress();
@@ -391,7 +387,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       } as any;
       
       // Process the routine
-      console.log(`Processing simulated routine for ${selectedDate.toLocaleDateString()}`);
+      console.log(`Processing simulated routine for ${dateToSimulate.toLocaleDateString()}`);
       const result = await gamificationManager.processCompletedRoutine(routine);
       
       // Calculate XP gained
@@ -426,17 +422,17 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       const finalProgress = await storageService.getUserProgress();
       
       // Add date to simulated dates
-      const dateStr = selectedDate.toISOString();
+      const dateStr = dateToSimulate.toISOString();
       setSimulatedDates(prev => [...prev, dateStr]);
       
       // Store the last configuration and date for quick simulation
       setLastConfig(config);
-      setLastSimulatedDate(selectedDate);
+      setLastSimulatedDate(dateToSimulate);
       
       // If this is a sequential day after the last one, increment the counter
       if (consecutiveDaysCount > 0 && 
           lastSimulatedDate && 
-          Math.abs(selectedDate.getTime() - lastSimulatedDate.getTime()) < 86400000 * 2) {
+          Math.abs(dateToSimulate.getTime() - lastSimulatedDate.getTime()) < 86400000 * 2) {
         setConsecutiveDaysCount(prev => prev + 1);
       } else {
         setConsecutiveDaysCount(1);
@@ -466,8 +462,10 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       setSimulationResult(simulationResult);
       setShowConfirmationModal(true);
       
-      // Reset selected date
-      setSelectedDate(null);
+      // Reset selected date if it was from the state
+      if (!simulationDate) {
+        setSelectedDate(null);
+      }
     } catch (error) {
       console.error('Error in single day simulation:', error);
       Alert.alert('Simulation Error', 'An error occurred during simulation');
@@ -480,28 +478,15 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   const handleQuickSimulation = () => {
     if (!lastSimulatedDate || !lastConfig) {
       Alert.alert('Error', 'No previous simulation data available');
-      return;
-    }
-    
+        return;
+      }
+      
     // Calculate the previous day
     const previousDay = new Date(lastSimulatedDate);
     previousDay.setDate(previousDay.getDate() - 1);
     
-    // Set as selected date and use lastConfig
-    setSelectedDate(previousDay);
-    
-    // Show a confirmation with the date
-    Alert.alert(
-      'Quick Simulate Previous Day',
-      `Simulate ${previousDay.toLocaleDateString()} with the same configuration?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Simulate', 
-          onPress: () => handleSingleDaySimulation(lastConfig)
-        }
-      ]
-    );
+    // Directly pass the date to the simulation function
+    handleSingleDaySimulation(lastConfig, previousDay);
   };
   
   // Handle batch simulation for 7 consecutive days
@@ -521,7 +506,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       if (!lastBatchEndDate) {
         // First batch: use yesterday as end date
         endDate = yesterday;
-      } else {
+        } else {
         // Subsequent batches: use 7 days before the last end date
         endDate = new Date(lastBatchEndDate);
         endDate.setDate(endDate.getDate() - 1);
@@ -552,18 +537,18 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         patchDateForSimulation(currentDate);
         
         // Create routine for this day
-        const routine = {
+      const routine = {
           id: `batch-stretch-${Date.now()}-${currentDate.getTime()}`,
-          date: new Date().toISOString(),
+        date: new Date().toISOString(),
           duration: config.duration.toString() as any,
           area: config.bodyArea as any,
           difficulty: config.difficulty as any,
           stretches: ["Batch Simulation Stretch"],
-          status: "completed"
+        status: "completed"
         } as any;
-        
-        // Process the routine
-        const result = await gamificationManager.processCompletedRoutine(routine);
+      
+      // Process the routine
+      const result = await gamificationManager.processCompletedRoutine(routine);
         
         // Claim any completed challenges
         if (result.completedChallenges && result.completedChallenges.length > 0) {
@@ -721,30 +706,25 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   };
   
   // Reset the simulation
-  const handleReset = () => {
+  const handleReset = async () => {
     Alert.alert(
-      'Reset Simulation',
-      'This will reset all progress and start fresh. Continue?',
+      'Reset Simulation Data',
+      'This will reset all simulation data including game progress, routines, and XP. Your testing progress, feedback, and premium status will be preserved.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Reset', 
-          style: 'destructive',
-          onPress: () => {
-            // Use the actual current date
-            const resetDate = new Date();
-            setCurrentDate(resetDate);
-            console.log(`Reset simulation date to today: ${resetDate.toISOString()}`);
-            
-            // Reset all the tracking states
-            setActivityLog([]);
-            setLastBatchEndDate(null);
-            setLastConfig(null);
-            setLastSimulatedDate(null);
-            setConsecutiveDaysCount(0);
-            
-            // Initialize fresh state
-            initializeBob();
+          text: 'Reset Simulation Data', 
+          style: 'destructive', 
+          onPress: async () => {
+            const success = await resetSimulationData();
+            if (success) {
+              Alert.alert('Success', 'Simulation data has been reset. You can now test different scenarios with a clean state.');
+              // Refresh the screen data after reset
+              initializeBob();
+              refreshBobStats();
+            } else {
+              Alert.alert('Error', 'Failed to reset simulation data. Please try again.');
+            }
           }
         }
       ]
@@ -765,37 +745,6 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     );
   };
   
-  // Add a method to handle going back one day
-  const handlePreviousDay = async () => {
-    const prevDate = new Date(currentDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    setCurrentDate(prevDate);
-    
-    // Update the simulated date
-    patchDateForSimulation(prevDate);
-    
-    // Log the change
-    addLog(`Went back to ${prevDate.toLocaleDateString()}`);
-    
-    try {
-      setIsLoading(true);
-      
-      // Get the current progress
-      const progress = await storageService.getUserProgress();
-      
-      // Since we're going backwards, we need to make sure all
-      // challenges are still properly set up for this date
-      await challengeManager.ensureChallengeCount(progress, CORE_CHALLENGES);
-      await storageService.saveUserProgress(progress);
-      
-      // Update stats
-      await refreshBobStats();
-    } catch (error) {
-      console.error('Error handling previous day:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
   
   // Also update the renderBobStats function to include additional stats
   const renderBobStats = () => {
@@ -924,9 +873,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color={theme.text} />
-          </TouchableOpacity>
-        </View>
-        
+            </TouchableOpacity>
+          </View>
+          
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {scenarioInstructions ? `Testing: Scenario #${scenarioInstructions.id}` : 'Bob Simulator'}
         </Text>
@@ -943,9 +892,17 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
               <Text style={[styles.loadingText, { color: theme.text }]}>
                 Processing simulation...
               </Text>
-            </View>
+          </View>
           ) : (
             <>
+              {/* Notice about testing screens */}
+              <View style={[styles.noticeCard, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)' }]}>
+                <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
+                <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
+                  Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
+                </Text>
+              </View>
+              
               {/* Testing Scenario Card - Only show if scenario data exists */}
               {scenarioInstructions && (
                 <View style={[styles.scenarioCard, { backgroundColor: theme.cardBackground }]}>
@@ -954,8 +911,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     <Text style={[styles.scenarioCardTitle, { color: theme.text }]}>
                       Scenario #{scenarioInstructions.id}: {scenarioInstructions.title}
                     </Text>
-                  </View>
-                  
+        </View>
+        
                   <View style={[styles.scenarioSetupContainer, { backgroundColor: theme.backgroundLight }]}>
                     <Text style={[styles.scenarioSetupLabel, { color: theme.accent }]}>Setup Instructions:</Text>
                     <Text style={[styles.scenarioSetupText, { color: theme.text }]}>
@@ -965,23 +922,23 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                   
                   <Text style={[styles.verificationLabel, { color: theme.text }]}>
                     Verification Points:
-                  </Text>
+              </Text>
                   
                   {scenarioInstructions.verification.map((point, index) => (
                     <View key={index} style={styles.verificationItem}>
                       <Ionicons name="checkmark-circle" size={20} color={theme.accent} style={{ marginRight: 8 }} />
                       <Text style={[styles.verificationText, { color: theme.text }]}>
                         {point}
-                      </Text>
+              </Text>
                     </View>
                   ))}
                   
                   <View style={styles.scenarioFooter}>
                     <Text style={[styles.scenarioFooterText, { color: theme.textSecondary }]}>
                       Complete this scenario and return to the testing screen to provide feedback.
-                    </Text>
-                  </View>
-                </View>
+              </Text>
+          </View>
+        </View>
               )}
               
               {/* Welcome and Instructions Card */}
@@ -996,8 +953,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                 <Text style={[styles.instructionsText, { color: theme.textSecondary }]}>
                   This tool lets you simulate stretching routines for testing purposes. Simulated routines 
                   will affect XP, levels, and unlock achievements just like real routines.
-                </Text>
-                
+          </Text>
+          
                 <View style={styles.stepsContainer}>
                   <View style={styles.stepItem}>
                     <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
@@ -1005,8 +962,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     </View>
                     <Text style={[styles.stepText, { color: theme.text }]}>
                       Choose a date to simulate a routine
-                    </Text>
-                  </View>
+                  </Text>
+            </View>
                   
                   <View style={styles.stepItem}>
                     <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
@@ -1014,7 +971,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     </View>
                     <Text style={[styles.stepText, { color: theme.text }]}>
                       Configure the routine details (area, difficulty, duration)
-                    </Text>
+          </Text>
                   </View>
                   
                   <View style={styles.stepItem}>
@@ -1023,7 +980,15 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     </View>
                     <Text style={[styles.stepText, { color: theme.text }]}>
                       Review the results and continue simulating
-                    </Text>
+                </Text>
+          </View>
+                  <View style={styles.stepItem}>
+                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
+                      <Text style={styles.stepNumberText}>4</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: theme.text }]}>
+                      Once you're done, close out the app and reopen it to see the results.
+          </Text>
                   </View>
                 </View>
               </View>
@@ -1035,15 +1000,15 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     <Ionicons name="stats-chart" size={24} color={theme.accent} />
                     <Text style={[styles.cardTitle, { color: theme.text }]}>
                       Current Stats
-                    </Text>
-                  </View>
-                  
+                </Text>
+          </View>
+          
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                       <Text style={[styles.statValue, { color: theme.text }]}>{stats.level}</Text>
                       <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Level</Text>
-                    </View>
-                    
+        </View>
+        
                     <View style={styles.statItem}>
                       <Text style={[styles.statValue, { color: theme.text }]}>{stats.totalXP}</Text>
                       <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total XP</Text>
@@ -1053,15 +1018,15 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                       <Text style={[styles.statValue, { color: theme.text }]}>{stats.currentStreak}</Text>
                       <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Streak</Text>
                     </View>
-                  </View>
-                  
+          </View>
+          
                   <View style={styles.progressBarContainer}>
                     <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>
                       Progress to Level {stats.level + 1}
-                    </Text>
+              </Text>
                     <View style={[styles.progressBarBg, { backgroundColor: isDark ? '#333' : '#e0e0e0' }]}>
                       <View 
-                        style={[
+                  style={[
                           styles.progressBarFill, 
                           { 
                             width: `${Math.min(100, Math.max(0, stats.percentToNextLevel))}%`, 
@@ -1072,9 +1037,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     </View>
                     <Text style={[styles.progressText, { color: theme.textSecondary }]}>
                       {stats.totalXP} / {stats.totalXP + stats.xpToNextLevel} XP
-                    </Text>
-                  </View>
-                </View>
+                </Text>
+          </View>
+        </View>
               )}
               
               {/* Simulation Actions Card */}
@@ -1096,7 +1061,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                 
                 {/* Add Quick Simulate Button if we have a last config */}
                 {lastConfig && lastSimulatedDate && (
-                  <TouchableOpacity 
+                <TouchableOpacity 
                     style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
                     onPress={handleQuickSimulation}
                   >
@@ -1105,7 +1070,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                       Quick Simulate Previous Day 
                       {consecutiveDaysCount > 0 ? ` (Day ${consecutiveDaysCount + 1})` : ''}
                     </Text>
-                  </TouchableOpacity>
+                </TouchableOpacity>
                 )}
                 
                 <TouchableOpacity 
@@ -1118,7 +1083,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     {lastBatchEndDate ? 
                       ` (${new Date(lastBatchEndDate.getTime() - 6 * 86400000).toLocaleDateString()} - ${new Date(lastBatchEndDate).toLocaleDateString()})` : 
                       ' Before Today'}
-                  </Text>
+                    </Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
@@ -1128,7 +1093,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                   <Ionicons name="refresh" size={20} color="#F44336" />
                   <Text style={[styles.resetButtonText, { color: '#F44336' }]}>
                     Reset Simulation Data
-                  </Text>
+                      </Text>
                 </TouchableOpacity>
               </View>
               
@@ -1154,20 +1119,20 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                             year: 'numeric'
                           })}
                         </Text>
-                      </View>
-                    ))}
+                  </View>
+                ))}
                     
                     {simulatedDates.length > 10 && (
                       <Text style={[styles.moreDatesText, { color: theme.textSecondary }]}>
                         +{simulatedDates.length - 10} more dates simulated
                       </Text>
                     )}
-                  </ScrollView>
-                </View>
+              </ScrollView>
+            </View>
               )}
             </>
           )}
-        </ScrollView>
+      </ScrollView>
       ) : null}
       
       {/* Authentication Modal */}
@@ -1202,7 +1167,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         onClose={() => setShowConfigModal(false)}
         onConfirm={(config) => {
           setShowConfigModal(false);
-          handleSingleDaySimulation(config);
+          handleSingleDaySimulation(config, selectedDate);
         }}
         title="Configure Stretch Routine"
       />
@@ -1497,6 +1462,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  noticeCard: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  noticeIcon: {
+    marginRight: 12,
+  },
+  noticeText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
 

@@ -7,7 +7,8 @@ import {
   Text,
   SafeAreaView,
   Alert,
-  BackHandler
+  BackHandler,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -26,6 +27,7 @@ const TESTING_CURRENT_STAGE = 'testing_current_stage';
 
 // Testing phases
 enum TestingPhase {
+  WELCOME = 'welcome',
   ACCESS = 'access',
   INTRO = 'intro',
   PART_1 = 'part1',
@@ -44,34 +46,86 @@ type TestingModalProps = {
 
 const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
   const navigation = useNavigation();
-  const { theme } = useTheme();
-  const [phase, setPhase] = useState<TestingPhase>(TestingPhase.ACCESS);
+  const { theme, isDark } = useTheme();
+  const [phase, setPhase] = useState<TestingPhase>(TestingPhase.WELCOME);
   const [hasAccess, setHasAccess] = useState(false);
 
-  // Load saved testing phase and access
+  // Set up initial phase on first render
   useEffect(() => {
-    const loadTestingState = async () => {
+    const checkPhase = async () => {
       try {
-        const savedPhase = await AsyncStorage.getItem(TESTING_PHASE_KEY);
-        const savedAccess = await AsyncStorage.getItem(TESTING_ACCESS_KEY);
+        // Check if returning to specific phase
+        const returnPhase = await AsyncStorage.getItem('@deskstretch:testing_return_phase');
         
-        if (savedAccess === 'true') {
-          setHasAccess(true);
-          if (savedPhase) {
-            setPhase(savedPhase as TestingPhase);
-          } else {
-            setPhase(TestingPhase.INTRO);
+        if (returnPhase) {
+          console.log('Returning to testing phase:', returnPhase);
+          // Clean up return phase key
+          await AsyncStorage.removeItem('@deskstretch:testing_return_phase');
+          
+          switch (returnPhase) {
+            case 'simulator':
+              setPhase(TestingPhase.SIMULATOR);
+              break;
+            case 'feedback':
+              setPhase(TestingPhase.FEEDBACK);
+              break;
+            default:
+              // Continue checking other phases
+              checkSavedPhase();
           }
+        } else {
+          checkSavedPhase();
         }
       } catch (error) {
-        console.error('Error loading testing state:', error);
+        console.error('Error checking return phase:', error);
+        checkSavedPhase();
       }
     };
+    
+    const checkSavedPhase = async () => {
+      try {
+        // Check if testing phase was saved
+        const savedPhase = await AsyncStorage.getItem(TESTING_PHASE_KEY);
+        const accessGranted = await AsyncStorage.getItem(TESTING_ACCESS_KEY);
+        
+        if (savedPhase) {
+          switch (savedPhase) {
+            case 'intro':
+              setPhase(TestingPhase.INTRO);
+              break;
+            case 'part1':
+              setPhase(TestingPhase.PART_1);
+              break;
+            case 'simulator':
+              setPhase(TestingPhase.SIMULATOR);
+              break;
+            case 'feedback':
+              setPhase(TestingPhase.FEEDBACK);
+              break;
+            case 'complete':
+              setPhase(TestingPhase.COMPLETE);
+              break;
+            default:
+              // Default to access if no valid phase saved
+              setPhase(accessGranted === 'true' ? TestingPhase.INTRO : TestingPhase.ACCESS);
+          }
+        } else {
+          // Default to welcome if no phase saved, unless already have access
+          setPhase(accessGranted === 'true' ? TestingPhase.INTRO : TestingPhase.WELCOME);
+        }
+      } catch (error) {
+        console.error('Error loading testing phase:', error);
+        setPhase(TestingPhase.WELCOME);
+      }
+    };
+    
+    checkPhase();
+  }, []);
 
-    if (visible) {
-      loadTestingState();
-    }
-  }, [visible]);
+  // Handle welcome screen continue
+  const handleWelcomeContinue = () => {
+    setPhase(TestingPhase.ACCESS);
+  };
 
   // Save current testing phase
   useEffect(() => {
@@ -193,8 +247,24 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
 
   const resetTestingAccess = async () => {
     try {
-      await AsyncStorage.removeItem(TESTING_PHASE_KEY);
-      await AsyncStorage.removeItem(TESTING_ACCESS_KEY);
+      // Clear all testing-related data but preserve premium and access credentials if needed
+      const testingKeys = [
+        '@deskstretch:simulator_scenario',
+        '@deskstretch:testing_feedback',
+        '@deskstretch:bob_simulator_access',
+        '@deskstretch:testing_return_phase',
+        '@deskstretch:testing_phase',
+        '@deskstretch:testing_checklist_progress',
+        '@deskstretch:testing_checklist_p2_progress',
+        '@deskstretch:testing_feedback_submitted',
+        TESTING_PHASE_KEY,
+        TESTING_ACCESS_KEY
+      ];
+      
+      // Note: We intentionally don't clear '@deskstretch:testing_premium_access'
+      // to ensure testers keep premium access even after resetting
+      
+      await AsyncStorage.multiRemove(testingKeys);
       setHasAccess(false);
       setPhase(TestingPhase.ACCESS);
     } catch (error) {
@@ -249,6 +319,93 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
 
   const renderContent = () => {
     switch (phase) {
+      case TestingPhase.WELCOME:
+        return (
+          <ScrollView contentContainerStyle={styles.welcomeContainer}>
+            <View style={[styles.welcomeCard, { backgroundColor: theme.cardBackground }]}>
+              <View style={[styles.welcomeIconContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)' }]}>
+                <Ionicons name="flask-outline" size={56} color={theme.accent} />
+              </View>
+              
+              <Text style={[styles.welcomeTitle, { color: theme.text }]}>
+                Welcome to FlexBreak Testing!
+              </Text>
+              
+              <Text style={[styles.welcomeDescription, { color: theme.textSecondary }]}>
+                Thank you for helping us improve FlexBreak. Your feedback is extremely valuable to us!
+              </Text>
+              
+              <View style={styles.welcomeInfoContainer}>
+                <View style={styles.welcomeInfoItem}>
+                  <View style={[styles.welcomeStep, { backgroundColor: theme.accent }]}>
+                    <Text style={styles.welcomeStepText}>1</Text>
+                  </View>
+                  <View style={styles.welcomeInfoTextContainer}>
+                    <Text style={[styles.welcomeInfoTitle, { color: theme.text }]}>
+                      Enter your access code
+                    </Text>
+                    <Text style={[styles.welcomeInfoDescription, { color: theme.textSecondary }]}>
+                      Use the code from your invitation email to begin testing
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.welcomeInfoItem}>
+                  <View style={[styles.welcomeStep, { backgroundColor: theme.accent }]}>
+                    <Text style={styles.welcomeStepText}>2</Text>
+                  </View>
+                  <View style={styles.welcomeInfoTextContainer}>
+                    <Text style={[styles.welcomeInfoTitle, { color: theme.text }]}>
+                      Test basic features
+                    </Text>
+                    <Text style={[styles.welcomeInfoDescription, { color: theme.textSecondary }]}>
+                      Follow the checklist to test core app functionality
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.welcomeInfoItem}>
+                  <View style={[styles.welcomeStep, { backgroundColor: theme.accent }]}>
+                    <Text style={styles.welcomeStepText}>3</Text>
+                  </View>
+                  <View style={styles.welcomeInfoTextContainer}>
+                    <Text style={[styles.welcomeInfoTitle, { color: theme.text }]}>
+                      Test gamification
+                    </Text>
+                    <Text style={[styles.welcomeInfoDescription, { color: theme.textSecondary }]}>
+                      Simulate stretching over time to test rewards and progression
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.welcomeInfoItem}>
+                  <View style={[styles.welcomeStep, { backgroundColor: theme.accent }]}>
+                    <Text style={styles.welcomeStepText}>4</Text>
+                  </View>
+                  <View style={styles.welcomeInfoTextContainer}>
+                    <Text style={[styles.welcomeInfoTitle, { color: theme.text }]}>
+                      Provide feedback
+                    </Text>
+                    <Text style={[styles.welcomeInfoDescription, { color: theme.textSecondary }]}>
+                      Share your thoughts to help us make the app better
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              
+              <Text style={[styles.welcomeNote, { color: theme.textSecondary }]}>
+                Testing takes about 15-30 minutes. You can pause and resume anytime.
+              </Text>
+              
+              <TouchableOpacity
+                style={[styles.welcomeButton, { backgroundColor: theme.accent }]}
+                onPress={handleWelcomeContinue}
+              >
+                <Text style={styles.welcomeButtonText}>Get Started</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        );
       case TestingPhase.ACCESS:
         return <TestingAccessForm onAccessGranted={handleAccessSuccess} />;
       case TestingPhase.INTRO:
@@ -299,41 +456,100 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
 
   return (
     <Modal
+      animationType="fade"
+      transparent={true}
       visible={visible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={handleBackAction}
+      onRequestClose={confirmExit}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={handleBackAction}
-          >
-            <Ionicons name="close" size={24} color={theme.text} />
-          </TouchableOpacity>
-          
-          <Text style={[styles.headerTitle, { color: theme.text }]}>
-            {renderStageTitle()}
-          </Text>
-          
-          <View style={styles.headerRight} />
-        </View>
-        
-        <View style={styles.content}>
-          {renderContent()}
-        </View>
-
-        {phase !== TestingPhase.ACCESS && phase !== TestingPhase.COMPLETE && (
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: theme.backgroundLight }]}
-            onPress={handleBackAction}
-          >
-            <Text style={[styles.backButtonText, { color: theme.text }]}>
-              Back
-            </Text>
-          </TouchableOpacity>
+        {phase !== TestingPhase.WELCOME && (
+          <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
+            <TouchableOpacity
+              onPress={confirmExit}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color={theme.text} />
+            </TouchableOpacity>
+            
+            {/* Show app name/version for some phases */}
+            {(phase === TestingPhase.ACCESS || phase === TestingPhase.INTRO) && (
+              <View style={styles.appInfoContainer}>
+                <Text style={[styles.appName, { color: theme.text }]}>
+                  FlexBreak Testing
+                </Text>
+                <Text style={[styles.appVersion, { color: theme.textSecondary }]}>
+                  Version 0.0.9 (Beta)
+                </Text>
+              </View>
+            )}
+            
+            {/* Show premium badge for all phases after access */}
+            {(phase === TestingPhase.INTRO || 
+              phase === TestingPhase.PART_1 || 
+              phase === TestingPhase.SIMULATOR || 
+              phase === TestingPhase.FEEDBACK || 
+              phase === TestingPhase.COMPLETE) && (
+              <View style={styles.premiumBadgeContainer}>
+                
+              </View>
+            )}
+            
+            {/* Show progress indicator for testing phases */}
+            {(phase === TestingPhase.PART_1 || phase === TestingPhase.SIMULATOR || phase === TestingPhase.FEEDBACK) && (
+              <View style={styles.progressIndicatorContainer}>
+                <View style={styles.progressSteps}>
+                  <View 
+                    style={[
+                      styles.progressStep, 
+                      { 
+                        backgroundColor: phase === TestingPhase.PART_1 ? theme.accent : 
+                                        (phase === TestingPhase.SIMULATOR || phase === TestingPhase.FEEDBACK) ? 
+                                        theme.accent + '80' : theme.backgroundLight 
+                      }
+                    ]}
+                  >
+                    <Text style={styles.progressStepText}>1</Text>
+                  </View>
+                  <View style={[styles.progressLine, { backgroundColor: (phase === TestingPhase.SIMULATOR || phase === TestingPhase.FEEDBACK) ? theme.accent + '80' : theme.backgroundLight }]} />
+                  <View 
+                    style={[
+                      styles.progressStep, 
+                      { 
+                        backgroundColor: phase === TestingPhase.SIMULATOR ? theme.accent : 
+                                        phase === TestingPhase.FEEDBACK ? 
+                                        theme.accent + '80' : theme.backgroundLight 
+                      }
+                    ]}
+                  >
+                    <Text style={styles.progressStepText}>2</Text>
+                  </View>
+                  <View style={[styles.progressLine, { backgroundColor: phase === TestingPhase.FEEDBACK ? theme.accent + '80' : theme.backgroundLight }]} />
+                  <View 
+                    style={[
+                      styles.progressStep, 
+                      { backgroundColor: phase === TestingPhase.FEEDBACK ? theme.accent : theme.backgroundLight }
+                    ]}
+                  >
+                    <Text style={styles.progressStepText}>3</Text>
+                  </View>
+                </View>
+                <View style={styles.progressLabels}>
+                  <Text style={[styles.progressLabel, { color: phase === TestingPhase.PART_1 ? theme.accent : theme.textSecondary }]}>
+                    Features
+                  </Text>
+                  <Text style={[styles.progressLabel, { color: phase === TestingPhase.SIMULATOR ? theme.accent : theme.textSecondary }]}>
+                    Gamification
+                  </Text>
+                  <Text style={[styles.progressLabel, { color: phase === TestingPhase.FEEDBACK ? theme.accent : theme.textSecondary }]}>
+                    Feedback
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
         )}
+        
+        {renderContent()}
       </SafeAreaView>
     </Modal>
   );
@@ -347,15 +563,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  closeButton: {
+    padding: 8,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 8,
   },
   headerRight: {
     width: 40,
@@ -396,6 +614,156 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  welcomeContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  welcomeCard: {
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  welcomeIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  welcomeDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  welcomeInfoContainer: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  welcomeInfoItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  welcomeStep: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+    marginTop: 2,
+  },
+  welcomeStepText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  welcomeInfoTextContainer: {
+    flex: 1,
+  },
+  welcomeInfoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  welcomeInfoDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  welcomeNote: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    fontStyle: 'italic',
+  },
+  welcomeButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  welcomeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  appInfoContainer: {
+    alignItems: 'center',
+  },
+  appName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  appVersion: {
+    fontSize: 12,
+  },
+  progressIndicatorContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  progressSteps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressStep: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressStepText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  progressLine: {
+    width: 20,
+    height: 2,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  progressLabel: {
+    fontSize: 10,
+    width: 64,
+    textAlign: 'center',
+  },
+  premiumBadgeContainer: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  premiumBadge: {
+    padding: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  premiumIcon: {
+    marginRight: 4,
+  },
+  premiumText: {
+    fontSize: 12,
     fontWeight: 'bold',
   },
 });

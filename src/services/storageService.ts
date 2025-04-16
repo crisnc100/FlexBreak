@@ -8,6 +8,7 @@ import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
 export const KEYS = {
   USER: {
     PREMIUM: '@user_premium',
+    TESTING_PREMIUM: '@deskstretch:testing_premium_access',
   },
   PROGRESS: {
     USER_PROGRESS: '@user_progress',
@@ -135,14 +136,27 @@ export const saveIsPremium = async (isPremium: boolean): Promise<boolean> => {
 };
 
 /**
- * Get premium status
+ * Get premium status, including testing premium if available
  * @returns Premium status boolean
  */
 export const getIsPremium = async (): Promise<boolean> => {
   console.log('Getting premium status from AsyncStorage');
-  const value = await getData<boolean>(KEYS.USER.PREMIUM, false);
-  console.log('Premium status:', value);
-  return value;
+  try {
+    // First check normal premium status
+    const isPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
+    
+    // Then check testing premium status
+    const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
+    
+    // User has premium if either regular premium or testing premium is active
+    const hasPremium = isPremium || testingPremium === 'true';
+    
+    console.log(`Premium status: Regular=${isPremium}, Testing=${testingPremium === 'true'}, Combined=${hasPremium}`);
+    return hasPremium;
+  } catch (error) {
+    console.error('Error getting premium status:', error);
+    return false;
+  }
 };
 
 // ========== PROGRESS METHODS ==========
@@ -777,7 +791,8 @@ export const clearAllData = async (): Promise<boolean> => {
       '@deskstretch:simulator_scenario',
       '@deskstretch:testing_feedback',
       'testing_access_granted',
-      'testing_current_stage'
+      'testing_current_stage',
+      KEYS.USER.TESTING_PREMIUM // Preserve premium testing status
     ];
     
     // Get all keys from AsyncStorage
@@ -929,6 +944,80 @@ export const clearRoutines = async (): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error clearing routines:', error);
+    return false;
+  }
+};
+
+/**
+ * Reset simulation data for testers
+ * This is similar to clearAllData but with extra precautions to preserve tester status and premium access
+ * @returns Success boolean
+ */
+export const resetSimulationData = async (): Promise<boolean> => {
+  try {
+    console.log('Starting to reset simulation data...');
+    
+    // First, backup premium and testing status
+    const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
+    const regularPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
+    
+    // Get all keys for simulation data
+    const simulationKeys = [
+      ...Object.values(KEYS.PROGRESS),
+      ...Object.values(KEYS.ROUTINES),
+      ...Object.values(KEYS.UI),
+      '@user_routines', 
+      '@all_routines', 
+      '@visible_routines',
+      '@user_progress',
+      '@gamification',
+      '@achievements',
+      '@challenges'
+    ];
+    
+    // Define keys to preserve (testing and premium related)
+    const keysToPreserve = [
+      KEYS.USER.PREMIUM,
+      KEYS.USER.TESTING_PREMIUM,
+      '@deskstretch:testing_phase',
+      '@deskstretch:testing_access',
+      '@deskstretch:bob_simulator_access',
+      '@deskstretch:testing_return_phase',
+      '@deskstretch:simulator_scenario',
+      '@deskstretch:testing_feedback',
+      '@deskstretch:testing_checklist_progress',
+      '@deskstretch:testing_checklist_p2_progress',
+      '@deskstretch:testing_feedback_submitted',
+      'testing_access_granted',
+      'testing_current_stage'
+    ];
+    
+    // Get all keys from AsyncStorage
+    const allKeys = await AsyncStorage.getAllKeys();
+    
+    // Filter to get just the keys we want to remove (simulation data)
+    const keysToRemove = allKeys.filter(key => 
+      simulationKeys.includes(key) && !keysToPreserve.includes(key)
+    );
+    
+    // Clear simulation keys except preserved ones
+    await AsyncStorage.multiRemove(keysToRemove);
+    console.log('Simulation data cleared, preserving testing and premium status. Cleared keys:', keysToRemove);
+    
+    // Safety check - restore premium status if somehow lost
+    if (testingPremium === 'true' || regularPremium) {
+      await AsyncStorage.setItem(KEYS.USER.TESTING_PREMIUM, testingPremium || 'false');
+      await setData(KEYS.USER.PREMIUM, regularPremium);
+      console.log('Restored premium status:', { testingPremium, regularPremium });
+    }
+    
+    // Re-initialize user progress with defaults
+    await initializeUserProgressIfEmpty();
+    console.log('Re-initialized user progress with defaults');
+    
+    return true;
+  } catch (e) {
+    console.error('Error resetting simulation data:', e);
     return false;
   }
 }; 

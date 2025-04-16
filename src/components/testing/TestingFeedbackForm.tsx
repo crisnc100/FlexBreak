@@ -20,7 +20,7 @@ interface TestingFeedbackFormProps {
 const FEEDBACK_EMAIL = 'cortegafit@gmail.com';
 
 const TestingFeedbackForm: React.FC<TestingFeedbackFormProps> = ({ onComplete }) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [overallExperience, setOverallExperience] = useState('');
   const [suggestions, setSuggestions] = useState('');
   const [bugs, setBugs] = useState('');
@@ -126,6 +126,13 @@ ${bugs}
           <Ionicons name="shield-checkmark-outline" size={16} color={theme.accent} style={styles.anonymousIcon} />
           <Text style={[styles.anonymousText, { color: theme.accent }]}>
             Your feedback is completely anonymous
+          </Text>
+        </View>
+        
+        <View style={[styles.noticeContainer, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)', marginTop: 16 }]}>
+          <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
+          <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
+            Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
           </Text>
         </View>
       </View>
@@ -295,6 +302,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     marginBottom: 40,
+  },
+  noticeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+  },
+  noticeIcon: {
+    marginRight: 8,
+  },
+  noticeText: {
+    fontSize: 14,
+    fontWeight: '500',
   }
 });
 
