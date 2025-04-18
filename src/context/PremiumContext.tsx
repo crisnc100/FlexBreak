@@ -1,15 +1,28 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { getIsPremium, saveIsPremium } from '../services/storageService';
+import { getIsPremium, saveIsPremium, getSubscriptionDetails, saveSubscriptionDetails, clearSubscriptionDetails } from '../services/storageService';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { gamificationEvents } from '../hooks/progress/useGamification';
 import { PREMIUM_STATUS_CHANGED } from '../hooks/progress/useFeatureAccess';
 import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
 
+export type SubscriptionDetails = {
+  productId: string;
+  purchaseDate: string;
+  expiryDate?: string;
+  isActive: boolean;
+  autoRenewing?: boolean;
+  platform: 'ios' | 'android';
+  purchaseToken?: string;
+};
+
 export type PremiumContextType = {
   isPremium: boolean;
   setPremiumStatus: (status: boolean) => Promise<void>;
   refreshPremiumStatus: () => Promise<void>;
+  subscriptionDetails: SubscriptionDetails | null;
+  updateSubscription: (details: SubscriptionDetails) => Promise<void>;
+  cancelSubscription: () => Promise<void>;
 };
 
 export const PremiumContext = createContext<PremiumContextType | undefined>(undefined);
@@ -17,8 +30,9 @@ export const PremiumContext = createContext<PremiumContextType | undefined>(unde
 export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isPremium, setIsPremium] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
 
-  // Load premium status on initial render
+  // Load premium status and subscription details on initial render
   useEffect(() => {
     console.log('PremiumProvider mounted, loading premium status');
     
@@ -31,21 +45,37 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }, 2000);
     
-    // Load premium status
-    refreshPremiumStatus()
-      .then(() => {
-        console.log('Premium status loaded successfully');
+    // Load premium status and subscription details
+    const initializeProvider = async () => {
+      try {
+        await refreshPremiumStatus();
+        await loadSubscriptionDetails();
+        console.log('Premium status and subscription details loaded successfully');
         setIsInitialized(true);
-      })
-      .catch(error => {
-        console.error('Error loading premium status:', error);
+      } catch (error) {
+        console.error('Error during initialization:', error);
         setIsInitialized(true); // Still mark as initialized even if there's an error
-      });
+      }
+    };
+    
+    initializeProvider();
     
     return () => {
       clearTimeout(timeoutId);
     };
   }, []); // Remove isInitialized from the dependency array to avoid circular dependency
+
+  // Function to load subscription details
+  const loadSubscriptionDetails = async (): Promise<void> => {
+    try {
+      console.log('Loading subscription details from storage');
+      const details = await getSubscriptionDetails();
+      console.log('Subscription details from storage:', details);
+      setSubscriptionDetails(details);
+    } catch (error) {
+      console.error('Error loading subscription details:', error);
+    }
+  };
 
   // Function to refresh premium status from storage
   const refreshPremiumStatus = async (): Promise<void> => {
@@ -56,6 +86,36 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsPremium(premiumStatus);
     } catch (error) {
       console.error('Error loading premium status:', error);
+    }
+  };
+
+  // Function to update subscription details
+  const updateSubscription = async (details: SubscriptionDetails): Promise<void> => {
+    try {
+      console.log('Updating subscription details:', details);
+      await saveSubscriptionDetails(details);
+      setSubscriptionDetails(details);
+      
+      // Update premium status based on subscription activity
+      if (details.isActive && !isPremium) {
+        await setPremiumStatus(true);
+      } else if (!details.isActive && isPremium) {
+        await setPremiumStatus(false);
+      }
+    } catch (error) {
+      console.error('Error updating subscription details:', error);
+    }
+  };
+
+  // Function to cancel subscription (locally)
+  const cancelSubscription = async (): Promise<void> => {
+    try {
+      console.log('Canceling subscription locally');
+      await clearSubscriptionDetails();
+      setSubscriptionDetails(null);
+      await setPremiumStatus(false);
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
     }
   };
 
@@ -150,7 +210,16 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }
 
   return (
-    <PremiumContext.Provider value={{ isPremium, setPremiumStatus, refreshPremiumStatus }}>
+    <PremiumContext.Provider 
+      value={{ 
+        isPremium, 
+        setPremiumStatus, 
+        refreshPremiumStatus,
+        subscriptionDetails,
+        updateSubscription,
+        cancelSubscription
+      }}
+    >
       {children}
     </PremiumContext.Provider>
   );

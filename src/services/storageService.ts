@@ -9,6 +9,7 @@ export const KEYS = {
   USER: {
     PREMIUM: '@user_premium',
     TESTING_PREMIUM: '@deskstretch:testing_premium_access',
+    SUBSCRIPTION_DETAILS: '@user_subscription_details',
   },
   PROGRESS: {
     USER_PROGRESS: '@user_progress',
@@ -1150,6 +1151,62 @@ export const clearAllPremiumStatus = async (): Promise<boolean> => {
     }
   } catch (error) {
     console.error('Error clearing premium status:', error);
+    return false;
+  }
+};
+
+// ========== SUBSCRIPTION MANAGEMENT ==========
+
+/**
+ * Save subscription details to storage
+ * @param details Subscription details object
+ * @returns Success boolean
+ */
+export const saveSubscriptionDetails = async (details: {
+  productId: string;
+  purchaseDate: string;
+  expiryDate?: string;
+  isActive: boolean;
+  autoRenewing?: boolean;
+  platform: 'ios' | 'android';
+  purchaseToken?: string;
+}): Promise<boolean> => {
+  try {
+    console.log('Saving subscription details:', details);
+    return await setData(KEYS.USER.SUBSCRIPTION_DETAILS, details);
+  } catch (error) {
+    console.error('Error saving subscription details:', error);
+    return false;
+  }
+};
+
+/**
+ * Get current subscription details
+ * @returns Subscription details or null if not found
+ */
+export const getSubscriptionDetails = async (): Promise<any | null> => {
+  try {
+    return await getData(KEYS.USER.SUBSCRIPTION_DETAILS, null);
+  } catch (error) {
+    console.error('Error getting subscription details:', error);
+    return null;
+  }
+};
+
+/**
+ * Clear subscription details (used when subscription is canceled)
+ * @returns Success boolean
+ */
+export const clearSubscriptionDetails = async (): Promise<boolean> => {
+  try {
+    // Clear subscription details
+    await removeData(KEYS.USER.SUBSCRIPTION_DETAILS);
+    // Also update premium status
+    await saveIsPremium(false);
+    console.log('Subscription details cleared and premium status set to false');
+    return true;
+  } catch (error) {
+    console.error('Error clearing subscription details:', error);
     return false;
   }
 }; 

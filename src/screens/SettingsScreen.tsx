@@ -127,8 +127,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     );
   };
 
- 
-  
   // Handle theme type selection
   const handleThemeTypeSelection = (type: ThemeType) => {
     if (type === 'dark') {
@@ -232,6 +230,16 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     );
   };
   
+  // Function to open subscription management page
+  const openSubscriptionManagement = () => {
+    if (Platform.OS === 'ios') {
+      // Opens iOS subscription management
+      Linking.openURL('https://apps.apple.com/account/subscriptions');
+    } else if (Platform.OS === 'android') {
+      // Opens Google Play subscription management
+      Linking.openURL('https://play.google.com/store/account/subscriptions');
+    }
+  };
   
   return (
     <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
@@ -373,6 +381,63 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 </View>
               )}
             </>
+          )}
+        </View>
+        
+        {/* Premium Subscription Section */}
+        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
+          <Text style={[styles.sectionTitle, {color: theme.text}]}>Subscription</Text>
+          
+          {isPremium ? (
+            <>
+              <View style={[styles.premiumInfoCard, { backgroundColor: isDark ? 'rgba(76, 175, 80, 0.1)' : '#E8F5E9' }]}>
+                <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                <View style={styles.premiumInfoContent}>
+                  <Text style={[styles.premiumInfoTitle, { color: isDark ? '#81C784' : '#4CAF50' }]}>
+                    Premium Subscription Active
+                  </Text>
+                  <Text style={[styles.premiumInfoText, { color: isDark ? theme.textSecondary : '#666' }]}>
+                    Thank you for supporting FlexBreak! You have access to all premium features.
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={styles.settingItem}
+                onPress={openSubscriptionManagement}
+              >
+                <View style={styles.settingContent}>
+                  <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                    <Ionicons name="card-outline" size={22} color="#2196F3" />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={[styles.settingTitle, {color: theme.text}]}>Manage Subscription</Text>
+                    <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
+                      Change or cancel your subscription
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleOpenSubscription}
+            >
+              <View style={styles.settingContent}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                  <Ionicons name="star" size={22} color="#FFD700" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[styles.settingTitle, {color: theme.text}]}>Upgrade to Premium</Text>
+                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
+                    Unlock all premium features
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+            </TouchableOpacity>
           )}
         </View>
         
@@ -1352,6 +1417,27 @@ const styles = StyleSheet.create({
   },
   testDescription: {
     marginBottom: 16,
+  },
+  premiumInfoCard: {
+    flexDirection: 'row',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 10,
+    borderRadius: 12,
+    alignItems: 'flex-start',
+  },
+  premiumInfoContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  premiumInfoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  premiumInfoText: {
+    fontSize: 14,
+    marginBottom: 8,
   },
 });
 
