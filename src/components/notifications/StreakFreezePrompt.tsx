@@ -305,20 +305,31 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       const todayActivity = status.maintainedToday;
       setHasTodayActivity(todayActivity);
       
-      // Only show if:
-      // 1. Streak is broken (legacy status for compatibility)
-      // 2. Freezes are available
-      // 3. User had a meaningful streak before (3+)
-      // 4. Streak is not truly broken (more than 2 days)
-      // 5. No activity today (can't save after starting new streak)
-      // 6. Rate limiting allows it
-      const isBroken = legacyStatus.streakBroken;
+      console.log('Streak freeze prompt check:', {
+        uiStreak: status.currentStreak,
+        legacyStreakBroken: legacyStatus.streakBroken,
+        canSaveYesterday: legacyStatus.canSaveYesterdayStreak,
+        isTrulyBroken,
+        todayActivity,
+        freezesAvailable: status.freezesAvailable
+      });
+
+      // The key check should be canSaveYesterdayStreak from legacyStatus
+      // This applies even when the UI still shows a streak number
+      // This is what StreakFreezeCard uses as the primary check
       const hadMeaningfulStreak = status.currentStreak >= 3 || userProgress?.statistics?.bestStreak >= 3;
       const canSave = legacyStatus.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity;
       
       setCanSaveStreak(canSave);
       
-      if (isBroken && status.freezesAvailable > 0 && hadMeaningfulStreak && freezeAvailable && canSave) {
+      // Show prompt if:
+      // 1. There are streak freezes available
+      // 2. User had a meaningful streak (3+ days)
+      // 3. We can save yesterday's streak (missing activity yesterday)
+      // 4. Streak is not truly broken (not missing more than 2 days)
+      // 5. No activity today (can't save after starting new streak)
+      // 6. Rate limiting allows it
+      if (status.freezesAvailable > 0 && hadMeaningfulStreak && freezeAvailable && canSave) {
         // First check if we should show the prompt based on rate limiting
         const shouldShow = await canShowPrompt();
         
@@ -373,7 +384,6 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         }, 2 * 60 * 1000); // 2 minutes
       } else {
         console.log('Not showing streak prompt - conditions not met:', {
-          isBroken,
           freezesAvailable: status.freezesAvailable,
           currentStreak: status.currentStreak,
           hadMeaningfulStreak,
