@@ -1,8 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { usePremium } from '../../context/PremiumContext';
 
 interface HomeHeaderProps {
@@ -24,20 +22,12 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
-        <LinearGradient
-          colors={isDark ? 
-            ['#4CAF50', '#2196F3'] : 
-            ['#66BB6A', '#42A5F5']}
-          start={{x: 0, y: 0}}
-          end={{x: 1, y: 1}}
-          style={styles.logoContainer}
-        >
-          <Ionicons 
-            name="fitness-outline" 
-            size={22} 
-            color="#FFFFFF" 
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../../../assets/images/potentialLogo1.png')} 
+            style={styles.logoImage}
           />
-        </LinearGradient>
+        </View>
         
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: theme.text }]}>
@@ -64,12 +54,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'visible'
+  },
+  logoImage: {
+    width: 110,
+    height: 110,
+    resizeMode: 'contain',
+    backgroundColor: 'transparent'
   },
   textContainer: {
     flex: 1,

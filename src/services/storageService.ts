@@ -142,16 +142,46 @@ export const saveIsPremium = async (isPremium: boolean): Promise<boolean> => {
 export const getIsPremium = async (): Promise<boolean> => {
   console.log('Getting premium status from AsyncStorage');
   try {
+    // FORCE CHECK ALL POSSIBLE PREMIUM KEYS DIRECTLY
+    const directKeys = [
+      KEYS.USER.PREMIUM,
+      KEYS.USER.TESTING_PREMIUM,
+      '@deskstretch:testing_premium_access',
+      '@user_premium',
+      '@premium',
+      '@isPremium',
+      '@premium_access',
+      'premium_status',
+      'isPremium',
+      'premium_access',
+      'premiumAccess',
+      'premium_unlocked',
+      'premium_user'
+    ];
+    
+    // Log all possible premium keys and their values
+    console.log('Checking ALL possible premium keys:');
+    const premiumValues = {};
+    for (const key of directKeys) {
+      const value = await AsyncStorage.getItem(key);
+      premiumValues[key] = value;
+      console.log(`- Premium key "${key}" = ${value}`);
+    }
+    
     // First check normal premium status
     const isPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
     
-    // Then check testing premium status
+    // Then check testing premium status (direct access, not through getData)
     const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
+    const testingPremiumAccess = await AsyncStorage.getItem('@deskstretch:testing_premium_access');
     
-    // User has premium if either regular premium or testing premium is active
-    const hasPremium = isPremium || testingPremium === 'true';
+    // User has premium if ANY premium flag is true
+    const hasPremium = 
+      isPremium || 
+      testingPremium === 'true' || 
+      testingPremiumAccess === 'true';
     
-    console.log(`Premium status: Regular=${isPremium}, Testing=${testingPremium === 'true'}, Combined=${hasPremium}`);
+    
     return hasPremium;
   } catch (error) {
     console.error('Error getting premium status:', error);
@@ -754,9 +784,10 @@ export const exportUserProgress = (progress: UserProgress): void => {
 
 /**
  * Clear all app data
+ * @param resetTestingData Optional parameter to also clear testing-related data
  * @returns Success boolean
  */
-export const clearAllData = async (): Promise<boolean> => {
+export const clearAllData = async (resetTestingData: boolean = false): Promise<boolean> => {
   try {
     console.log('Starting to clear all app data...');
     
@@ -792,46 +823,70 @@ export const clearAllData = async (): Promise<boolean> => {
       '@deskstretch:testing_feedback',
       'testing_access_granted',
       'testing_current_stage',
-      KEYS.USER.TESTING_PREMIUM // Preserve premium testing status
     ];
     
+    // Explicitly ensure premium keys are included for removal
+    const premiumKeys = [
+      KEYS.USER.PREMIUM,
+      KEYS.USER.TESTING_PREMIUM,
+      '@deskstretch:testing_premium_access',
+      '@user_premium',
+      '@premium',
+      '@isPremium'
+    ];
+    
+    // Add premium keys to known keys to ensure they get cleared
+    knownKeys.push(...premiumKeys);
+    
     // Get all keys from AsyncStorage
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      console.log('All AsyncStorage keys found:', allKeys);
-      
-      // Merge with our known keys list
-      const uniqueKeys = [...new Set([...knownKeys, ...allKeys])] as string[];
-      
-      // Filter out testing keys
-      const keysToRemove = uniqueKeys.filter(key => !testingKeys.includes(key));
-      
-      // Clear all keys except testing keys
-      await AsyncStorage.multiRemove(keysToRemove);
-      console.log('App data cleared successfully, preserving testing data. Cleared keys:', keysToRemove);
-      
-      // Additional check - verify data has been cleared
-      const routines = await getAllRoutines();
-      const progress = await getUserProgress();
-      
-      console.log('After clearing - routines length:', routines?.length || 0);
-      console.log('After clearing - progress XP:', progress?.totalXP || 0);
-    } catch (innerError) {
-      // If getAllKeys fails, fall back to our predefined list
-      console.warn('Error getting all keys, falling back to predefined list:', innerError);
-      const keysToRemove = knownKeys.filter(key => !testingKeys.includes(key));
-      await AsyncStorage.multiRemove(keysToRemove);
-      console.log('Cleared predefined keys (preserving testing data):', keysToRemove);
+    const allKeys = await AsyncStorage.getAllKeys();
+    console.log('All AsyncStorage keys found:', allKeys);
+    
+    // Merge with our known keys list
+    const uniqueKeys = [...new Set([...knownKeys, ...allKeys])] as string[];
+    
+    // Filter out testing keys if needed
+    const keysToRemove = resetTestingData 
+      ? uniqueKeys 
+      : uniqueKeys.filter(key => !testingKeys.includes(key));
+    
+    console.log(`Will remove ${keysToRemove.length} keys from storage`);
+    
+    // Remove the keys in batches to avoid potential issues
+    await AsyncStorage.multiRemove(keysToRemove);
+    
+    // If testing data was preserved, restore basic testing access
+    if (!resetTestingData) {
+      await restoreTestingAccess();
     }
     
-    // Re-initialize user progress with defaults
-    await initializeUserProgressIfEmpty();
-    console.log('Re-initialized user progress with defaults');
+    // Explicitly clear premium status to ensure it's reset
+    await AsyncStorage.setItem(KEYS.USER.PREMIUM, 'false');
+    await AsyncStorage.setItem(KEYS.USER.TESTING_PREMIUM, 'false');
     
+    console.log('All app data cleared successfully');
     return true;
-  } catch (e) {
-    console.error('Error clearing app data:', e);
+  } catch (error) {
+    console.error('Error clearing all app data:', error);
     return false;
+  }
+};
+
+/**
+ * Restore basic testing access after a complete reset
+ * This ensures the user can still access testing features
+ */
+export const restoreTestingAccess = async (): Promise<void> => {
+  try {
+    console.log('Restoring basic testing access...');
+    
+    // Set minimum testing keys to ensure access
+    await AsyncStorage.setItem('@deskstretch:testing_access', 'true');
+    await AsyncStorage.setItem('@deskstretch:testing_phase', '1');
+    
+    console.log('Basic testing access restored');
+  } catch (error) {
+    console.error('Error restoring testing access:', error);
   }
 };
 
@@ -1018,6 +1073,83 @@ export const resetSimulationData = async (): Promise<boolean> => {
     return true;
   } catch (e) {
     console.error('Error resetting simulation data:', e);
+    return false;
+  }
+};
+
+/**
+ * Aggressively clear all premium status from any possible location
+ * @returns Whether the premium status was successfully cleared
+ */
+export const clearAllPremiumStatus = async (): Promise<boolean> => {
+  console.log('AGGRESSIVELY CLEARING ALL PREMIUM STATUS');
+  
+  // Define all possible premium-related keys that might exist
+  const premiumKeys = [
+    KEYS.USER.PREMIUM,
+    KEYS.USER.TESTING_PREMIUM,
+    '@deskstretch:testing_premium_access',
+    '@user_premium',
+    '@premium',
+    '@isPremium',
+    '@premium_access',
+    'premium_status',
+    'isPremium',
+    'premium_access',
+    'premiumAccess',
+    'premium_unlocked',
+    'premium_user'
+  ];
+  
+  try {
+    // First get current status for debugging
+    console.log('Current premium status before clearing:');
+    for (const key of premiumKeys) {
+      const value = await AsyncStorage.getItem(key);
+      console.log(`- Premium key "${key}" = ${value}`);
+    }
+    
+    // Different removal techniques
+    console.log('Trying multiple methods to clear premium status:');
+    
+    // Method 1: Direct removal
+    for (const key of premiumKeys) {
+      await AsyncStorage.removeItem(key);
+      console.log(`Method 1: Removed key: ${key}`);
+    }
+    
+    // Method 2: Set to false then remove
+    for (const key of premiumKeys) {
+      await AsyncStorage.setItem(key, 'false');
+      await AsyncStorage.removeItem(key);
+      console.log(`Method 2: Set false then removed: ${key}`);
+    }
+    
+    // Method 3: Use multiRemove
+    await AsyncStorage.multiRemove(premiumKeys);
+    console.log('Method 3: Used multiRemove on all premium keys');
+    
+    // Verification after all methods
+    let stillExists = false;
+    console.log('Verification after clearing:');
+    for (const key of premiumKeys) {
+      const value = await AsyncStorage.getItem(key);
+      console.log(`- Premium key "${key}" after clearing = ${value}`);
+      if (value !== null && value !== '') {
+        stillExists = true;
+        console.log(`  WARNING: Key "${key}" still exists with value: ${value}`);
+      }
+    }
+    
+    if (stillExists) {
+      console.error('FAILED TO CLEAR ALL PREMIUM STATUS - some keys still exist');
+      return false;
+    } else {
+      console.log('SUCCESS: All premium status successfully cleared');
+      return true;
+    }
+  } catch (error) {
+    console.error('Error clearing premium status:', error);
     return false;
   }
 }; 

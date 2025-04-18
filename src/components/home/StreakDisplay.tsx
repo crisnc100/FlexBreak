@@ -278,12 +278,12 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
   // Create milestone data for streak path
   const milestones = [
     { days: 1, label: "START" },
-    { days: 3, label: "3" },
+    { days: 3, label: "3D" },
     { days: 7, label: "WEEK" },
-    { days: 14, label: "14" },
+    { days: 14, label: "14D" },
     { days: 30, label: "30D" },
     { days: 90, label: "90D" },
-    { days: 180, label: "180" },
+    { days: 180, label: "180D" },
     { days: 365, label: "YEAR" }
   ];
   

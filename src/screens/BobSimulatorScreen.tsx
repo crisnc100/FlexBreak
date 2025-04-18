@@ -714,13 +714,13 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Reset Simulation Data', 
-          style: 'destructive', 
+          style: 'destructive',
           onPress: async () => {
             const success = await resetSimulationData();
             if (success) {
               Alert.alert('Success', 'Simulation data has been reset. You can now test different scenarios with a clean state.');
               // Refresh the screen data after reset
-              initializeBob();
+            initializeBob();
               refreshBobStats();
             } else {
               Alert.alert('Error', 'Failed to reset simulation data. Please try again.');
@@ -901,8 +901,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                 <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
                   Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
                 </Text>
-              </View>
-              
+        </View>
+        
               {/* Testing Scenario Card - Only show if scenario data exists */}
               {scenarioInstructions && (
                 <View style={[styles.scenarioCard, { backgroundColor: theme.cardBackground }]}>
@@ -917,7 +917,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     <Text style={[styles.scenarioSetupLabel, { color: theme.accent }]}>Setup Instructions:</Text>
                     <Text style={[styles.scenarioSetupText, { color: theme.text }]}>
                       {scenarioInstructions.setup}
-                    </Text>
+              </Text>
                   </View>
                   
                   <Text style={[styles.verificationLabel, { color: theme.text }]}>
@@ -930,14 +930,14 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                       <Text style={[styles.verificationText, { color: theme.text }]}>
                         {point}
               </Text>
-                    </View>
+          </View>
                   ))}
                   
                   <View style={styles.scenarioFooter}>
                     <Text style={[styles.scenarioFooterText, { color: theme.textSecondary }]}>
                       Complete this scenario and return to the testing screen to provide feedback.
               </Text>
-          </View>
+        </View>
         </View>
               )}
               

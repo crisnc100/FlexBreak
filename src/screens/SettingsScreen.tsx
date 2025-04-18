@@ -127,6 +127,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     );
   };
 
+ 
   
   // Handle theme type selection
   const handleThemeTypeSelection = (type: ThemeType) => {
@@ -519,6 +520,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
             
+            
             <TouchableOpacity 
               style={[styles.settingItem, styles.lastItem]}
               onPress={handleResetData}
@@ -802,15 +804,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
       />
       
       {/* Testing Modal */}
-      <TestingModal 
+      <TestingModal
         visible={testingModalVisible}
         onClose={() => setTestingModalVisible(false)}
-        navigateToPart2={() => {
-          setTestingModalVisible(false);
-          navigation.navigate('BobSimulator');
-        }}
       />
+      
     </SafeAreaView>
+    
+    
   );
 };
 

@@ -123,6 +123,8 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [snowflakePositions, setSnowflakePositions] = useState<Array<{x: number, y: number, delay: number, duration: number, scale: number}>>([]);
   const [userProgress, setUserProgress] = useState(null);
+  const [hasTodayActivity, setHasTodayActivity] = useState(false);
+  const [canSaveStreak, setCanSaveStreak] = useState(false);
   
   // Animation refs
   const slideAnim = useRef(new Animated.Value(400)).current;
@@ -296,15 +298,27 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       // Get legacy streak status for backwards compatibility
       const legacyStatus = await streakManager.getLegacyStreakStatus();
       
+      // Check if streak is truly broken by checking the last 3 days
+      const isTrulyBroken = await streakManager.isStreakBroken();
+      
+      // Check if user has completed a routine today
+      const todayActivity = status.maintainedToday;
+      setHasTodayActivity(todayActivity);
+      
       // Only show if:
       // 1. Streak is broken (legacy status for compatibility)
       // 2. Freezes are available
       // 3. User had a meaningful streak before (3+)
-      // 4. Rate limiting allows it
+      // 4. Streak is not truly broken (more than 2 days)
+      // 5. No activity today (can't save after starting new streak)
+      // 6. Rate limiting allows it
       const isBroken = legacyStatus.streakBroken;
       const hadMeaningfulStreak = status.currentStreak >= 3 || userProgress?.statistics?.bestStreak >= 3;
+      const canSave = legacyStatus.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity;
       
-      if (isBroken && status.freezesAvailable > 0 && hadMeaningfulStreak && freezeAvailable) {
+      setCanSaveStreak(canSave);
+      
+      if (isBroken && status.freezesAvailable > 0 && hadMeaningfulStreak && freezeAvailable && canSave) {
         // First check if we should show the prompt based on rate limiting
         const shouldShow = await canShowPrompt();
         
@@ -362,7 +376,10 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
           isBroken,
           freezesAvailable: status.freezesAvailable,
           currentStreak: status.currentStreak,
-          hadMeaningfulStreak
+          hadMeaningfulStreak,
+          isTrulyBroken,
+          todayActivity,
+          canSave
         });
       }
     } catch (error) {
@@ -618,8 +635,13 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
           
           <View style={styles.content}>
             <Text style={[styles.message, { color: theme.text }]}>
-              You missed yesterday's exercise and your {streakData.currentStreak}-day streak is at risk. 
-              Use a streak freeze to preserve your progress!
+              {hasTodayActivity ? (
+                "You've already completed a routine today! Your streak will start fresh."
+              ) : canSaveStreak ? (
+                `You missed yesterday's exercise and your ${streakData.currentStreak}-day streak is at risk. Use a streak freeze to preserve your progress!`
+              ) : (
+                `Your ${streakData.currentStreak}-day streak can't be saved because you've missed more than one day.`
+              )}
             </Text>
             
             <View style={[
@@ -636,8 +658,13 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                 color={isDark ? '#90CAF9' : theme.accent} 
               />
               <Text style={[styles.freezeText, { color: theme.text }]}>
-                You have {streakData.freezesAvailable} streak {streakData.freezesAvailable === 1 ? 'freeze' : 'freezes'} available.
-                {streakData.freezesAvailable > 1 ? ' ' : ''}
+                {canSaveStreak ? (
+                  `You have ${streakData.freezesAvailable} streak ${streakData.freezesAvailable === 1 ? 'freeze' : 'freezes'} available.`
+                ) : hasTodayActivity ? (
+                  "Complete today's routine to start a new streak!"
+                ) : (
+                  "Streak freezes only work for 1-day gaps. Complete a routine today to start fresh!"
+                )}
               </Text>
             </View>
           </View>
@@ -655,25 +682,27 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                 styles.buttonText,
                 { color: isDark ? 'rgba(255,255,255,0.7)' : '#757575' }
               ]}>
-                No thanks
+                {hasTodayActivity ? 'Got it' : 'No thanks'}
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.acceptButton,
-                { backgroundColor: theme.accent }
-              ]}
-              onPress={handleUseStreakFreeze}
-            >
-              <Text style={styles.buttonText}>
-                Use Streak Freeze
-              </Text>
-              <Text style={styles.buttonBadge}>
-                {streakData.freezesAvailable}
-              </Text>
-            </TouchableOpacity>
+            {canSaveStreak && (
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.acceptButton,
+                  { backgroundColor: theme.accent }
+                ]}
+                onPress={handleUseStreakFreeze}
+              >
+                <Text style={styles.buttonText}>
+                  Use Streak Freeze
+                </Text>
+                <Text style={styles.buttonBadge}>
+                  {streakData.freezesAvailable}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Animated.View>
       </View>
