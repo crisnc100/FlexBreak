@@ -10,7 +10,8 @@ import {
   Animated,
   Dimensions,
   Platform,
-  Easing
+  Easing,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../../types';
@@ -19,6 +20,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { enhanceRoutineWithPremiumInfo } from '../../utils/premiumUtils';
 import * as soundEffects from '../../utils/soundEffects';
 import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
+import { Video, ResizeMode } from 'expo-av';
+import { Audio } from 'expo-av';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,6 +50,16 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string })[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDone, setIsDone] = useState(false);
+  
+  // Video and audio state
+  const [isPlayingDemo, setIsPlayingDemo] = useState(false);
+  const [isDemoReady, setIsDemoReady] = useState(false);
+  const [isVideoPaused, setIsVideoPaused] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [areControlsVisible, setAreControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const videoRef = useRef<Video>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   
   // Track last second where we played a sound to avoid multiple plays
   const lastSecondPlayedRef = useRef<number>(-1);
@@ -117,13 +130,32 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Get the current stretch
   const currentStretch = routine[currentIndex];
   
+  // Check if current stretch has a demo video
+  const isCurrentDemoStretch = 
+    currentStretch && 
+    !('isRest' in currentStretch) && 
+    (currentStretch as Stretch).hasDemo === true;
+
   // Effect to start timer for the current stretch when currentIndex changes
   useEffect(() => {
     if (!initialRenderRef.current && routine.length > 0 && currentIndex < routine.length) {
       const currentDuration = routine[currentIndex]?.duration || 30;
       console.log(`Starting timer for stretch ${currentIndex} with duration ${currentDuration}`);
+      
       try {
-        startTimer(currentDuration);
+        // Check if this is our demo stretch (ID 27)
+        if (isCurrentDemoStretch) {
+          console.log('Demo stretch detected - ID 27');
+          setIsDemoReady(true); // Set demo as ready to view, but not playing yet
+          
+          // Start the timer as normal for UI purposes
+          startTimer(currentDuration);
+        } else {
+          // Normal stretch - start the timer as usual
+          setIsDemoReady(false);
+          setIsPlayingDemo(false);
+          startTimer(currentDuration);
+        }
       } catch (error) {
         console.error('Error starting timer:', error);
       }
@@ -133,12 +165,22 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     if (initialRenderRef.current) {
       initialRenderRef.current = false;
     }
-  }, [currentIndex, routine]);
+  }, [currentIndex, routine, isCurrentDemoStretch]);
   
   // Clean up timer on unmount
   useEffect(() => {
     return () => {
       pauseTimer();
+      
+      // Clean up audio if it's playing
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+      
+      // Clear any control timeout
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
     };
   }, []);
   
@@ -257,7 +299,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           } else {
             // Generate a routine normally if no custom stretches
             console.log('Generating routine without custom stretches');
-            const generatedRoutine = await generateRoutine(area, duration, level, undefined, includePremiumStretches);
+            const generatedRoutine = await generateRoutine(area, duration, level, undefined);
             
             // Enhance the routine with premium information
             try {
@@ -412,6 +454,227 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     }
   };
   
+  // Prepare demo video and show it (but don't play yet)
+  const handleShowDemo = async () => {
+    if (!currentStretch || !('hasDemo' in currentStretch) || !currentStretch.hasDemo) return;
+    
+    try {
+      soundEffects.playClickSound();
+      
+      // Pause the timer while viewing the demo
+      pauseTimer();
+      
+      // Show the demo video player but don't play yet
+      setIsPlayingDemo(true);
+      
+      // Load audio but don't play yet
+      if ('demoAudio' in currentStretch && currentStretch.demoAudio) {
+        try {
+          // Unload any existing sound first
+          if (soundRef.current) {
+            await soundRef.current.unloadAsync();
+          }
+          
+          // Create a new sound object and load the audio
+          const { sound } = await Audio.Sound.createAsync(currentStretch.demoAudio);
+          soundRef.current = sound;
+          
+          // Set initial muted state
+          await sound.setIsMutedAsync(isMuted);
+          
+          console.log(`Audio for ${currentStretch.name} loaded and ready`);
+        } catch (audioError) {
+          console.error('Error loading demo audio:', audioError);
+        }
+      }
+    } catch (error) {
+      console.error('Error showing demo:', error);
+    }
+  };
+  
+  // Show controls temporarily and set timeout to hide them
+  const showControlsTemporarily = () => {
+    // Clear any existing timeout
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    
+    // Show controls
+    setAreControlsVisible(true);
+    
+    // Set timeout to hide controls after 3 seconds
+    controlsTimeoutRef.current = setTimeout(() => {
+      // Only hide controls if video is playing
+      if (!isVideoPaused) {
+        setAreControlsVisible(false);
+      }
+    }, 3000); // Reduced to 2 seconds for faster hiding
+  };
+  
+  // Handle video container tap to show/hide controls
+  const handleVideoContainerTap = () => {
+    if (areControlsVisible) {
+      // If controls are visible, hide them immediately when playing
+      if (!isVideoPaused) {
+        setAreControlsVisible(false);
+        if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+        }
+      }
+    } else {
+      // If controls are hidden, show them temporarily
+      showControlsTemporarily();
+    }
+  };
+  
+  // Play/pause the demo video and audio
+  const handlePlayDemo = async () => {
+    if (!videoRef.current) return;
+    
+    try {
+      const status = await videoRef.current.getStatusAsync();
+      
+      // Check if status is a success status with isPlaying property
+      const isCurrentlyPlaying = status.isLoaded && 'isPlaying' in status && status.isPlaying;
+      
+      if (isCurrentlyPlaying) {
+        // Pause the video
+        await videoRef.current.pauseAsync();
+        setIsVideoPaused(true);
+        
+        // When paused, always show controls
+        setAreControlsVisible(true);
+        
+        // Pause the audio if it's loaded
+        if (soundRef.current) {
+          const soundStatus = await soundRef.current.getStatusAsync();
+          if (soundStatus.isLoaded) {
+            await soundRef.current.pauseAsync();
+          }
+        }
+      } else {
+        // Play the video
+        await videoRef.current.playAsync();
+        setIsVideoPaused(false);
+        
+        // Show controls temporarily
+        showControlsTemporarily();
+        
+        // Play the audio if it's loaded
+        if (soundRef.current) {
+          const soundStatus = await soundRef.current.getStatusAsync();
+          if (soundStatus.isLoaded) {
+            await soundRef.current.playAsync();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling demo playback:', error);
+    }
+  };
+  
+  // Handle closing the demo
+  const handleCloseDemo = async () => {
+    try {
+      // Stop video if playing
+      if (videoRef.current) {
+        await videoRef.current.stopAsync();
+      }
+      
+      // Stop and unload audio
+      if (soundRef.current) {
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+        }
+      }
+      
+      // Clear any control timeout
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      
+      // Hide the demo
+      setIsPlayingDemo(false);
+      
+      // Resume the timer
+      resumeTimer();
+      
+      soundEffects.playClickSound();
+    } catch (error) {
+      console.error('Error closing demo:', error);
+    }
+  };
+  
+  // Handle muting/unmuting audio
+  const handleToggleMute = async () => {
+    try {
+      const newMutedState = !isMuted;
+      setIsMuted(newMutedState);
+      
+      if (soundRef.current) {
+        // Check if sound is loaded before attempting to mute
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded) {
+          await soundRef.current.setIsMutedAsync(newMutedState);
+        }
+      }
+      
+      soundEffects.playClickSound();
+    } catch (error) {
+      console.error('Error toggling mute:', error);
+    }
+  };
+
+  // Handle video playback status updates
+  const handleVideoStatusUpdate = async (status: any) => {
+    // Update the pause state based on video status
+    if (status.isLoaded && 'isPlaying' in status) {
+      const wasPlaying = !isVideoPaused;
+      const isNowPlaying = status.isPlaying;
+      
+      setIsVideoPaused(!isNowPlaying);
+      
+      // If started playing, hide controls after a delay
+      if (!wasPlaying && isNowPlaying) {
+        showControlsTemporarily();
+      }
+      
+      // If stopped playing, show controls
+      if (wasPlaying && !isNowPlaying) {
+        setAreControlsVisible(true);
+      }
+    }
+    
+    if (status.didJustFinish) {
+      // Video finished playing
+      if (soundRef.current) {
+        const soundStatus = await soundRef.current.getStatusAsync();
+        if (soundStatus.isLoaded) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+        }
+      }
+      
+      setIsVideoPaused(true);
+      // Don't automatically close the video player
+      // Let the user close it when they're ready
+    } else if (status.isLoaded && 'isPlaying' in status) {
+      // Sync audio with video play/pause status
+      if (soundRef.current) {
+        const soundStatus = await soundRef.current.getStatusAsync();
+        if (soundStatus.isLoaded) {
+          if (status.isPlaying) {
+            await soundRef.current.playAsync();
+          } else {
+            await soundRef.current.pauseAsync();
+          }
+        }
+      }
+    }
+  };
+  
   // Render the current stretch or rest period
   const renderCurrentItem = () => {
     if (!currentStretch) {
@@ -426,6 +689,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
 
     const isRest = 'isRest' in currentStretch;
     const isPremium = !isRest && (currentStretch as any).isPremium;
+    const isDemo = isCurrentDemoStretch;
 
     return (
       <Animated.View 
@@ -464,25 +728,109 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                   <Text style={styles.premiumText}>VIP</Text>
                 </View>
               )}
+              
+              {isDemo && (
+                <View style={[styles.demoBadge, { backgroundColor: '#FF5722' }]}>
+                  <Ionicons name="videocam" size={16} color="#FFF" />
+                  <Text style={styles.demoText}>Demo</Text>
+                </View>
+              )}
             </View>
             
             <View style={[styles.imageContainer, { 
               backgroundColor: isDark ? theme.cardBackground : '#FFF',
-              borderColor: isPremium ? ((currentStretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD')
+              borderColor: isPremium ? ((currentStretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD'),
+              height: isPlayingDemo ? height * 0.3 : height * 0.2,
             }]}>
-              <Image 
-                source={currentStretch.image}
-                style={styles.stretchImage}
-                resizeMode="contain"
-                onError={(e) => {
-                  // Attempt to update the image source to a fallback
-                  if (currentStretch && !('isRest' in currentStretch)) {
-                    const safeName = encodeURIComponent((currentStretch as Stretch).name || 'Stretch');
-                    // We can't directly modify the source, but we can log it for debugging
-                  }
-                }}
-                defaultSource={{uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent(currentStretch.name || 'Stretch')}`}}
-              />
+              {isPlayingDemo && isDemo && 'demoVideo' in currentStretch && currentStretch.demoVideo ? (
+                <TouchableOpacity 
+                  style={styles.videoContainer} 
+                  activeOpacity={1}
+                  onPress={handleVideoContainerTap}
+                >
+                  <Video
+                    ref={videoRef}
+                    source={currentStretch.demoVideo}
+                    rate={1.0}
+                    volume={1.0}
+                    isMuted={false}
+                    resizeMode={ResizeMode.CONTAIN}
+                    shouldPlay={false}
+                    isLooping={false}
+                    style={styles.video}
+                    useNativeControls={false}
+                    onPlaybackStatusUpdate={handleVideoStatusUpdate}
+                  />
+                  
+                  {/* Simple transparent overlay for touch detection - always present */}
+                  <View style={styles.touchOverlay} />
+                  
+                  {/* Only show play button when both controls are visible AND video is paused */}
+                  {areControlsVisible && isVideoPaused && (
+                    <View style={styles.playButtonContainer}>
+                      <TouchableOpacity 
+                        style={styles.playButton}
+                        onPress={handlePlayDemo}
+                      >
+                        <Ionicons name="play-circle" size={60} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  
+                  {/* Always show essential controls when areControlsVisible is true */}
+                  {areControlsVisible && (
+                    <View style={styles.videoControls}>
+                      <TouchableOpacity 
+                        style={styles.videoControlButton}
+                        onPress={handleToggleMute}
+                      >
+                        <Ionicons 
+                          name={isMuted ? "volume-mute" : "volume-high"} 
+                          size={24} 
+                          color="#FFF" 
+                        />
+                      </TouchableOpacity>
+                      {!isVideoPaused && (
+                        <TouchableOpacity 
+                          style={styles.videoControlButton}
+                          onPress={handlePlayDemo}
+                        >
+                          <Ionicons name="pause" size={24} color="#FFF" />
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity 
+                        style={styles.videoControlButton}
+                        onPress={handleCloseDemo}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <Image 
+                    source={currentStretch.image}
+                    style={styles.stretchImage}
+                    resizeMode="contain"
+                    onError={(e) => {
+                      if (currentStretch && !('isRest' in currentStretch)) {
+                        const safeName = encodeURIComponent((currentStretch as Stretch).name || 'Stretch');
+                      }
+                    }}
+                    defaultSource={{uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent(currentStretch.name || 'Stretch')}`}}
+                  />
+                  
+                  {isDemo && (
+                    <TouchableOpacity style={styles.demoOverlay} onPress={handleShowDemo}>
+                      <Ionicons name="play-circle" size={48} color="#FFF" />
+                      <Text style={styles.demoOverlayText}>
+                        Watch Demo Video
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
             </View>
             
             <Text style={[styles.stretchDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
@@ -492,6 +840,12 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
             {isPremium && (
               <Text style={[styles.premiumNote, { color: (currentStretch as any).vipBadgeColor || '#FFD700' }]}>
                 This is a premium stretch unlocked at level 7!
+              </Text>
+            )}
+            
+            {isDemo && !isPlayingDemo && (
+              <Text style={[styles.demoNote, { color: isDark ? '#FF5722' : '#FF5722' }]}>
+                Tap on the image to watch a demonstration video. Follow the timer for the full stretch duration.
               </Text>
             )}
           </View>
@@ -564,12 +918,17 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       </View>
       
       {/* Main content */}
-      <View style={{
-        flex: 1, 
-        backgroundColor: isDark ? theme.background : '#FFF'
-      }}>
+      <ScrollView 
+        style={{
+          flex: 1, 
+          backgroundColor: isDark ? theme.background : '#FFF'
+        }}
+        contentContainerStyle={{
+          flexGrow: 1
+        }}
+      >
         {renderCurrentItem()}
-      </View>
+      </ScrollView>
       
       {/* Controls */}
       <View style={[styles.controlsContainer, { 
@@ -933,6 +1292,103 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     color: '#FFF',
     padding: 5,
+  },
+  demoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 10,
+    marginHorizontal: 5,
+    backgroundColor: '#FF5722',
+  },
+  demoText: {
+    color: '#FFF',
+    fontSize: 12,
+    marginLeft: 5,
+    fontWeight: '600',
+  },
+  demoNote: {
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 10,
+    fontSize: 14,
+    color: '#FF5722',
+  },
+  demoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  demoOverlayText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  videoContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    maxWidth: width * 0.8,
+    maxHeight: width * 0.5,
+  },
+  touchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent', // Completely transparent
+  },
+  playButtonContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  videoControls: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  videoControlButton: {
+    padding: 8,
+    marginLeft: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+  },
+  playButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 40,
+    padding: 10,
   },
 });
 

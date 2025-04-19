@@ -14,6 +14,10 @@ export interface Stretch {
   image: any;
   bilateral?: boolean;
   premium?: boolean;
+  hasDemo?: boolean;
+  demoVideo?: any;
+  demoVideoDuration?: number; // seconds
+  demoAudio?: any; // Path to the voice instructions audio file
 }
 
 export interface CustomRestPeriod {
