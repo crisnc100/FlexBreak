@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Animated } from 'react-native';
+import { Animated, Easing } from 'react-native';
 
 interface UseRoutineTimerProps {
   initialDuration?: number;
@@ -35,6 +35,13 @@ export function useRoutineTimer({
   // Refs
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastTickTime = useRef<number>(0);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const isPausedRef = useRef<boolean>(true);
+  
+  // Keep the ref in sync with the state
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
   
   // Animations
   const progressAnim = useRef(new Animated.Value(1)).current;
@@ -46,17 +53,23 @@ export function useRoutineTimer({
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
     };
   }, []);
   
   // Start the timer with a new duration
   const startTimer = (duration?: number) => {
-    console.log('Starting timer with duration:', duration || initialDuration);
-    
     // Clear any existing timer
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+    }
+    
+    // Stop any existing animation
+    if (animationRef.current) {
+      animationRef.current.stop();
     }
     
     // Set the new duration
@@ -64,28 +77,24 @@ export function useRoutineTimer({
     setTimeRemaining(newDuration);
     setTotalDuration(newDuration);
     setIsPaused(false);
+    isPausedRef.current = false;
     
-    // Reset and start the progress animation
-    progressAnim.setValue(1);
-    Animated.timing(progressAnim, {
-      toValue: 0,
-      duration: newDuration * 1000,
-      useNativeDriver: false
-    }).start();
+    // Reset and start the progress animation - full duration = 1.0
+    progressAnim.setValue(1.0);
     
     // Start the timer
     lastTickTime.current = Date.now();
     tickTimer();
   };
   
-  // Tick the timer (called every second)
+  // Tick the timer (called every tick interval)
   const tickTimer = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
     
-    // Only tick if not paused
-    if (!isPaused) {
+    // Only tick if not paused - use ref instead of state for immediate value
+    if (!isPausedRef.current) {
       const now = Date.now();
       const elapsed = now - lastTickTime.current;
       lastTickTime.current = now;
@@ -102,13 +111,22 @@ export function useRoutineTimer({
             timerRef.current = null;
           }
           
+          // Stop the animation
+          if (animationRef.current) {
+            animationRef.current.stop();
+          }
+          
           // Call the onComplete callback
           onComplete();
           return 0;
         }
         
-        // Schedule the next tick
-        timerRef.current = setTimeout(tickTimer, 100);
+        // Update the progress animation value directly
+        const currentProgress = newTime / totalDuration;
+        progressAnim.setValue(currentProgress);
+        
+        // Schedule the next tick - use a shorter interval for smoother updates
+        timerRef.current = setTimeout(tickTimer, 50);
         return newTime;
       });
     }
@@ -116,13 +134,9 @@ export function useRoutineTimer({
   
   // Pause the timer
   const pauseTimer = () => {
-    console.log('Pausing timer');
-    
-    if (!isPaused) {
+    if (!isPausedRef.current) {
       setIsPaused(true);
-      
-      // Pause the progress animation
-      progressAnim.stopAnimation();
+      isPausedRef.current = true;
       
       // Clear the timer
       if (timerRef.current) {
@@ -134,32 +148,34 @@ export function useRoutineTimer({
   
   // Resume the timer
   const resumeTimer = () => {
-    console.log('Resuming timer');
-    
-    if (isPaused && timeRemaining > 0) {
+    if (isPausedRef.current && timeRemaining > 0) {
+      // Update both the state and ref
       setIsPaused(false);
+      isPausedRef.current = false;
       
-      // Resume the progress animation
-      Animated.timing(progressAnim, {
-        toValue: 0,
-        duration: timeRemaining * 1000,
-        useNativeDriver: false
-      }).start();
+      // Make sure the progress animation value is correct
+      const currentProgress = timeRemaining / totalDuration;
+      progressAnim.setValue(currentProgress);
       
-      // Start the timer
+      // Start the timer with fresh timestamp
       lastTickTime.current = Date.now();
+      
+      // Start ticking
       tickTimer();
     }
   };
   
   // Reset the timer
   const resetTimer = (newDuration?: number) => {
-    console.log('Resetting timer with duration:', newDuration || initialDuration);
-    
     // Clear any existing timer
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+    }
+    
+    // Stop any existing animation
+    if (animationRef.current) {
+      animationRef.current.stop();
     }
     
     // Set the new duration
@@ -167,6 +183,7 @@ export function useRoutineTimer({
     setTimeRemaining(duration);
     setTotalDuration(duration);
     setIsPaused(true);
+    isPausedRef.current = true;
     
     // Reset the progress animation
     progressAnim.setValue(1);
@@ -174,7 +191,7 @@ export function useRoutineTimer({
   
   // Toggle pause state
   const togglePause = () => {
-    if (isPaused) {
+    if (isPausedRef.current) {
       resumeTimer();
     } else {
       pauseTimer();

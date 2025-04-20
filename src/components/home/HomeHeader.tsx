@@ -24,7 +24,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
       <View style={styles.titleContainer}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('../../../assets/images/potentialLogo2.png')} 
+            source={require('../../../assets/images/potentialLogo3.png')} 
             style={styles.logoImage}
           />
         </View>

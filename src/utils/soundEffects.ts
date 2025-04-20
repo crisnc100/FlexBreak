@@ -20,6 +20,29 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   redeemingChallenge: null
 };
 
+// Add debounce tracking for sounds that are frequently played
+const soundDebounceMap: Record<SoundEffect, number> = {
+  success: 0,
+  failure: 0,
+  start: 0,
+  complete: 0,
+  levelUp: 0,
+  click: 0,
+  timerTick: 0,
+  streakFreeze: 0,
+  xpBoost: 0,
+  intro: 0,
+  premiumUnlocked: 0,
+  redeemingChallenge: 0
+};
+
+// Minimum time between playing the same sound (in milliseconds)
+const DEBOUNCE_TIME = {
+  click: 150,
+  timerTick: 300,
+  default: 100
+};
+
 // Sound settings key in AsyncStorage
 const SOUND_ENABLED_KEY = 'app_sound_effects_enabled';
 
@@ -125,6 +148,20 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
       return;
     }
     
+    const now = Date.now();
+    const debounceTime = soundName in DEBOUNCE_TIME ? 
+      DEBOUNCE_TIME[soundName as keyof typeof DEBOUNCE_TIME] : 
+      DEBOUNCE_TIME.default;
+    
+    // Check if we're trying to play the sound too soon after the last play
+    if (now - soundDebounceMap[soundName] < debounceTime) {
+      // Skip this sound to prevent interruption errors
+      return;
+    }
+    
+    // Update the last played time
+    soundDebounceMap[soundName] = now;
+    
     // Load the sound if not already loaded
     if (!soundCache[soundName]) {
       await loadSound(soundName);
@@ -132,14 +169,21 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
     
     const sound = soundCache[soundName];
     if (sound) {
-      // Reset sound to start position
-      await sound.setPositionAsync(0);
+      // Get the current status
+      const status = await sound.getStatusAsync();
       
-      // Set volume
-      await sound.setVolumeAsync(volume);
-      
-      // Play the sound
-      await sound.playAsync();
+      // Only attempt to set position if the sound isn't currently playing
+      // This helps prevent the "Seeking interrupted" error
+      if (!status.isLoaded || !status.isPlaying) {
+        // Reset sound to start position
+        await sound.setPositionAsync(0);
+        
+        // Set volume
+        await sound.setVolumeAsync(volume);
+        
+        // Play the sound
+        await sound.playAsync();
+      }
     }
   } catch (error) {
     console.error(`Error playing sound "${soundName}":`, error);
@@ -150,7 +194,12 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
  * Play click sound - useful for buttons
  */
 export const playClickSound = async (): Promise<void> => {
-  await playSound('click', 0.5);
+  try {
+    await playSound('click', 0.5);
+  } catch (error) {
+    // Silently ignore errors for click sounds to prevent crashes
+    console.warn('Click sound error suppressed:', error);
+  }
 };
 
 /**
