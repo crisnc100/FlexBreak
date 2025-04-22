@@ -53,8 +53,13 @@ export const enhanceRoutineWithPremiumInfo = async (
       
       // Fix the image property if needed
       if ((copy as Stretch).image) {
+        // If image is a required local asset (number type), keep it as is
+        if (typeof (copy as Stretch).image === 'number') {
+          // Leave the image untouched as it's a local asset
+          console.log(`Preserving local image asset for: ${(copy as Stretch).name}`);
+        }
         // Check if image is an object with uri property
-        if (typeof (copy as Stretch).image === 'object' && (copy as Stretch).image !== null) {
+        else if (typeof (copy as Stretch).image === 'object' && (copy as Stretch).image !== null) {
           const imageObj = (copy as Stretch).image as any;
           
           // If it has a uri property that's a string, validate/fix it
@@ -78,7 +83,7 @@ export const enhanceRoutineWithPremiumInfo = async (
             };
           }
         } else {
-          // If image is not an object, create a valid image object
+          // If image is not an object or number, create a valid image object
           (copy as Stretch).image = { 
             uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent((copy as Stretch).name || 'Stretch')}` 
           };

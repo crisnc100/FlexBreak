@@ -22,8 +22,8 @@ import * as soundEffects from '../../utils/soundEffects';
 import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Audio } from 'expo-av';
-import Slider from '@react-native-community/slider';
 import StretchFlowView from './StretchFlowView';
+import stretches from '../../data/stretches';
 
 const { width, height } = Dimensions.get('window');
 
@@ -302,7 +302,12 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                   stretchCopy.tags = [area];
                 }
                 if (!stretchCopy.image) {
-                  stretchCopy.image = { uri: `https://via.placeholder.com/200/FF9800/FFFFFF?text=${encodeURIComponent(stretchCopy.name)}` };
+                  // Find a stretch from the stretches data with matching tags or name for the image
+                  const matchingStretch = stretches.find(s => 
+                    s.tags.includes(area) || s.name.toLowerCase() === stretchCopy.name.toLowerCase()
+                  );
+                  stretchCopy.image = matchingStretch ? matchingStretch.image : 
+                    { uri: '../../assets/stretchData/default_stretch.gif' };
                 }
               }
               
@@ -404,32 +409,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     initRoutine();
   }, [area, duration, level, customStretches, includePremiumStretches]);
   
-  // Format time from seconds to MM:SS
-  const formatTime = (seconds: number) => {
-    // Round seconds to nearest integer to avoid decimal display
-    const roundedSeconds = Math.round(seconds);
-    
-    // Only play timer tick when transitioning to a new second
-    // and only for the countdown (5,4,3,2,1)
-    if (roundedSeconds <= 5 && roundedSeconds > 0 && roundedSeconds !== lastSecondPlayedRef.current) {
-      lastSecondPlayedRef.current = roundedSeconds;
-      // Wrap in try/catch to prevent errors from affecting the routine
-      try {
-        // Only play tick sound if not in demo mode and not paused
-        if (!isPlayingDemo && !isPaused) {
-          soundEffects.playTimerTickSound();
-        }
-      } catch (error) {
-        console.error('Error playing timer tick:', error);
-        // Don't let sound errors affect the routine flow
-      }
-    }
-    
-    // Format as MM:SS with fixed integer display (no decimals)
-    const mins = Math.floor(roundedSeconds / 60);
-    const secs = roundedSeconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
+
   
   // Function to handle going back to previous stretch
   const handlePrevious = () => {
@@ -516,179 +496,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     }
   };
   
-  // Handle video playback status updates
-  const handleVideoStatusUpdate = async (status: AVPlaybackStatus) => {
-    // Update the pause state based on video status
-    if (status.isLoaded) {
-      const wasPlaying = !isVideoPaused;
-      const isNowPlaying = status.isPlaying;
-      
-      setIsVideoPaused(!isNowPlaying);
-      
-      // Track video position and duration for the seek bar
-      if (status.positionMillis !== undefined && status.durationMillis !== undefined) {
-        setVideoPosition(status.positionMillis);
-        setVideoDuration(status.durationMillis);
-        setVideoProgress(status.positionMillis / status.durationMillis);
-      }
-      
-      // If started playing, hide controls after a delay
-      if (!wasPlaying && isNowPlaying) {
-        showControlsTemporarily();
-      }
-      
-      // If stopped playing, show controls
-      if (wasPlaying && !isNowPlaying) {
-        setAreControlsVisible(true);
-      }
-    }
-    
-    if (status.isLoaded && status.didJustFinish) {
-      // Video finished playing
-      if (soundRef.current) {
-        const soundStatus = await soundRef.current.getStatusAsync();
-        if (soundStatus.isLoaded) {
-          await soundRef.current.stopAsync();
-          await soundRef.current.unloadAsync();
-        }
-      }
-      
-      setIsVideoPaused(true);
-      // Don't automatically close the video player
-      // Let the user close it when they're ready
-    } else if (status.isLoaded && 'isPlaying' in status) {
-      // Sync audio with video play/pause status
-      if (soundRef.current) {
-        const soundStatus = await soundRef.current.getStatusAsync();
-        if (soundStatus.isLoaded) {
-          if (status.isPlaying) {
-            await soundRef.current.playAsync();
-          } else {
-            await soundRef.current.pauseAsync();
-          }
-        }
-      }
-    }
-  };
-  
-  // Handle skipping forward by 10 seconds
-  const handleSkipForward = async () => {
-    if (!videoRef.current) return;
-    
-    try {
-      soundEffects.playClickSound();
-      const status = await videoRef.current.getStatusAsync();
-      
-      if (status.isLoaded) {
-        const newPosition = Math.min(status.positionMillis + 10000, status.durationMillis);
-        await videoRef.current.setPositionAsync(newPosition);
-        
-        // If there's audio, seek it as well
-        if (soundRef.current) {
-          const soundStatus = await soundRef.current.getStatusAsync();
-          if (soundStatus.isLoaded) {
-            await soundRef.current.setPositionAsync(newPosition);
-          }
-        }
-        
-        // Show controls temporarily
-        showControlsTemporarily();
-      }
-    } catch (error) {
-      console.error('Error skipping forward:', error);
-    }
-  };
-  
-  // Handle skipping backward by 10 seconds
-  const handleSkipBackward = async () => {
-    if (!videoRef.current) return;
-    
-    try {
-      soundEffects.playClickSound();
-      const status = await videoRef.current.getStatusAsync();
-      
-      if (status.isLoaded) {
-        const newPosition = Math.max(status.positionMillis - 10000, 0);
-        await videoRef.current.setPositionAsync(newPosition);
-        
-        // If there's audio, seek it as well
-        if (soundRef.current) {
-          const soundStatus = await soundRef.current.getStatusAsync();
-          if (soundStatus.isLoaded) {
-            await soundRef.current.setPositionAsync(newPosition);
-          }
-        }
-        
-        // Show controls temporarily
-        showControlsTemporarily();
-      }
-    } catch (error) {
-      console.error('Error skipping backward:', error);
-    }
-  };
-  
-  // Handle seek to position
-  const handleSeekTo = async (progress: number) => {
-    if (!videoRef.current) return;
-    
-    try {
-      const status = await videoRef.current.getStatusAsync();
-      
-      if (status.isLoaded) {
-        const newPosition = progress * status.durationMillis;
-        await videoRef.current.setPositionAsync(newPosition);
-        
-        // If there's audio, seek it as well
-        if (soundRef.current) {
-          const soundStatus = await soundRef.current.getStatusAsync();
-          if (soundStatus.isLoaded) {
-            await soundRef.current.setPositionAsync(newPosition);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error seeking to position:', error);
-    }
-  };
-  
-  // Toggle fullscreen mode
-  const handleToggleFullscreen = () => {
-    soundEffects.playClickSound();
-    setVideoFullscreen(!videoFullscreen);
-    showControlsTemporarily();
-  };
-  
-  // Toggle video enhancement
-  const handleToggleEnhancement = () => {
-    soundEffects.playClickSound();
-    setVideoEnhanced(!videoEnhanced);
-    showControlsTemporarily();
-  };
-  
-  // Format duration in MM:SS format
-  const formatDuration = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  };
 
-  // Handle showing demo
-  const handleShowDemo = async () => {
-    try {
-      console.log('Showing demo...');
-      soundEffects.playClickSound();
-      
-      // Always pause the timer when showing demo
-      if (!isTimerPaused) {
-        togglePause();
-      }
-      
-      setIsPlayingDemo(true);
-    } catch (error) {
-      console.error('Error showing demo:', error);
-    }
-  };
   
   // Show controls temporarily and set timeout to hide them
   const showControlsTemporarily = () => {
@@ -709,104 +517,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     }, 3000); // Reduced to 2 seconds for faster hiding
   };
   
-  // Handle video container tap to show/hide controls
-  const handleVideoContainerTap = () => {
-    if (areControlsVisible) {
-      // If controls are visible, hide them immediately when playing
-      if (!isVideoPaused) {
-        setAreControlsVisible(false);
-        if (controlsTimeoutRef.current) {
-          clearTimeout(controlsTimeoutRef.current);
-        }
-      }
-    } else {
-      // If controls are hidden, show them temporarily
-      showControlsTemporarily();
-    }
-  };
   
-  // Function to play demo video
-  const handlePlayDemo = async () => {
-    try {
-      // Always pause the timer when showing demo video
-      if (!isTimerPaused) {
-        togglePause();
-      }
-      
-      setIsPlayingDemo(true);
-      
-      // Attempt to load and play the current demo video
-      if (videoRef.current) {
-        console.log('Playing demo video...');
-        
-        try {
-          await videoRef.current.playAsync();
-          setIsVideoPaused(false);
-          
-          // Start with controls visible
-          setAreControlsVisible(true);
-          showControlsTemporarily();
-        } catch (playError) {
-          console.error('Error playing video:', playError);
-        }
-      }
-    } catch (error) {
-      console.error('Error handling play demo:', error);
-    }
-  };
-  
-  // Handle closing the demo video
-  const handleCloseDemo = async () => {
-    try {
-      console.log('Closing demo');
-      
-      // Play click sound for feedback
-      soundEffects.playClickSound();
-      
-      // Stop demo video playback
-      if (videoRef.current) {
-        try {
-          await videoRef.current.pauseAsync();
-          await videoRef.current.setPositionAsync(0);
-        } catch (stopError) {
-          console.error('Error stopping video:', stopError);
-        }
-      }
-      
-      // Hide demo video
-      setIsPlayingDemo(false);
-      setIsVideoPaused(true);
-      
-      // Reset controls state
-      setAreControlsVisible(true);
-      setVideoFullscreen(false);
-      setVideoEnhanced(false);
-      
-      // No need to automatically resume timer - let the user decide when to resume
-    } catch (error) {
-      console.error('Error closing demo:', error);
-    }
-  };
-  
-  // Handle muting/unmuting audio
-  const handleToggleMute = async () => {
-    try {
-      const newMutedState = !isMuted;
-      setIsMuted(newMutedState);
-      
-      if (soundRef.current) {
-        // Check if sound is loaded before attempting to mute
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded) {
-          await soundRef.current.setIsMutedAsync(newMutedState);
-        }
-      }
-      
-      soundEffects.playClickSound();
-    } catch (error) {
-      console.error('Error toggling mute:', error);
-    }
-  };
   
   // Render the current stretch or rest period
   const renderCurrentItem = () => {

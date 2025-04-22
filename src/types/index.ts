@@ -11,7 +11,7 @@ export interface Stretch {
   duration: number; // seconds
   tags: BodyArea[];
   level: StretchLevel;
-  image: any;
+  image: number | { uri: string }; // number for require('./path'), object for remote URLs
   bilateral?: boolean;
   premium?: boolean;
   hasDemo?: boolean;

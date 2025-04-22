@@ -7,7 +7,8 @@ import {
   Image,
   Dimensions,
   Animated,
-  Platform
+  Platform,
+  ImageSourcePropType
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -17,6 +18,31 @@ import { Stretch, RestPeriod } from '../../types';
 import { NavigationButtons } from './utils';
 
 const { width, height } = Dimensions.get('window');
+
+// Helper function to safely handle image sources
+const getImageSource = (image: any, stretchId?: number): ImageSourcePropType => {
+  // For local required assets (used by some stretches like Twisted Figure-Four)
+  if (typeof image === 'number') {
+    // Direct return for local assets that are result of require() - React Native expects this exact format
+    return image;
+  } 
+  // For required image objects (new React Native versions may return objects for require)
+  else if (image && typeof image === 'object' && '__packager_asset' in image) {
+    return image; // Return the packager asset directly
+  }
+  // For remote URI objects
+  else if (image && typeof image === 'object' && 'uri' in image) {
+    return { ...image }; // Create a new object to avoid reference issues
+  } 
+  // For direct string paths
+  else if (typeof image === 'string') {
+    return { uri: image };
+  }
+  // Fallback
+  else {
+    return { uri: 'https://via.placeholder.com/350x350/FF9800/FFFFFF?text=No+Image' };
+  }
+};
 
 export interface StretchFlowViewProps {
   stretch: Stretch | RestPeriod;
@@ -57,6 +83,9 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   const [demoVideoStatus, setDemoVideoStatus] = useState<'not-started' | 'playing' | 'completed'>('not-started');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [displayedTime, setDisplayedTime] = useState(timeRemaining);
+  const [currentImageKey, setCurrentImageKey] = useState<string>(`img-${Date.now()}`);
+  const [currentStretchId, setCurrentStretchId] = useState<string | number>(stretch.id);
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -66,6 +95,23 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   useEffect(() => {
     setDisplayedTime(timeRemaining);
   }, [timeRemaining]);
+  
+  // Reset image when stretch changes
+  useEffect(() => {
+    if (currentStretchId !== stretch.id) {
+      // Force a new image key when stretch changes to prevent caching issues
+      setCurrentImageKey(`img-${stretch.id}-${Date.now()}`);
+      
+      // Reset hasDemoBeenWatched when stretch changes
+      setHasDemoBeenWatched(false);
+      
+      // Update current stretch ID
+      setCurrentStretchId(stretch.id);
+      
+      // Reset image error state
+      setImageLoadError(false);
+    }
+  }, [stretch.id, currentStretchId]);
   
   // Is this a rest or a stretch?
   const isRest = 'isRest' in stretch;
@@ -409,12 +455,25 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             borderColor: isPremium ? ((stretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD')
           }
         ]}>
-          <Image 
-            source={stretchObj.image}
-            style={styles.stretchImage}
-            resizeMode="contain"
-            defaultSource={{uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent(stretchObj.name || 'Stretch')}`}}
-          />
+          {imageLoadError ? (
+            <View style={styles.fallbackImageContainer}>
+              <Ionicons name="image-outline" size={50} color={isDark ? "#666" : "#999"} />
+              <Text style={[styles.fallbackImageText, { color: isDark ? theme.textSecondary : '#666' }]}>
+                {stretchObj.name}
+              </Text>
+            </View>
+          ) : (
+            <Image 
+              key={currentImageKey}
+              source={getImageSource(stretchObj.image, Number(stretchObj.id))}
+              style={styles.stretchImage}
+              resizeMode="contain"
+              onError={(e) => {
+                console.warn(`Failed to load image for stretch: ${stretchObj.name}`, e.nativeEvent.error);
+                setImageLoadError(true);
+              }}
+            />
+          )}
         </View>
         
         {/* Description */}
@@ -669,7 +728,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 26,
-  }
+  },
+  fallbackImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fallbackImageText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
 });
 
 export default StretchFlowView; 
