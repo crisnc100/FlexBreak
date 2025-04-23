@@ -172,27 +172,50 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     }
     
     if (!initialRenderRef.current && routine.length > 0 && currentIndex < routine.length) {
-      const currentDuration = routine[currentIndex]?.duration || 30;
+      // Get the current stretch and check if it's bilateral
+      const currentStretchItem = routine[currentIndex];
+      
+      // Calculate the duration based on whether it's bilateral or not
+      let currentDuration = currentStretchItem?.duration || 30;
+      
+      // For bilateral stretches, double the duration - BUT ONLY for custom routines
+      // Standard generated routines already have their durations calculated correctly in routineGenerator.ts
+      if (customStretches && customStretches.length > 0) {
+        // Only if it's a stretch (not a rest) and has bilateral property set to true
+        if (currentStretchItem && 
+            !('isRest' in currentStretchItem) && 
+            (currentStretchItem as Stretch).bilateral === true) {
+          console.log(`Custom routine: Stretch ${currentIndex} is bilateral, doubling duration from ${currentDuration} to ${currentDuration * 2}`);
+          currentDuration = currentDuration * 2;
+        }
+      } else {
+        // For generated routines, the bilateral timing is already factored in by routineGenerator
+        console.log(`Standard routine: Using stretch duration directly: ${currentDuration}s`);
+      }
+      
       console.log(`Starting timer for stretch ${currentIndex} with duration ${currentDuration}`);
       
       try {
         isHandlingTimerStateChangeRef.current = true; // Set the flag to prevent recursive calls
         
         // Check if this is a stretch with demo
-        const currentHasDemo = currentStretch && 
-          !('isRest' in currentStretch) && 
-          (currentStretch as Stretch).hasDemo === true;
+        const currentHasDemo = currentStretchItem && 
+          !('isRest' in currentStretchItem) && 
+          (currentStretchItem as Stretch).hasDemo === true;
           
         if (currentHasDemo) {
-          console.log('Demo stretch detected - initializing timer but pausing for demo');
+          console.log('Demo stretch detected - starting timer immediately');
           setIsDemoReady(true);
           setIsPlayingDemo(false); // Ensure demo is not marked as playing yet
           
-          // Initialize the timer but set it to paused state
-          resetTimer(currentDuration);
+          // Start the timer right away so it begins counting down. The timer will
+          // be paused automatically if the user taps "Watch Demo".
+          startTimer(currentDuration);
           
-          // Ensure the UI elements associated with time are properly reset
-          lastSecondPlayedRef.current = -1;
+          // Make sure timer is running
+          if (isPaused) {
+            resumeTimer();
+          }
         } else {
           // Normal stretch - start the timer as usual and ensure it's not paused
           setIsDemoReady(false);

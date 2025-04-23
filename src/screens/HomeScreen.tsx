@@ -586,18 +586,14 @@ export default function HomeScreen() {
     });
     
     // Log all stretch IDs for debugging
-    if (params.customStretches && params.customStretches.length > 0) {
-      console.log('Custom stretches IDs:', params.customStretches.map(s => 
-        `${s.id} (${typeof s.id}, ${('isRest' in s) ? 'rest' : 'stretch'})`
-      ).join(', '));
-    }
-    
-    handleStartStretching();
-    
-    // Use type assertion to navigate with the params
-    setTimeout(() => {
-      navigation.navigate('Routine', params as any);
-    }, 100);
+    console.log('Custom stretches IDs:', params.customStretches && params.customStretches.length > 0 ?
+      params.customStretches.map(s => `${s.id} (${typeof s.id}, ${('isRest' in s) ? 'rest' : 'stretch'})`).join(', ') : 'None');
+
+    // Directly navigate to the Routine screen with the provided custom params
+    // Avoid calling handleStartStretching() first, as that triggers an initial navigation
+    // with default/previous picker params which can overwrite the custom selection.
+    // Instead, we go straight to the Routine screen with the correct custom routine data.
+    navigation.navigate('Routine', params as any);
   };
 
   // Handle desk break boost
