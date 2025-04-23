@@ -1,4 +1,4 @@
-# DeskStretch
+# FlexBreak
 
 A mobile application to help desk workers incorporate healthy stretching routines into their workday, enhance physical well-being, and maintain productivity.
 
