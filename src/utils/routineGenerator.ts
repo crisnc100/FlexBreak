@@ -771,3 +771,24 @@ export const selectStretches = (
   console.log(`Selected ${selectedStretches.length} stretches for smart routine (${Math.round(currentDuration/60)} minutes)`);
   return selectedStretches;
 };
+
+/**
+ * Helper function to mark an MP4 file as a video source
+ * This helps the stretchImage component determine whether to render
+ * a Video component or an Image component
+ */
+export function markAsVideo(source: any): any {
+  if (typeof source === 'string') {
+    return { uri: source, __video: true };
+  } else if (source && typeof source === 'object' && 'uri' in source) {
+    return { ...source, __video: true };
+  } else if (typeof source === 'number') {
+    // Handle number type (asset reference from require())
+    // Don't convert to URI object, just add the __video flag to the original
+    return { __video: true, __asset: source };
+  } else {
+    console.warn('Invalid source for markAsVideo, must be a string, number, or {uri: string}');
+    // Return a placeholder if needed
+    return { uri: '', __video: true };
+  }
+}

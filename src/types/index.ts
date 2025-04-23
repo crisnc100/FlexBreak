@@ -11,13 +11,13 @@ export interface Stretch {
   duration: number; // seconds
   tags: BodyArea[];
   level: StretchLevel;
-  image: number | { uri: string }; // number for require('./path'), object for remote URLs
+  image: number | { uri: string; __video?: boolean } | { __video: true; uri: string }; // Support for images and MP4 videos
   bilateral?: boolean;
   premium?: boolean;
   hasDemo?: boolean;
-  demoVideo?: any;
+  demoVideo?: number | { uri: string };
   demoVideoDuration?: number; // seconds
-  demoAudio?: any; // Path to the voice instructions audio file
+  demoAudio?: number | { uri: string }; // Path to the voice instructions audio file
 }
 
 export interface CustomRestPeriod {
@@ -56,6 +56,8 @@ export interface ProgressEntry {
   stretchCount?: number;
   hidden?: boolean;
   customStretches?: { id: number | string; isRest?: boolean }[];
+  level?: StretchLevel;
+  savedStretches?: any[]; // Array of stretches saved with the routine
 }
 
 // Gamification Types
@@ -151,7 +153,7 @@ export interface Level {
 
 export type RootStackParamList = {
   Home: undefined;
-  Routine: RoutineParams & { customStretches?: Stretch[] };
+  Routine: RoutineParams;
   Progress: undefined;
   Favorites: undefined;
   Testing: undefined;

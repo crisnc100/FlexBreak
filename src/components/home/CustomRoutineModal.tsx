@@ -42,7 +42,11 @@ interface CustomRoutine {
   area: BodyArea;
   duration: Duration;
   timestamp: string;
-  customStretches?: { id: number | string; isRest?: boolean }[];
+  customStretches?: { 
+    id: number | string; 
+    isRest?: boolean;
+    bilateral?: boolean;
+  }[];
 }
 
 interface CustomRoutineModalProps {
@@ -71,6 +75,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   const [selectedStretches, setSelectedStretches] = useState<(Stretch | CustomRestPeriod)[]>([]);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'routines' | 'create'>('routines');
+  const [isSaving, setIsSaving] = useState(false);
   
   // Rest period options
   const restPeriods: CustomRestPeriod[] = [
@@ -149,90 +154,89 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     }
   };
   
-  // Save custom routine
+  // Save a new custom routine
   const saveCustomRoutine = async () => {
-    if (!routineName.trim()) {
-      Alert.alert('Name Required', 'Please enter a name for your routine.');
-      return;
-    }
-    
     try {
-      // Check if maximum number of routines has been reached
-      if (customRoutines.length >= MAX_CUSTOM_ROUTINES) {
+      // Ensure required fields are filled out
+      if (!routineName.trim()) {
+        Alert.alert('Missing Information', 'Please enter a name for your routine.');
+        return;
+      }
+
+      // Ensure minimum stretches requirement is met
+      if (selectedStretches.length === 0) {
+        Alert.alert('No Stretches Selected', 'Please select at least one stretch for your routine.');
+        return;
+      }
+
+      // Check if meets minimum time requirement
+      if (!meetsMinimumRequirement()) {
+        Alert.alert('Time Requirement Not Met', `Your routine is too short. It needs to meet the minimum time requirement for a ${selectedDuration}-minute routine.`);
+        return;
+      }
+
+      // Get existing custom routines
+      const existingRoutines = await getCustomRoutines();
+
+      // Check if we've reached the maximum limit
+      if (existingRoutines.length >= MAX_CUSTOM_ROUTINES) {
         Alert.alert(
           'Maximum Routines Reached',
-          `You can save up to ${MAX_CUSTOM_ROUTINES} custom routines. Please delete some to make room for new ones.`,
-          [{ text: 'OK' }]
+          `You can save up to ${MAX_CUSTOM_ROUTINES} custom routines. Please delete some before adding more.`
         );
         return;
       }
-      
-      // Validate minimum time requirements when using custom stretches
-      if (selectedStretches.length > 0) {
-        // Calculate total time
-        const totalTime = selectedStretches.reduce((total, stretch) => {
-          if ('isRest' in stretch) {
-            return total + stretch.duration;
-          }
-          return total + (stretch.bilateral ? stretch.duration * 2 : stretch.duration);
-        }, 0);
-        
-        // Convert to minutes for easier comparison
-        const totalMinutes = totalTime / 60;
-        const durationValue = parseInt(selectedDuration);
-        
-        // Set minimum required minutes based on selected duration
-        let minimumMinutes = 1.5;  // Default for 5-minute routines
-        
-        if (durationValue === 10) {
-          minimumMinutes = 6;
-        } else if (durationValue === 15) {
-          minimumMinutes = 11;
+
+      // Prepare routine data - save bilateral flags for each stretch
+      const stretchesData = selectedStretches.map(stretch => {
+        if ('isRest' in stretch) {
+          return {
+            id: stretch.id,
+            isRest: true
+          };
+        } else {
+          return {
+            id: stretch.id,
+            bilateral: stretch.bilateral || false
+          };
         }
-        
-        // Check if total time meets minimum requirements
-        if (totalMinutes < minimumMinutes) {
-          Alert.alert(
-            'More Content Needed',
-            `For a ${durationValue}-minute routine, please add at least ${minimumMinutes} minutes of content. You currently have ${totalMinutes.toFixed(1)} minutes.`,
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-      
-      const newRoutine: any = {
+      });
+
+      const routineData = {
         name: routineName.trim(),
         area: selectedArea,
-        duration: selectedDuration
+        duration: selectedDuration,
+        customStretches: stretchesData
       };
-      
-      // Add selected stretches if using custom stretches
-      if (selectedStretches.length > 0) {
-        newRoutine.customStretches = selectedStretches.map(stretch => {
-          if ('isRest' in stretch) {
-            return { id: stretch.id, isRest: true };
-          }
-          return { id: stretch.id };
-        });
-      }
-      
-      // Save to storage service
-      const success = await saveCustomRoutineToStorage(newRoutine);
-      
+
+      // Save to storage
+      console.log('Saving custom routine:', routineData);
+      const success = await saveCustomRoutineToStorage(routineData);
+
       if (success) {
-        // Also save as a favorite routine
-        await saveFavoriteRoutine(newRoutine);
+        // Show success message
+        setIsSaving(true);
         
+        // Also save to favorites for easy access
+        console.log('Saving favorite routine:', routineData);
+        await saveFavoriteRoutine(routineData);
+
         // Reset form
         setRoutineName('');
-        setShowCreateForm(false);
+        setSelectedArea('Full Body');
+        setSelectedDuration('10');
         setSelectedStretches([]);
-        
-        // Reload routines to get the updated list with IDs
+
+        // Reload routines list
         await loadCustomRoutines();
-        
-        Alert.alert('Success', 'Your custom routine has been saved!');
+
+        // Switch to "My Routines" tab
+        setActiveTab('routines');
+
+        // Hide saving indicator after a delay
+        setTimeout(() => {
+          setIsSaving(false);
+        }, 1500);
       } else {
         throw new Error('Failed to save routine');
       }
@@ -244,6 +248,9 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   
   // Start a custom routine
   const startCustomRoutine = (routine: CustomRoutine) => {
+    console.log('Starting custom routine:', routine.name, 'with', 
+                routine.customStretches?.length || 0, 'stretches');
+    
     let params: RoutineParams = {
       area: routine.area,
       duration: routine.duration,
@@ -252,10 +259,20 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     
     // Add custom stretches if available
     if (routine.customStretches && routine.customStretches.length > 0) {
+      console.log('Custom stretches found, processing', routine.customStretches.length, 'items');
+      
+      // Debug the custom stretches IDs and types
+      routine.customStretches.forEach((s, i) => {
+        console.log(`Stretch ${i}: ID=${s.id}, type=${typeof s.id}, isRest=${s.isRest || false}`);
+      });
+      
+      // Create a detailed array of stretches with all properties needed
       const selectedStretchDetails = routine.customStretches.map(s => {
         if (s.isRest) {
           // Handle rest periods
           const restPeriodId = s.id.toString();
+          console.log(`Processing rest period: ${restPeriodId}`);
+          
           // Find matching rest period from our predefined options
           if (restPeriodId === 'rest-15') {
             return { 
@@ -285,15 +302,45 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
           return null;
         } else {
           // Handle regular stretches
-          const stretchDetail = stretches.find(stretch => stretch.id === s.id);
-          return stretchDetail;
+          console.log(`Looking for stretch with ID: ${s.id} (${typeof s.id})`);
+          
+          const stretchDetail = stretches.find(stretch => 
+            // Convert both IDs to strings for consistent comparison
+            String(stretch.id) === String(s.id)
+          );
+          
+          if (stretchDetail) {
+            console.log(`✅ Found matching stretch: ${stretchDetail.name}, ID=${stretchDetail.id}`);
+            // Create a deep copy of the stretch detail with all properties
+            const stretchCopy = {...stretchDetail};
+            
+            // Ensure the bilateral flag is set correctly based on saved value
+            if (s.bilateral !== undefined) {
+              stretchCopy.bilateral = s.bilateral;
+            }
+            
+            return stretchCopy;
+          }
+          
+          console.log(`❌ Could not find stretch with ID ${s.id} - will be filtered out`);
+          return null;
         }
       }).filter(Boolean) as (Stretch | CustomRestPeriod)[];
       
+      // Log the final set of stretches being used
+      console.log(`Final routine has ${selectedStretchDetails.length} items:`, 
+                  selectedStretchDetails.map(s => `${s.name} (${s.id})`).join(', '));
+      
+      // Save the detailed stretches to params
       params.customStretches = selectedStretchDetails;
       
       console.log(`Starting routine with ${selectedStretchDetails.length} items (including ${
         selectedStretchDetails.filter(s => 'isRest' in s).length} rest periods)`);
+    }
+    
+    // Also save the customStretches IDs and properties to the routine params for future reference
+    if (routine.customStretches) {
+      (params as any).savedCustomStretches = routine.customStretches;
     }
     
     onStartRoutine(params);

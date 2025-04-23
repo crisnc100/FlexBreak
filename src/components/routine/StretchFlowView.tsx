@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Dimensions,
   Animated,
   Platform,
-  ImageSourcePropType
+  ImageSourcePropType,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -16,33 +17,9 @@ import DemoVideoPlayer from './DemoVideoPlayer';
 import * as soundEffects from '../../utils/soundEffects';
 import { Stretch, RestPeriod } from '../../types';
 import { NavigationButtons } from './utils';
+import { Video, ResizeMode as VideoResizeMode } from 'expo-av';
 
 const { width, height } = Dimensions.get('window');
-
-// Helper function to safely handle image sources
-const getImageSource = (image: any, stretchId?: number): ImageSourcePropType => {
-  // For local required assets (used by some stretches like Twisted Figure-Four)
-  if (typeof image === 'number') {
-    // Direct return for local assets that are result of require() - React Native expects this exact format
-    return image;
-  } 
-  // For required image objects (new React Native versions may return objects for require)
-  else if (image && typeof image === 'object' && '__packager_asset' in image) {
-    return image; // Return the packager asset directly
-  }
-  // For remote URI objects
-  else if (image && typeof image === 'object' && 'uri' in image) {
-    return { ...image }; // Create a new object to avoid reference issues
-  } 
-  // For direct string paths
-  else if (typeof image === 'string') {
-    return { uri: image };
-  }
-  // Fallback
-  else {
-    return { uri: 'https://via.placeholder.com/350x350/FF9800/FFFFFF?text=No+Image' };
-  }
-};
 
 export interface StretchFlowViewProps {
   stretch: Stretch | RestPeriod;
@@ -59,7 +36,7 @@ export interface StretchFlowViewProps {
   isPlaying: boolean;
 }
 
-const StretchFlowView: React.FC<StretchFlowViewProps> = ({
+export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   stretch,
   timeRemaining,
   progressAnim,
@@ -76,47 +53,54 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   const { theme, isDark } = useTheme();
   
   // App states
-  const [viewMode, setViewMode] = useState<'demo' | 'stretch' | 'rest'>('demo');
+  const [viewMode, setViewMode] = useState<'demo' | 'stretch' | 'rest'>('stretch');
   const [hasDemoBeenWatched, setHasDemoBeenWatched] = useState(false);
   const [previousStretch, setPreviousStretch] = useState<Stretch | null>(null);
   const [timerForceUpdate, setTimerForceUpdate] = useState(Date.now());
   const [demoVideoStatus, setDemoVideoStatus] = useState<'not-started' | 'playing' | 'completed'>('not-started');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [displayedTime, setDisplayedTime] = useState(timeRemaining);
-  const [currentImageKey, setCurrentImageKey] = useState<string>(`img-${Date.now()}`);
-  const [currentStretchId, setCurrentStretchId] = useState<string | number>(stretch.id);
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const imageOpacity = useRef(new Animated.Value(0)).current;
   
   // Update displayed time whenever timeRemaining changes
   useEffect(() => {
     setDisplayedTime(timeRemaining);
   }, [timeRemaining]);
   
-  // Reset image when stretch changes
-  useEffect(() => {
-    if (currentStretchId !== stretch.id) {
-      // Force a new image key when stretch changes to prevent caching issues
-      setCurrentImageKey(`img-${stretch.id}-${Date.now()}`);
-      
-      // Reset hasDemoBeenWatched when stretch changes
-      setHasDemoBeenWatched(false);
-      
-      // Update current stretch ID
-      setCurrentStretchId(stretch.id);
-      
-      // Reset image error state
-      setImageLoadError(false);
-    }
-  }, [stretch.id, currentStretchId]);
-  
   // Is this a rest or a stretch?
   const isRest = 'isRest' in stretch;
   const isPremium = !isRest && (stretch as any).isPremium;
   const hasDemo = !isRest && 'hasDemo' in stretch && (stretch as Stretch).hasDemo;
+  // Define stretchObj here for scope access in all functions
+  const stretchObj = isRest ? null : (stretch as Stretch);
+  
+  // Track current stretch ID for detecting changes
+  const currentStretchId = stretch.id;
+  
+  // Effect to handle stretch changes
+  useEffect(() => {
+    // Reset image error state when stretch changes
+    setImageLoadError(false);
+    
+    // Fade out current image
+    Animated.timing(imageOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true
+    }).start(() => {
+      // Start loading new image
+      setIsImageLoading(true);
+      
+      // Reset hasDemoBeenWatched when stretch changes
+      setHasDemoBeenWatched(false);
+    });
+  }, [currentStretchId]);
   
   // Determine if this stretch has tips
   const hasTips = !isRest && 'tips' in stretch && (stretch as any).tips && (stretch as any).tips.length > 0;
@@ -126,16 +110,8 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     if (isRest) {
       // Rest periods don't have demos, go straight to stretch view
       animateViewTransition('stretch', false);
-    } else if (hasDemo && !hasDemoBeenWatched) {
-      // Has demo and hasn't been watched yet, show demo
-      animateViewTransition('demo', false);
-      
-      // Pause timer during demo
-      if (!isPaused) {
-        onTogglePause();
-      }
     } else {
-      // No demo or already watched, go to stretch
+      // Default to showing stretch view (not demo)
       animateViewTransition('stretch', false);
     }
   }, [stretch.id]);
@@ -149,12 +125,10 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       setViewMode("stretch");
       // Force timer reset by resetting timerForceUpdate
       setTimerForceUpdate(Date.now());
-      // Start the timer with full duration for this stretch
-      if (startTimer && currentStretch) {
-        startTimer(currentStretch.duration);
-      }
+      // Timer should already be running since we modified ActiveRoutine to start it immediately
+      // No need to call startTimer again here
     }
-  }, [demoVideoStatus, isPlaying, currentStretch, startTimer]);
+  }, [demoVideoStatus, isPlaying]);
   
   // Handle smooth transition between views
   const animateViewTransition = (newView: 'demo' | 'stretch', animate = true) => {
@@ -212,7 +186,8 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       // Animate transition to stretch view
       animateViewTransition('stretch');
       
-      // Always start the timer when transitioning from demo to stretch
+      // Always resume timer when transitioning from demo to stretch
+      // Since we always pause when watching demo, we need to resume here
       if (isPaused) {
         // Small delay to allow animation to complete
         setTimeout(() => {
@@ -221,8 +196,6 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       }
       
       // Force timer text to update by re-rendering
-      // This fixes the issue where timer stays static after watching demo
-      const currentTime = timeRemaining;
       setTimerForceUpdate(Date.now());
     } catch (error) {
       console.error('Error transitioning to stretch mode:', error);
@@ -241,7 +214,7 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       
       // Always pause timer when watching demo
       if (!isPaused) {
-        onTogglePause();
+        onTogglePause(); // Pause the timer
       }
       
       // Animate transition to demo view
@@ -262,6 +235,193 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     } else {
       return `${secs}s`;
     }
+  };
+  
+  // Enhanced detection for video sources
+  const isVideoSource = useCallback(() => {
+    if (isRest || !stretchObj || !stretchObj.image) {
+      return false;
+    }
+
+    // Case 1: Check for the __video flag
+    if (typeof stretchObj.image === 'object' && 
+        stretchObj.image !== null && 
+        (stretchObj.image as any).__video === true) {
+      return true;
+    }
+    
+    // Case 2: Check for .mp4 extension in uri
+    if (typeof stretchObj.image === 'object' && 
+        stretchObj.image !== null && 
+        'uri' in stretchObj.image && 
+        typeof stretchObj.image.uri === 'string' && 
+        stretchObj.image.uri.toLowerCase().endsWith('.mp4')) {
+      return true;
+    }
+
+    // Case 3: Check for require asset with MP4 reference
+    if (typeof stretchObj.image === 'object' && 
+        (stretchObj.image as any).__asset) {
+      return true;
+    }
+
+    // Case 4: Last resort - try to detect MP4 from number asset
+    if (typeof stretchObj.image === 'number') {
+      // Convert to string and check for MP4 in the debug description
+      const assetStr = stretchObj.image.toString();
+      
+      // Try to detect MP4 from the asset reference
+      const isMp4 = assetStr.includes('mp4') || assetStr.includes('video');
+      if (isMp4) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, [isRest, stretchObj]);
+  
+  // Use effect to log debugging info only when stretch changes
+  useEffect(() => {
+    if (!isRest && stretchObj) {
+      console.log(`Source type for ${stretchObj.name}:`, {
+        type: typeof stretchObj.image,
+        isObject: typeof stretchObj.image === 'object',
+        hasVideo: typeof stretchObj.image === 'object' && 
+                  (stretchObj.image as any).__video === true,
+        sourceValue: typeof stretchObj.image === 'number' ? 
+                  `[Asset #${stretchObj.image}]` : 
+                  JSON.stringify(stretchObj.image).substring(0, 100),
+      });
+      
+      if (isVideoSource()) {
+        console.log(`✅ Video detected for ${stretchObj.name}`);
+      } else {
+        console.log(`❌ Not detected as video for ${stretchObj.name}`);
+      }
+      
+      console.log(`Source for ${stretchObj.name}: ${typeof stretchObj.image} | isVideo: ${isVideoSource()}`);
+    }
+  }, [currentStretchId, isRest, isVideoSource, stretchObj]);
+  
+  // Render the appropriate image or video
+  const renderStretchImage = () => {
+    if (isRest || imageLoadError) {
+      return (
+        <View style={styles.fallbackImageContainer}>
+          <Ionicons name="image-outline" size={50} color={isDark ? "#666" : "#999"} />
+          <Text style={[styles.fallbackImageText, { color: isDark ? theme.textSecondary : '#666' }]}>
+            {isRest ? (stretch.name || 'Rest Period') : 'Image unavailable'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (!stretchObj) return null;
+    
+    const shouldRenderVideo = isVideoSource();
+    
+    if (shouldRenderVideo) {
+      let videoSource = stretchObj.image;
+      // If we have an __asset field, use the asset reference directly
+      if ((stretchObj.image as any).__asset) {
+        videoSource = (stretchObj.image as any).__asset;
+      }
+      
+      return (
+        <Animated.View style={[styles.imageWrapper, { opacity: imageOpacity }]}>
+          <Video 
+            source={videoSource}
+            style={styles.stretchImage}
+            resizeMode={VideoResizeMode.CONTAIN}
+            shouldPlay={true}
+            isLooping={true}
+            isMuted={true}
+            useNativeControls={false}
+            onLoadStart={() => {
+              setIsImageLoading(true);
+            }}
+            onReadyForDisplay={() => {
+              console.log(`Video ready for display: ${stretchObj.name}`);
+              setIsImageLoading(false);
+              // Fade in the video when loaded
+              Animated.timing(imageOpacity, {
+                toValue: 1,
+                duration: 250,
+                useNativeDriver: true
+              }).start();
+            }}
+            onLoad={() => {
+              console.log(`Successfully loaded video for ${stretchObj.name}`);
+              setIsImageLoading(false);
+              // Fade in the video when loaded
+              Animated.timing(imageOpacity, {
+                toValue: 1,
+                duration: 250,
+                useNativeDriver: true
+              }).start();
+            }}
+            onError={(error) => {
+              console.warn(`Failed to load video for stretch: ${stretchObj.name}`, error);
+              setImageLoadError(true);
+              setIsImageLoading(false);
+            }}
+            onPlaybackStatusUpdate={(status) => {
+              // Also mark as loaded when playback starts
+              if (status.isLoaded && status.isPlaying && isImageLoading) {
+                console.log(`Video is now playing for ${stretchObj.name}`);
+                setIsImageLoading(false);
+                Animated.timing(imageOpacity, {
+                  toValue: 1,
+                  duration: 250,
+                  useNativeDriver: true
+                }).start();
+              }
+            }}
+          />
+          {isImageLoading && (
+            <View style={styles.imageLoadingContainer}>
+              <ActivityIndicator size="large" color={isDark ? theme.accent : '#4CAF50'} />
+              <Text style={[styles.loadingText, { color: isDark ? theme.textSecondary : '#666', marginTop: 10 }]}>
+                Loading video...
+              </Text>
+            </View>
+          )}
+        </Animated.View>
+      );
+    }
+    
+    return (
+      <Animated.View style={[styles.imageWrapper, { opacity: imageOpacity }]}>
+        <Image 
+          source={stretchObj.image}
+          style={styles.stretchImage}
+          resizeMode="contain"
+          onLoadStart={() => {
+            setIsImageLoading(true);
+          }}
+          onLoad={() => {
+            console.log(`Successfully loaded image for ${stretchObj.name}`);
+            setIsImageLoading(false);
+            // Fade in the image when loaded
+            Animated.timing(imageOpacity, {
+              toValue: 1,
+              duration: 250,
+              useNativeDriver: true
+            }).start();
+          }}
+          onError={(e) => {
+            console.warn(`Failed to load image for stretch: ${stretchObj.name}`, e.nativeEvent.error);
+            setImageLoadError(true);
+            setIsImageLoading(false);
+          }}
+        />
+        {isImageLoading && (
+          <View style={styles.imageLoadingContainer}>
+            <ActivityIndicator size="large" color={isDark ? theme.accent : '#4CAF50'} />
+          </View>
+        )}
+      </Animated.View>
+    );
   };
   
   // Render rest period
@@ -455,25 +615,7 @@ const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             borderColor: isPremium ? ((stretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD')
           }
         ]}>
-          {imageLoadError ? (
-            <View style={styles.fallbackImageContainer}>
-              <Ionicons name="image-outline" size={50} color={isDark ? "#666" : "#999"} />
-              <Text style={[styles.fallbackImageText, { color: isDark ? theme.textSecondary : '#666' }]}>
-                {stretchObj.name}
-              </Text>
-            </View>
-          ) : (
-            <Image 
-              key={currentImageKey}
-              source={getImageSource(stretchObj.image, Number(stretchObj.id))}
-              style={styles.stretchImage}
-              resizeMode="contain"
-              onError={(e) => {
-                console.warn(`Failed to load image for stretch: ${stretchObj.name}`, e.nativeEvent.error);
-                setImageLoadError(true);
-              }}
-            />
-          )}
+          {renderStretchImage()}
         </View>
         
         {/* Description */}
@@ -738,6 +880,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 16,
+  },
+  imageWrapper: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  imageLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

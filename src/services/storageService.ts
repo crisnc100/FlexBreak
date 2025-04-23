@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { ProgressEntry, RoutineParams, BodyArea, Duration } from '../types';
+import { ProgressEntry, RoutineParams, BodyArea, Duration, StretchLevel } from '../types';
 import { UserProgress } from '../utils/progress/types';
 import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
 
@@ -347,6 +347,7 @@ export const saveRoutineProgress = async (entry: {
   duration: Duration; 
   date: string;
   stretchCount?: number;
+  level?: StretchLevel;
 }): Promise<boolean> => {
   try {
     console.log('Saving routine progress:', entry);
@@ -359,14 +360,18 @@ export const saveRoutineProgress = async (entry: {
       area: entry.area,
       duration: entry.duration,
       date: entry.date,
-      stretchCount: entry.stretchCount || 0
+      stretchCount: entry.stretchCount || 0,
+      level: entry.level || 'beginner'
     };
     
     // Add to beginning of array
     const updatedRoutines = [newEntry, ...existingRoutines];
     
+    // Limit to 20 most recent routines to prevent excessive growth
+    const limitedRoutines = updatedRoutines.slice(0, 20);
+    
     // Save to storage for recent routines
-    const saveRecentResult = await setData(KEYS.PROGRESS.PROGRESS_HISTORY, updatedRoutines);
+    const saveRecentResult = await setData(KEYS.PROGRESS.PROGRESS_HISTORY, limitedRoutines);
     
     // Also save to progress key for statistics
     const allRoutines = await getAllRoutines();
@@ -396,7 +401,8 @@ export const saveCompletedRoutine = async (
       area: routine.area,
       duration: routine.duration,
       date: new Date().toISOString(),
-      stretchCount: stretchCount
+      stretchCount: stretchCount,
+      level: routine.level
     };
     
     return await saveRoutineProgress(entry);
@@ -902,7 +908,7 @@ export const saveCustomRoutine = async (routine: {
   name: string; 
   area: BodyArea; 
   duration: Duration;
-  customStretches?: { id: number }[];
+  customStretches?: { id: number | string; isRest?: boolean; bilateral?: boolean; }[];
 }): Promise<boolean> => {
   try {
     console.log('Saving custom routine:', routine);

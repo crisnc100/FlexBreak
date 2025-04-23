@@ -33,7 +33,7 @@ export interface ActiveRoutineProps {
   level: StretchLevel;
   customStretches?: (Stretch | RestPeriod)[];
   includePremiumStretches?: boolean;
-  onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean) => Promise<void>;
+  onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean, currentStretches?: any[]) => Promise<void>;
   onNavigateHome: () => void;
 }
 
@@ -75,10 +75,43 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Add state for paused status
   const [isPaused, setIsPaused] = useState(false);
   
-  // Add state for preloading
+  // State for preloading
   const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(new Set());
+  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
   
-  // Define handleNext as useCallback to avoid dependency issues
+  // Create a ref for the handleNext function to break the circular dependency
+  const handleNextRef = useRef<() => void>(() => {});
+  
+  // Use the routine timer hook
+  const { 
+    timeRemaining, 
+    progressAnim, 
+    fadeAnim,
+    startTimer, 
+    pauseTimer, 
+    resumeTimer,
+    resetTimer,
+    isPaused: isTimerPaused,  // Get isPaused from the hook
+    togglePause           // Get togglePause function
+  } = useRoutineTimer({
+    onComplete: () => handleNextRef.current()
+  });
+  
+  // Keep local isPaused state in sync with timer hook
+  // Only update when timer hook's isPaused state changes
+  useEffect(() => {
+    if (isTimerPaused !== isPaused) {
+      setIsPaused(isTimerPaused);
+    }
+  }, [isTimerPaused]);
+  
+  // Get the current stretch
+  const currentStretch = routine[currentIndex];
+  
+  // Get the next stretch for preloading
+  const nextStretch = routine[currentIndex + 1];
+  
+  // Create the actual handleNext function
   const handleNext = useCallback(() => {
     console.log('handleNext called');
     
@@ -108,6 +141,12 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         console.log(`Setting new index to ${newIndex}`);
         return newIndex;
       });
+      
+      // Ensure timer is not paused when moving to the next stretch
+      // This will make sure the timer continues running after "Next" is clicked
+      if (isPaused) {
+        resumeTimer();
+      }
     } else {
       // Don't play any completion sound here - this will be handled in RoutineScreen.tsx
       
@@ -115,71 +154,193 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       console.log('Reached the end of the routine, completing...');
       handleComplete();
     }
+  }, [currentIndex, routine.length, isPaused, resumeTimer, fadeAnim]);
+  
+  // Update the ref when handleNext changes
+  useEffect(() => {
+    handleNextRef.current = handleNext;
+  }, [handleNext]);
+  
+  // Add a ref to track if we're currently handling a timer state change
+  const isHandlingTimerStateChangeRef = useRef(false);
+  
+  // Effect to start timer for the current stretch when currentIndex changes
+  useEffect(() => {
+    // Prevent recursive calls during timer state changes
+    if (isHandlingTimerStateChangeRef.current) {
+      return; // Skip execution if we're already handling a timer state change
+    }
+    
+    if (!initialRenderRef.current && routine.length > 0 && currentIndex < routine.length) {
+      const currentDuration = routine[currentIndex]?.duration || 30;
+      console.log(`Starting timer for stretch ${currentIndex} with duration ${currentDuration}`);
+      
+      try {
+        isHandlingTimerStateChangeRef.current = true; // Set the flag to prevent recursive calls
+        
+        // Check if this is a stretch with demo
+        const currentHasDemo = currentStretch && 
+          !('isRest' in currentStretch) && 
+          (currentStretch as Stretch).hasDemo === true;
+          
+        if (currentHasDemo) {
+          console.log('Demo stretch detected - initializing timer but pausing for demo');
+          setIsDemoReady(true);
+          setIsPlayingDemo(false); // Ensure demo is not marked as playing yet
+          
+          // Initialize the timer but set it to paused state
+          resetTimer(currentDuration);
+          
+          // Ensure the UI elements associated with time are properly reset
+          lastSecondPlayedRef.current = -1;
+        } else {
+          // Normal stretch - start the timer as usual and ensure it's not paused
+          setIsDemoReady(false);
+          setIsPlayingDemo(false);
+          
+          // Start timer and ensure it's running (not paused)
+          startTimer(currentDuration);
+          
+          // Make sure timer is running
+          if (isPaused) {
+            resumeTimer();
+          }
+        }
+        
+        // Reset the flag after a short delay to allow state updates to settle
+        setTimeout(() => {
+          isHandlingTimerStateChangeRef.current = false;
+        }, 100);
+      } catch (error) {
+        console.error('Error starting timer:', error);
+        isHandlingTimerStateChangeRef.current = false; // Reset the flag in case of error
+      }
+    } else {
+      // After first render, set initialRender to false
+      if (initialRenderRef.current) {
+        initialRenderRef.current = false;
+      }
+      
+      // No need to set the flag here as we're exiting early
+    }
   }, [currentIndex, routine.length]);
   
-  // Use the routine timer hook
-  const { 
-    timeRemaining, 
-    progressAnim, 
-    fadeAnim,
-    startTimer, 
-    pauseTimer, 
-    resumeTimer,
-    resetTimer,
-    isPaused: isTimerPaused,  // Get isPaused from the hook
-    togglePause           // Get togglePause function
-  } = useRoutineTimer({
-    onComplete: handleNext
-  });
-  
-  // Keep local isPaused state in sync with timer hook
+  // Preload next stretch assets when current index changes
   useEffect(() => {
-    setIsPaused(isTimerPaused);
-  }, [isTimerPaused]);
-  
-  // Get the current stretch
-  const currentStretch = routine[currentIndex];
-  
-  // Get the next stretch for preloading
-  const nextStretch = routine[currentIndex + 1];
-  
-  // Preload next demo video when current index changes
-  useEffect(() => {
-    const preloadNextVideo = async () => {
-      if (nextStretch && 
-          !('isRest' in nextStretch) && 
-          (nextStretch as Stretch).hasDemo && 
-          (nextStretch as Stretch).demoVideo) {
+    const preloadNextAssets = async () => {
+      if (nextStretch && !('isRest' in nextStretch)) {
+        const stretchObj = nextStretch as Stretch;
         
-        // Generate a key for the video
-        const videoKey = `video-${(nextStretch as Stretch).id}`;
+        // Generate keys for preloading tracking
+        const videoKey = `video-${stretchObj.id}`;
+        const imageKey = `image-${stretchObj.id}`;
         
-        // Only preload if not already preloaded
-        if (!preloadedVideos.has(videoKey)) {
-          console.log(`Preloading next demo video for stretch: ${(nextStretch as Stretch).name}`);
+        // 1. Preload next demo video if needed
+        if (stretchObj.hasDemo && stretchObj.demoVideo && !preloadedVideos.has(videoKey)) {
+          console.log(`Preloading next demo video for stretch: ${stretchObj.name}`);
           
           try {
-            // Preload just by creating the object, don't play it
-            const { sound } = await Audio.Sound.createAsync(
-              'demoAudio' in nextStretch ? (nextStretch as any).demoAudio : null,
-              { shouldPlay: false, volume: 0 }
-            );
+            // Check if the stretch has demoAudio property that contains a valid URI
+            const hasValidAudio = 'demoAudio' in stretchObj && 
+                                  stretchObj.demoAudio && 
+                                  typeof stretchObj.demoAudio === 'object' && 
+                                  'uri' in stretchObj.demoAudio && 
+                                  stretchObj.demoAudio.uri;
             
-            // Unload it immediately to free memory but keep in cache
-            await sound.unloadAsync();
+            if (hasValidAudio) {
+              // Preload just by creating the object, don't play it
+              const { sound } = await Audio.Sound.createAsync(
+                stretchObj.demoAudio,
+                { shouldPlay: false, volume: 0 }
+              );
+              
+              // Unload it immediately to free memory but keep in cache
+              await sound.unloadAsync();
+            }
+            
+            // Preload the actual video if it exists
+            if (stretchObj.demoVideo) {
+              try {
+                // Just attempt to load the video without using createAsync
+                // The Video component will handle preloading internally when needed
+                console.log(`Marking demo video for ${stretchObj.name} as preloaded`);
+              } catch (videoError) {
+                console.warn(`Error preloading video for ${stretchObj.name}:`, videoError);
+              }
+            }
             
             // Mark as preloaded
-            setPreloadedVideos(prev => new Set([...prev, videoKey]));
+            setPreloadedVideos(prev => {
+              const newSet = new Set([...prev]);
+              newSet.add(videoKey);
+              return newSet;
+            });
           } catch (error) {
-            console.error('Error preloading demo audio:', error);
+            console.warn('Error preloading demo audio:', error);
+            // Still mark as preloaded to prevent repeated attempts
+            setPreloadedVideos(prev => {
+              const newSet = new Set([...prev]);
+              newSet.add(videoKey);
+              return newSet;
+            });
+          }
+        }
+        
+        // 2. Preload next image/video if not already preloaded
+        if (stretchObj.image && !preloadedImages.has(imageKey)) {
+          console.log(`Preloading image/video for next stretch: ${stretchObj.name}`);
+          
+          try {
+            // Check if the source is a video (MP4)
+            const isVideoSource = stretchObj.image && 
+              typeof stretchObj.image === 'object' && 
+              (
+                (stretchObj.image as any).uri?.endsWith('.mp4') || 
+                (stretchObj.image as any).__video === true
+              );
+              
+            if (isVideoSource) {
+              // For videos, just mark as preloaded - preloading will be handled by the Video component
+              console.log(`Marking preview video for ${stretchObj.name} as ready for loading`);
+            } else {
+              // Handle image preloading as before
+              if (typeof stretchObj.image === 'object' && 'uri' in stretchObj.image && stretchObj.image.uri) {
+                // Remote image - use prefetch
+                if (stretchObj.image.uri.startsWith('http')) {
+                  const success = await Image.prefetch(stretchObj.image.uri);
+                  console.log(`Image prefetch ${success ? 'successful' : 'failed'} for ${stretchObj.name}`);
+                } else {
+                  // Local image - no need to prefetch as they're immediately available
+                  console.log(`Local image for ${stretchObj.name} doesn't need prefetching`);
+                }
+              } else {
+                // For require() based images, no preloading needed
+                console.log(`Require-based image for ${stretchObj.name} doesn't need prefetching`);
+              }
+            }
+            
+            // Mark as preloaded regardless of outcome to prevent repeated attempts
+            setPreloadedImages(prev => {
+              const newSet = new Set([...prev]);
+              newSet.add(imageKey);
+              return newSet;
+            });
+          } catch (error) {
+            console.warn(`Error preloading image/video for ${stretchObj.name}:`, error);
+            // Mark as attempted anyway to prevent retries
+            setPreloadedImages(prev => {
+              const newSet = new Set([...prev]);
+              newSet.add(imageKey);
+              return newSet;
+            });
           }
         }
       }
     };
     
     // Run preloading
-    preloadNextVideo();
-  }, [currentIndex, routine]);
+    preloadNextAssets();
+  }, [currentIndex, routine, preloadedVideos, preloadedImages]);
   
   // Check if current stretch has a demo video
   const isCurrentDemoStretch = 
@@ -187,44 +348,21 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     !('isRest' in currentStretch) && 
     (currentStretch as Stretch).hasDemo === true;
 
-  // Effect to start timer for the current stretch when currentIndex changes
+  // Add debugging for the current stretch image source
   useEffect(() => {
-    if (!initialRenderRef.current && routine.length > 0 && currentIndex < routine.length) {
-      const currentDuration = routine[currentIndex]?.duration || 30;
-      console.log(`Starting timer for stretch ${currentIndex} with duration ${currentDuration}`);
-      
-      try {
-        // Check if this is a stretch with demo
-        const currentHasDemo = currentStretch && 
-          !('isRest' in currentStretch) && 
-          (currentStretch as Stretch).hasDemo === true;
-          
-        if (currentHasDemo) {
-          console.log('Demo stretch detected - timer will start after demo is watched');
-          setIsDemoReady(true);
-          
-          // Reset the timer but don't start it yet - it will be started when demo is complete
-          resetTimer(currentDuration);
-          
-          // Ensure the UI elements associated with time are properly reset
-          // This addresses the issue with static time displays
-          lastSecondPlayedRef.current = -1;
-        } else {
-          // Normal stretch - start the timer as usual
-          setIsDemoReady(false);
-          setIsPlayingDemo(false);
-          startTimer(currentDuration);
-        }
-      } catch (error) {
-        console.error('Error starting timer:', error);
-      }
+    if (currentStretch && !('isRest' in currentStretch)) {
+      const stretch = currentStretch as Stretch;
+      console.log(`Current stretch image source type for "${stretch.name}":`, {
+        type: typeof stretch.image,
+        isObject: typeof stretch.image === 'object',
+        hasVideoFlag: typeof stretch.image === 'object' && '__video' in stretch.image,
+        hasUri: typeof stretch.image === 'object' && 'uri' in stretch.image,
+        source: typeof stretch.image === 'number' ? 
+                `[Asset #${stretch.image}]` : 
+                JSON.stringify(stretch.image).substring(0, 100)
+      });
     }
-    
-    // After first render, set initialRender to false
-    if (initialRenderRef.current) {
-      initialRenderRef.current = false;
-    }
-  }, [currentIndex, routine]);
+  }, [currentStretch]);
   
   // Clean up timer on unmount
   useEffect(() => {
@@ -262,12 +400,15 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               // Clone to avoid modifying the original
               let stretchCopy: any = {...stretch};
               
-                          
+              console.log(`Validating stretch ${index}: ID=${stretchCopy.id}, type=${typeof stretchCopy.id}`);
+              
               // Ensure required properties
               if (!('id' in stretchCopy)) {
+                console.log(`Stretch ${index} has no ID, generating one`);
                 stretchCopy.id = `custom-${Math.random().toString(36).substring(2, 9)}`;
               } else if (typeof stretchCopy.id === 'number') {
                 // Convert number IDs to strings to ensure consistency
+                console.log(`Converting number ID ${stretchCopy.id} to string`);
                 stretchCopy.id = String(stretchCopy.id);
               }
               
@@ -278,6 +419,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               
               if ('isRest' in stretchCopy) {
                 // This is a rest period, make sure it has all required fields
+                console.log(`Stretch ${index} is a rest period`);
                 if (!stretchCopy.name) {
                   stretchCopy.name = 'Rest Period';
                 }
@@ -286,6 +428,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 }
               } else {
                 // This is a stretch
+                console.log(`Stretch ${index} is a regular stretch: ${stretchCopy.name || 'unnamed'}`);
                 if (!stretchCopy.name) {
                   stretchCopy.name = 'Stretch';
                 }
@@ -303,18 +446,37 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 }
                 if (!stretchCopy.image) {
                   // Find a stretch from the stretches data with matching tags or name for the image
-                  const matchingStretch = stretches.find(s => 
-                    s.tags.includes(area) || s.name.toLowerCase() === stretchCopy.name.toLowerCase()
-                  );
-                  stretchCopy.image = matchingStretch ? matchingStretch.image : 
-                    { uri: '../../assets/stretchData/default_stretch.gif' };
+                  const matchingStretch = stretches.find(s => {
+                    // Try to match by ID first (converting both to strings)
+                    if (String(s.id) === String(stretchCopy.id)) {
+                      console.log(`Found stretch by ID match: ${s.name}`);
+                      return true;
+                    }
+                    // Then try to match by tags or name
+                    return s.tags.includes(area) || s.name.toLowerCase() === stretchCopy.name.toLowerCase();
+                  });
+                  
+                  if (matchingStretch) {
+                    console.log(`Found matching stretch for image: ${matchingStretch.name}`);
+                    stretchCopy.image = matchingStretch.image;
+                    
+                    // If this is a video-based stretch, mark it appropriately
+                    if (matchingStretch.image && 
+                        typeof matchingStretch.image === 'object' && 
+                        (matchingStretch.image as any).__video) {
+                      console.log(`Copying video attributes from matching stretch`);
+                      stretchCopy.hasDemo = matchingStretch.hasDemo;
+                      stretchCopy.demoVideo = matchingStretch.demoVideo;
+                    }
+                  } else {
+                    stretchCopy.image = { uri: '../../assets/stretchData/default_stretch.gif' };
+                    console.log(`Using default image for stretch ${stretchCopy.name}`);
+                  }
                 }
               }
               
               return stretchCopy;
             });
-            
-      
             
             // Additional debugging - validate final stretches before enhancing
             const idTypes = validCustomStretches.map(s => typeof s.id);
@@ -342,7 +504,14 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 
                 // Start the timer with the first stretch duration
                 console.log(`Starting timer with duration: ${enhancedRoutine[0].duration} (${typeof enhancedRoutine[0].duration})`);
+                
+                // Start the timer and ensure it's running (not paused)
                 startTimer(enhancedRoutine[0].duration);
+                
+                // Ensure the timer is not paused initially
+                if (isPaused) {
+                  resumeTimer();
+                }
               } else {
                 throw new Error('No stretches in enhanced routine');
               }
@@ -356,6 +525,11 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 setRoutine(validCustomStretches);
                 
                 startTimer(validCustomStretches[0].duration);
+                
+                // Ensure the timer is not paused initially
+                if (isPaused) {
+                  resumeTimer();
+                }
               } else {
                 throw new Error('No valid custom stretches to show');
               }
@@ -374,6 +548,11 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               if (enhancedRoutine.length > 0) {
                 // Start the timer with the first stretch duration
                 startTimer(enhancedRoutine[0].duration);
+                
+                // Ensure the timer is not paused initially
+                if (isPaused) {
+                  resumeTimer();
+                }
               } else {
                 throw new Error('No stretches in enhanced routine');
               }
@@ -383,6 +562,11 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               setRoutine(generatedRoutine);
               if (generatedRoutine.length > 0) {
                 startTimer(generatedRoutine[0].duration);
+                
+                // Ensure the timer is not paused initially
+                if (isPaused) {
+                  resumeTimer();
+                }
               } else {
                 throw new Error('No stretches in generated routine');
               }
@@ -407,9 +591,31 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     };
     
     initRoutine();
-  }, [area, duration, level, customStretches, includePremiumStretches]);
+  }, []); // Empty dependency array to run only once on mount
   
-
+  // Log all props on component mount
+  useEffect(() => {
+    console.log('[ActiveRoutine] Props received:', {
+      area,
+      duration,
+      level,
+      customStretchesCount: customStretches?.length || 0,
+      includePremiumStretches
+    });
+    
+    // Log detailed info about custom stretches if they exist
+    if (customStretches && customStretches.length > 0) {
+      console.log('[ActiveRoutine] Custom stretches details:');
+      customStretches.forEach((stretch, index) => {
+        const isRest = 'isRest' in stretch;
+        const id = stretch.id;
+        const name = stretch.name;
+        const duration = stretch.duration;
+        
+        console.log(`  ${index}: ${name} (ID=${id}, type=${typeof id}, isRest=${isRest}, duration=${duration}s)`);
+      });
+    }
+  }, []);
   
   // Function to handle going back to previous stretch
   const handlePrevious = () => {
@@ -482,21 +688,32 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       item => !('isRest' in item) && (item as Stretch).level === 'advanced'
     );
     
-    // Call onComplete callback
-    onComplete(area, duration, stretchCount, hasAdvancedStretch);
+    // Call onComplete callback with the routine
+    onComplete(area, duration, stretchCount, hasAdvancedStretch, routine);
   };
   
   // Handle toggle pause
   const handleTogglePause = () => {
     try {
+      // Prevent action if we're already handling a timer state change
+      if (isHandlingTimerStateChangeRef.current) {
+        return;
+      }
+      
+      isHandlingTimerStateChangeRef.current = true;
+      
       soundEffects.playClickSound();
       togglePause();
+      
+      // Reset the flag after a short delay
+      setTimeout(() => {
+        isHandlingTimerStateChangeRef.current = false;
+      }, 100);
     } catch (error) {
       console.error('Error toggling pause:', error);
+      isHandlingTimerStateChangeRef.current = false;
     }
   };
-  
-
   
   // Show controls temporarily and set timeout to hide them
   const showControlsTemporarily = () => {
@@ -516,8 +733,6 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       }
     }, 3000); // Reduced to 2 seconds for faster hiding
   };
-  
-  
   
   // Render the current stretch or rest period
   const renderCurrentItem = () => {

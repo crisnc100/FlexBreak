@@ -43,65 +43,103 @@ export const enhanceRoutineWithPremiumInfo = async (
     
     // Create a deep copy to avoid mutating the original objects
     const enhancedRoutine = routine.map(item => {
-      // Create a clean copy with all properties preserved
-      const copy = {...item};
-      
-      // Skip rest periods
-      if ('isRest' in copy) {
-        return copy;
+      // Skip rest periods with minimal copy
+      if ('isRest' in item) {
+        return { ...item };
       }
       
-      // Fix the image property if needed
-      if ((copy as Stretch).image) {
-        // If image is a required local asset (number type), keep it as is
-        if (typeof (copy as Stretch).image === 'number') {
-          // Leave the image untouched as it's a local asset
-          console.log(`Preserving local image asset for: ${(copy as Stretch).name}`);
-        }
-        // Check if image is an object with uri property
-        else if (typeof (copy as Stretch).image === 'object' && (copy as Stretch).image !== null) {
-          const imageObj = (copy as Stretch).image as any;
-          
-          // If it has a uri property that's a string, validate/fix it
-          if (imageObj.uri && typeof imageObj.uri === 'string') {
-            // Replace spaces with plus signs in the URI
-            if (imageObj.uri.includes(' ')) {
-              imageObj.uri = imageObj.uri.replace(/ /g, '+');
-            }
+      // For stretches, create a fresh copy first
+      const copy = { ...item } as Stretch;
+      
+      // Handle image in a safe way
+      try {
+        if (copy.image) {
+          // If image is a number (local asset), keep it as is
+          if (typeof copy.image === 'number') {
+            // Leave it untouched
+          }
+          // For objects, we need to be careful
+          else if (typeof copy.image === 'object' && copy.image !== null) {
+            const imgObj = copy.image as any;
             
-            // Ensure URI is properly encoded for placeholder
-            if (imageObj.uri.includes('placeholder.com')) {
-              const textPart = imageObj.uri.split('text=')[1];
-              if (textPart && !textPart.includes('%')) {
-                imageObj.uri = imageObj.uri.split('text=')[0] + 'text=' + encodeURIComponent(decodeURIComponent(textPart));
+            // For video marked objects, create a new object with same properties
+            if (imgObj.__video === true) {
+              // Create a safe copy that preserves the __video flag
+              const newImgObj: any = {};
+              // Copy all keys except uri (which might be frozen)
+              Object.keys(imgObj).forEach(key => {
+                if (key !== 'uri') {
+                  newImgObj[key] = imgObj[key];
+                }
+              });
+              
+              // If there's a uri, handle it separately
+              if (imgObj.uri && typeof imgObj.uri === 'string') {
+                newImgObj.uri = imgObj.uri;
               }
+              
+              // __asset needs special handling
+              if (imgObj.__asset !== undefined) {
+                newImgObj.__asset = imgObj.__asset;
+              }
+              
+              copy.image = newImgObj;
             }
-          } else {
-            // If no uri property, create a fallback
-            (copy as Stretch).image = { 
-              uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent((copy as Stretch).name || 'Stretch')}` 
+            // For regular image objects with URI
+            else if (imgObj.uri && typeof imgObj.uri === 'string') {
+              // Create a new image object with the processed URI
+              let processedUri = imgObj.uri;
+              
+              // Clean up the URI if needed
+              if (processedUri.includes(' ')) {
+                processedUri = processedUri.replace(/ /g, '+');
+              }
+              
+              // Handle placeholder URIs
+              if (processedUri.includes('placeholder.com') && processedUri.includes('text=')) {
+                const textPart = processedUri.split('text=')[1];
+                if (textPart && !textPart.includes('%')) {
+                  processedUri = processedUri.split('text=')[0] + 'text=' + encodeURIComponent(decodeURIComponent(textPart));
+                }
+              }
+              
+              copy.image = { uri: processedUri };
+            }
+            // Default case - create a fallback image
+            else {
+              copy.image = { 
+                uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent(copy.name || 'Stretch')}` 
+              };
+            }
+          }
+          // Default case for non-object, non-number
+          else {
+            copy.image = { 
+              uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent(copy.name || 'Stretch')}` 
             };
           }
-        } else {
-          // If image is not an object or number, create a valid image object
-          (copy as Stretch).image = { 
-            uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent((copy as Stretch).name || 'Stretch')}` 
+        }
+        // If no image at all
+        else {
+          copy.image = { 
+            uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent(copy.name || 'Stretch')}` 
           };
         }
-      } else {
-        // If no image property at all, create one
-        (copy as Stretch).image = { 
-          uri: `https://via.placeholder.com/350x350/FF9800/FFFFFF?text=${encodeURIComponent((copy as Stretch).name || 'Stretch')}` 
+      } catch (imageError) {
+        console.warn(`Error processing image for stretch ${copy.name}:`, imageError);
+        // Provide a fallback image
+        copy.image = { 
+          uri: `https://via.placeholder.com/350x350/FF0000/FFFFFF?text=${encodeURIComponent('Error: ' + (copy.name || 'Stretch'))}` 
         };
       }
       
       // For premium stretches, add VIP badge
-      if ((copy as Stretch).premium) {
+      if (copy.premium) {
         // Create a level-based badge color
         let vipBadgeColor = '#FFD700'; // Default gold
-        if ((copy as Stretch).level === 'advanced') {
+        if (copy.level === 'advanced') {
           vipBadgeColor = '#FF5722'; // Deep orange for advanced
-        } else if ((copy as Stretch).level === 'intermediate') {
+        } else if (copy.level === 'intermediate') {
           vipBadgeColor = '#FF9800'; // Orange for intermediate
         }
         
@@ -112,7 +150,7 @@ export const enhanceRoutineWithPremiumInfo = async (
         };
       }
       
-      // Regular stretches - ensure no properties are lost
+      // Regular stretches
       return copy;
     });
     
@@ -120,8 +158,8 @@ export const enhanceRoutineWithPremiumInfo = async (
     return enhancedRoutine;
   } catch (error) {
     console.error('Error enhancing routine with premium info:', error);
-    // If enhancement fails, return the original routine
-    return routine;
+    // If enhancement fails, return a defensive copy of the original routine
+    return routine.map(item => ({...item}));
   }
 };
 

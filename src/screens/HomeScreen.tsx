@@ -578,14 +578,25 @@ export default function HomeScreen() {
   
   // Handle starting a custom routine
   const handleStartCustomRoutine = (params: RoutineParams) => {
-    const routineParamsWithType: RoutineParams & { customStretches?: Stretch[] } = {
-      ...params,
-      customStretches: params.customStretches as Stretch[]
-    };
+    console.log('Starting custom routine with params:', {
+      area: params.area,
+      duration: params.duration,
+      level: params.level,
+      stretches: params.customStretches?.length || 0
+    });
+    
+    // Log all stretch IDs for debugging
+    if (params.customStretches && params.customStretches.length > 0) {
+      console.log('Custom stretches IDs:', params.customStretches.map(s => 
+        `${s.id} (${typeof s.id}, ${('isRest' in s) ? 'rest' : 'stretch'})`
+      ).join(', '));
+    }
     
     handleStartStretching();
+    
+    // Use type assertion to navigate with the params
     setTimeout(() => {
-      navigation.navigate('Routine', routineParamsWithType);
+      navigation.navigate('Routine', params as any);
     }, 100);
   };
 

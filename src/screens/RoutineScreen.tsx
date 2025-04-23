@@ -146,7 +146,13 @@ export default function RoutineScreen() {
   );
 
   // Handle routine completion
-  const handleRoutineComplete = async (routineArea: BodyArea, routineDuration: Duration, stretchCount: number = 5, hasAdvancedStretch: boolean = false) => {
+  const handleRoutineComplete = async (
+    routineArea: BodyArea, 
+    routineDuration: Duration, 
+    stretchCount: number = 5, 
+    hasAdvancedStretch: boolean = false,
+    currentStretches: any[] = [] // Add parameter to receive stretches
+  ) => {
     console.log('Routine completed');
 
     try {
@@ -157,7 +163,9 @@ export default function RoutineScreen() {
         area: routineArea,
         duration: routineDuration,
         date: new Date().toISOString(),
-        stretchCount: stretchCount
+        stretchCount: stretchCount,
+        level: level || 'beginner', // Include the level when saving the routine
+        savedStretches: currentStretches // Save the actual stretches used
       };
 
       // REMOVED: Direct call to saveRoutineProgress - removed to avoid duplicate entries
@@ -671,13 +679,27 @@ export default function RoutineScreen() {
 
     // Navigate to the routine screen with new params
     setTimeout(() => {
-      console.log('Navigating to routine with params:', routine.area, routine.duration);
-      // Navigate to routine with the parameters from the selected routine
-      navigateToRoutine({
-        area: routine.area,
-        duration: routine.duration,
-        level: 'beginner' // Default to beginner for recent routines
-      });
+      console.log('Navigating to routine with params:', routine.area, routine.duration, routine.level || 'beginner');
+      
+      // Check if this routine has saved stretches
+      if (routine.savedStretches && routine.savedStretches.length > 0) {
+        console.log(`Using ${routine.savedStretches.length} saved stretches from past routine`);
+        
+        // Navigate to routine with the parameters and saved stretches
+        navigateToRoutine({
+          area: routine.area,
+          duration: routine.duration,
+          level: routine.level || 'beginner',
+          customStretches: routine.savedStretches // Use the saved stretches
+        });
+      } else {
+        // If no saved stretches, just use the parameters
+        navigateToRoutine({
+          area: routine.area,
+          duration: routine.duration,
+          level: routine.level || 'beginner'
+        });
+      }
     }, 100);
   };
 
