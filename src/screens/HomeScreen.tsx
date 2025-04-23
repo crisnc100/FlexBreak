@@ -42,7 +42,7 @@ import * as notifications from '../utils/notifications';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
 import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
-import { generateDeskBreakBoostRoutine, isDeskBreakBoostAvailable } from '../utils/deskBreakBoostGenerator';
+import { generateDeskBreakBoostRoutine, isDeskBreakBoostAvailable } from '../utils/generators/deskBreakBoostGenerator';
 
 const { height, width } = Dimensions.get('window');
 

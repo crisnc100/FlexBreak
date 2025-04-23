@@ -16,7 +16,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { BodyArea, Stretch, StretchLevel, CustomRestPeriod } from '../../types';
 import stretches from '../../data/stretches';
 import * as rewardManager from '../../utils/progress/modules/rewardManager';
-import { isPremiumStretch, filterStretchesByLevel } from '../../utils/premiumUtils';
+import { isPremiumStretch, filterStretchesByLevel } from '../../utils/generators/premiumUtils';
 
 interface StretchSelectorProps {
   area: BodyArea;

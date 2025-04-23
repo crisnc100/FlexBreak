@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as rewardManager from '../../utils/progress/modules/rewardManager';
+import * as storageService from '../../services/storageService';
 import { Reward } from '../../utils/progress/types';
 import RewardCard from './RewardCard';
 import { useTheme, ThemeType } from '../../context/ThemeContext';
@@ -30,6 +31,22 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
   const { theme, isDark, themeType, toggleTheme, setThemeType } = useTheme();
   const [refreshKey, setRefreshKey] = useState(0); // Add refresh key to force re-render
   const [showPremiumStretches, setShowPremiumStretches] = useState(false);
+  const [realUserLevel, setRealUserLevel] = useState(userLevel);
+  
+  // Get real user level directly from storage
+  useEffect(() => {
+    const getRealLevel = async () => {
+      try {
+        const userProgress = await storageService.getUserProgress();
+        setRealUserLevel(userProgress.level);
+        console.log(`Rewards component - Real level from storage: ${userProgress.level}, Prop userLevel: ${userLevel}`);
+      } catch (error) {
+        console.error('Error getting user level in Rewards:', error);
+      }
+    };
+    
+    getRealLevel();
+  }, [userLevel]); // Re-check when userLevel prop changes
   
   // Load rewards when component mounts
   useEffect(() => {
@@ -122,9 +139,29 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
   }, [isDark, setThemeType]);
   
   // Handle pressing on a reward card - Now with a stable callback handler that won't break rules of hooks
-  const handleRewardPress = useCallback((reward: Reward) => {
+  const handleRewardPress = useCallback(async (reward: Reward) => {
+    // Get real user level directly from storage for accurate checks
+    let currentLevel = realUserLevel;
+    try {
+      const userProgress = await storageService.getUserProgress();
+      currentLevel = userProgress.level;
+      console.log(`handleRewardPress - Real level from storage: ${currentLevel}`);
+    } catch (error) {
+      console.error('Error getting user level in handleRewardPress:', error);
+    }
+    
+    // Special check for streak_freezes - always verify level 6 requirement
+    if (reward.id === 'streak_freezes' && currentLevel < 6) {
+      Alert.alert(
+        'Reward Locked',
+        `You need to reach level 6 to unlock Streak Freezes. You're currently level ${currentLevel}.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     // Check if reward is unlocked or if the user meets level requirements
-    const isUnlocked = reward.unlocked || userLevel >= reward.levelRequired;
+    const isUnlocked = reward.unlocked || currentLevel >= reward.levelRequired;
     
     // If reward is locked, show premium upsell or level requirement message
     if (!isUnlocked) {
@@ -177,7 +214,9 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
       case 'streak_freezes':
         Alert.alert(
           'Streak Freezes',
-          'You have 2 streak freezes available per month. These can be used when you miss a day to preserve your streak.',
+          currentLevel >= 6 
+            ? 'You have 2 streak freezes available per month. These can be used when you miss a day to preserve your streak.'
+            : `Streak Freezes unlock at level 6. You're currently level ${currentLevel}.`,
           [{ text: 'Awesome!' }]
         );
         break;
@@ -219,7 +258,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
           [{ text: 'Close' }]
         );
     }
-  }, [isPremium, onUpgradeToPremium, setThemeType, userLevel, isDark, setShowPremiumStretches]);
+  }, [isPremium, onUpgradeToPremium, setThemeType, realUserLevel, isDark, setShowPremiumStretches]);
   
   // Close premium stretches preview modal
   const closePremiumStretches = useCallback(() => {

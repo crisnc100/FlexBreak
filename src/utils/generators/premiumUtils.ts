@@ -1,5 +1,5 @@
-import { Stretch, RestPeriod } from '../types';
-import * as rewardManager from './progress/modules/rewardManager';
+import { Stretch, RestPeriod } from '../../types';
+import * as rewardManager from '../progress/modules/rewardManager';
 
 /**
  * Check if an item is a premium stretch

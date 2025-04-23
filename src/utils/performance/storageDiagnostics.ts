@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KEYS } from '../services/storageService';
+import { KEYS } from '../../services/storageService';
 import { measureAsyncOperation } from './performance';
 
 // Constants for storage optimization
@@ -90,8 +90,6 @@ export const logStorageInfo = async (): Promise<void> => {
   } else if (stats.totalSize > warningThreshold) {
     console.warn('WARNING: AsyncStorage usage is approaching limits');
   }
-  
-  return stats;
 };
 
 /**

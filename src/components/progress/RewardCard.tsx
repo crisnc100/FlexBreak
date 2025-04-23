@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Reward } from '../../utils/progress/types';
 import { useTheme } from '../../context/ThemeContext';
+import * as storageService from '../../services/storageService';
+import { useState, useEffect } from 'react';
 
 interface RewardCardProps {
   reward: Reward;
@@ -13,6 +15,28 @@ interface RewardCardProps {
 
 const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, userLevel }) => {
   const { theme, isDark } = useTheme();
+  const [realUserLevel, setRealUserLevel] = useState(userLevel);
+  
+  // Get the actual user level from storage
+  useEffect(() => {
+    const loadRealUserLevel = async () => {
+      try {
+        const userProgress = await storageService.getUserProgress();
+        const level = userProgress?.level || 1;
+        console.log(`Direct level check for ${reward.id}: ${level}`);
+        setRealUserLevel(level);
+      } catch (error) {
+        console.error('Error getting real user level:', error);
+      }
+    };
+    
+    loadRealUserLevel();
+  }, [reward.id]);
+  
+  // Add a direct console log for rewards component props
+  console.log(`RewardCard rendered: ${reward.id}
+  - Component userLevel: ${userLevel}
+  - Real user level: ${realUserLevel}`);
   
   // Check if reward is dark theme and it's unlocked (to show active state)
   const isDarkThemeReward = reward.id === 'dark_theme';
@@ -50,6 +74,11 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       return reward.unlocked ? 'moon-outline' : 'lock-closed-outline';
     }
     
+    // Special case for streak freezes
+    if (reward.id === 'streak_freezes') {
+      return realUserLevel >= 6 ? 'snow' : 'snow-outline';
+    }
+    
     // Base icon from the reward data
     let iconName = reward.icon || 'star';
     
@@ -66,6 +95,11 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   
   // Get reward status text
   const getStatusText = () => {
+    // Special case for streak_freezes
+    if (reward.id === 'streak_freezes') {
+      return realUserLevel >= 6 ? 'Unlocked' : 'Unlocks at Level 6';
+    }
+    
     if (!isPremium) return 'Premium Only';
     if (reward.unlocked) return 'Unlocked';
     return `Unlocks at Level ${reward.levelRequired}`;
@@ -73,6 +107,11 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   
   // Get status color
   const getStatusColor = () => {
+    // Special case for streak_freezes
+    if (reward.id === 'streak_freezes') {
+      return realUserLevel >= 6 ? '#4CAF50' : '#757575';
+    }
+    
     if (!isPremium) return '#FF9800';
     if (reward.unlocked) return '#4CAF50';
     return '#757575';
@@ -82,18 +121,43 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   const getBadgeText = () => {
     if (isDarkThemeReward) {
       if (isDark) return 'Active';
-      if (reward.unlocked || userLevel >= reward.levelRequired) return 'Tap to Enable';
+      if (reward.unlocked || realUserLevel >= reward.levelRequired) return 'Tap to Enable';
       return null;
     }
     if (reward.id === 'xp_boost' && reward.unlocked) return '2x XP';
     return null;
   };
   
+  // Explicitly track if streak freezes should be shown as unlocked
+  const isStreakFreezeUnlocked = reward.id === 'streak_freezes' && realUserLevel >= 6;
+  
+  // Log the status for streak freezes to help debug
+  if (reward.id === 'streak_freezes') {
+    console.log(`Streak Freezes Card Status:
+    - Provided userLevel: ${userLevel}
+    - Real user level: ${realUserLevel} 
+    - Unlocked in data: ${reward.unlocked}
+    - isStreakFreezeUnlocked: ${isStreakFreezeUnlocked}
+    - isEnabled: ${isStreakFreezeUnlocked || (isPremium && reward.unlocked)}
+    - Status Text: ${getStatusText()}
+    - Icon: ${getIconName()}`);
+  }
+  
   // Determine if reward is enabled
-  const isEnabled = isPremium && (reward.unlocked || (isDarkThemeReward && userLevel >= reward.levelRequired));
+  const isEnabled = reward.id === 'streak_freezes'
+    ? isStreakFreezeUnlocked // Special case: streak freezes only needs level 6+
+    : (isPremium && (reward.unlocked || (isDarkThemeReward && realUserLevel >= reward.levelRequired)));
   
   // Direct handler for reward press - no unnecessary alerts
   const handleRewardPress = () => {
+    // Special check for streak_freezes (level 6 requirement)
+    if (reward.id === 'streak_freezes') {
+      if (realUserLevel < 6) {
+        return; // Don't allow interaction if under level 6
+      }
+      // Allow interaction if level 6+
+    }
+
     // Only call handler if reward is enabled
     if (isEnabled) {
       // Just directly call parent handler - no alert, no message
@@ -101,6 +165,11 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       onPress();
     }
   };
+  
+  // Force streak_freezes to have correct unlocked status based on user level
+  const effectiveUnlocked = reward.id === 'streak_freezes'
+    ? realUserLevel >= 6 
+    : reward.unlocked;
   
   return (
     <TouchableOpacity 
@@ -156,7 +225,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       {isEnabled && (
         <View style={styles.actionContainer}>
           <Ionicons 
-            name={isDarkThemeReward ? (isDark ? 'checkmark-circle' : 'chevron-forward') : 'chevron-forward'} 
+            name={
+              isDarkThemeReward 
+                ? (isDark ? 'checkmark-circle' : 'chevron-forward') 
+                : isStreakFreezeUnlocked 
+                  ? 'chevron-forward'
+                  : 'chevron-forward'
+            } 
             size={20} 
             color={theme.accent} 
           />
@@ -165,8 +240,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       
       {!isEnabled && (
         <View style={styles.lockContainer}>
-          {!isPremium ? (
+          {!isPremium && reward.id !== 'streak_freezes' ? (
             <Text style={styles.premiumBadge}>Premium</Text>
+          ) : reward.id === 'streak_freezes' ? (
+            realUserLevel < 6 ? <Text style={styles.levelBadge}>Level 6</Text> : null
           ) : !reward.unlocked ? (
             <Text style={styles.levelBadge}>Level {reward.levelRequired}</Text>
           ) : null}

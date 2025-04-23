@@ -20,7 +20,7 @@
     {
       "id": "xp_boost",
       "title": "XP Boost",
-      "description": "Get a 2x boost in XP for your daily streak",
+      "description": "Get a 2x boost in XP for 36 hours",
       "icon": "flash",
       "unlocked": false,
       "levelRequired": 4,

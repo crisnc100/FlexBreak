@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Stretch } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { getPremiumStretchesPreview } from '../../utils/premiumUtils';
+import { getPremiumStretchesPreview } from '../../utils/generators/premiumUtils';
 
 interface PremiumStretchesPreviewProps {
   onClose?: () => void;

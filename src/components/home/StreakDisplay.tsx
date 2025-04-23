@@ -118,40 +118,42 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
       ])
     ).start();
     
-    // Glow animation for the streak path
+    // Simplified glow animation with better performance
     Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
-          duration: 2000,
+          duration: 3000,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false
+          useNativeDriver: true
         }),
         Animated.timing(glowAnim, {
           toValue: 0,
-          duration: 2000,
+          duration: 3000,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false
+          useNativeDriver: true
         })
       ])
     ).start();
     
-    // Progress animation
-    startProgressAnimation();
-  }, []);
-  
-  // Start progress animation
-  const startProgressAnimation = () => {
-    // Simple progress animation without pulsing
+    // Simple one-time progress animation
     Animated.timing(progressAnim, {
       toValue: 1,
-      duration: 800,
+      duration: 1000,
       easing: Easing.out(Easing.ease),
-      useNativeDriver: false
+      useNativeDriver: false // Keep false as we animate width
     }).start();
-    
-    // Set progressPulse to false as we're removing this effect
-    setProgressPulse(false);
+  }, []);
+  
+  // Simplified progress animation without pulsing
+  const startProgressAnimation = () => {
+    progressAnim.setValue(0);
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 1000,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false // Keep false as we animate width
+    }).start();
   };
   
   // Handle milestone tap - simplify animation for better performance
@@ -448,7 +450,16 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
                         backgroundColor: isCurrent 
                           ? (isDark ? '#FF9800' : '#FF9800')
                           : (isCompleted ? '#81C784' : '#90CAF9'),
-                        opacity: isFocused ? 0.7 : glowOpacity,
+                        opacity: isFocused ? 0.7 : glowAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.3, 0.5]
+                        }),
+                        transform: [{
+                          scale: isFocused ? 1 : glowAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.9, 1.1]
+                          })
+                        }],
                         width: isFocused ? 30 : 24,
                         height: isFocused ? 30 : 24,
                       }
@@ -505,8 +516,11 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
                           styles.progressLine,
                           {
                             backgroundColor: isDark ? '#FFB74D' : '#FF9800',
-                            width: `${progress * 100}%`,
-                            shadowOpacity: 0.4
+                            width: progressAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0%', `${progress * 100}%`]
+                            }),
+                            shadowOpacity: 0.3
                           }
                         ]}
                       />

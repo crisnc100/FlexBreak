@@ -6,7 +6,7 @@ import * as soundEffects from '../../../utils/soundEffects';
 // Constants
 const XP_BOOST_REWARD_ID = 'xp_boost';
 const DEFAULT_BOOST_MULTIPLIER = 2;
-const DEFAULT_BOOST_DURATION_HOURS = 72; // 3 days (72 hours)
+const DEFAULT_BOOST_DURATION_HOURS = 36; // Changed from 72 to 36 hours
 
 /**
  * Check if an XP boost is currently active
@@ -31,19 +31,22 @@ export const checkXpBoostStatus = async (): Promise<{
     }
   };
   
-  // Check if boost exists
+  // Check if boost exists and log boost state
   if (
     !userProgress.rewards || 
     !userProgress.rewards[XP_BOOST_REWARD_ID] || 
     !userProgress.rewards[XP_BOOST_REWARD_ID].unlocked
   ) {
+    console.log('XP Boost status check: Reward not unlocked or unavailable');
     return returnData;
   }
   
   // Check for active boost in extended data
   const boostReward = userProgress.rewards[XP_BOOST_REWARD_ID] as any;
+  console.log(`XP Boost status check: Available uses: ${boostReward.uses || 0}`);
   
   if (!boostReward.xpBoostExpiry) {
+    console.log('XP Boost status check: No active boost');
     return returnData;
   }
   
@@ -56,7 +59,7 @@ export const checkXpBoostStatus = async (): Promise<{
     const hoursRemaining = Math.floor(timeRemainingMs / (1000 * 60 * 60));
     const minutesRemaining = Math.floor((timeRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
     
-    console.log(`XP Boost active! Expires in ${hoursRemaining}h ${minutesRemaining}m`);
+    console.log(`XP Boost active! Expires in ${hoursRemaining}h ${minutesRemaining}m (Uses remaining: ${boostReward.uses || 0})`);
     
     return {
       isActive: true,
@@ -67,7 +70,7 @@ export const checkXpBoostStatus = async (): Promise<{
       }
     };
   } else {
-    console.log('XP Boost expired');
+    console.log(`XP Boost expired. Available uses: ${boostReward.uses || 0}`);
     
     // Clean up expired boost
     delete boostReward.xpBoostExpiry;
@@ -220,11 +223,13 @@ export const addXpBoosts = async (amount: number): Promise<boolean> => {
   
   const boostReward = userProgress.rewards[XP_BOOST_REWARD_ID] as any;
   
-  // Add XP boosts
-  boostReward.uses = (boostReward.uses || 0) + amount;
+  // Add XP boosts, but cap at 2
+  const currentUses = boostReward.uses || 0;
+  boostReward.uses = Math.min(2, currentUses + amount);
   boostReward.lastRefill = new Date().toISOString();
   
-  console.log(`Added ${amount} XP boost(s). Now has ${boostReward.uses} total.`);
+  const actualAdded = boostReward.uses - currentUses;
+  console.log(`Added ${actualAdded} XP boost(s). Now has ${boostReward.uses} total (capped at 2).`);
   
   // Save updated progress
   await storageService.saveUserProgress(userProgress);
@@ -302,4 +307,81 @@ export const validateXpBoostReward = async (): Promise<{
 /**
  * Alias for getXpBoostRemainingTime for backward compatibility
  */
-export const getXpBoostRemainingTime = getRemainingXpBoostTime; 
+export const getXpBoostRemainingTime = getRemainingXpBoostTime;
+
+/**
+ * Check and award additional XP boosts based on user achievements and progress
+ * Returns the number of boosts awarded
+ */
+export const checkAndAwardAdditionalBoosts = async (userProgress: UserProgress): Promise<number> => {
+  let boostsAwarded = 0;
+  
+  // Don't proceed if XP boost reward isn't unlocked
+  if (
+    !userProgress.rewards || 
+    !userProgress.rewards[XP_BOOST_REWARD_ID] || 
+    !userProgress.rewards[XP_BOOST_REWARD_ID].unlocked
+  ) {
+    return boostsAwarded;
+  }
+
+  const boostReward = userProgress.rewards[XP_BOOST_REWARD_ID] as any;
+  
+  // Check level-based rewards (levels 7 and 9)
+  const levelMilestones = [7, 9];
+  const currentLevel = userProgress.level;
+  
+  // Track which level rewards have been claimed
+  boostReward.levelRewardsClaimed = boostReward.levelRewardsClaimed || [];
+  
+  if (levelMilestones.includes(currentLevel) && !boostReward.levelRewardsClaimed.includes(currentLevel)) {
+    boostsAwarded++;
+    boostReward.levelRewardsClaimed.push(currentLevel);
+    console.log(`Awarded 1 XP boost for reaching level ${currentLevel}`);
+  }
+  
+  // Check special and monthly challenge completion
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  
+  // Track monthly challenge rewards
+  boostReward.monthlyRewardsClaimed = boostReward.monthlyRewardsClaimed || [];
+  const monthKey = startOfMonth.toISOString().split('T')[0];
+  
+  let specialCompleted = false;
+  let monthlyCompleted = false;
+  
+  for (const [challengeId, challenge] of Object.entries(userProgress.challenges)) {
+    if (challenge.completed && new Date(challenge.dateCompleted!) >= startOfMonth) {
+      if (challenge.category === 'special') {
+        specialCompleted = true;
+      } else if (challenge.category === 'monthly') {
+        monthlyCompleted = true;
+      }
+    }
+  }
+  
+  // Award boost for completing both special and monthly challenges
+  if (specialCompleted && monthlyCompleted && !boostReward.monthlyRewardsClaimed.includes(monthKey)) {
+    boostsAwarded++;
+    boostReward.monthlyRewardsClaimed.push(monthKey);
+    console.log('Awarded 1 XP boost for completing special and monthly challenges');
+  }
+  
+  // If boosts were awarded, update the count (capped at 2)
+  if (boostsAwarded > 0) {
+    const currentUses = boostReward.uses || 0;
+    boostReward.uses = Math.min(2, currentUses + boostsAwarded);
+    const actualAwarded = boostReward.uses - currentUses;
+    
+    if (actualAwarded < boostsAwarded) {
+      console.log(`Note: XP boost cap reached (max 2). Only awarded ${actualAwarded} of ${boostsAwarded} earned boosts.`);
+    }
+    
+    await storageService.saveUserProgress(userProgress);
+    console.log(`Total XP boosts awarded: ${actualAwarded}. New total: ${boostReward.uses} (capped at 2)`);
+  }
+  
+  return Math.min(boostsAwarded, 2 - (boostReward.uses || 0));
+}; 

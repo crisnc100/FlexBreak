@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../../types';
-import { generateRoutine } from '../../utils/routineGenerator';
+import { generateRoutine } from '../../utils/generators/routineGenerator';
 import { useTheme } from '../../context/ThemeContext';
-import { enhanceRoutineWithPremiumInfo } from '../../utils/premiumUtils';
+import { enhanceRoutineWithPremiumInfo } from '../../utils/generators/premiumUtils';
 import * as soundEffects from '../../utils/soundEffects';
 import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';

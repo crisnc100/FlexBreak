@@ -26,7 +26,7 @@ import * as xpBoostManager from '../utils/progress/modules/xpBoostManager';
 import * as storageService from '../services/storageService';
 
 // Import smart pick generator
-import { generateSmartPick, RoutineRecommendation } from '../utils/smartPickGenerator';
+import { generateSmartPick, RoutineRecommendation } from '../utils/generators/smartPickGenerator';
 
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';

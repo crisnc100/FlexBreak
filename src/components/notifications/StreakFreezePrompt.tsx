@@ -122,7 +122,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   const [showSnowflakes, setShowSnowflakes] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [snowflakePositions, setSnowflakePositions] = useState<Array<{x: number, y: number, delay: number, duration: number, scale: number}>>([]);
-  const [userProgress, setUserProgress] = useState(null);
+  const [userProgress, setUserProgress] = useState<any>(null);
   const [hasTodayActivity, setHasTodayActivity] = useState(false);
   const [canSaveStreak, setCanSaveStreak] = useState(false);
   
@@ -279,10 +279,22 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   // Check if streak is broken and prompt user
   const checkStreak = async () => {
     try {
+      // Check if the user meets the level requirement (level 6)
+      if (!userProgress || userProgress.level < 6) {
+        console.log('User does not meet level requirement for streak freezes (requires level 6)');
+        return;
+      }
+      
       // Always get a fresh premium status directly from storage
       const directPremiumCheck = await storageService.getIsPremium();
       
       console.log('StreakFreezePrompt - Direct premium check:', directPremiumCheck);
+      
+      // Don't proceed if user is not premium
+      if (!directPremiumCheck) {
+        console.log('User is not premium, not showing streak freeze prompt');
+        return;
+      }
       
       // Initialize streak if needed
       if (!streakManager.streakCache.initialized) {
@@ -569,7 +581,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   
   return (
     <Modal
-      visible={visible && isPremium}
+      visible={visible && isPremium && (userProgress?.level >= 6)}
       transparent={true}
       animationType="none"
       onRequestClose={handleClose}

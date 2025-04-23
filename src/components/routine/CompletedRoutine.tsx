@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { BodyArea, Duration, RoutineParams } from '../../types';
 import { AppNavigationProp } from '../../types';
-import { generateRoutine } from '../../utils/routineGenerator';
+import { generateRoutine } from '../../utils/generators/routineGenerator';
 import { saveFavoriteRoutine } from '../../services/storageService';
 import XpNotificationManager from '../notifications/XpNotificationManager';
 import { useTheme } from '../../context/ThemeContext';

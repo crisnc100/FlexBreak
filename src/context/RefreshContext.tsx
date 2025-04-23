@@ -1,8 +1,8 @@
 import React, { createContext, useState, useContext, useCallback, useRef, useEffect } from 'react';
 import { useRoutineStorage } from '../hooks/routines/useRoutineStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { measureAsyncOperation } from '../utils/performance';
-import { debounce } from '../utils/debounce';
+import { measureAsyncOperation } from '../utils/performance/performance';
+import { debounce } from '../utils/performance/debounce';
 import { ProgressEntry } from '../types';
 
 interface RefreshContextType {

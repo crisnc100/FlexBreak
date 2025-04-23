@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated } from 'react-native';
+import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated, Pressable } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -29,6 +29,8 @@ import { useGamification, gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EV
 import * as soundEffects from './src/utils/soundEffects';
 import IntroManager from './src/components/intro/IntroManager';
 import * as streakValidator from './src/utils/progress/modules/streakValidator';
+import * as Haptics from 'expo-haptics';
+import * as performance from './src/utils/performance/performance';
 
 // Avoid playing intro sound twice
 let introSoundPlayed = false;
@@ -90,6 +92,28 @@ function navigate(name: keyof RootStackParamList, params?: any) {
 
 // Main entry point for the app
 export default function App() {
+  // Mark app start time for performance measurement
+  performance.markAppStart();
+  
+  // Subscribe to AppState changes for performance tracking
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        // App came to foreground
+        performance.trackAppForeground();
+        console.log('App moved to foreground');
+      } else if (nextAppState === 'background') {
+        // App went to background
+        performance.trackAppBackground();
+        console.log('App moved to background');
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+  
   return (
     <Provider store={store}>
       <SafeAreaProvider>
@@ -117,6 +141,11 @@ const TabNavigator = () => {
   const { isPremium } = usePremium();
   const { canAccessFeature } = useFeatureAccess();
   const [hasPlaylistAccess, setHasPlaylistAccess] = useState(false);
+  
+  // Mark component render for performance tracking
+  useEffect(() => {
+    performance.markComponentRender('TabNavigator');
+  }, []);
   
   // Check for reopen_settings flag
   useEffect(() => {
@@ -184,10 +213,11 @@ const TabNavigator = () => {
   return (
     <>
       <Tab.Navigator
+        // @ts-ignore - id property is available but TypeScript doesn't recognize it
         id="tab-navigator"
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
-            let iconName: string = 'home';
+            let iconName = 'home';
 
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
@@ -218,6 +248,15 @@ const TabNavigator = () => {
           headerTitleStyle: {
             fontWeight: '500',
           },
+          tabBarButton: (props) => (
+            <Pressable
+              {...props}
+              onPress={(e) => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                props.onPress(e);
+              }}
+            />
+          ),
         })}
       >
         <Tab.Screen 
@@ -226,7 +265,10 @@ const TabNavigator = () => {
           options={{
             headerRight: () => (
               <TouchableOpacity 
-                onPress={() => setSettingsModalVisible(true)}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSettingsModalVisible(true);
+                }}
                 style={{ marginRight: 16 }}
               >
                 <Ionicons name="settings-outline" size={24} color={theme.text} />
@@ -268,6 +310,11 @@ function MainApp() {
   const { theme, isDark } = useTheme();
   const [showIntro, setShowIntro] = useState(true);
   const fadeInAnim = useRef(new Animated.Value(0)).current;
+  
+  // Mark component render for performance tracking
+  useEffect(() => {
+    performance.markComponentRender('MainApp');
+  }, []);
   
   // Initialize streaks and streak freezes when app launches
   useEffect(() => {

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import * as Permissions from 'expo-permissions';
 import { Ionicons } from '@expo/vector-icons';
-import { parseUserInput, generateRoutineConfig, selectStretches } from '../../utils/routineGenerator';
+import { parseUserInput, generateRoutineConfig, selectStretches } from '../../utils/generators/routineGenerator';
 import { SmartRoutineInput, IssueType, Duration, Stretch, StretchLevel, RestPeriod, BodyArea } from '../../types';
 import allStretches from '../../data/stretches';
 import { useTheme } from '../../context/ThemeContext';

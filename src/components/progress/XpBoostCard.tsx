@@ -67,19 +67,28 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
       
       // Get user progress to check level
       const userProgress = await storageService.getUserProgress();
-      setUserLevel(userProgress.level || 1);
+      const level = userProgress.level || 1;
+      setUserLevel(level);
       
       // Check if XP boost reward is unlocked
       const isUnlocked = await rewardManager.isRewardUnlocked('xp_boost');
+      console.log('XP Boost status:', {
+        level,
+        isUnlocked,
+        hasReward: userProgress.rewards?.xp_boost?.unlocked
+      });
       setIsRewardUnlocked(isUnlocked);
       
       // Check XP boost status and get available boosts in parallel
       const [statusResult, boostCount] = await Promise.all([
         xpBoostManager.checkXpBoostStatus(),
-        typeof xpBoostManager.getAvailableBoosts === 'function' 
-          ? xpBoostManager.getAvailableBoosts() 
-          : Promise.resolve(0)
+        xpBoostManager.getAvailableBoosts()
       ]);
+      
+      console.log('XP Boost details:', {
+        statusResult,
+        boostCount
+      });
       
       const { isActive: active, data } = statusResult;
       setIsActive(active);
@@ -116,8 +125,22 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
   };
   
   useEffect(() => {
-    // Load initial data
-    refreshData();
+    // Validate XP boost reward first, then load initial data
+    const initializeCard = async () => {
+      try {
+        // Validate XP boost reward
+        const validationResult = await xpBoostManager.validateXpBoostReward();
+        console.log('XP Boost validation:', validationResult);
+        
+        // Load data after validation
+        await refreshData();
+      } catch (error) {
+        console.error('Error initializing XP boost card:', error);
+        setLoading(false);
+      }
+    };
+
+    initializeCard();
     
     // Set up timer to refresh remaining time every minute when active
     const timer = isActive ? setInterval(async () => {
@@ -252,7 +275,7 @@ const XpBoostCard: React.FC<XpBoostCardProps> = ({ onActivate }) => {
         ) : (
           <Text style={[styles.descText, { color: theme.textSecondary }]}>
             {availableBoosts > 0 
-              ? 'Double all XP for 72 hours' 
+              ? 'Double all XP for 36 hours' 
               : 'Complete challenges to earn boosts'}
           </Text>
         )}

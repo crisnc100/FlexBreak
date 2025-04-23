@@ -1,5 +1,5 @@
 import { Stretch } from '../types';
-import { markAsVideo } from '../utils/routineGenerator';
+import { markAsVideo } from '../utils/generators/routineGenerator';
 
 const stretches: Stretch[] = [
   // Hips & Legs (13 total: 5 Beginner, 5 Intermediate, 3 Advanced)

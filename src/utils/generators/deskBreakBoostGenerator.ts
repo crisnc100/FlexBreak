@@ -1,5 +1,5 @@
-import { Stretch, RestPeriod } from '../types';
-import stretches from '../data/stretches';
+import { Stretch, RestPeriod } from '../../types';
+import stretches from '../../data/stretches';
 
 // The IDs for the desk break boost stretches as specified in the requirements
 const DESK_BREAK_BOOST_STRETCH_IDS = [

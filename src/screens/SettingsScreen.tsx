@@ -655,11 +655,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             <TouchableOpacity 
               onPress={() => setDiagnosticsModalVisible(false)}
               style={styles.backButton}
-              hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
+              hitSlop={{top: 5, bottom: 0, left: 15, right: 15}}
             >
-              <Ionicons name="close" size={24} color={theme.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, {color: theme.text}]}>Diagnostics</Text>
             <View style={styles.headerRight} />
           </View>
           <DiagnosticsScreen navigation={{ goBack: () => setDiagnosticsModalVisible(false) }} />

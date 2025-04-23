@@ -18,7 +18,7 @@ import { ProgressEntry, Challenge, Achievement, Reward, CHALLENGE_STATUS } from 
 import * as gamificationManager from '../../utils/progress/gameEngine';
 import * as achievementManager from '../../utils/progress/modules/achievementManager';
 import * as storageService from '../../services/storageService';
-import { EventEmitter } from '../../utils/EventEmitter';
+import { EventEmitter } from '../../utils/performance/EventEmitter';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as soundEffects from '../../utils/soundEffects';
 

@@ -1,6 +1,6 @@
-import stretches from '../data/stretches';
-import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod, IssueType, SmartRoutineInput, SmartRoutineConfig } from '../types';
-import * as rewardManager from './progress/modules/rewardManager';
+import stretches from '../../data/stretches';
+import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod, IssueType, SmartRoutineInput, SmartRoutineConfig } from '../../types';
+import * as rewardManager from '../progress/modules/rewardManager';
 
 export const generateRoutine = async (
   area: BodyArea,

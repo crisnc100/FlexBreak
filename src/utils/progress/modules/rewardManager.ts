@@ -2,7 +2,7 @@ import { Reward, UserProgress } from '../types';
 import * as storageService from '../../../services/storageService';
 import * as xpBoostManager from './xpBoostManager';
 import CORE_REWARDS from '../../../data/rewards.json';
-import { getRandomPremiumStretches } from '../../routineGenerator';
+import { getRandomPremiumStretches } from '../../generators/routineGenerator';
 import { Stretch } from '../../../types';
 
 // Extend the Reward interface to include additional properties for management
@@ -352,7 +352,8 @@ export const cleanupDuplicateRewards = async (): Promise<boolean> => {
           title: 'Streak Freezes',
           description: 'Miss a day, keep your streak—perfect for busy schedules',
           icon: 'snow',
-          unlocked: oldEntry.unlocked,
+          // Ensure unlocked status reflects current level requirement (level 6)
+          unlocked: userProgress.level >= 6 && !!oldEntry.unlocked,
           levelRequired: 6,
           type: 'app_feature'
         };
@@ -385,6 +386,11 @@ export const cleanupDuplicateRewards = async (): Promise<boolean> => {
         // (user shouldn't get more freezes from a bug)
         if (oldEntry.uses !== undefined && newEntry.uses !== undefined) {
           newEntry.uses = Math.min(oldEntry.uses, newEntry.uses);
+        }
+        
+        // Ensure unlocked status meets level requirement
+        if (userProgress.level < 6) {
+          newEntry.unlocked = false;
         }
       }
       

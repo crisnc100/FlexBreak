@@ -1,5 +1,5 @@
-import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../types';
-import * as rewardManager from './progress/modules/rewardManager';
+import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../../types';
+import * as rewardManager from '../progress/modules/rewardManager';
 
 // Type for routine recommendation
 export interface RoutineRecommendation {

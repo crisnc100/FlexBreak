@@ -217,9 +217,8 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
         // Show success message
         setIsSaving(true);
         
-        // Also save to favorites for easy access
-        console.log('Saving favorite routine:', routineData);
-        await saveFavoriteRoutine(routineData);
+        // Removed automatic saving to favorites
+        // Now custom routines will not automatically be added to favorites
 
         // Reset form
         setRoutineName('');
@@ -588,9 +587,6 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
           const success = await saveCustomRoutineToStorage(newRoutine);
           
           if (success) {
-            // Also save as a favorite routine
-            await saveFavoriteRoutine(newRoutine);
-            
             // Reload routines to include the newly saved one
             await loadCustomRoutines();
             
