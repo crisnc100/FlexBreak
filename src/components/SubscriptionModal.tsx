@@ -1,242 +1,280 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
+// SubscriptionModal.tsx
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  SafeAreaView,
+  FlatList,
+  ScrollView,
+  Platform
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { saveIsPremium } from '../services/storageService';
+
+import {
+  getProducts,
+  purchaseSubscription,
+  restorePurchases,
+  PRODUCTS
+} from '../services/iapService';
+
+import * as soundEffects from '../utils/soundEffects';
+import * as storageService from '../services/storageService';
+import CORE_REWARDS from '../data/rewards.json';
+
 import { usePremium } from '../context/PremiumContext';
 import { useFeatureAccess, PREMIUM_STATUS_CHANGED } from '../hooks/progress/useFeatureAccess';
 import { useGamification } from '../hooks/progress/useGamification';
-import * as storageService from '../services/storageService';
-import { gamificationEvents, REWARD_UNLOCKED_EVENT } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
-import CORE_REWARDS from '../data/rewards.json';
-import * as soundEffects from '../utils/soundEffects';
+import { gamificationEvents } from '../hooks/progress/useGamification';
 
-/**
- * Helper function to initialize rewards from rewards.json
- */
-const createInitialRewards = () => {
-  // Convert array to object with id as keys
-  return Object.fromEntries(
-    CORE_REWARDS.map(reward => [
-      reward.id, 
-      { 
-        ...reward, 
+/* -------------------------------------------------- */
+/* helpers                                            */
+/* -------------------------------------------------- */
+
+const BENEFITS = [
+  'Track your progress',
+  'Custom routines',
+  'Dark mode',
+  'XP Boost & streak protection',
+  'Premium stretches'
+];
+
+const createInitialRewards = () =>
+  Object.fromEntries(
+    CORE_REWARDS.map(r => [
+      r.id,
+      {
+        ...r,
         unlocked: false,
-        // Add uses property for rewards that should have them
-        ...(reward.id === 'xp_boost' ? { initialUses: 2 } : {}),
-        ...(reward.id === 'streak_freezes' ? { initialUses: 1 } : {})
+        ...(r.id === 'xp_boost' ? { initialUses: 2 } : {}),
+        ...(r.id === 'streak_freezes' ? { initialUses: 1 } : {})
       }
     ])
   );
-};
 
-interface SubscriptionModalProps {
+/* -------------------------------------------------- */
+/* component                                          */
+/* -------------------------------------------------- */
+
+export default function SubscriptionModal({
+  visible,
+  onClose
+}: {
   visible: boolean;
   onClose: () => void;
-  onSubscribe?: () => void;
-}
-
-export default function SubscriptionModal({ visible, onClose, onSubscribe }: SubscriptionModalProps) {
-  // Use the global premium context
-  const { setPremiumStatus, refreshPremiumStatus } = usePremium();
+}) {
+  const { subscriptionDetails, updateSubscription, setPremiumStatus, refreshPremiumStatus } =
+    usePremium();
   const { refreshAccess } = useFeatureAccess();
-  const { level, refreshData } = useGamification();
+  const { refreshData } = useGamification();
   const { refreshTheme } = useTheme();
 
-  const handleSubscribe = async () => {
-    try {
-      console.log('Starting subscription process...');
-      
-      // First, get current user progress
-      const currentProgress = await storageService.getUserProgress();
-      console.log(`Current user level: ${currentProgress?.level || 1}`);
-      
-      // Initialize rewards if they don't exist
-      if (!currentProgress || !currentProgress.rewards || Object.keys(currentProgress.rewards).length === 0) {
-        // Create initial rewards using our helper function
-        const initialRewards = createInitialRewards();
-          
-        const updatedProgress = {
-          ...(currentProgress || storageService.INITIAL_STATE.USER_PROGRESS),
-          rewards: initialRewards
-        };
-        await storageService.saveUserProgress(updatedProgress);
-      }
-      
-      // Manually unlock dark theme if level is sufficient
-      if (currentProgress && currentProgress.level && currentProgress.level >= 2) {
-        if (currentProgress.rewards?.dark_theme && !currentProgress.rewards.dark_theme.unlocked) {
-          // Update dark theme property directly
-          const updatedProgress = { ...currentProgress };
-          updatedProgress.rewards.dark_theme.unlocked = true;
-          await storageService.saveUserProgress(updatedProgress);
-          console.log('Dark theme manually unlocked due to sufficient level');
-        }
-      }
-      
-      // Only then update premium status
-      await setPremiumStatus(true);
-      console.log('Premium status updated');
-      
-      // Play premium unlocked sound effect
-      try {
-        await soundEffects.playPremiumUnlockedSound();
-      } catch (error) {
-        console.error('Error playing premium unlocked sound:', error);
-      }
-      
-      // Emit event for premium status change
-      gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
-      console.log('Premium status changed event emitted');
-      
-      // Force update rewards based on current level
-      const userProgress = await storageService.getUserProgress();
-      
-      // Update UI
-      if (refreshPremiumStatus) await refreshPremiumStatus();
-      if (refreshAccess) refreshAccess();
-      if (refreshData) refreshData();
-      if (refreshTheme) refreshTheme();
-      
-      // Close the modal
-      if (onSubscribe) onSubscribe();
-      onClose();
-      
-    } catch (error) {
-      console.error('Error during subscription:', error);
-      alert(`There was an error processing your subscription. Please try again.\nError during subscription: ${error}`);
+  const [products, setProducts] = useState<any[]>([]);
+
+  /* pull current App-Store prices on open */
+  useEffect(() => {
+    if (visible) getProducts().then(setProducts).catch(console.warn);
+  }, [visible]);
+
+  /* ------------------------------------ */
+  /* business-logic wrappers              */
+  /* ------------------------------------ */
+
+  const unlockPremiumLocally = async () => {
+    /* identical to your old handleSubscribe, minus the UI */
+    const current = await storageService.getUserProgress();
+
+    if (!current.rewards || Object.keys(current.rewards).length === 0) {
+      await storageService.saveUserProgress({
+        ...(current || storageService.INITIAL_STATE.USER_PROGRESS),
+        rewards: createInitialRewards()
+      });
     }
+
+    if (current.level >= 2 && current.rewards?.dark_theme && !current.rewards.dark_theme.unlocked) {
+      const updated = { ...current };
+      updated.rewards.dark_theme.unlocked = true;
+      await storageService.saveUserProgress(updated);
+    }
+
+    await setPremiumStatus(true);
+    await soundEffects.playPremiumUnlockedSound().catch(() => {});
+    gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
+
+    if (refreshPremiumStatus) await refreshPremiumStatus();
+    refreshAccess?.();
+    refreshData?.();
+    refreshTheme?.();
   };
 
-  const handleRestore = () => {
-    // In a real app, this would check for existing purchases
-    alert('No previous purchases found.');
+  const onBuy = async (pid: string) => {
+    const res = await purchaseSubscription(pid, updateSubscription);
+    if (res.success) await unlockPremiumLocally();
+    onClose();
   };
+
+  const onRestore = async () => {
+    const res = await restorePurchases(updateSubscription);
+    if (res.success && res.hasPurchases) await unlockPremiumLocally();
+    if (!res.hasPurchases) alert('No previous purchases found.');
+    onClose();
+  };
+
+  /* ------------------------------------ */
+  /* helpers for UI                       */
+  /* ------------------------------------ */
+
+  const monthly = products.find(p => p.productId === PRODUCTS.MONTHLY_SUB);
+  const yearly = products.find(p => p.productId === PRODUCTS.YEARLY_SUB);
+  const isCurrent = (pid: string) =>
+    subscriptionDetails?.productId === pid && subscriptionDetails?.isActive;
+
+  const discountLabel = () => {
+    if (!monthly || !yearly) return 'Save 25 %';
+    const m = monthly.priceAmountMicros / 1e6;
+    const y = yearly.priceAmountMicros / 1e6;
+    const pct = 100 - (y / 12 / m) * 100;
+    return `Save ${Math.round(pct)} %`;
+  };
+
+  const Plan = ({ item, highlight }: { item: any; highlight?: boolean }) => (
+    <TouchableOpacity
+      accessibilityRole="button"
+      disabled={isCurrent(item.productId)}
+      style={[
+        styles.card,
+        highlight && styles.cardHighlight,
+        isCurrent(item.productId) && styles.cardDisabled
+      ]}
+      onPress={() => onBuy(item.productId)}
+    >
+      <Text style={styles.cardTitle}>{item.title}</Text>
+      <Text style={styles.cardPrice}>{item.price}</Text>
+
+      {highlight && <Text style={styles.cardBadge}>{discountLabel()}</Text>}
+
+      {item === yearly && monthly && (
+        <Text style={styles.cardSub}>
+          ≈{' '}
+          {(item.priceAmountMicros / 12 / 1e6).toLocaleString(undefined, {
+            style: 'currency',
+            currency: item.priceCurrencyCode
+          })}
+          /mo
+        </Text>
+      )}
+
+      {isCurrent(item.productId) && (
+        <Text style={styles.cardCurrent}>Current plan</Text>
+      )}
+    </TouchableOpacity>
+  );
+
+  /* ------------------------------------ */
+  /* render                               */
+  /* ------------------------------------ */
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#333" />
-          </TouchableOpacity>
-          
-          <Text style={styles.modalHeader}>Go Premium</Text>
-          
-          <View style={styles.benefitsList}>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.benefitText}>Track your progress</Text>
-            </View>
-            
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.benefitText}>Unlock custom routines</Text>
-            </View>
-            
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.benefitText}>Dark mode</Text>
-            </View>
-            
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.benefitText}>XP Boost & Streak protection</Text>
-            </View>
-            
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.benefitText}>Premium stretches & features</Text>
-            </View>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <SafeAreaView style={styles.overlay}>
+        <View style={styles.sheet}>
+          {/* header */}
+          <View style={styles.headerRow}>
+            <Text style={styles.header}>Go Premium</Text>
+            <Ionicons
+              name="close"
+              size={26}
+              color="#555"
+              onPress={onClose}
+              accessibilityLabel="Close"
+            />
           </View>
-          
-          <TouchableOpacity style={styles.subscribeButton} onPress={handleSubscribe}>
-            <Text style={styles.subscribeText}>Subscribe Now</Text>
+
+          {/* plans */}
+          <FlatList
+            horizontal
+            data={[yearly, monthly].filter(Boolean)}
+            keyExtractor={p => p.productId}
+            renderItem={({ item }) => (
+              <Plan item={item} highlight={item === yearly} />
+            )}
+            contentContainerStyle={{ gap: 14 }}
+            showsHorizontalScrollIndicator={false}
+            style={{ marginVertical: 18 }}
+          />
+
+          {/* benefits */}
+          <ScrollView style={{ maxHeight: 220 }} contentContainerStyle={styles.benefits}>
+            {BENEFITS.map(b => (
+              <View key={b} style={styles.row}>
+                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                <Text style={styles.benefit}>{b}</Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* restore */}
+          <TouchableOpacity onPress={onRestore} style={{ marginTop: 18 }}>
+            <Text style={styles.restore}>Restore purchase</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.restoreButton} onPress={handleRestore}>
-            <Text style={styles.restoreText}>Restore Purchase</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.disclaimer}>
-            Premium features unlock as you level up. Subscribe once to unlock them permanently.
-          </Text>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
+/* -------------------------------------------------- */
+/* styles                                             */
+/* -------------------------------------------------- */
+
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center',
-    alignItems: 'center',
+    padding: 16
   },
-  modalContent: {
-    width: '80%',
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
+  sheet: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 24
   },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  header: { fontSize: 28, fontWeight: '700', color: '#111' },
+
+  /* plan card */
+  card: {
+    width: 170,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#d0d0d0',
+    borderRadius: 16,
+    alignItems: 'center'
   },
-  modalHeader: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
-  },
-  benefitsList: {
-    width: '100%',
-    marginVertical: 16,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  benefitText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#333',
-  },
-  subscribeButton: {
+  cardHighlight: { borderColor: '#4CAF50' },
+  cardDisabled: { opacity: 0.45 },
+  cardTitle: { fontSize: 15, fontWeight: '600' },
+  cardPrice: { fontSize: 22, fontWeight: '700', marginTop: 2 },
+  cardBadge: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#fff',
     backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    marginTop: 16,
-    alignItems: 'center',
-    width: '100%',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6
   },
-  subscribeText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  restoreButton: {
-    marginTop: 16,
-    padding: 8,
-  },
-  restoreText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  disclaimer: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-}); 
+  cardSub: { fontSize: 12, color: '#555', marginTop: 2 },
+  cardCurrent: { marginTop: 6, fontSize: 12, color: '#4CAF50' },
+
+  /* benefits */
+  benefits: { gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  benefit: { fontSize: 14 },
+
+  /* restore */
+  restore: { fontSize: 13, color: '#666', textAlign: 'center' }
+});

@@ -83,7 +83,7 @@ const DeskBreakBoost: React.FC<DeskBreakBoostProps> = ({
                   Desk Break Boost
                 </Text>
                 <Text style={[styles.description, { color: isDark ? '#90A4AE' : '#78909C', fontSize: 12 }]}>
-                  Fast stretches to recharge the grind!
+                  Fast desk stretches to recharge the grind!
                 </Text>
               </View>
             </View>

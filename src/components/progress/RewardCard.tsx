@@ -23,7 +23,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       try {
         const userProgress = await storageService.getUserProgress();
         const level = userProgress?.level || 1;
-        console.log(`Direct level check for ${reward.id}: ${level}`);
         setRealUserLevel(level);
       } catch (error) {
         console.error('Error getting real user level:', error);
@@ -32,11 +31,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
     
     loadRealUserLevel();
   }, [reward.id]);
-  
-  // Add a direct console log for rewards component props
-  console.log(`RewardCard rendered: ${reward.id}
-  - Component userLevel: ${userLevel}
-  - Real user level: ${realUserLevel}`);
   
   // Check if reward is dark theme and it's unlocked (to show active state)
   const isDarkThemeReward = reward.id === 'dark_theme';
@@ -130,18 +124,6 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   
   // Explicitly track if streak freezes should be shown as unlocked
   const isStreakFreezeUnlocked = reward.id === 'streak_freezes' && realUserLevel >= 6;
-  
-  // Log the status for streak freezes to help debug
-  if (reward.id === 'streak_freezes') {
-    console.log(`Streak Freezes Card Status:
-    - Provided userLevel: ${userLevel}
-    - Real user level: ${realUserLevel} 
-    - Unlocked in data: ${reward.unlocked}
-    - isStreakFreezeUnlocked: ${isStreakFreezeUnlocked}
-    - isEnabled: ${isStreakFreezeUnlocked || (isPremium && reward.unlocked)}
-    - Status Text: ${getStatusText()}
-    - Icon: ${getIconName()}`);
-  }
   
   // Determine if reward is enabled
   const isEnabled = reward.id === 'streak_freezes'

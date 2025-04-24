@@ -39,7 +39,6 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
       try {
         const userProgress = await storageService.getUserProgress();
         setRealUserLevel(userProgress.level);
-        console.log(`Rewards component - Real level from storage: ${userProgress.level}, Prop userLevel: ${userLevel}`);
       } catch (error) {
         console.error('Error getting user level in Rewards:', error);
       }
@@ -145,7 +144,6 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
     try {
       const userProgress = await storageService.getUserProgress();
       currentLevel = userProgress.level;
-      console.log(`handleRewardPress - Real level from storage: ${currentLevel}`);
     } catch (error) {
       console.error('Error getting user level in handleRewardPress:', error);
     }

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "DeskStretch",
-    "slug": "DeskStretch",
+    "name": "FlexBreak",
+    "slug": "flexbreak",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -16,8 +16,7 @@
     "android": {
       "package": "com.cristianortega.flexbreak"
     },
-    "web": {
-    },
+    "web": {},
     "plugins": [
       [
         "expo-notifications",
@@ -28,8 +27,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "flexbreak-28ad0"
+        "projectId": "e2f2f0ca-229d-4469-9de8-9f69b7f7a724"
       }
-    }
+    },
+    "owner": "crisnc100"
   }
 }

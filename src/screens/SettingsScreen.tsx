@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { clearAllData } from '../services/storageService';
+import { resetSimulationData } from '../services/storageService';
+
 import DiagnosticsScreen from './DiagnosticsScreen';
 import { ThemeType, useTheme } from '../context/ThemeContext';
 import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
@@ -117,6 +119,25 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         { text: 'Cancel', style: 'cancel' },
         { text: 'Reset', style: 'destructive', onPress: async () => {
           const success = await clearAllData();
+          if (success) {
+            Alert.alert('Success', 'All app data has been reset');
+          } else {
+            Alert.alert('Error', 'Failed to reset app data');
+          }
+        }}
+      ]
+    );
+  };
+
+  // Handle reset data
+  const handleResetSimulationData = async () => {
+    Alert.alert(
+      'Reset Simulation Data',
+      'This will delete all simulation data only, for testers, please use this to reset the simulator data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset', style: 'destructive', onPress: async () => {
+          const success = await resetSimulationData();
           if (success) {
             Alert.alert('Success', 'All app data has been reset');
           } else {
@@ -600,6 +621,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 </View>
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.settingItem, styles.lastItem]}
+              onPress={handleResetSimulationData}
+            >
+              <View style={styles.settingContent}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                  <Ionicons name="trash-outline" size={22} color="#F44336" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset Simulation Data</Text>
+                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all simulation data only (for testers)</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+            
           </View>
         )}
         
