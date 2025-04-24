@@ -4,6 +4,7 @@
 
 # source control
 .git/
+.github/
 
 # node / expo caches
 node_modules/
@@ -23,6 +24,14 @@ assets/**/*.MP4
 assets/**/*.mov
 assets/**/*.mkv
 assets/**/*.avi
+assets/**/*.webm
+assets/**/*.flac
+assets/**/*.wav
+assets/**/*.mp3
+assets/**/*.gif
+assets/**/*.GIF
+assets/sounds/
+assets/stretchData/
 *.aab
 *.apk
 *.ipa
@@ -35,7 +44,40 @@ assets/**/*.avi
 *.ai
 *.sketch
 
-# misc build artifacts
+# build artifacts and temporary files
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+build/
+dist/
+web-build/
+**/*.orig
+**/.log/
+**/logs/
+**/coverage/
+**/.nyc_output/
+
+# testing and documentation
+__tests__/
+__mocks__/
+docs/
+test/
+tests/
+*.test.js
+*.spec.js
+*.test.tsx
+*.spec.tsx
+
+# large data files
+**/*.csv
+**/*.json.backup
+**/*.sql
+**/*.sqlite
+**/*.db
+
+# development-only files
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
