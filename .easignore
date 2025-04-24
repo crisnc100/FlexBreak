@@ -1,0 +1,29 @@
+# Exclude large media files
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Exclude node modules (already in .gitignore but adding for safety)
+node_modules/
+
+# Exclude other large or unnecessary files
+.git/
+.expo/
+web-build/
+dist/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Exclude build folders
+build/
+android/build/
+ios/build/
+ios/Pods/
+
+# Keep smaller preview videos if needed (modify as needed)
+# !assets/videos/preview_*.mp4 
