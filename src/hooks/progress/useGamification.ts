@@ -1,5 +1,5 @@
 /**
- * DeskStretch Gamification System
+ * flexbreak Gamification System
  * ------------------------------
  * PRIMARY HOOK: This is the recommended hook for all gamification functionality.
  * 

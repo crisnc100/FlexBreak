@@ -1,4 +1,4 @@
-# DeskStretch Gamification System
+# flexbreak Gamification System
 
 ## Modular Structure
 

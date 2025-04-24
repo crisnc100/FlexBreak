@@ -2,7 +2,7 @@
 
 ## Centralization & Cleanup Summary
 
-This document outlines the changes made to centralize and simplify the gamification system in DeskStretch.
+This document outlines the changes made to centralize and simplify the gamification system in flexbreak.
 
 ### 1. Centralized Gamification Logic
 

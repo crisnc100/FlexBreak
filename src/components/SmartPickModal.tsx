@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RoutineRecommendation } from '../utils/smartPickGenerator';
+import { RoutineRecommendation } from '../utils/generators/smartPickGenerator';
 import { useTheme } from '../context/ThemeContext';
 
 interface SmartPickModalProps {

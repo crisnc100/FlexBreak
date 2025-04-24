@@ -641,7 +641,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={[tw('flex-1 justify-center items-center'), { backgroundColor: theme.background }]}>
         <ActivityIndicator size="large" color={theme.accent} />
-        <Text style={[tw('mt-3 text-base'), { color: theme.textSecondary }]}>Loading DeskStretch...</Text>
+        <Text style={[tw('mt-3 text-base'), { color: theme.textSecondary }]}>Loading flexbreak...</Text>
       </SafeAreaView>
     );
   }

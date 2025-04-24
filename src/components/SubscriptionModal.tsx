@@ -13,12 +13,21 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+// Comment out IAP imports for now
+/* 
 import {
   getProducts,
   purchaseSubscription,
   restorePurchases,
   PRODUCTS
 } from '../services/iapService';
+*/
+
+// Temporary mock for IAP service
+const PRODUCTS = {
+  MONTHLY_SUB: 'month_sub',
+  YEARLY_SUB: 'year_sub'
+};
 
 import * as soundEffects from '../utils/soundEffects';
 import * as storageService from '../services/storageService';
@@ -76,7 +85,27 @@ export default function SubscriptionModal({
 
   /* pull current App-Store prices on open */
   useEffect(() => {
-    if (visible) getProducts().then(setProducts).catch(console.warn);
+    if (visible) {
+      // Mock products for now
+      setProducts([
+        {
+          productId: PRODUCTS.MONTHLY_SUB,
+          title: 'Monthly Premium',
+          price: '$4.99',
+          priceAmountMicros: 4990000,
+          priceCurrencyCode: 'USD'
+        },
+        {
+          productId: PRODUCTS.YEARLY_SUB,
+          title: 'Yearly Premium',
+          price: '$39.99',
+          priceAmountMicros: 39990000,
+          priceCurrencyCode: 'USD'
+        }
+      ]);
+      // Commented out for now
+      // getProducts().then(setProducts).catch(console.warn);
+    }
   }, [visible]);
 
   /* ------------------------------------ */
@@ -111,15 +140,26 @@ export default function SubscriptionModal({
   };
 
   const onBuy = async (pid: string) => {
+    // Mock purchase for now
+    alert('Purchases are disabled in this build.');
+    /*
     const res = await purchaseSubscription(pid, updateSubscription);
     if (res.success) await unlockPremiumLocally();
+    */
+    
+    // For testing
+    await unlockPremiumLocally();
     onClose();
   };
 
   const onRestore = async () => {
+    // Mock restore for now
+    alert('Restore functionality is disabled in this build.');
+    /*
     const res = await restorePurchases(updateSubscription);
     if (res.success && res.hasPurchases) await unlockPremiumLocally();
     if (!res.hasPurchases) alert('No previous purchases found.');
+    */
     onClose();
   };
 

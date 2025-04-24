@@ -38,7 +38,7 @@ const TestingAccessForm: React.FC<TestingAccessFormProps> = ({ onAccessGranted }
         setIsLoading(false);
         
         // Set the testing premium flag to unlock premium features for testers
-        AsyncStorage.setItem('@deskstretch:testing_premium_access', 'true')
+        AsyncStorage.setItem('@flexbreak:testing_premium_access', 'true')
           .then(() => {
             console.log('[Testing Mode] Premium access enabled for tester');
             

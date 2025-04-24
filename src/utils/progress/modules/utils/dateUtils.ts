@@ -1,5 +1,5 @@
 /**
- * Date Utilities for DeskStretch
+ * Date Utilities for flexbreak
  * Handles all date-related operations consistently across the application
  */
 

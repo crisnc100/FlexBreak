@@ -8,7 +8,7 @@ import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
 export const KEYS = {
   USER: {
     PREMIUM: '@user_premium',
-    TESTING_PREMIUM: '@deskstretch:testing_premium_access',
+    TESTING_PREMIUM: '@flexbreak:testing_premium_access',
     SUBSCRIPTION_DETAILS: '@user_subscription_details',
   },
   PROGRESS: {
@@ -147,7 +147,7 @@ export const getIsPremium = async (): Promise<boolean> => {
     const directKeys = [
       KEYS.USER.PREMIUM,
       KEYS.USER.TESTING_PREMIUM,
-      '@deskstretch:testing_premium_access',
+      '@flexbreak:testing_premium_access',
       '@user_premium',
       '@premium',
       '@isPremium',
@@ -174,7 +174,7 @@ export const getIsPremium = async (): Promise<boolean> => {
     
     // Then check testing premium status (direct access, not through getData)
     const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
-    const testingPremiumAccess = await AsyncStorage.getItem('@deskstretch:testing_premium_access');
+    const testingPremiumAccess = await AsyncStorage.getItem('@flexbreak:testing_premium_access');
     
     // User has premium if ANY premium flag is true
     const hasPremium = 
@@ -774,7 +774,7 @@ export const exportUserProgress = (progress: UserProgress): void => {
       
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'deskstretch_progress.json';
+      a.download = 'flexbreak_progress.json';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -822,12 +822,12 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
     
     // Define testing-related keys to preserve
     const testingKeys = [
-      '@deskstretch:testing_phase',
-      '@deskstretch:testing_access',
-      '@deskstretch:bob_simulator_access',
-      '@deskstretch:testing_return_phase',
-      '@deskstretch:simulator_scenario',
-      '@deskstretch:testing_feedback',
+      '@flexbreak:testing_phase',
+      '@flexbreak:testing_access',
+      '@flexbreak:bob_simulator_access',
+      '@flexbreak:testing_return_phase',
+      '@flexbreak:simulator_scenario',
+      '@flexbreak:testing_feedback',
       'testing_access_granted',
       'testing_current_stage',
     ];
@@ -836,7 +836,7 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
     const premiumKeys = [
       KEYS.USER.PREMIUM,
       KEYS.USER.TESTING_PREMIUM,
-      '@deskstretch:testing_premium_access',
+      '@flexbreak:testing_premium_access',
       '@user_premium',
       '@premium',
       '@isPremium'
@@ -888,8 +888,8 @@ export const restoreTestingAccess = async (): Promise<void> => {
     console.log('Restoring basic testing access...');
     
     // Set minimum testing keys to ensure access
-    await AsyncStorage.setItem('@deskstretch:testing_access', 'true');
-    await AsyncStorage.setItem('@deskstretch:testing_phase', '1');
+    await AsyncStorage.setItem('@flexbreak:testing_access', 'true');
+    await AsyncStorage.setItem('@flexbreak:testing_phase', '1');
     
     console.log('Basic testing access restored');
   } catch (error) {
@@ -1041,15 +1041,15 @@ export const resetSimulationData = async (): Promise<boolean> => {
     const keysToPreserve = [
       KEYS.USER.PREMIUM,
       KEYS.USER.TESTING_PREMIUM,
-      '@deskstretch:testing_phase',
-      '@deskstretch:testing_access',
-      '@deskstretch:bob_simulator_access',
-      '@deskstretch:testing_return_phase',
-      '@deskstretch:simulator_scenario',
-      '@deskstretch:testing_feedback',
-      '@deskstretch:testing_checklist_progress',
-      '@deskstretch:testing_checklist_p2_progress',
-      '@deskstretch:testing_feedback_submitted',
+      '@flexbreak:testing_phase',
+      '@flexbreak:testing_access',
+      '@flexbreak:bob_simulator_access',
+      '@flexbreak:testing_return_phase',
+      '@flexbreak:simulator_scenario',
+      '@flexbreak:testing_feedback',
+      '@flexbreak:testing_checklist_progress',
+      '@flexbreak:testing_checklist_p2_progress',
+      '@flexbreak:testing_feedback_submitted',
       'testing_access_granted',
       'testing_current_stage'
     ];
@@ -1095,7 +1095,7 @@ export const clearAllPremiumStatus = async (): Promise<boolean> => {
   const premiumKeys = [
     KEYS.USER.PREMIUM,
     KEYS.USER.TESTING_PREMIUM,
-    '@deskstretch:testing_premium_access',
+    '@flexbreak:testing_premium_access',
     '@user_premium',
     '@premium',
     '@isPremium',

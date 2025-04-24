@@ -43,7 +43,7 @@ const SubscriptionTeaser: React.FC<SubscriptionTeaserProps> = ({
           
           <View style={styles.textContainer}>
             <Text style={styles.title}>
-              {isDark ? 'DeskStretch Premium' : 'Go Premium'}
+              {isDark ? 'flexbreak Premium' : 'Go Premium'}
             </Text>
             <Text style={styles.description}>
               {text}

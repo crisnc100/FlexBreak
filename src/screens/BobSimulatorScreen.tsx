@@ -87,7 +87,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   useEffect(() => {
     const checkTestingAccess = async () => {
       try {
-        const testingAccess = await AsyncStorage.getItem('@deskstretch:bob_simulator_access');
+        const testingAccess = await AsyncStorage.getItem('@flexbreak:bob_simulator_access');
         if (testingAccess === 'true') {
           setIsAuthenticated(true);
           setShowAuthModal(false);
@@ -117,7 +117,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       } else {
         // Check for scenario data in AsyncStorage as fallback
         try {
-          const storedScenario = await AsyncStorage.getItem('@deskstretch:simulator_scenario');
+          const storedScenario = await AsyncStorage.getItem('@flexbreak:simulator_scenario');
           if (storedScenario) {
             const parsedScenario = JSON.parse(storedScenario);
             setScenarioInstructions(parsedScenario);
@@ -804,7 +804,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     return () => {
       // Clean up when component unmounts
       try {
-        AsyncStorage.removeItem('@deskstretch:bob_simulator_access');
+        AsyncStorage.removeItem('@flexbreak:bob_simulator_access');
       } catch (error) {
         console.error('Error removing simulator access:', error);
       }
@@ -852,7 +852,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                 
                 // Store a flag to indicate that we need to re-open settings with the testing modal
                 // This will be picked up by TabNavigator
-                AsyncStorage.setItem('@deskstretch:reopen_settings', 'true')
+                AsyncStorage.setItem('@flexbreak:reopen_settings', 'true')
                   .then(() => {
                     console.log('[BobSimulator] Set reopen_settings flag');
                   })
@@ -861,7 +861,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                   });
                   
                 // Make sure we keep our testing access
-                AsyncStorage.setItem('@deskstretch:testing_access', 'true')
+                AsyncStorage.setItem('@flexbreak:testing_access', 'true')
                   .catch(error => {
                     console.error('Error preserving testing access:', error);
                   });

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the steps required to complete the migration to a centralized gamification system for DeskStretch. The goal is to eliminate type inconsistencies, centralize logic, and improve system reliability.
+This document outlines the steps required to complete the migration to a centralized gamification system for flexbreak. The goal is to eliminate type inconsistencies, centralize logic, and improve system reliability.
 
 ## Current Issues
 

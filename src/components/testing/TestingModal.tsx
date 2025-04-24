@@ -36,8 +36,8 @@ enum TestingPhase {
   COMPLETE = 'complete'
 }
 
-const TESTING_PHASE_KEY = '@deskstretch:testing_phase';
-const TESTING_ACCESS_KEY = '@deskstretch:testing_access';
+const TESTING_PHASE_KEY = '@flexbreak:testing_phase';
+const TESTING_ACCESS_KEY = '@flexbreak:testing_access';
 
 type TestingModalProps = {
   visible: boolean;
@@ -55,12 +55,12 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
     const checkPhase = async () => {
       try {
         // Check if returning to specific phase
-        const returnPhase = await AsyncStorage.getItem('@deskstretch:testing_return_phase');
+        const returnPhase = await AsyncStorage.getItem('@flexbreak:testing_return_phase');
         
         if (returnPhase) {
           console.log('Returning to testing phase:', returnPhase);
           // Clean up return phase key
-          await AsyncStorage.removeItem('@deskstretch:testing_return_phase');
+          await AsyncStorage.removeItem('@flexbreak:testing_return_phase');
           
           switch (returnPhase) {
             case 'simulator':
@@ -164,12 +164,12 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
       // If we're returning from BobSimulator, check if we need to restore phase
       const checkReturnFromSimulator = async () => {
         try {
-          const returnPhase = await AsyncStorage.getItem('@deskstretch:testing_return_phase');
+          const returnPhase = await AsyncStorage.getItem('@flexbreak:testing_return_phase');
           if (returnPhase) {
             // Set the phase back to what it was
             setPhase(returnPhase as TestingPhase);
             // Clear the flag so we don't reuse it
-            await AsyncStorage.removeItem('@deskstretch:testing_return_phase');
+            await AsyncStorage.removeItem('@flexbreak:testing_return_phase');
             console.log('[TestingModal] Restored phase from BobSimulator return:', returnPhase);
           }
         } catch (error) {
@@ -249,19 +249,19 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
     try {
       // Clear all testing-related data but preserve premium and access credentials if needed
       const testingKeys = [
-        '@deskstretch:simulator_scenario',
-        '@deskstretch:testing_feedback',
-        '@deskstretch:bob_simulator_access',
-        '@deskstretch:testing_return_phase',
-        '@deskstretch:testing_phase',
-        '@deskstretch:testing_checklist_progress',
-        '@deskstretch:testing_checklist_p2_progress',
-        '@deskstretch:testing_feedback_submitted',
+        '@flexbreak:simulator_scenario',
+        '@flexbreak:testing_feedback',
+        '@flexbreak:bob_simulator_access',
+        '@flexbreak:testing_return_phase',
+        '@flexbreak:testing_phase',
+        '@flexbreak:testing_checklist_progress',
+        '@flexbreak:testing_checklist_p2_progress',
+        '@flexbreak:testing_feedback_submitted',
         TESTING_PHASE_KEY,
         TESTING_ACCESS_KEY
       ];
       
-      // Note: We intentionally don't clear '@deskstretch:testing_premium_access'
+      // Note: We intentionally don't clear '@flexbreak:testing_premium_access'
       // to ensure testers keep premium access even after resetting
       
       await AsyncStorage.multiRemove(testingKeys);
@@ -276,10 +276,10 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
     // Save testing authentication state for the simulator
     try {
       // Set a flag in AsyncStorage that the simulator can check
-      AsyncStorage.setItem('@deskstretch:bob_simulator_access', 'true');
+      AsyncStorage.setItem('@flexbreak:bob_simulator_access', 'true');
       
       // Also store the current testing phase so we can come back to it
-      AsyncStorage.setItem('@deskstretch:testing_return_phase', phase);
+      AsyncStorage.setItem('@flexbreak:testing_return_phase', phase);
       
       // Navigate directly to BobSimulator
       setTimeout(() => {

@@ -1,7 +1,7 @@
 /**
- * DeskStretch Gamification System
+ * flexbreak Gamification System
  * ------------------------------
- * This module contains the gamification components for DeskStretch:
+ * This module contains the gamification components for flexbreak:
  * - XP System
  * - Achievements
  * - Challenges

@@ -1,5 +1,5 @@
 /**
- * Cache Utilities for DeskStretch
+ * Cache Utilities for flexbreak
  * Handles caching mechanisms for improved performance
  */
 

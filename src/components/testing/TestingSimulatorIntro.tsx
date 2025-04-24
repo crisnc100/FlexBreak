@@ -206,7 +206,7 @@ const TestingSimulatorIntro: React.FC<TestingSimulatorIntroProps> = ({
           text: 'Open Simulator',
           onPress: () => {
             // Save the selected scenario to AsyncStorage for the simulator to use
-            AsyncStorage.setItem('@deskstretch:simulator_scenario', JSON.stringify({
+            AsyncStorage.setItem('@flexbreak:simulator_scenario', JSON.stringify({
               id: scenario.id,
               title: scenario.title,
               setup: scenario.setup,
@@ -313,17 +313,17 @@ const TestingSimulatorIntro: React.FC<TestingSimulatorIntroProps> = ({
             try {
               // Clear all testing-related data but keep access credentials and premium access
               const testingKeys = [
-                '@deskstretch:simulator_scenario',
-                '@deskstretch:testing_feedback',
-                '@deskstretch:bob_simulator_access',
-                '@deskstretch:testing_return_phase',
-                '@deskstretch:testing_phase',
-                '@deskstretch:testing_checklist_progress',
-                '@deskstretch:testing_checklist_p2_progress',
-                '@deskstretch:testing_feedback_submitted'
+                '@flexbreak:simulator_scenario',
+                '@flexbreak:testing_feedback',
+                '@flexbreak:bob_simulator_access',
+                '@flexbreak:testing_return_phase',
+                '@flexbreak:testing_phase',
+                '@flexbreak:testing_checklist_progress',
+                '@flexbreak:testing_checklist_p2_progress',
+                '@flexbreak:testing_feedback_submitted'
               ];
               
-              // Note: We intentionally don't clear '@deskstretch:testing_premium_access'
+              // Note: We intentionally don't clear '@flexbreak:testing_premium_access'
               // to ensure testers keep premium access even after resetting
               
               await AsyncStorage.multiRemove(testingKeys);

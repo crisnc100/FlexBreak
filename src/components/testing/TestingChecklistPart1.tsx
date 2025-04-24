@@ -22,7 +22,7 @@ interface TestingChecklistPart1Props {
 const FEEDBACK_EMAIL = 'cortegafit@gmail.com';
 
 // Key for storing checklist progress
-const TESTING_CHECKLIST_PROGRESS = '@deskstretch:testing_checklist_progress';
+const TESTING_CHECKLIST_PROGRESS = '@flexbreak:testing_checklist_progress';
 
 interface ChecklistItem {
   id: string;
@@ -206,10 +206,10 @@ const TestingChecklistPart1: React.FC<TestingChecklistPart1Props> = ({ onComplet
             try {
               // Clear all testing-related data but keep access credentials
               const testingKeys = [
-                '@deskstretch:testing_checklist_progress',
-                '@deskstretch:testing_feedback',
-                '@deskstretch:testing_phase',
-                '@deskstretch:testing_feedback_submitted'
+                '@flexbreak:testing_checklist_progress',
+                '@flexbreak:testing_feedback',
+                '@flexbreak:testing_phase',
+                '@flexbreak:testing_feedback_submitted'
               ];
               
               await AsyncStorage.multiRemove(testingKeys);

@@ -151,10 +151,10 @@ const TabNavigator = () => {
   useEffect(() => {
     const checkReopenSettings = async () => {
       try {
-        const shouldReopenSettings = await AsyncStorage.getItem('@deskstretch:reopen_settings');
+        const shouldReopenSettings = await AsyncStorage.getItem('@flexbreak:reopen_settings');
         if (shouldReopenSettings === 'true') {
           // Clear the flag to prevent it from re-opening again next time
-          await AsyncStorage.removeItem('@deskstretch:reopen_settings');
+          await AsyncStorage.removeItem('@flexbreak:reopen_settings');
           // Open settings modal
           setSettingsModalVisible(true);
           console.log('[TabNavigator] Auto-reopening settings from flag');

@@ -1,4 +1,8 @@
 {
-  "compilerOptions": {},
+  "compilerOptions": {
+    "jsx": "react-native",
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  },
   "extends": "expo/tsconfig.base"
 }

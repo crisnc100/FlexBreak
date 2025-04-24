@@ -4,7 +4,7 @@
 
 ### Overview
 
-This folder contains hooks for the DeskStretch gamification and progress tracking system. We are transitioning to a more centralized approach to improve performance, reduce redundancy, and make the codebase more maintainable.
+This folder contains hooks for the flexbreak gamification and progress tracking system. We are transitioning to a more centralized approach to improve performance, reduce redundancy, and make the codebase more maintainable.
 
 ### Primary Hook: `useGamification`
 
