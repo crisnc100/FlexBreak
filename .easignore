@@ -1,29 +1,41 @@
-# Exclude large media files
-*.mp4
-*.mov
-*.avi
-*.mkv
+###############################################################################
+#  universal ignore – managed workflow, proven small                          #
+###############################################################################
 
-# Exclude node modules (already in .gitignore but adding for safety)
-node_modules/
-
-# Exclude other large or unnecessary files
+# source control
 .git/
+
+# node / expo caches
+node_modules/
+.cache/
 .expo/
-web-build/
-dist/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+.expo-shared/
+metro-cache/
+metro-cache*/
 
-# Exclude build folders
-build/
-android/build/
-ios/build/
-ios/Pods/
+# native folders (managed workflow uses cloud workers, so we skip them)
+android/
+ios/
 
-# Keep smaller preview videos if needed (modify as needed)
-# !assets/videos/preview_*.mp4 
+# videos & other large binaries
+assets/**/*.mp4
+assets/**/*.MP4
+assets/**/*.mov
+assets/**/*.mkv
+assets/**/*.avi
+*.aab
+*.apk
+*.ipa
+*.zip
+*.tar
+*.gz
+*.7z
+*.dmg
+*.psd
+*.ai
+*.sketch
+
+# misc build artifacts
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
