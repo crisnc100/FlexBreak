@@ -16,6 +16,7 @@ import FavoritesScreen from './src/screens/FavoritesScreen';
 import PlaylistsScreen from './src/screens/PlaylistsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import BobSimulatorScreen from './src/screens/BobSimulatorScreen';
+import TestNotificationsScreen from './src/screens/TestNotificationsScreen';
 import { PremiumProvider, usePremium } from './src/context/PremiumContext';
 import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -24,6 +25,8 @@ import * as streakFreezeManager from './src/utils/progress/modules/streakFreezeM
 import * as streakManager from './src/utils/progress/modules/streakManager';
 import StreakFreezePrompt from './src/components/notifications/StreakFreezePrompt';
 import * as rewardManager from './src/utils/progress/modules/rewardManager';
+import * as fcmService from './src/services/fcmService';
+import * as notificationBridge from './src/services/notificationBridge';
 import { useFeatureAccess } from './src/hooks/progress/useFeatureAccess';
 import { useGamification, gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT } from './src/hooks/progress/useGamification';
 import * as soundEffects from './src/utils/soundEffects';
@@ -46,6 +49,7 @@ type RootStackParamList = {
     testingAccessGranted?: boolean;
     returnToTesting?: boolean;
   } | undefined;
+  TestNotifications: undefined;
 };
 
 // Create a navigation ref that can be used outside of React components
@@ -310,10 +314,75 @@ function MainApp() {
   const { theme, isDark } = useTheme();
   const [showIntro, setShowIntro] = useState(true);
   const fadeInAnim = useRef(new Animated.Value(0)).current;
+  const notificationListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
+  const foregroundMessageListener = useRef<(() => void) | null>(null);
   
   // Mark component render for performance tracking
   useEffect(() => {
     performance.markComponentRender('MainApp');
+  }, []);
+  
+  // Initialize notification system
+  useEffect(() => {
+    const initNotificationSystem = async () => {
+      try {
+        console.log('Initializing notification system...');
+        // Use the imported instance instead of dynamic import
+        await notificationBridge.initializeNotifications();
+      } catch (error) {
+        console.error('Error initializing notification system:', error);
+      }
+    };
+    
+    initNotificationSystem();
+  }, []);
+
+  // Set up notification listeners
+  useEffect(() => {
+    // Listen for incoming notifications (when app is foregrounded)
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received in foreground:', notification);
+    });
+
+    // Listen for user interaction with notifications
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('User tapped on notification:', response);
+      // Handle notification based on type
+      const data = response.notification.request.content.data;
+      // Example of basic routing based on notification type
+      if (data?.type === 'streak_protection') {
+        // Navigate to a specific screen
+        navigateFromAnywhere('MainTabs');
+      }
+    });
+
+    // Set up FCM foreground message listener
+    const setupFCMListener = async () => {
+      try {
+        // Use imported modules instead of dynamic imports
+        foregroundMessageListener.current = fcmService.setupMessageListener(
+          (message) => notificationBridge.processIncomingFCMMessage(message)
+        );
+      } catch (error) {
+        console.error('Error setting up FCM listener:', error);
+      }
+    };
+    
+    setupFCMListener();
+
+    // Clean up listeners when component unmounts
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+      if (foregroundMessageListener.current) {
+        foregroundMessageListener.current();
+      }
+    };
   }, []);
   
   // Initialize streaks and streak freezes when app launches
@@ -419,6 +488,7 @@ function MainApp() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen name="BobSimulator" component={BobSimulatorScreen} />
+          <Stack.Screen name="TestNotifications" component={TestNotificationsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       

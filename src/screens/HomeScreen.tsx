@@ -39,6 +39,7 @@ import {
   DeskBreakBoost
 } from '../components/home';
 import * as notifications from '../utils/notifications';
+import * as notificationTester from '../utils/notificationTester';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
 import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
@@ -528,7 +529,12 @@ export default function HomeScreen() {
   const handleTestNotification = async () => {
     try {
       console.log('Testing notification system...');
-      const hasPermission = await notifications.requestNotificationsPermissions();
+      
+      // Initialize the notifications
+      notificationTester.setupNotifications();
+      
+      // Request permissions
+      const hasPermission = await notificationTester.requestPermissions();
       console.log('Notification permission status:', hasPermission);
 
       if (!hasPermission) {
@@ -542,18 +548,22 @@ export default function HomeScreen() {
       }
 
       // Schedule the test notification for 5 seconds in the future
-      // Using a much shorter delay for interactive testing
       const delaySeconds = 5;
-      const testId = await notifications.scheduleTestNotification(delaySeconds);
+      const testId = await notificationTester.scheduleNotificationInSeconds(
+        delaySeconds,
+        'Test Notification',
+        'This is a test notification from FlexBreak. If you see this, notifications are working!'
+      );
+      
       console.log('TEST notification scheduled with ID:', testId);
       
       Alert.alert(
         'Test Notification Scheduled',
-        `A notification will appear in ${delaySeconds} seconds.\n\nIMPORTANT EXPO LIMITATIONS:\n- You may need to exit the app completely to see it\n- If reminders aren't working, try restarting the app`
+        `A notification will appear in ${delaySeconds} seconds.\n\nIf you don't see it, please check your device's notification settings.`
       );
     } catch (error) {
       console.error('Error sending test notification:', error);
-      Alert.alert('Error', 'Could not send test notification');
+      Alert.alert('Error', 'Could not send test notification. Error: ' + error.message);
     }
   };
 

@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     height: 3,
     left: '50%',
-    right: -'50%',
+    right: '50%',
     top: 10,
     zIndex: 0,
   },

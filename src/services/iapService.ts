@@ -19,10 +19,26 @@ export const PRODUCTS = {
 // Initialize IAP module
 export const initializeIAP = async () => {
   try {
+    // First disconnect to ensure we don't have an existing connection
+    try {
+      await InAppPurchases.disconnectAsync();
+      console.log('Disconnected existing IAP connection');
+    } catch (disconnectError) {
+      // Ignore any disconnect errors, just continue
+      console.log('No existing IAP connection to disconnect');
+    }
+
+    // Now we can safely connect
     await InAppPurchases.connectAsync();
     console.log('IAP connection established');
     return true;
   } catch (error) {
+    // Check if the error is just that we're already connected
+    if (error instanceof Error && error.message.includes('Already connected')) {
+      console.log('Already connected to App Store, proceeding with existing connection');
+      return true; // Return true because we do have a connection
+    }
+    
     console.error('Failed to establish IAP connection:', error);
     return false;
   }

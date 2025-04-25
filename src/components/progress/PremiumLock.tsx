@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import SubscriptionModal from '../SubscriptionModal';
 import { useGamification, gamificationEvents, XP_UPDATED_EVENT } from '../../hooks/progress/useGamification';
 
 interface PremiumLockProps {
@@ -96,10 +95,7 @@ const PremiumLock: React.FC<PremiumLockProps> = ({
         <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
       </TouchableOpacity>
       
-      <SubscriptionModal 
-        visible={subscriptionModalVisible}
-        onClose={onCloseSubscription}
-      />
+  
     </View>
   );
 };
