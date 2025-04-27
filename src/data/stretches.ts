@@ -123,7 +123,7 @@ const stretches: Stretch[] = [
   {
     id: 10,
     name: "Wall Calf Stretch",
-    description: "Stand facing a wall with one foot back, heel down, and lean forward to stretch the calf, aiding leg flexibility. Hold for 30 seconds per side.",
+    description: "Stand facing a wall or desk with one foot back, heel down, and lean forward to stretch the calf, aiding leg flexibility. Hold for 30 seconds per side.",
     duration: 30,
     bilateral: true,
     premium: false,
@@ -212,7 +212,7 @@ const stretches: Stretch[] = [
   {
     id: 17,
     name: "Side Lunge with Desk Support",
-    description: "Hold your desk, step into a wide side lunge, and lower your hips to stretch the inner thighs. Hold for 30 seconds per side.",
+    description: "Hold your desk or chair, step into a wide side lunge, and lower your hips to stretch the inner thighs. Hold for 30 seconds per side.",
     duration: 30,
     bilateral: true,
     premium: false,
@@ -222,8 +222,8 @@ const stretches: Stretch[] = [
   },
   {
     id: 18,
-    name: "Chair Hip Opener",
-    description: "Sit at the edge of your chair, place one foot flat, rest the other ankle on your knee, lean forward slightly to stretch the hip. Hold for 30 seconds per side.",
+    name: "Seated Piriformis Stretch",
+    description: "Sit at the edge of a chair with one foot flat on the floor. Cross the other ankle over your opposite thigh. Grasp the knee of the crossed leg and gently pull it toward the opposite shoulder to stretch the glute. Hold for 30 seconds per side.",
     duration: 30,
     bilateral: true,
     premium: false,
@@ -233,8 +233,8 @@ const stretches: Stretch[] = [
   },
   {
     id: 19,
-    name: "Standing Towel Hip Stretch",
-    description: "Stand, loop a towel around one thigh, lift the leg forward, and pull gently to stretch the hip flexors. Hold for 30 seconds per side.",
+    name: "Standing Supported Hip Stretch",
+    description: "Stand and loop a belt or towel around the back of one thigh. Lift the leg in front of you, then gently open the hip by moving the leg slightly out to the side while pulling up on the strap to stretch the hip flexors. Hold for 30 seconds per side.",
     duration: 30,
     bilateral: true,
     premium: false,
@@ -270,7 +270,7 @@ const stretches: Stretch[] = [
   {
     id: 22,
     name: "Deep Desk Squat Stretch",
-    description: "Hold your desk, lower into a deep squat, press knees outward with elbows for a challenging hip and groin stretch. Hold for 30 seconds.",
+    description: "Hold your desk or chair, lower into a deep squat, feet wider than hips, knees outward for a deep hip and groin stretch. Hold for 30 seconds.",
     duration: 30,
     bilateral: false,
     premium: false,
@@ -280,8 +280,8 @@ const stretches: Stretch[] = [
   },
   {
     id: 23,
-    name: "Split Prep with Desk",
-    description: "Face your desk, place one foot up high, lean forward to deeply stretch the hamstrings and hips. Hold for 30 seconds per side.",
+    name: "Chair Hamstring Stretch",
+    description: "Sit at the edge of your chair, cross one ankle over the opposite knee, lean forward slightly to stretch the hamstrings. Hold for 30 seconds per side.",
     duration: 30,
     bilateral: true,
     premium: true,
@@ -442,7 +442,7 @@ const stretches: Stretch[] = [
   {
     id: 35,
     name: "Standing Desk Lean",
-    description: "Place hands on your desk, step back, and hinge at the hips to stretch the lower back and hamstrings. Hold for 30 seconds.",
+    description: "Step back from your desk, place your hands on it, set your feet wider than hip-width, hinge at the hips, and drop your torso to stretch your lower back and hamstrings. Hold for 30 seconds.",
     duration: 30,
     bilateral: false,
     premium: false,
@@ -464,7 +464,7 @@ const stretches: Stretch[] = [
   {
     id: 37,
     name: "Standing Pelvic Tilt",
-    description: "Stand with hands on hips, tilt pelvis forward and back to gently stretch and mobilize the lower back. Perform for 30 seconds.",
+    description: "Stand with both hands on the back of your head, tilt pelvis forward and back to gently stretch and mobilize the lower back. Perform for 30 seconds.",
     duration: 30,
     bilateral: false,
     premium: false,
@@ -478,7 +478,7 @@ const stretches: Stretch[] = [
   {
     id: 38,
     name: "Desk-Supported Child's Pose",
-    description: "Place hands on your desk, step back, lower chest toward the floor to stretch the lower back. Hold for 30 seconds.",
+    description: "Sit in your chair, place your hands on the desk, roll the chair back as you lower your chest toward the floor to stretch your lower back. Hold for 30 seconds.",
     duration: 30,
     bilateral: false,
     premium: false,
@@ -489,7 +489,7 @@ const stretches: Stretch[] = [
   {
     id: 39,
     name: "Seated Lower Back Twist",
-    description: "Sit tall, hold your chair armrest, twist torso to one side to stretch the lower back and obliques. Hold for 30 seconds per side.",
+    description: "Sit tall in a chair with one ankle resting on the opposite thigh. Place the opposite hand on the ankle for support. Twist your torso toward the bent knee to stretch your lower back and obliques. Hold for 30 seconds per side.",
     duration: 30,
     bilateral: true,
     premium: false,
@@ -524,7 +524,7 @@ const stretches: Stretch[] = [
   {
     id: 42,
     name: "Thoracic Extension",
-    description: "Sit or stand, hands behind head, gently arch your upper back to stretch the rhomboids and relieve hunching. Hold for 15 seconds.",
+    description: "Sit or stand with your hands behind your head. Gently arch and return to neutral, moving back and forth to stretch the upper back and relieve hunching. Repeat for 15 seconds.",
     duration: 15,
     bilateral: false,
     premium: false,
@@ -534,8 +534,8 @@ const stretches: Stretch[] = [
   },
   {
     id: 43,
-    name: "Doorway Chest Stretch",
-    description: "Stand in a doorway, arms on the frame, step forward to open the chest and shoulders, counteracting slouching. Hold for 30 seconds.",
+    name: "Doorway or Corner Chest Stretch",
+    description: "Stand in a doorway or corner with your arms placed on the walls. Step forward slightly to open the chest and shoulders, helping counteract slouching. Hold for 30 seconds.",
     duration: 30,
     bilateral: false,
     premium: false,

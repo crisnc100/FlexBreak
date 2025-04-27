@@ -1,21 +1,10 @@
-import * as InAppPurchases from 'expo-in-app-purchases';
+// TEMPORARY MOCK VERSION OF IAP SERVICE
+// Remove dependency on expo-in-app-purchases
+// import * as InAppPurchases from 'expo-in-app-purchases';
 import { Platform } from 'react-native';
 import * as storageService from './storageService';
 
-// Define types for IAP responses to help TypeScript
-interface IAPPurchaseResult {
-  responseCode: number;
-  results: Array<{
-    productId: string;
-    transactionId?: string;
-    originalOrderId?: string;
-    purchaseToken?: string;
-    purchaseTime?: number;
-    [key: string]: any;
-  }>;
-}
-
-// Define subscription product IDs
+// Define product IDs (using proper App Store IDs)
 export const PRODUCTS = {
   MONTHLY_SUB: Platform.select({
     ios: 'flexbreak_monthly_4.99',
@@ -33,6 +22,7 @@ export const PRODUCTS = {
 export const initializeIAP = async () => {
   try {
     // First disconnect to ensure we don't have an existing connection
+    /*
     try {
       await InAppPurchases.disconnectAsync();
       console.log('Disconnected existing IAP connection');
@@ -43,15 +33,10 @@ export const initializeIAP = async () => {
 
     // Now we can safely connect
     await InAppPurchases.connectAsync();
-    console.log('IAP connection established');
+    */
+    console.log('[MOCK] IAP connection established');
     return true;
   } catch (error) {
-    // Check if the error is just that we're already connected
-    if (error instanceof Error && error.message.includes('Already connected')) {
-      console.log('Already connected to App Store, proceeding with existing connection');
-      return true; // Return true because we do have a connection
-    }
-    
     console.error('Failed to establish IAP connection:', error);
     return false;
   }
@@ -60,8 +45,8 @@ export const initializeIAP = async () => {
 // Disconnect IAP
 export const disconnectIAP = async () => {
   try {
-    await InAppPurchases.disconnectAsync();
-    console.log('IAP connection closed');
+    // await InAppPurchases.disconnectAsync();
+    console.log('[MOCK] IAP connection closed');
   } catch (error) {
     console.error('Failed to disconnect IAP:', error);
   }
@@ -74,10 +59,27 @@ export const getProducts = async () => {
     console.log('Requesting products with IDs:', productIDs);
     
     // Add a small delay before getProductsAsync to ensure connection is ready
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // await new Promise(resolve => setTimeout(resolve, 500));
     
-    const { results } = await InAppPurchases.getProductsAsync(productIDs);
-    console.log('IAP products loaded:', results);
+    // const { results } = await InAppPurchases.getProductsAsync(productIDs);
+    // Mock products for testing
+    const results = [
+      {
+        productId: PRODUCTS.MONTHLY_SUB,
+        title: 'Monthly Premium',
+        price: '$4.99',
+        priceAmountMicros: 4990000,
+        priceCurrencyCode: 'USD'
+      },
+      {
+        productId: PRODUCTS.YEARLY_SUB,
+        title: 'Yearly Premium',
+        price: '$44.99',
+        priceAmountMicros: 44990000,
+        priceCurrencyCode: 'USD'
+      }
+    ];
+    console.log('[MOCK] IAP products loaded:', results);
     return results;
   } catch (error) {
     console.error('Failed to get products:', error);
@@ -105,16 +107,18 @@ const formatSubscriptionDetails = (purchase: any) => {
     isActive: true,
     autoRenewing: true,
     platform: (Platform.OS === 'ios' ? 'ios' : 'android') as 'ios' | 'android',
-    purchaseToken: purchase.transactionId || purchase.originalOrderId || purchase.purchaseToken,
+    purchaseToken: purchase.transactionId || purchase.originalOrderId || purchase.purchaseToken || 'mock-token',
   };
 };
 
 // Purchase subscription
 export const purchaseSubscription = async (productId: string, updateSubscription: Function) => {
   try {
-    console.log(`Initiating purchase for ${productId}`);
+    console.log(`[MOCK] Initiating purchase for ${productId}`);
+    
+    /*
     // Cast to our defined type to fix TypeScript errors
-    const result = await InAppPurchases.purchaseItemAsync(productId) as unknown as IAPPurchaseResult | null;
+    const result = await InAppPurchases.purchaseItemAsync(productId);
     
     // Handle case where result might be null
     if (!result) {
@@ -148,8 +152,31 @@ export const purchaseSubscription = async (productId: string, updateSubscription
     }
     
     return { success: false, responseCode };
+    */
+    
+    // Mock a successful purchase
+    const mockPurchase = {
+      productId: productId,
+      transactionId: 'mock-transaction-' + Date.now(),
+      transactionDate: new Date().toISOString()
+    };
+    
+    // Format subscription details
+    const subscriptionDetails = formatSubscriptionDetails(mockPurchase);
+    
+    // Update subscription details and premium status
+    if (updateSubscription) {
+      await updateSubscription(subscriptionDetails);
+    } else {
+      // Fallback to old method if context function not available
+      await storageService.saveSubscriptionDetails(subscriptionDetails);
+      await storageService.saveIsPremium(true);
+    }
+    
+    console.log('[MOCK] Purchase successful');
+    return { success: true, purchase: mockPurchase, subscriptionDetails };
   } catch (error) {
-    console.error('Error during purchase:', error);
+    console.error('[MOCK] Error during purchase:', error);
     return { success: false, error };
   }
 };
@@ -157,9 +184,11 @@ export const purchaseSubscription = async (productId: string, updateSubscription
 // Restore purchases
 export const restorePurchases = async (updateSubscription: Function) => {
   try {
-    console.log('Restoring purchases...');
+    console.log('[MOCK] Restoring purchases...');
+    
+    /*
     // Cast to our defined type to fix TypeScript errors
-    const result = await InAppPurchases.getPurchaseHistoryAsync() as unknown as IAPPurchaseResult | null;
+    const result = await InAppPurchases.getPurchaseHistoryAsync();
     
     // Handle case where result might be null
     if (!result) {
@@ -208,8 +237,12 @@ export const restorePurchases = async (updateSubscription: Function) => {
     }
     
     return { success: false, responseCode };
+    */
+    
+    console.log('[MOCK] No previous purchases found');
+    return { success: true, hasPurchases: false };
   } catch (error) {
-    console.error('Error restoring purchases:', error);
+    console.error('[MOCK] Error restoring purchases:', error);
     return { success: false, error };
   }
 };

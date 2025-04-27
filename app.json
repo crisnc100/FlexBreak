@@ -21,18 +21,20 @@
     },
     "web": {},
     "plugins": [
-      [
-        "expo-notifications",
-        {
-          "color": "#ffffff"
-        }
-      ]
+      "expo-dev-client"
     ],
     "extra": {
       "eas": {
         "projectId": "e2f2f0ca-229d-4469-9de8-9f69b7f7a724"
       }
     },
-    "owner": "crisnc100"
+    "owner": "crisnc100",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e2f2f0ca-229d-4469-9de8-9f69b7f7a724"
+    },
+    "scheme": "flexbreak-app"
   }
 }
