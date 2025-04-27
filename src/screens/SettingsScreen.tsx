@@ -606,21 +606,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => navigation.navigate && navigation.navigate('TestNotifications')}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
-                  <Ionicons name="notifications-outline" size={22} color={theme.accent} />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Test Notifications</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Test different types of notifications</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.settingItem, styles.lastItem]}

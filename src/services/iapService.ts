@@ -2,17 +2,30 @@ import * as InAppPurchases from 'expo-in-app-purchases';
 import { Platform } from 'react-native';
 import * as storageService from './storageService';
 
+// Define types for IAP responses to help TypeScript
+interface IAPPurchaseResult {
+  responseCode: number;
+  results: Array<{
+    productId: string;
+    transactionId?: string;
+    originalOrderId?: string;
+    purchaseToken?: string;
+    purchaseTime?: number;
+    [key: string]: any;
+  }>;
+}
+
 // Define subscription product IDs
 export const PRODUCTS = {
   MONTHLY_SUB: Platform.select({
-    ios: 'com.cristianortega.flexbreak.monthly',
-    android: 'com.cristianortega.flexbreak.monthly',
-    default: 'com.cristianortega.flexbreak.monthly',
+    ios: 'flexbreak_monthly_4.99',
+    android: 'flexbreak_monthly_4.99',
+    default: 'flexbreak_monthly_4.99',
   }),
   YEARLY_SUB: Platform.select({
-    ios: 'com.cristianortega.flexbreak.yearly',
-    android: 'com.cristianortega.flexbreak.yearly',
-    default: 'com.cristianortega.flexbreak.yearly',
+    ios: 'flexbreak_yearly_44.99',
+    android: 'flexbreak_yearly_44.99',
+    default: 'flexbreak_yearly_44.99',
   }),
 };
 
@@ -58,6 +71,11 @@ export const disconnectIAP = async () => {
 export const getProducts = async () => {
   try {
     const productIDs = Object.values(PRODUCTS);
+    console.log('Requesting products with IDs:', productIDs);
+    
+    // Add a small delay before getProductsAsync to ensure connection is ready
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     const { results } = await InAppPurchases.getProductsAsync(productIDs);
     console.log('IAP products loaded:', results);
     return results;
@@ -68,7 +86,7 @@ export const getProducts = async () => {
 };
 
 // Format purchase data into subscription details
-const formatSubscriptionDetails = (purchase) => {
+const formatSubscriptionDetails = (purchase: any) => {
   const now = new Date();
   // Default to 1 month expiry if not specified
   let expiryDate = new Date(now);
@@ -92,11 +110,13 @@ const formatSubscriptionDetails = (purchase) => {
 };
 
 // Purchase subscription
-export const purchaseSubscription = async (productId, updateSubscription) => {
+export const purchaseSubscription = async (productId: string, updateSubscription: Function) => {
   try {
     console.log(`Initiating purchase for ${productId}`);
-    const result = await InAppPurchases.purchaseItemAsync(productId);
-    // Handle case where result might be void
+    // Cast to our defined type to fix TypeScript errors
+    const result = await InAppPurchases.purchaseItemAsync(productId) as unknown as IAPPurchaseResult | null;
+    
+    // Handle case where result might be null
     if (!result) {
       return { success: false, error: 'No result from purchase' };
     }
@@ -106,7 +126,8 @@ export const purchaseSubscription = async (productId, updateSubscription) => {
     if (responseCode === InAppPurchases.IAPResponseCode.OK) {
       console.log('Purchase successful:', results);
       
-      if (results.length > 0) {
+      // Check if results is an array with items
+      if (Array.isArray(results) && results.length > 0) {
         // Handle purchase verification (receipt validation would typically go here)
         const purchase = results[0];
         
@@ -134,11 +155,13 @@ export const purchaseSubscription = async (productId, updateSubscription) => {
 };
 
 // Restore purchases
-export const restorePurchases = async (updateSubscription) => {
+export const restorePurchases = async (updateSubscription: Function) => {
   try {
     console.log('Restoring purchases...');
-    const result = await InAppPurchases.getPurchaseHistoryAsync();
-    // Handle case where result might be void
+    // Cast to our defined type to fix TypeScript errors
+    const result = await InAppPurchases.getPurchaseHistoryAsync() as unknown as IAPPurchaseResult | null;
+    
+    // Handle case where result might be null
     if (!result) {
       return { success: false, error: 'No result from restore purchases' };
     }
@@ -147,6 +170,11 @@ export const restorePurchases = async (updateSubscription) => {
     
     if (responseCode === InAppPurchases.IAPResponseCode.OK) {
       console.log('Restored purchases:', results);
+      
+      // Ensure results is an array before proceeding
+      if (!Array.isArray(results)) {
+        return { success: true, hasPurchases: false };
+      }
       
       // Check if any valid subscription exists
       const validSubscriptions = results.filter(purchase => 
