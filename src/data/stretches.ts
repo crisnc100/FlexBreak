@@ -190,7 +190,10 @@ const stretches: Stretch[] = [
     premium: false,
     tags: ["Hips & Legs"],
     level: "beginner",
-    image: { uri: 'https://via.placeholder.com/200/2196F3/FFFFFF?text=Seated+Pigeon+Stretch' },
+    image: markAsVideo(require('../../assets/stretchData/seated_pigeon_id15_office/image.mp4')),
+    hasDemo: true,
+    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/seated_pigeon_id15_office/video.mp4' },
+    demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/seated_pigeon_id15_office/audio.mp3' },
   },
   {
     id: 16,
