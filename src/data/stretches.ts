@@ -28,8 +28,8 @@ const stretches: Stretch[] = [
     level: "beginner",
     image: markAsVideo(require('../../assets/stretchData/id2_standing_quad_office/image.mp4')),
     hasDemo: true,
-    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id2_standing_quad_office/video.mp4' },
-    demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id2_standing_quad_office/audio.mp3' },
+    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id2_standing_quad_office/video.mp4' },
+    demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id2_standing_quad_office/audio.mp3' },
   },
   {
     id: 3,
@@ -204,8 +204,8 @@ const stretches: Stretch[] = [
     level: "beginner",
     image: markAsVideo(require('../../assets/stretchData/id15_seated_pigeon_office/image.mp4')),
     hasDemo: true,
-    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id15_seated_pigeon_office/video.mp4' },
-    demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id15_seated_pigeon_office/audio.mp3' },
+    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id15_seated_pigeon_office/video.mp4' },
+    demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id15_seated_pigeon_office/audio.mp3' },
   },
   {
     id: 16,
