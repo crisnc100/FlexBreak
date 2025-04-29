@@ -23,21 +23,56 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [hasSynchronized, setHasSynchronized] = useState(false);
 
+  // Log routines when they change
+  useEffect(() => {
+    if (recentRoutines.length > 0) {
+      console.log('[HOOK DEBUG] Recent routines updated in state:', recentRoutines.length);
+      
+      // Log dates for all routines
+      const sortedDates = recentRoutines
+        .map(r => r.date?.split('T')[0])
+        .filter(Boolean)
+        .sort();
+      
+      console.log('[HOOK DEBUG] Recent routine dates in state:', JSON.stringify(sortedDates));
+      
+      // Log dates for routines in the current month
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      
+      const thisMonthDates = recentRoutines
+        .filter(r => {
+          if (!r.date) return false;
+          const routineDate = new Date(r.date);
+          return routineDate.getMonth() === currentMonth && 
+                 routineDate.getFullYear() === currentYear;
+        })
+        .map(r => r.date?.split('T')[0])
+        .sort();
+      
+      console.log(`[HOOK DEBUG] Routines this month (${currentMonth + 1}/${currentYear}):`, 
+                 thisMonthDates.length, JSON.stringify(thisMonthDates));
+    }
+  }, [recentRoutines]);
+
   // Load recent routines on mount
   useEffect(() => {
     const loadRoutines = async () => {
       try {
+        console.log('[HOOK DEBUG] Loading routines from storage...');
         const routines = await getRecentRoutines();
         setRecentRoutines(routines);
-        console.log('Loaded routines:', routines.length);
+        console.log('[HOOK DEBUG] Loaded routines:', routines.length);
         
         // Synchronize data between storage locations (only once)
         if (!hasSynchronized) {
+          console.log('[HOOK DEBUG] Starting initial data synchronization...');
           await synchronizeProgressData();
           setHasSynchronized(true);
         }
       } catch (error) {
-        console.error('Error loading routines:', error);
+        console.error('[HOOK ERROR] Error loading routines:', error);
       } finally {
         setIsLoading(false);
       }
@@ -49,18 +84,31 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Synchronize data between storage locations
   const synchronizeProgressData = useCallback(async () => {
     try {
+      console.log('[HOOK DEBUG] Synchronizing progress data...');
+      
       // Use the centralized function from storageService
       const success = await storageService.synchronizeProgressData();
       
       if (success) {
+        console.log('[HOOK DEBUG] Synchronization successful, refreshing recent routines...');
         // Refresh recent routines after synchronization
         const updatedRoutines = await storageService.getRecentRoutines();
         setRecentRoutines(updatedRoutines);
+        
+        // Log dates for synced routines
+        const syncedDates = updatedRoutines
+          .map(r => r.date?.split('T')[0])
+          .filter(Boolean)
+          .sort();
+        
+        console.log('[HOOK DEBUG] Synced routine dates:', JSON.stringify(syncedDates));
+      } else {
+        console.log('[HOOK DEBUG] Synchronization failed or no changes made');
       }
       
       return success;
     } catch (error) {
-      console.error('Error calling synchronizeProgressData:', error);
+      console.error('[HOOK ERROR] Error calling synchronizeProgressData:', error);
       return false;
     }
   }, []);
@@ -68,18 +116,30 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Save routine progress
   const saveRoutineProgress = useCallback(async (entry: { area: BodyArea; duration: Duration; date: string }) => {
     try {
-      console.log('Saving routine progress:', entry);
+      console.log('[HOOK DEBUG] Saving routine progress:', JSON.stringify(entry));
+      console.log(`[HOOK DEBUG] Routine date: ${entry.date.split('T')[0]}`);
       
       // Use storageService instead of direct AsyncStorage calls
       const success = await storageService.saveRoutineProgress(entry);
       
       if (success) {
+        console.log('[HOOK DEBUG] Routine saved successfully, refreshing data...');
         // Update local state
         const updatedRoutines = await storageService.getRecentRoutines();
         setRecentRoutines(updatedRoutines);
+        
+        // Log updated routine dates after save
+        const updatedDates = updatedRoutines
+          .map(r => r.date?.split('T')[0])
+          .filter(Boolean)
+          .sort();
+        
+        console.log('[HOOK DEBUG] Updated routine dates after save:', JSON.stringify(updatedDates));
+      } else {
+        console.log('[HOOK DEBUG] Failed to save routine progress');
       }
     } catch (error) {
-      console.error('Error saving routine progress:', error);
+      console.error('[HOOK ERROR] Error saving routine progress:', error);
       throw error;
     }
   }, []);
@@ -87,15 +147,39 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Get recent routines (only visible ones)
   const getRecentRoutines = useCallback(async (): Promise<ProgressEntry[]> => {
     try {
+      console.log('[HOOK DEBUG] Fetching recent routines from storage...');
+      
       // Use storageService instead of direct AsyncStorage calls
       const freshRoutines = await storageService.getRecentRoutines();
+      
+      // Log the retrieved routine dates
+      const retrievedDates = freshRoutines
+        .map(r => r.date?.split('T')[0])
+        .filter(Boolean)
+        .sort();
+      
+      console.log('[HOOK DEBUG] Retrieved routine dates:', JSON.stringify(retrievedDates));
+      
+      // Check for today and yesterday dates
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      
+      const hasToday = retrievedDates.includes(todayStr);
+      const hasYesterday = retrievedDates.includes(yesterdayStr);
+      
+      console.log(`[HOOK DEBUG] Has routine for today (${todayStr}): ${hasToday}`);
+      console.log(`[HOOK DEBUG] Has routine for yesterday (${yesterdayStr}): ${hasYesterday}`);
       
       // Update local state with fresh data
       setRecentRoutines(freshRoutines);
       
       return freshRoutines;
     } catch (error) {
-      console.error('Error getting recent routines:', error);
+      console.error('[HOOK ERROR] Error getting recent routines:', error);
       return [];
     }
   }, []);
@@ -171,10 +255,39 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Get all routines (both visible and hidden) for statistics
   const getAllRoutines = useCallback(async (): Promise<ProgressEntry[]> => {
     try {
+      console.log('[HOOK DEBUG] Fetching all routines from storage...');
+      
       // Use storageService instead of direct AsyncStorage calls
-      return await storageService.getAllRoutines();
+      const allRoutines = await storageService.getAllRoutines();
+      
+      // Log all routine dates
+      const allDates = allRoutines
+        .map(r => r.date?.split('T')[0])
+        .filter(Boolean)
+        .sort();
+      
+      console.log('[HOOK DEBUG] All routine dates:', JSON.stringify(allDates));
+      
+      // Count routines by month for the current year
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      
+      const routinesByMonth = Array(12).fill(0);
+      
+      allRoutines.forEach(routine => {
+        if (routine.date) {
+          const routineDate = new Date(routine.date);
+          if (routineDate.getFullYear() === currentYear) {
+            routinesByMonth[routineDate.getMonth()]++;
+          }
+        }
+      });
+      
+      console.log(`[HOOK DEBUG] Routines by month for ${currentYear}:`, JSON.stringify(routinesByMonth));
+      
+      return allRoutines;
     } catch (error) {
-      console.error('Error getting all routines:', error);
+      console.error('[HOOK ERROR] Error getting all routines:', error);
       return [];
     }
   }, []);

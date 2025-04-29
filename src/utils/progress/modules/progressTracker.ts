@@ -1,6 +1,8 @@
 import { ProgressEntry } from '../../../types';
 import * as dateUtils from './utils/dateUtils';
 
+// For converting ISO date strings to local YYYY-MM-DD format, use dateUtils.toDateString
+
 /**
  * Calculates the current streak from a list of routines
  * This method handles basic streak calculation, not streak freeze logic
@@ -14,16 +16,14 @@ export const calculateStreak = (routines: ProgressEntry[]): number => {
     return 0;
   }
   
-  // Get unique dates from routines
+  // Get unique dates from routines, using local dates instead of UTC
   const uniqueDates = Array.from(
     new Set(
       routines
         .filter(r => r.date)
-        .map(r => r.date!.split('T')[0]) // Take only the date part
+        .map(r => dateUtils.toDateString(r.date!)) // Use dateUtils.toDateString instead of convertToLocalDateStr
     )
   ).sort().reverse(); // Sort in descending order (newest first)
-  
-  console.log(`Calculating basic streak from ${uniqueDates.length} unique dates`);
   
   // If no dates, return 0
   if (uniqueDates.length === 0) {
@@ -67,11 +67,12 @@ export const calculateWeeklyActivity = (data: ProgressEntry[]) => {
   const sevenDaysAgo = new Date(today);
   sevenDaysAgo.setDate(today.getDate() - 6); // Go back 6 days to include today
   
-  console.log('Calculating weekly activity from', sevenDaysAgo.toISOString(), 'to', today.toISOString());
+  // Count entries within range for validation
+  let entriesInRange = 0;
   
   // Process each routine entry
   data.forEach(entry => {
-    // Parse the entry date and set to midnight
+    // Parse the entry date using local time, not UTC
     const entryDate = new Date(entry.date);
     entryDate.setHours(0, 0, 0, 0);
     
@@ -79,6 +80,8 @@ export const calculateWeeklyActivity = (data: ProgressEntry[]) => {
     if (entryDate >= sevenDaysAgo && entryDate <= today) {
       // Calculate days difference from today
       const daysDiff = Math.floor((today.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      entriesInRange++;
       
       // Increment the count for this day
       if (daysDiff >= 0 && daysDiff < 7) {
@@ -90,7 +93,6 @@ export const calculateWeeklyActivity = (data: ProgressEntry[]) => {
   // Reverse the array so it's in chronological order (oldest to newest)
   const result = [...last7Days].reverse();
   
-  console.log('Weekly activity data:', result);
   return result;
 };
 
@@ -101,9 +103,13 @@ export const calculateDayOfWeekActivity = (data: ProgressEntry[]) => {
   // Initialize array for days of week (0 = Monday, 1 = Tuesday, ..., 6 = Sunday)
   const daysOfWeek = Array(7).fill(0);
   
+  // Count how many entries we successfully process
+  let processedEntries = 0;
+  
   // Process each routine entry
   data.forEach(entry => {
     try {
+      // Use local date to get the day of week to ensure correct day attribution
       const date = new Date(entry.date);
       
       // Convert JavaScript day (0 = Sunday, 1 = Monday, ...) to our format (0 = Monday, ..., 6 = Sunday)
@@ -112,12 +118,13 @@ export const calculateDayOfWeekActivity = (data: ProgressEntry[]) => {
       
       // Increment the count for this day of week
       daysOfWeek[adjustedDayOfWeek]++;
+      
+      processedEntries++;
     } catch (error) {
-      console.error('Error processing date:', entry.date, error);
+      // Silent fail
     }
   });
   
-  console.log('Day of week activity data:', daysOfWeek);
   return daysOfWeek;
 };
 
@@ -125,20 +132,29 @@ export const calculateDayOfWeekActivity = (data: ProgressEntry[]) => {
  * Calculate active days over the last 30 days
  */
 export const calculateActiveDays = (data: ProgressEntry[]) => {
-  if (data.length === 0) return 0;
+  if (data.length === 0) {
+    return 0;
+  }
   
   const today = new Date().setHours(0, 0, 0, 0);
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29); // 30 days including today
   const thirtyDaysAgoTimestamp = thirtyDaysAgo.setHours(0, 0, 0, 0);
   
-  // Get unique dates in the last 30 days
+  // Get unique dates in the last 30 days, using local dates for consistent day attribution
   const uniqueDates = new Set();
   
+  // Track which dates were found
+  const foundDates: string[] = [];
+  
   data.forEach(entry => {
-    const entryDate = new Date(entry.date).setHours(0, 0, 0, 0);
+    // Convert the entry date to local time for consistency
+    const localDateStr = dateUtils.toDateString(entry.date);
+    const entryDate = new Date(localDateStr).setHours(0, 0, 0, 0);
+    
     if (entryDate >= thirtyDaysAgoTimestamp && entryDate <= today) {
       uniqueDates.add(entryDate);
+      foundDates.push(localDateStr);
     }
   });
   
@@ -181,14 +197,16 @@ export const getWeeklyActivityDateRange = () => {
     return `${month}/${day}`;
   };
   
-  return `${formatDate(sevenDaysAgo)} - ${formatDate(today)}`;
+  const result = `${formatDate(sevenDaysAgo)} - ${formatDate(today)}`;
+  return result;
 };
 
 /**
  * Calculate consistency percentage
  */
 export const getConsistencyPercentage = (activeDays: number) => {
-  return Math.round((activeDays / 30) * 100);
+  const result = Math.round((activeDays / 30) * 100);
+  return result;
 };
 
 /**
@@ -233,12 +251,17 @@ export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: 
     new Set([...routineDates, ...freezeDates])
   ).sort().reverse(); // Sort in descending order (newest first)
   
-  console.log(`Calculating streak from ${uniqueDates.length} unique dates (${routineDates.length} routines, ${freezeDates.length} freezes)`);
-  
   // If no dates, return 0
   if (uniqueDates.length === 0) {
     return 0;
   }
+  
+  // Today and yesterday check for debugging
+  const today = new Date();
+  const todayStr = dateUtils.formatDateYYYYMMDD(today);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
   
   // Count consecutive days starting from most recent date
   let streakCount = 1;  // Start with 1 for the most recent date
@@ -258,6 +281,10 @@ export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: 
       break;
     }
   }
+  
+  // Also check for streak-breaking gaps from today
+  const mostRecentDate = new Date(uniqueDates[0]);
+  const daysSinceLastActivity = dateUtils.daysBetween(mostRecentDate, new Date());
   
   return streakCount;
 }; 

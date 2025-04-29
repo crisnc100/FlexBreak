@@ -16,18 +16,24 @@ const MAX_FREEZES = 2;
  */
 export const isFreezeAvailable = async (): Promise<boolean> => {
   try {
+    console.log('[FREEZE DEBUG] Checking if streak freeze is available');
+    
     // First, check if user has access to streak freezes feature
     const hasAccess = await featureAccessUtils.canAccessFeature('streak_freezes');
     if (!hasAccess) {
-      console.log('User does not have access to streak freezes feature');
+      console.log('[FREEZE DEBUG] User does not have access to streak freezes feature');
       return false;
     }
     
     // Get streak status which includes freezes available
     const streakStatus = await simpleStreakManager.getStreakStatus();
-    return streakStatus.canFreeze && streakStatus.freezesAvailable > 0;
+    const isAvailable = streakStatus.canFreeze && streakStatus.freezesAvailable > 0;
+    
+    console.log(`[FREEZE DEBUG] Freeze availability check: canFreeze=${streakStatus.canFreeze}, freezesAvailable=${streakStatus.freezesAvailable}, isAvailable=${isAvailable}`);
+    
+    return isAvailable;
   } catch (error) {
-    console.error('Error checking streak freeze availability:', error);
+    console.error('[FREEZE ERROR] Error checking streak freeze availability:', error);
     return false;
   }
 };
@@ -36,6 +42,8 @@ export const isFreezeAvailable = async (): Promise<boolean> => {
  * Check if a streak freeze was applied for a specific date
  */
 export const wasStreakFreezeAppliedForDate = async (dateStr: string): Promise<boolean> => {
+  console.log(`[FREEZE DEBUG] Checking if freeze was applied for date: ${dateStr}`);
+  
   // Make sure streak manager is initialized
   if (!simpleStreakManager.streakCache.initialized) {
     await simpleStreakManager.initializeStreak();
@@ -47,18 +55,23 @@ export const wasStreakFreezeAppliedForDate = async (dateStr: string): Promise<bo
     const userProgress = await storageService.getUserProgress();
     const freezeDates = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.appliedDates || [];
     
+    console.log(`[FREEZE DEBUG] Freeze dates from storage: ${JSON.stringify(freezeDates)}`);
+    
     if (freezeDates.includes(dateStr)) {
       // Sync the cache if there's a discrepancy
-      console.log(`Found freeze date ${dateStr} in storage but not in cache, syncing...`);
+      console.log(`[FREEZE DEBUG] Found freeze date ${dateStr} in storage but not in cache, syncing...`);
       simpleStreakManager.streakCache.freezeDates = [...freezeDates];
       return true;
     }
     
+    console.log(`[FREEZE DEBUG] No freeze found for date ${dateStr}`);
     return false;
   }
   
   // Check the freeze dates in the streak cache
-  return simpleStreakManager.streakCache.freezeDates.includes(dateStr);
+  const result = simpleStreakManager.streakCache.freezeDates.includes(dateStr);
+  console.log(`[FREEZE DEBUG] Freeze for date ${dateStr}: ${result ? 'FOUND' : 'NOT FOUND'}`);
+  return result;
 };
 
 /**
@@ -74,13 +87,18 @@ export const wasStreakFreezeAppliedRecently = async (): Promise<boolean> => {
     const todayStr = dateUtils.formatDateYYYYMMDD(today);
     const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
     
+    console.log(`[FREEZE DEBUG] Checking if freeze was applied recently (${todayStr} or ${yesterdayStr})`);
+    
     // Check if a freeze was applied for either day
     const appliedToday = await wasStreakFreezeAppliedForDate(todayStr);
     const appliedYesterday = await wasStreakFreezeAppliedForDate(yesterdayStr);
     
-    return appliedToday || appliedYesterday;
+    const result = appliedToday || appliedYesterday;
+    console.log(`[FREEZE DEBUG] Recent freeze check: today=${appliedToday}, yesterday=${appliedYesterday}, result=${result}`);
+    
+    return result;
   } catch (error) {
-    console.error('Error checking if streak freeze was applied recently:', error);
+    console.error('[FREEZE ERROR] Error checking if streak freeze was applied recently:', error);
     return false;
   }
 };
@@ -90,6 +108,8 @@ export const wasStreakFreezeAppliedRecently = async (): Promise<boolean> => {
  */
 export const getFreezesAvailable = async (): Promise<number> => {
   try {
+    console.log('[FREEZE DEBUG] Getting available freezes count');
+    
     // Always get the count directly from UserProgress for accuracy
     const userProgress = await storageService.getUserProgress();
     
@@ -99,19 +119,20 @@ export const getFreezesAvailable = async (): Promise<number> => {
       
       // Update the streak manager cache to match
       if (simpleStreakManager.streakCache.freezesAvailable !== storedCount) {
-        console.log(`Updating streak manager cache freeze count from ${simpleStreakManager.streakCache.freezesAvailable} to ${storedCount}`);
+        console.log(`[FREEZE DEBUG] Updating streak manager cache freeze count from ${simpleStreakManager.streakCache.freezesAvailable} to ${storedCount}`);
         simpleStreakManager.streakCache.freezesAvailable = storedCount;
       }
       
-      console.log(`Direct freeze count from storage: ${storedCount}`);
+      console.log(`[FREEZE DEBUG] Direct freeze count from storage: ${storedCount}`);
       return storedCount;
     }
     
     // Fallback to streak manager status
     const streakStatus = await simpleStreakManager.getStreakStatus();
+    console.log(`[FREEZE DEBUG] Fallback freeze count from streak manager: ${streakStatus.freezesAvailable}`);
     return streakStatus.freezesAvailable;
   } catch (error) {
-    console.error('Error getting freezes available:', error);
+    console.error('[FREEZE ERROR] Error getting freezes available:', error);
     return 0;
   }
 };
@@ -126,6 +147,8 @@ export const applyFreeze = async (): Promise<{
   remainingFreezes: number;
 }> => {
   try {
+    console.log('[FREEZE DEBUG] Attempting to apply streak freeze');
+    
     // Apply freeze through the simpleStreakManager with retry for version conflicts
     const result = await simpleStreakManager.applyFreeze();
     
@@ -138,12 +161,15 @@ export const applyFreeze = async (): Promise<{
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
       
+      console.log(`[FREEZE DEBUG] Successfully applied freeze for ${yesterdayStr}, remaining freezes: ${result.remainingFreezes}`);
+      
       return {
         success: true,
         appliedDate: yesterdayStr,
         remainingFreezes: result.remainingFreezes
       };
     } else {
+      console.log(`[FREEZE DEBUG] Failed to apply freeze, remaining freezes: ${result.remainingFreezes}`);
       return {
         success: false,
         appliedDate: '',
@@ -151,7 +177,7 @@ export const applyFreeze = async (): Promise<{
       };
     }
   } catch (error) {
-    console.error('Error applying streak freeze:', error);
+    console.error('[FREEZE ERROR] Error applying streak freeze:', error);
     return {
       success: false,
       appliedDate: '',
@@ -165,10 +191,12 @@ export const applyFreeze = async (): Promise<{
  */
 export const refillFreezes = async (): Promise<boolean> => {
   try {
+    console.log('[FREEZE DEBUG] Checking if freezes need to be refilled');
+    
     // Check if user has access to streak freezes feature
     const hasAccess = await featureAccessUtils.canAccessFeature('streak_freezes');
     if (!hasAccess) {
-      console.log('User does not have access to streak freezes feature');
+      console.log('[FREEZE DEBUG] User does not have access to streak freezes feature');
       return false;
     }
     
@@ -192,12 +220,14 @@ export const refillFreezes = async (): Promise<boolean> => {
     const lastRefillMonth = lastRefill.getMonth();
     const lastRefillYear = lastRefill.getFullYear();
     
+    console.log(`[FREEZE DEBUG] Refill check - Current: ${currentMonth+1}/${currentYear}, Last refill: ${lastRefillMonth+1}/${lastRefillYear}, Current freezes: ${currentFreezes}/${MAX_FREEZES}`);
+    
     // If premium was just gained OR we're in a new month, refill freezes
     const isDifferentMonth = lastRefillMonth !== currentMonth || lastRefillYear !== currentYear;
     const needsRefill = isDifferentMonth && currentFreezes < MAX_FREEZES;
     
     if (needsRefill) {
-      console.log(`Refilling freezes: ${currentFreezes} → ${MAX_FREEZES} for month ${currentMonth + 1}/${currentYear}`);
+      console.log(`[FREEZE DEBUG] Refilling freezes: ${currentFreezes} → ${MAX_FREEZES} for month ${currentMonth + 1}/${currentYear}`);
       
       // Use simpleStreakManager to refill freezes with version checking
       const result = await simpleStreakManager.refillFreezes();
@@ -211,22 +241,23 @@ export const refillFreezes = async (): Promise<boolean> => {
           
           // Save with version check
           await saveUserProgressWithVersionCheck(updatedUserProgress, 'streak_freeze_refill');
+          console.log(`[FREEZE DEBUG] Updated lastRefill date to ${today.toISOString()}`);
         }
         
-        console.log(`Refilled streak freezes to ${MAX_FREEZES} for ${currentMonth + 1}/${currentYear}`);
+        console.log(`[FREEZE DEBUG] Successfully refilled streak freezes to ${MAX_FREEZES} for ${currentMonth + 1}/${currentYear}`);
         return true;
       }
     } else {
       if (currentFreezes >= MAX_FREEZES) {
-        console.log(`Streak freezes already at maximum: ${currentFreezes}/${MAX_FREEZES}`);
+        console.log(`[FREEZE DEBUG] Streak freezes already at maximum: ${currentFreezes}/${MAX_FREEZES}`);
       } else if (!isDifferentMonth) {
-        console.log(`Streak freezes already refilled this month (${currentMonth + 1}/${currentYear})`);
+        console.log(`[FREEZE DEBUG] Streak freezes already refilled this month (${currentMonth + 1}/${currentYear})`);
       }
     }
     
     return false;
   } catch (error) {
-    console.error('Error refilling streak freezes:', error);
+    console.error('[FREEZE ERROR] Error refilling streak freezes:', error);
     return false;
   }
 };
@@ -240,6 +271,6 @@ export const refillMonthlyStreakFreezes = refillFreezes;
 export const getStreakFreezeCount = getFreezesAvailable;
 
 export const wasStreakFreezeUsedForCurrentDay = async (): Promise<boolean> => {
-  console.warn('[DEPRECATED] wasStreakFreezeUsedForCurrentDay is deprecated. Use wasStreakFreezeAppliedRecently instead.');
+  console.warn('[FREEZE WARN] wasStreakFreezeUsedForCurrentDay is deprecated. Use wasStreakFreezeAppliedRecently instead.');
   return wasStreakFreezeAppliedRecently();
 }; 

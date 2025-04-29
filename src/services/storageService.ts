@@ -74,7 +74,6 @@ export const getData = async <T>(key: string, defaultValue: T): Promise<T> => {
     }
     return JSON.parse(jsonValue);
   } catch (error) {
-    console.error(`Error getting data for key ${key}:`, error);
     return defaultValue;
   }
 };
@@ -91,7 +90,6 @@ export const setData = async <T>(key: string, value: T): Promise<boolean> => {
     await AsyncStorage.setItem(key, jsonValue);
     return true;
   } catch (error) {
-    console.error(`Error setting data for key ${key}:`, error);
     return false;
   }
 };
@@ -106,7 +104,6 @@ export const removeData = async (key: string): Promise<boolean> => {
     await AsyncStorage.removeItem(key);
     return true;
   } catch (error) {
-    console.error(`Error removing data for key ${key}:`, error);
     return false;
   }
 };
@@ -119,7 +116,6 @@ export const getAllKeys = async (): Promise<readonly string[]> => {
   try {
     return await AsyncStorage.getAllKeys();
   } catch (error) {
-    console.error('Error getting all keys:', error);
     return [];
   }
 };
@@ -132,7 +128,6 @@ export const getAllKeys = async (): Promise<readonly string[]> => {
  * @returns Success boolean
  */
 export const saveIsPremium = async (isPremium: boolean): Promise<boolean> => {
-  console.log(`Saving premium status: ${isPremium}`);
   return setData(KEYS.USER.PREMIUM, isPremium);
 };
 
@@ -141,7 +136,6 @@ export const saveIsPremium = async (isPremium: boolean): Promise<boolean> => {
  * @returns Premium status boolean
  */
 export const getIsPremium = async (): Promise<boolean> => {
-  console.log('Getting premium status from AsyncStorage');
   try {
     // FORCE CHECK ALL POSSIBLE PREMIUM KEYS DIRECTLY
     const directKeys = [
@@ -160,15 +154,6 @@ export const getIsPremium = async (): Promise<boolean> => {
       'premium_user'
     ];
     
-    // Log all possible premium keys and their values
-    console.log('Checking ALL possible premium keys:');
-    const premiumValues = {};
-    for (const key of directKeys) {
-      const value = await AsyncStorage.getItem(key);
-      premiumValues[key] = value;
-      console.log(`- Premium key "${key}" = ${value}`);
-    }
-    
     // First check normal premium status
     const isPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
     
@@ -182,10 +167,8 @@ export const getIsPremium = async (): Promise<boolean> => {
       testingPremium === 'true' || 
       testingPremiumAccess === 'true';
     
-    
     return hasPremium;
   } catch (error) {
-    console.error('Error getting premium status:', error);
     return false;
   }
 };
@@ -211,10 +194,8 @@ export const getUserProgress = async (): Promise<UserProgress> => {
       await saveUserProgress(migratedProgress);
     }
     
-    console.log(`Retrieved user progress: Level ${migratedProgress.level}, XP: ${migratedProgress.totalXP}`);
     return migratedProgress;
   } catch (error) {
-    console.error('Error retrieving user progress:', error);
     return { ...INITIAL_USER_PROGRESS };
   }
 };
@@ -233,10 +214,8 @@ export const saveUserProgress = async (progress: UserProgress): Promise<boolean>
     };
     
     const result = await setData(KEYS.PROGRESS.USER_PROGRESS, updatedProgress);
-    console.log(`Saved user progress: Level ${progress.level}, XP: ${progress.totalXP}`);
     return result;
   } catch (error) {
-    console.error('Error saving user progress:', error);
     return false;
   }
 };
@@ -248,10 +227,8 @@ export const saveUserProgress = async (progress: UserProgress): Promise<boolean>
 export const resetUserProgress = async (): Promise<UserProgress> => {
   try {
     await removeData(KEYS.PROGRESS.USER_PROGRESS);
-    console.log('User progress reset to initial state');
     return { ...INITIAL_USER_PROGRESS };
   } catch (error) {
-    console.error('Error resetting user progress:', error);
     return { ...INITIAL_USER_PROGRESS };
   }
 };
@@ -292,7 +269,6 @@ const migrateUserProgress = (progress: UserProgress): UserProgress => {
   if (!migratedProgress.hasReceivedWelcomeBonus) {
     // If the user has any XP or completed routines, they should have the flag set to true
     if (migratedProgress.totalXP > 0 || migratedProgress.statistics.totalRoutines > 0) {
-      console.log('Setting hasReceivedWelcomeBonus flag for existing user with XP or routines');
       migratedProgress.hasReceivedWelcomeBonus = true;
     } else {
       // New user, initialize the flag to false
@@ -314,10 +290,9 @@ export const getRecentRoutines = async (): Promise<ProgressEntry[]> => {
     const routines = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_HISTORY, []);
     // Filter out hidden routines
     const visibleRoutines = routines.filter(routine => !routine.hidden);
-    console.log('Retrieved visible routines:', visibleRoutines.length);
+    
     return visibleRoutines;
   } catch (error) {
-    console.error('Error getting recent routines:', error);
     return [];
   }
 };
@@ -329,10 +304,9 @@ export const getRecentRoutines = async (): Promise<ProgressEntry[]> => {
 export const getAllRoutines = async (): Promise<ProgressEntry[]> => {
   try {
     const allRoutines = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
-    console.log('Retrieved all routines:', allRoutines.length);
+    
     return allRoutines;
   } catch (error) {
-    console.error('Error getting all routines:', error);
     return [];
   }
 };
@@ -350,8 +324,6 @@ export const saveRoutineProgress = async (entry: {
   level?: StretchLevel;
 }): Promise<boolean> => {
   try {
-    console.log('Saving routine progress:', entry);
-    
     // Get existing routines
     const existingRoutines = await getRecentRoutines();
     
@@ -380,7 +352,6 @@ export const saveRoutineProgress = async (entry: {
     
     return saveRecentResult && saveAllResult;
   } catch (error) {
-    console.error('Error saving routine progress:', error);
     return false;
   }
 };
@@ -397,17 +368,20 @@ export const saveCompletedRoutine = async (
 ): Promise<boolean> => {
   try {
     // Create progress entry
+    const now = new Date();
+    const formattedDate = now.toISOString();
+    const cleanDate = formattedDate.split('T')[0];
+    
     const entry: ProgressEntry = {
       area: routine.area,
       duration: routine.duration,
-      date: new Date().toISOString(),
+      date: formattedDate,
       stretchCount: stretchCount,
       level: routine.level
     };
     
     return await saveRoutineProgress(entry);
   } catch (error) {
-    console.error('Error saving completed routine:', error);
     return false;
   }
 };
@@ -419,8 +393,6 @@ export const saveCompletedRoutine = async (
  */
 export const hideRoutine = async (routineDate: string): Promise<boolean> => {
   try {
-    console.log('Hiding routine with date:', routineDate);
-    
     // Get existing routines
     const existingRoutines = await getRecentRoutines();
     
@@ -428,7 +400,6 @@ export const hideRoutine = async (routineDate: string): Promise<boolean> => {
     const routineToHide = existingRoutines.find(routine => routine.date === routineDate);
     
     if (!routineToHide) {
-      console.log('Routine not found, nothing to hide');
       return false;
     }
     
@@ -454,7 +425,6 @@ export const hideRoutine = async (routineDate: string): Promise<boolean> => {
     
     return true;
   } catch (error) {
-    console.error('Error hiding routine:', error);
     return false;
   }
 };
@@ -483,7 +453,6 @@ export const saveFavorite = async (stretchId: number): Promise<boolean> => {
     }
     return true;
   } catch (error) {
-    console.error('Error saving favorite:', error);
     return false;
   }
 };
@@ -499,7 +468,6 @@ export const removeFavorite = async (stretchId: number): Promise<boolean> => {
     const updatedFavorites = favorites.filter(id => id !== stretchId);
     return await setData(KEYS.ROUTINES.FAVORITES, updatedFavorites);
   } catch (error) {
-    console.error('Error removing favorite:', error);
     return false;
   }
 };
@@ -515,14 +483,11 @@ export const saveFavoriteRoutine = async (routine: {
   duration: Duration 
 }): Promise<{success: boolean, limitReached?: boolean, message?: string}> => {
   try {
-    console.log('Saving favorite routine:', routine);
-    
     // Get existing favorites
     const favorites = await getData<any[]>(KEYS.ROUTINES.FAVORITE_ROUTINES, []);
     
     // Check if we've reached the maximum number of favorites (15)
     if (favorites.length >= 15) {
-      console.log('Maximum number of favorites reached (15)');
       return {
         success: false,
         limitReached: true,
@@ -548,7 +513,6 @@ export const saveFavoriteRoutine = async (routine: {
       message: saveResult ? 'Routine saved to favorites!' : 'Failed to save routine'
     };
   } catch (error) {
-    console.error('Error saving favorite routine:', error);
     return {
       success: false,
       message: 'An error occurred while saving the routine'
@@ -563,10 +527,8 @@ export const saveFavoriteRoutine = async (routine: {
 export const getFavoriteRoutines = async (): Promise<any[]> => {
   try {
     const favorites = await getData<any[]>(KEYS.ROUTINES.FAVORITE_ROUTINES, []);
-    console.log(`Retrieved ${favorites.length} favorite routines`);
     return favorites;
   } catch (error) {
-    console.error('Error getting favorite routines:', error);
     return [];
   }
 };
@@ -586,16 +548,13 @@ export const deleteFavoriteRoutine = async (routineId: string): Promise<boolean>
     
     // If nothing was removed, return false
     if (updatedFavorites.length === favorites.length) {
-      console.log('No favorite routine found with ID:', routineId);
       return false;
     }
     
     // Save updated favorites
     const success = await setData(KEYS.ROUTINES.FAVORITE_ROUTINES, updatedFavorites);
-    console.log(`Deleted favorite routine with ID: ${routineId}, success: ${success}`);
     return success;
   } catch (error) {
-    console.error('Error deleting favorite routine:', error);
     return false;
   }
 };
@@ -637,7 +596,6 @@ export const getReminderTime = async (): Promise<string | null> => {
     // Direct AsyncStorage call for string value
     return await AsyncStorage.getItem(KEYS.SETTINGS.REMINDER_TIME);
   } catch (error) {
-    console.error('Error getting reminder time:', error);
     return null;
   }
 };
@@ -667,17 +625,10 @@ export const getDashboardFlag = async (): Promise<boolean> => {
  */
 export const synchronizeProgressData = async (): Promise<boolean> => {
   try {
-    console.log('Starting progress data synchronization...');
-    
     // Get data from all storage locations
     const recentRoutinesData = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_HISTORY, []);
     const progressData = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
     const hiddenRoutinesData = await getData<ProgressEntry[]>(KEYS.PROGRESS.HIDDEN_ROUTINES, []);
-    
-    console.log('Synchronizing data from multiple sources:');
-    console.log('- Visible routines:', recentRoutinesData.length);
-    console.log('- Progress data:', progressData.length);
-    console.log('- Hidden routines:', hiddenRoutinesData.length);
     
     // Create a merged set of unique entries based on date
     const mergedEntries: { [key: string]: ProgressEntry } = {};
@@ -749,14 +700,8 @@ export const synchronizeProgressData = async (): Promise<boolean> => {
     // Update timestamp of synchronization
     await setData(KEYS.UI.SYNC_TIMESTAMP, new Date().toISOString());
     
-    console.log('Progress data synchronized successfully:');
-    console.log('- Total entries:', mergedRoutines.length);
-    console.log('- Visible entries:', visibleRoutines.length);
-    console.log('- Hidden entries:', hiddenRoutines.length);
-    
     return true;
   } catch (error) {
-    console.error('Error synchronizing progress data:', error);
     return false;
   }
 };
@@ -779,13 +724,9 @@ export const exportUserProgress = (progress: UserProgress): void => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
-      console.log('User progress exported successfully');
     } catch (error) {
-      console.error('Error exporting user progress:', error);
     }
   } else {
-    console.log('Export functionality is only available on web platform');
   }
 };
 
@@ -796,8 +737,6 @@ export const exportUserProgress = (progress: UserProgress): void => {
  */
 export const clearAllData = async (resetTestingData: boolean = false): Promise<boolean> => {
   try {
-    console.log('Starting to clear all app data...');
-    
     // Get all known keys from our KEYS object
     const knownKeys = [
       ...Object.values(KEYS.USER),
@@ -847,7 +786,6 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
     
     // Get all keys from AsyncStorage
     const allKeys = await AsyncStorage.getAllKeys();
-    console.log('All AsyncStorage keys found:', allKeys);
     
     // Merge with our known keys list
     const uniqueKeys = [...new Set([...knownKeys, ...allKeys])] as string[];
@@ -856,8 +794,6 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
     const keysToRemove = resetTestingData 
       ? uniqueKeys 
       : uniqueKeys.filter(key => !testingKeys.includes(key));
-    
-    console.log(`Will remove ${keysToRemove.length} keys from storage`);
     
     // Remove the keys in batches to avoid potential issues
     await AsyncStorage.multiRemove(keysToRemove);
@@ -871,10 +807,8 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
     await AsyncStorage.setItem(KEYS.USER.PREMIUM, 'false');
     await AsyncStorage.setItem(KEYS.USER.TESTING_PREMIUM, 'false');
     
-    console.log('All app data cleared successfully');
     return true;
   } catch (error) {
-    console.error('Error clearing all app data:', error);
     return false;
   }
 };
@@ -885,15 +819,10 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
  */
 export const restoreTestingAccess = async (): Promise<void> => {
   try {
-    console.log('Restoring basic testing access...');
-    
     // Set minimum testing keys to ensure access
     await AsyncStorage.setItem('@flexbreak:testing_access', 'true');
     await AsyncStorage.setItem('@flexbreak:testing_phase', '1');
-    
-    console.log('Basic testing access restored');
   } catch (error) {
-    console.error('Error restoring testing access:', error);
   }
 };
 
@@ -911,8 +840,6 @@ export const saveCustomRoutine = async (routine: {
   customStretches?: { id: number | string; isRest?: boolean; bilateral?: boolean; }[];
 }): Promise<boolean> => {
   try {
-    console.log('Saving custom routine:', routine);
-    
     // Get existing custom routines
     const customRoutines = await getCustomRoutines();
     
@@ -929,7 +856,6 @@ export const saveCustomRoutine = async (routine: {
     // Save to storage
     return await setData(KEYS.CUSTOM.CUSTOM_ROUTINES, updatedRoutines);
   } catch (error) {
-    console.error('Error saving custom routine:', error);
     return false;
   }
 };
@@ -958,7 +884,6 @@ export const deleteCustomRoutine = async (routineId: string): Promise<boolean> =
     // Save to storage
     return await setData(KEYS.CUSTOM.CUSTOM_ROUTINES, updatedRoutines);
   } catch (error) {
-    console.error('Error deleting custom routine:', error);
     return false;
   }
 };
@@ -973,7 +898,6 @@ export const initializeUserProgressIfEmpty = async (): Promise<UserProgress> => 
     
     // If progress is empty or has no totalXP property, initialize it
     if (!progress || progress.totalXP === undefined) {
-      console.log('User progress is empty, initializing with defaults');
       const defaultProgress = INITIAL_USER_PROGRESS;
       await saveUserProgress(defaultProgress);
       return defaultProgress;
@@ -981,7 +905,6 @@ export const initializeUserProgressIfEmpty = async (): Promise<UserProgress> => 
     
     return progress;
   } catch (error) {
-    console.error('Error initializing user progress:', error);
     // Return default progress if there was an error
     return INITIAL_USER_PROGRESS;
   }
@@ -993,19 +916,15 @@ export const initializeUserProgressIfEmpty = async (): Promise<UserProgress> => 
  */
 export const clearRoutines = async (): Promise<boolean> => {
   try {
-    console.log('Clearing all routines from storage...');
-    
     // Clear routine data from storage
     await setData(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
     await setData(KEYS.PROGRESS.PROGRESS_HISTORY, []);
     
     // Verify the routines were cleared
     const routines = await getAllRoutines();
-    console.log('After clearing - routines length:', routines?.length || 0);
     
     return true;
   } catch (error) {
-    console.error('Error clearing routines:', error);
     return false;
   }
 };
@@ -1017,8 +936,6 @@ export const clearRoutines = async (): Promise<boolean> => {
  */
 export const resetSimulationData = async (): Promise<boolean> => {
   try {
-    console.log('Starting to reset simulation data...');
-    
     // First, backup premium and testing status
     const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
     const regularPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
@@ -1064,22 +981,18 @@ export const resetSimulationData = async (): Promise<boolean> => {
     
     // Clear simulation keys except preserved ones
     await AsyncStorage.multiRemove(keysToRemove);
-    console.log('Simulation data cleared, preserving testing and premium status. Cleared keys:', keysToRemove);
     
     // Safety check - restore premium status if somehow lost
     if (testingPremium === 'true' || regularPremium) {
       await AsyncStorage.setItem(KEYS.USER.TESTING_PREMIUM, testingPremium || 'false');
       await setData(KEYS.USER.PREMIUM, regularPremium);
-      console.log('Restored premium status:', { testingPremium, regularPremium });
     }
     
     // Re-initialize user progress with defaults
     await initializeUserProgressIfEmpty();
-    console.log('Re-initialized user progress with defaults');
     
     return true;
   } catch (e) {
-    console.error('Error resetting simulation data:', e);
     return false;
   }
 };
@@ -1089,8 +1002,6 @@ export const resetSimulationData = async (): Promise<boolean> => {
  * @returns Whether the premium status was successfully cleared
  */
 export const clearAllPremiumStatus = async (): Promise<boolean> => {
-  console.log('AGGRESSIVELY CLEARING ALL PREMIUM STATUS');
-  
   // Define all possible premium-related keys that might exist
   const premiumKeys = [
     KEYS.USER.PREMIUM,
@@ -1110,53 +1021,41 @@ export const clearAllPremiumStatus = async (): Promise<boolean> => {
   
   try {
     // First get current status for debugging
-    console.log('Current premium status before clearing:');
     for (const key of premiumKeys) {
       const value = await AsyncStorage.getItem(key);
-      console.log(`- Premium key "${key}" = ${value}`);
     }
     
     // Different removal techniques
-    console.log('Trying multiple methods to clear premium status:');
     
     // Method 1: Direct removal
     for (const key of premiumKeys) {
       await AsyncStorage.removeItem(key);
-      console.log(`Method 1: Removed key: ${key}`);
     }
     
     // Method 2: Set to false then remove
     for (const key of premiumKeys) {
       await AsyncStorage.setItem(key, 'false');
       await AsyncStorage.removeItem(key);
-      console.log(`Method 2: Set false then removed: ${key}`);
     }
     
     // Method 3: Use multiRemove
     await AsyncStorage.multiRemove(premiumKeys);
-    console.log('Method 3: Used multiRemove on all premium keys');
     
     // Verification after all methods
     let stillExists = false;
-    console.log('Verification after clearing:');
     for (const key of premiumKeys) {
       const value = await AsyncStorage.getItem(key);
-      console.log(`- Premium key "${key}" after clearing = ${value}`);
       if (value !== null && value !== '') {
         stillExists = true;
-        console.log(`  WARNING: Key "${key}" still exists with value: ${value}`);
       }
     }
     
     if (stillExists) {
-      console.error('FAILED TO CLEAR ALL PREMIUM STATUS - some keys still exist');
       return false;
     } else {
-      console.log('SUCCESS: All premium status successfully cleared');
       return true;
     }
   } catch (error) {
-    console.error('Error clearing premium status:', error);
     return false;
   }
 };
@@ -1178,10 +1077,8 @@ export const saveSubscriptionDetails = async (details: {
   purchaseToken?: string;
 }): Promise<boolean> => {
   try {
-    console.log('Saving subscription details:', details);
     return await setData(KEYS.USER.SUBSCRIPTION_DETAILS, details);
   } catch (error) {
-    console.error('Error saving subscription details:', error);
     return false;
   }
 };
@@ -1194,7 +1091,6 @@ export const getSubscriptionDetails = async (): Promise<any | null> => {
   try {
     return await getData(KEYS.USER.SUBSCRIPTION_DETAILS, null);
   } catch (error) {
-    console.error('Error getting subscription details:', error);
     return null;
   }
 };
@@ -1209,10 +1105,8 @@ export const clearSubscriptionDetails = async (): Promise<boolean> => {
     await removeData(KEYS.USER.SUBSCRIPTION_DETAILS);
     // Also update premium status
     await saveIsPremium(false);
-    console.log('Subscription details cleared and premium status set to false');
     return true;
   } catch (error) {
-    console.error('Error clearing subscription details:', error);
     return false;
   }
 }; 

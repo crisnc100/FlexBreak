@@ -6,15 +6,35 @@
 /**
  * Format a date to YYYY-MM-DD
  */
-export const toDateString = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+// util/date.ts
+export const toDateString = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+
+  // Use the system-default tz (or pass an explicit one)
+  const [year, month, day] = [
+    d.getFullYear(),
+    d.getMonth() + 1,          // zero-based
+    d.getDate()
+  ].map(n => String(n).padStart(2, '0'));
+
+  return `${year}-${month}-${day}`;   // local YYYY-MM-DD
 };
+
 
 /**
  * Get current date string in YYYY-MM-DD format
  */
 export const today = (): string => {
   return toDateString(new Date());
+};
+
+/**
+ * Get yesterday's date string in YYYY-MM-DD format
+ */
+export const yesterdayString = (): string => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return toDateString(yesterday);
 };
 
 /**
@@ -132,9 +152,41 @@ export const getEndDateForCategory = (category: string): string => {
 };
 
 /**
- * Format a date as YYYY-MM-DD
+ * Format date as YYYY-MM-DD using local timezone
+ * This is used throughout the app for streak calculations
  */
-export const formatDateYYYYMMDD = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return toDateString(d);
+export const formatDateYYYYMMDD = (date: Date): string => {
+  // Use local date components to avoid timezone issues
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // months are 0-indexed
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Get the day of the week for a date (0 = Sunday, 1 = Monday, etc.)
+ */
+export const getDayOfWeek = (date: Date): number => {
+  return date.getDay();
+};
+
+/**
+ * Check if a date is yesterday
+ */
+export const isYesterday = (date: Date): boolean => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return (
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear()
+  );
+};
+
+/**
+ * Parse a date string to a Date object
+ */
+export const parseDate = (dateStr: string): Date => {
+  return new Date(dateStr);
 }; 

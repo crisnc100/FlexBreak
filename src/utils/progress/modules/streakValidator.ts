@@ -28,6 +28,7 @@ export const validateAndCorrectStreak = async (): Promise<{
   corrections: string[];
 }> => {
   try {
+    console.log('[VALIDATOR DEBUG] Starting streak validation and correction');
     const corrections: string[] = [];
     
     // 1. Get user progress from storage
@@ -54,11 +55,13 @@ export const validateAndCorrectStreak = async (): Promise<{
       .filter(r => r.date)
       .map(r => r.date.split('T')[0]);
     
+    console.log(`[VALIDATOR DEBUG] Found ${routineDates.length} routine dates and ${freezeDates.length} freeze dates for calculation`);
+    
     // Calculate with freezes
     const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
     
     // 4. Compare and log discrepancies
-    console.log('Streak validation:', {
+    console.log('[VALIDATOR DEBUG] Streak validation values:', {
       storedStreak,
       managerStreak,
       calculatedStreak,
@@ -77,28 +80,30 @@ export const validateAndCorrectStreak = async (): Promise<{
     if (correctedFreezeCount > MAX_FREEZES) {
       correctedFreezeCount = MAX_FREEZES;
       corrections.push(`Capped freeze count to maximum ${MAX_FREEZES}`);
+      console.log(`[VALIDATOR DEBUG] Capping freeze count from ${storedFreezeCount} to max ${MAX_FREEZES}`);
     }
     
     if (storedFreezeCount !== managerFreezeCount) {
       corrections.push(`Freeze count mismatch: stored=${storedFreezeCount}, manager=${managerFreezeCount}, using ${correctedFreezeCount}`);
+      console.log(`[VALIDATOR DEBUG] Freeze count mismatch: stored=${storedFreezeCount}, manager=${managerFreezeCount}, corrected=${correctedFreezeCount}`);
     }
     
     // 7. Fix any discrepancies
     if (storedStreak !== correctedStreak) {
-      console.log(`Correcting stored streak: ${storedStreak} → ${correctedStreak}`);
+      console.log(`[VALIDATOR DEBUG] Correcting stored streak: ${storedStreak} → ${correctedStreak}`);
       userProgress.statistics.currentStreak = correctedStreak;
       corrections.push(`Stored streak corrected: ${storedStreak} → ${correctedStreak}`);
     }
     
     if (managerStreak !== correctedStreak) {
-      console.log(`Correcting streak manager: ${managerStreak} → ${correctedStreak}`);
+      console.log(`[VALIDATOR DEBUG] Correcting streak manager cache: ${managerStreak} → ${correctedStreak}`);
       await streakManager.updateStoredStreak(correctedStreak);
       corrections.push(`Manager streak corrected: ${managerStreak} → ${correctedStreak}`);
     }
     
     // 8. Fix freeze count if needed
     if (storedFreezeCount !== correctedFreezeCount) {
-      console.log(`Correcting stored freeze count: ${storedFreezeCount} → ${correctedFreezeCount}`);
+      console.log(`[VALIDATOR DEBUG] Correcting stored freeze count: ${storedFreezeCount} → ${correctedFreezeCount}`);
       
       if (userProgress.rewards?.streak_freezes) {
         userProgress.rewards.streak_freezes.uses = correctedFreezeCount;
@@ -107,7 +112,7 @@ export const validateAndCorrectStreak = async (): Promise<{
     }
     
     if (managerFreezeCount !== correctedFreezeCount) {
-      console.log(`Correcting manager freeze count: ${managerFreezeCount} → ${correctedFreezeCount}`);
+      console.log(`[VALIDATOR DEBUG] Correcting manager freeze count: ${managerFreezeCount} → ${correctedFreezeCount}`);
       
       // Update storage with corrected count to fix manager cache
       await streakManager.updateStorage(correctedStreak, routineDates, freezeDates, correctedFreezeCount);
@@ -116,7 +121,10 @@ export const validateAndCorrectStreak = async (): Promise<{
     
     // 9. Save any changes
     if (corrections.length > 0) {
+      console.log(`[VALIDATOR DEBUG] Saving corrections to storage: ${corrections.length} fixes applied`);
       await storageService.saveUserProgress(userProgress);
+    } else {
+      console.log('[VALIDATOR DEBUG] No corrections needed, streak data is consistent');
     }
     
     // 10. Return results
@@ -133,7 +141,7 @@ export const validateAndCorrectStreak = async (): Promise<{
       corrections
     };
   } catch (error) {
-    console.error('Error validating streak:', error);
+    console.error('[VALIDATOR ERROR] Error validating streak:', error);
     return {
       success: false,
       originalValues: {
@@ -154,31 +162,31 @@ export const validateAndCorrectStreak = async (): Promise<{
  */
 export const runStartupStreakValidation = async (): Promise<void> => {
   try {
-    console.log('Running startup streak validation...');
+    console.log('[VALIDATOR DEBUG] Running startup streak validation...');
     
     // First validate and correct streak
     const streakResult = await validateAndCorrectStreak();
     
     if (streakResult.corrections.length > 0) {
-      console.log('Streak validation made corrections:', streakResult.corrections);
+      console.log('[VALIDATOR DEBUG] Streak validation made corrections:', streakResult.corrections);
     } else {
-      console.log('Streak validation completed: No streak corrections needed');
+      console.log('[VALIDATOR DEBUG] Streak validation completed: No streak corrections needed');
     }
     
     // Then fix freeze count based on actual usage
     const freezeResult = await fixFreezeCountBasedOnUsage();
     
     if (freezeResult.originalCount !== freezeResult.correctedCount) {
-      console.log(`Corrected freeze count: ${freezeResult.originalCount} → ${freezeResult.correctedCount}`);
+      console.log(`[VALIDATOR DEBUG] Corrected freeze count: ${freezeResult.originalCount} → ${freezeResult.correctedCount}`);
     } else {
-      console.log(`Freeze count validation completed: Count is correct (${freezeResult.correctedCount})`);
+      console.log(`[VALIDATOR DEBUG] Freeze count validation completed: Count is correct (${freezeResult.correctedCount})`);
     }
     
     // Check if streak is actually broken (missed multiple days)
     const isStreakBroken = await streakManager.isStreakBroken();
     
     if (isStreakBroken) {
-      console.log('Streak is completely broken (multiple days missed). UI will show as 0.');
+      console.log('[VALIDATOR DEBUG] Streak is completely broken (multiple days missed). UI will show as 0.');
       // Note: We don't actually reset the stored streak here
       // This is handled by the UI layer showing 0 instead of the stored value
       // When the user completes their next routine, the streak will restart from 1
@@ -186,8 +194,10 @@ export const runStartupStreakValidation = async (): Promise<void> => {
 
     // Force refresh of the streak cache to ensure UI components have latest data
     await forceStreakRefresh();
+    
+    console.log('[VALIDATOR DEBUG] Startup streak validation completed successfully');
   } catch (error) {
-    console.error('Error in startup streak validation:', error);
+    console.error('[VALIDATOR ERROR] Error in startup streak validation:', error);
   }
 };
 
@@ -197,7 +207,7 @@ export const runStartupStreakValidation = async (): Promise<void> => {
  */
 export const forceStreakRefresh = async (): Promise<void> => {
   try {
-    console.log('Forcing streak cache refresh...');
+    console.log('[VALIDATOR DEBUG] Forcing streak cache refresh...');
     
     // Clear initialized flag to force a complete refresh
     streakManager.streakCache.initialized = false;
@@ -208,9 +218,9 @@ export const forceStreakRefresh = async (): Promise<void> => {
     // Emit streak_updated event to trigger UI updates
     streakManager.streakEvents.emit('streak_updated');
     
-    console.log('Streak cache refresh complete');
+    console.log('[VALIDATOR DEBUG] Streak cache refresh complete');
   } catch (error) {
-    console.error('Error forcing streak refresh:', error);
+    console.error('[VALIDATOR ERROR] Error forcing streak refresh:', error);
   }
 };
 
@@ -223,7 +233,7 @@ export const forceStreakRefresh = async (): Promise<void> => {
  */
 export const setFreezeCount = async (count: number): Promise<boolean> => {
   try {
-    console.log(`Manually setting freeze count to ${count}`);
+    console.log(`[VALIDATOR DEBUG] Manually setting freeze count to ${count}`);
     
     // Validate the count
     const MAX_FREEZES = 2;
@@ -237,6 +247,7 @@ export const setFreezeCount = async (count: number): Promise<boolean> => {
       userProgress.rewards.streak_freezes.uses = validCount;
     } else {
       // Initialize reward if it doesn't exist
+      console.log('[VALIDATOR DEBUG] Creating streak_freezes reward in UserProgress');
       userProgress.rewards['streak_freezes'] = {
         id: 'streak_freezes',
         title: "Streak Freezes",
@@ -257,10 +268,10 @@ export const setFreezeCount = async (count: number): Promise<boolean> => {
     // Update streak manager cache
     streakManager.streakCache.freezesAvailable = validCount;
     
-    console.log(`Successfully set freeze count to ${validCount}`);
+    console.log(`[VALIDATOR DEBUG] Successfully set freeze count to ${validCount}`);
     return true;
   } catch (error) {
-    console.error('Error setting freeze count:', error);
+    console.error('[VALIDATOR ERROR] Error setting freeze count:', error);
     return false;
   }
 };
@@ -275,6 +286,8 @@ export const fixFreezeCountBasedOnUsage = async (): Promise<{
   correctedCount: number;
 }> => {
   try {
+    console.log('[VALIDATOR DEBUG] Checking freeze count based on usage');
+    
     // Get user progress
     const userProgress = await storageService.getUserProgress();
     
@@ -295,10 +308,11 @@ export const fixFreezeCountBasedOnUsage = async (): Promise<{
     // Calculate what the count should be based on monthly freezes used
     const correctedCount = Math.max(0, MAX_FREEZES - freezesUsedThisMonth);
     
-    console.log(`Freeze count check: current=${currentCount}, applied=${freezesUsedThisMonth}, corrected=${correctedCount}`);
+    console.log(`[VALIDATOR DEBUG] Freeze count analysis: current=${currentCount}, applied this month=${freezesUsedThisMonth}, calculated corrected=${correctedCount}`);
     
     // Update if different
     if (correctedCount !== currentCount) {
+      console.log(`[VALIDATOR DEBUG] Applying freeze count correction: ${currentCount} → ${correctedCount}`);
       // Update using the setter function
       await setFreezeCount(correctedCount);
       
@@ -315,7 +329,7 @@ export const fixFreezeCountBasedOnUsage = async (): Promise<{
       correctedCount: currentCount // No change needed
     };
   } catch (error) {
-    console.error('Error fixing freeze count:', error);
+    console.error('[VALIDATOR ERROR] Error fixing freeze count:', error);
     return {
       success: false,
       originalCount: 0,

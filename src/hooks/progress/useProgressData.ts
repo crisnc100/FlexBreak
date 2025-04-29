@@ -63,17 +63,48 @@ export function useProgressData() {
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [freezeCount, setFreezeCount] = useState(0);
 
+  // Add debug effect to log stats when they change
+  useEffect(() => {
+    console.log(`[STATS DEBUG] Stats updated: 
+      - Total routines: ${stats.totalRoutines}
+      - Total minutes: ${stats.totalMinutes}
+      - Current streak: ${stats.currentStreak}
+      - Today complete: ${stats.isTodayComplete}
+      - Active days (30d): ${stats.activeRoutineDays}
+      - Areas: ${Object.keys(stats.areaBreakdown).join(', ')}
+    `);
+    
+    // Log weekly activity data
+    console.log(`[STATS DEBUG] Weekly activity: ${JSON.stringify(stats.weeklyActivity)}`);
+    
+    // Log day of week breakdown
+    console.log(`[STATS DEBUG] Day of week breakdown: ${JSON.stringify(stats.dayOfWeekBreakdown)}`);
+    
+  }, [stats]);
+  
+  // Log when freeze count changes
+  useEffect(() => {
+    console.log(`[STATS DEBUG] Freeze count updated: ${freezeCount}`);
+  }, [freezeCount]);
+
   // Check if user has completed routines but they're all hidden
   const hasHiddenRoutinesOnly = allProgressData.length > 0 && progressData.length === 0;
 
   // Calculate all stats from progress data
   const calculateStats = useCallback(async (data: ProgressEntry[]) => {
     if (!data || data.length === 0) {
-      console.log('No data to calculate stats from');
+      console.log('[STATS DEBUG] No data to calculate stats from');
       return;
     }
     
-    console.log(`Calculating stats from ${data.length} routines (including hidden)`);
+    console.log(`[STATS DEBUG] Calculating stats from ${data.length} routines (including hidden)`);
+    
+    // Log all dates for debugging
+    const allDates = data.map(entry => {
+      const dateOnly = dateUtils.toDateString(entry.date) || '';
+      return dateOnly;
+    }).sort();
+    console.log(`[STATS DEBUG] All routine dates: ${JSON.stringify(allDates)}`);
     
     // First get user progress from storage to ensure we have the most accurate streak
     const userProgress = await storageService.getUserProgress();
@@ -81,6 +112,7 @@ export function useProgressData() {
     
     // Get the freeze dates to include in streak calculation
     const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+    console.log(`[STATS DEBUG] Freeze dates: ${JSON.stringify(freezeDates)}`);
     
     // Total routines
     const totalRoutines = data.length;
@@ -100,44 +132,69 @@ export function useProgressData() {
       .filter(r => r.date)
       .map(r => r.date!.split('T')[0]);
     
+    console.log(`[STATS DEBUG] Extracted ${routineDates.length} routine dates for streak calculation`);
+    
+    // Check today and yesterday
+    const today = new Date();
+    const todayStr = dateUtils.formatDateYYYYMMDD(today);
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
+    
+    const hasToday = routineDates.includes(todayStr);
+    const hasYesterday = routineDates.includes(yesterdayStr);
+    const hasFreezeYesterday = freezeDates.includes(yesterdayStr);
+    
+    console.log(`[STATS DEBUG] Date checks: 
+      - Today (${todayStr}): ${hasToday ? 'Has routine' : 'No routine'}
+      - Yesterday (${yesterdayStr}): ${hasYesterday ? 'Has routine' : 'No routine'}, ${hasFreezeYesterday ? 'Has freeze' : 'No freeze'}
+    `);
+    
     // Calculate current streak with and without freezes to compare
     const calculatedStreakBasic = calculateStreak(data);
     const calculatedStreakWithFreezes = calculateStreakWithFreezes(routineDates, freezeDates);
+    
+    console.log(`[STATS DEBUG] Streak calculations:
+      - Basic streak: ${calculatedStreakBasic}
+      - With freezes: ${calculatedStreakWithFreezes}
+      - Stored streak: ${storedStreak}
+    `);
     
     // IMPORTANT: To avoid streak switching between 0 and 1, explicitly validate with streakValidator
     let displayStreak = calculatedStreakWithFreezes;
     
     try {
       // Validate through the streak validator which is the most reliable source of truth
+      console.log('[STATS DEBUG] Calling streak validator...');
       const validationResult = await streakValidator.validateAndCorrectStreak();
       
       if (validationResult.success) {
         displayStreak = validationResult.correctedStreak;
+        console.log(`[STATS DEBUG] Validator returned corrected streak: ${displayStreak}`);
         
         // If we've made corrections, make sure they're saved
         if (validationResult.corrections.length > 0) {
-          console.log('Streak validation corrections made:', validationResult.corrections);
+          console.log('[STATS DEBUG] Streak validation corrections made:', validationResult.corrections);
         }
+      } else {
+        console.log('[STATS DEBUG] Streak validation failed, using calculated streak');
       }
     } catch (error) {
-      console.error('Error validating streak, falling back to calculated value:', error);
+      console.error('[STATS ERROR] Error validating streak, falling back to calculated value:', error);
     }
     
     // Make sure we never flip-flop between 0 and 1 for single day activity
     if (calculatedStreakWithFreezes === 1 && displayStreak === 0) {
       // If there's activity today, a streak of 1 is more accurate than 0
-      const today = new Date();
-      const todayStr = dateUtils.formatDateYYYYMMDD(today);
-      
       const hasTodayActivity = routineDates.includes(todayStr);
       
       if (hasTodayActivity) {
-        console.log('Override: Using streak=1 because there is activity today');
+        console.log('[STATS DEBUG] Override: Using streak=1 because there is activity today');
         displayStreak = 1;
       }
     }
     
-    console.log('Streak comparison:', {
+    console.log('[STATS DEBUG] Final streak comparison:', {
       calculatedStreak: calculatedStreakBasic, 
       calculatedWithFreezes: calculatedStreakWithFreezes,
       storedStreak, 
@@ -145,38 +202,42 @@ export function useProgressData() {
     });
 
     // Check if there's an activity today
-    const today = new Date();
-    const todayStr = dateUtils.formatDateYYYYMMDD(today);
-    
     const isTodayComplete = routineDates.includes(todayStr);
     
-    console.log(`Today's activity check (${todayStr}): ${isTodayComplete ? 'Complete' : 'Incomplete'}`);
+    console.log(`[STATS DEBUG] Today's activity check (${todayStr}): ${isTodayComplete ? 'Complete' : 'Incomplete'}`);
 
     // Area breakdown
     const areaBreakdown = data.reduce((acc, entry) => {
       acc[entry.area] = (acc[entry.area] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+    
+    console.log(`[STATS DEBUG] Area breakdown: ${JSON.stringify(areaBreakdown)}`);
 
     // Weekly activity trend (last 7 days)
     const weeklyActivity = calculateWeeklyActivity(data);
+    console.log(`[STATS DEBUG] Weekly activity: ${JSON.stringify(weeklyActivity)}`);
 
     // Day of week breakdown
     const dayOfWeekBreakdown = calculateDayOfWeekActivity(data);
+    console.log(`[STATS DEBUG] Day of week breakdown: ${JSON.stringify(dayOfWeekBreakdown)}`);
 
     // Calculate active days over the last 30 days
     const activeRoutineDays = calculateActiveDays(data);
+    console.log(`[STATS DEBUG] Active days (30 days): ${activeRoutineDays}`);
 
-    console.log(`Stats calculated: ${totalRoutines} routines, ${totalMinutes} minutes, streak: ${displayStreak}, today complete: ${isTodayComplete}`);
+    console.log(`[STATS DEBUG] Stats calculated: ${totalRoutines} routines, ${totalMinutes} minutes, streak: ${displayStreak}, today complete: ${isTodayComplete}`);
     
     // Save the value back to userProgress to ensure consistency across the app
     if (userProgress.statistics.currentStreak !== displayStreak) {
+      console.log(`[STATS DEBUG] Updating UserProgress streak from ${userProgress.statistics.currentStreak} to ${displayStreak}`);
       userProgress.statistics.currentStreak = displayStreak;
       await storageService.saveUserProgress(userProgress);
-      console.log(`Updated UserProgress streak to ${displayStreak}`);
+      console.log(`[STATS DEBUG] Updated UserProgress streak to ${displayStreak}`);
     }
     
-    setStats({
+    // Create and set updated stats
+    const newStats = {
       totalRoutines,
       totalMinutes,
       currentStreak: displayStreak,
@@ -185,10 +246,13 @@ export function useProgressData() {
       dayOfWeekBreakdown,
       activeRoutineDays,
       isTodayComplete
-    });
+    };
+    
+    console.log('[STATS DEBUG] Setting new stats:', JSON.stringify(newStats, null, 2));
+    setStats(newStats);
     
     // Log stats for debugging
-    console.log('Stats updated for achievements:', {
+    console.log('[STATS DEBUG] Stats updated for achievements:', {
       totalRoutines,
       streak: displayStreak,
       areaCount: Object.keys(areaBreakdown).length,
@@ -209,12 +273,14 @@ export function useProgressData() {
       
       // Use cached data if valid and not forcing refresh
       if (cacheValid) {
-        console.log('Using cached progress data (age: ' + (now - dataCache.lastUpdated) + 'ms)');
+        console.log(`[STATS DEBUG] Using cached progress data (age: ${now - dataCache.lastUpdated}ms)`);
         setUserProgress(dataCache.userProgress);
       } else {
         // Load fresh data from storage
-        console.log('Loading fresh progress data from storage');
+        console.log('[STATS DEBUG] Loading fresh progress data from storage');
         const progress = await storageService.getUserProgress();
+        
+        console.log(`[STATS DEBUG] Loaded user progress: Level ${progress.level}, XP: ${progress.totalXP}, Current streak: ${progress.statistics.currentStreak}`);
         
         // Update cache
         dataCache.userProgress = progress;
@@ -228,14 +294,16 @@ export function useProgressData() {
                               (now - dataCache.freezeLastUpdated < dataCache.cooldownPeriod);
       
       if (freezeCacheValid) {
-        console.log('Using cached freeze count: ' + dataCache.freezeCount);
+        console.log(`[STATS DEBUG] Using cached freeze count: ${dataCache.freezeCount}`);
         setFreezeCount(dataCache.freezeCount);
       } else {
         // Check if user is premium before getting freeze count
         const isPremium = await storageService.getIsPremium();
         
         if (isPremium) {
+          console.log('[STATS DEBUG] User is premium, fetching freeze count');
           const count = await streakFreezeManager.getFreezesAvailable();
+          console.log(`[STATS DEBUG] Retrieved freeze count: ${count}`);
           
           // Update freeze cache
           dataCache.freezeCount = count;
@@ -244,13 +312,14 @@ export function useProgressData() {
           setFreezeCount(count);
         } else {
           // Set to 0 for non-premium users
+          console.log('[STATS DEBUG] User is not premium, setting freeze count to 0');
           dataCache.freezeCount = 0;
           dataCache.freezeLastUpdated = now;
           setFreezeCount(0);
         }
       }
     } catch (error) {
-      console.error('Error loading progress data:', error);
+      console.error('[STATS ERROR] Error loading progress data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -258,36 +327,48 @@ export function useProgressData() {
   
   // Force refresh bypassing cache
   const forceRefresh = useCallback(async () => {
+    console.log('[STATS DEBUG] Force refreshing progress data...');
     await loadUserProgress(true);
   }, [loadUserProgress]);
 
   // Handle refresh - this now ensures both progress and gamification data are refreshed
   const handleRefresh = useCallback(async () => {
-    console.log('Refreshing progress and gamification data...');
+    console.log('[STATS DEBUG] Refreshing progress and gamification data...');
     setIsLoading(true);
     
     try {
       // First synchronize all data between storage locations
+      console.log('[STATS DEBUG] Synchronizing storage data...');
       await synchronizeProgressData();
       
       // Then refresh the context
+      console.log('[STATS DEBUG] Refreshing progress context...');
       await refreshProgress();
       
       // Refresh gamification data
+      console.log('[STATS DEBUG] Refreshing gamification data...');
       await refreshGamificationData();
       
       // Get all routines - this should now be consistent across all data sources
+      console.log('[STATS DEBUG] Getting all routines after refresh...');
       const allRoutines = await getAllRoutines();
-      console.log('Refreshed all routines:', allRoutines.length);
+      console.log(`[STATS DEBUG] Refreshed all routines: ${allRoutines.length}`);
+      
+      // Extract dates for debugging
+      const routineDates = allRoutines.map(r => r.date?.split('T')[0]).sort();
+      console.log(`[STATS DEBUG] All routine dates after refresh: ${JSON.stringify(routineDates)}`);
       
       // Update state
       setAllProgressData(allRoutines);
       setProgressData(allRoutines.filter(r => !r.hidden));
       
       // Calculate stats - now we need to await this since it's async
+      console.log('[STATS DEBUG] Calculating stats after refresh...');
       await calculateStats(allRoutines);
+      
+      console.log('[STATS DEBUG] Refresh complete');
     } catch (error) {
-      console.error('Error refreshing all routines and gamification data:', error);
+      console.error('[STATS ERROR] Error refreshing all routines and gamification data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -296,27 +377,38 @@ export function useProgressData() {
   // Initial data load - now with better coordination
   useEffect(() => {
     const loadData = async () => {
+      console.log('[STATS DEBUG] Initial data load started');
       setIsLoading(true);
       try {
         // First make sure all data is synchronized
+        console.log('[STATS DEBUG] Synchronizing progress data on initial load...');
         await storageService.synchronizeProgressData();
         
         // Load all routines
+        console.log('[STATS DEBUG] Loading all routines on initial load...');
         const allRoutines = await getAllRoutines();
         
         if (allRoutines && allRoutines.length > 0) {
-          console.log('Loaded routines for stats calculation:', allRoutines.length);
+          console.log(`[STATS DEBUG] Loaded ${allRoutines.length} routines for stats calculation`);
+          
+          // Extract dates for debugging
+          const routineDates = allRoutines.map(r => r.date?.split('T')[0]).sort();
+          console.log(`[STATS DEBUG] All routine dates on initial load: ${JSON.stringify(routineDates)}`);
+          
           setAllProgressData(allRoutines);
           setProgressData(allRoutines.filter(r => !r.hidden));
+          console.log(`[STATS DEBUG] Visible routines: ${allRoutines.filter(r => !r.hidden).length}`);
           
           // Calculate stats
+          console.log('[STATS DEBUG] Calculating initial stats...');
           calculateStats(allRoutines);
         } else {
-          console.log('No routines found for stats calculation');
+          console.log('[STATS DEBUG] No routines found for stats calculation');
           setAllProgressData([]);
           setProgressData([]);
           
           // Reset stats to default values
+          console.log('[STATS DEBUG] Setting default stats (no routines)');
           setStats({
             totalRoutines: 0,
             totalMinutes: 0,
@@ -329,9 +421,10 @@ export function useProgressData() {
           });
         }
       } catch (error) {
-        console.error('Error loading progress data:', error);
+        console.error('[STATS ERROR] Error loading progress data:', error);
       } finally {
         setIsLoading(false);
+        console.log('[STATS DEBUG] Initial data load complete');
       }
     };
     
@@ -340,6 +433,7 @@ export function useProgressData() {
 
   // Load data on component mount
   useEffect(() => {
+    console.log('[STATS DEBUG] Initial user progress load');
     loadUserProgress();
   }, [loadUserProgress]);
 

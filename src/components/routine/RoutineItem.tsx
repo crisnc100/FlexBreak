@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
