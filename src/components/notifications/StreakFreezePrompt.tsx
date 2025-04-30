@@ -18,6 +18,7 @@ import * as storageService from '../../services/storageService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePremium } from '../../context/PremiumContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as dateUtils from '../../utils/progress/modules/utils/dateUtils';
 
 // Snowflake component that animates from a central source outward with various effects
 const Snowflake: React.FC<{
@@ -326,11 +327,48 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         freezesAvailable: status.freezesAvailable
       });
 
+      // More detailed logs to debug today's activity issue
+      console.log('[PROMPT DEBUG] Activity details:');
+      const today = dateUtils.today ? dateUtils.today() : new Date().toISOString().split('T')[0];
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      
+      // Check direct routine dates
+      if (streakManager.streakCache && streakManager.streakCache.routineDates) {
+        console.log('[PROMPT DEBUG] Routine dates in cache:', streakManager.streakCache.routineDates);
+        console.log(`[PROMPT DEBUG] Has today (${today}) in cache:`, streakManager.streakCache.routineDates.includes(today));
+        console.log(`[PROMPT DEBUG] Has yesterday (${yesterdayStr}) in cache:`, streakManager.streakCache.routineDates.includes(yesterdayStr));
+      }
+      
+      // Gather more conditions and explain the decision logic
+      const hasRoutineToday = await streakManager.hasRoutineToday();
+      const hasRoutineYesterday = await streakManager.hasRoutineYesterday();
+      const hasYesterdayFreeze = await streakManager.hasFreezeYesterday();
+      
+      console.log('[PROMPT DEBUG] Direct checks:', {
+        hasRoutineToday,
+        hasRoutineYesterday,
+        hasYesterdayFreeze,
+        currentStreak: status.currentStreak,
+        bestStreak: userProgress?.statistics?.bestStreak || 0
+      });
+
       // The key check should be canSaveYesterdayStreak from legacyStatus
       // This applies even when the UI still shows a streak number
       // This is what StreakFreezeCard uses as the primary check
       const hadMeaningfulStreak = status.currentStreak >= 3 || userProgress?.statistics?.bestStreak >= 3;
-      const canSave = legacyStatus.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity;
+      
+      // Modified logic to allow saving streak even with today's activity
+      const canSave = legacyStatus.canSaveYesterdayStreak && !isTrulyBroken;
+      
+      // Log the reason why canSave is true or false
+      console.log('[PROMPT DEBUG] Can save streak decision:', {
+        canSave,
+        legacyCanSaveYesterday: legacyStatus.canSaveYesterdayStreak,
+        notTrulyBroken: !isTrulyBroken,
+        todayBlockingFreeze: legacyStatus.canSaveYesterdayStreak && !isTrulyBroken && todayActivity
+      });
       
       setCanSaveStreak(canSave);
       
@@ -436,6 +474,13 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   
   // Handle use streak freeze
   const handleUseStreakFreeze = async () => {
+    console.log('[PROMPT DEBUG] Handling streak freeze with conditions:', {
+      currentStreak: streakData.currentStreak,
+      freezesAvailable: streakData.freezesAvailable,
+      canSaveStreak,
+      hasTodayActivity
+    });
+  
     // Create snowflake particle effect
     createSnowflakeEffect();
     
@@ -476,7 +521,9 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     // Save streak with freeze using the new implementation
+    console.log('[PROMPT DEBUG] Calling applyFreeze()...');
     const result = await streakManager.applyFreeze();
+    console.log('[PROMPT DEBUG] applyFreeze result:', result);
     
     if (result.success) {
       console.log('Streak saved with freeze!');
@@ -510,6 +557,11 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       }, 2500);
     } else {
       console.log('Failed to save streak with freeze.');
+      console.log('[PROMPT DEBUG] Failure details:', {
+        hasTodayActivity,
+        currentStreak: streakData.currentStreak,
+        freezesAvailable: streakData.freezesAvailable
+      });
       handleClose();
     }
   };

@@ -303,23 +303,44 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       const todayActivity = newStatus.maintainedToday;
       setHasTodayActivity(todayActivity);
       
+      // Log extensive streak details to debug
+      console.log('STREAK DEBUG - Current state:', {
+        currentStreak: newStatus.currentStreak,
+        streakBroken: status.streakBroken,
+        canSaveYesterdayStreak: status.canSaveYesterdayStreak,
+        freezesAvailable: status.freezesAvailable,
+        hasTodayActivity: todayActivity,
+        isTrulyBroken,
+        maintainedToday: newStatus.maintainedToday
+      });
+      
+      // Current logic - prevents showing apply button if user did activity today
+      const originalCanSave = status.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity;
+      
+      // New logic - would allow applying freeze even if there's activity today
+      const newLogicCanSave = status.canSaveYesterdayStreak && !isTrulyBroken;
+      
+      console.log('STREAK DEBUG - Applying logic:', {
+        currentLogic: originalCanSave,
+        newPotentialLogic: newLogicCanSave,
+        todayActivityBlockingApply: (newLogicCanSave && !originalCanSave)
+      });
+      
       // Only allow saving if:
       // 1. It's technically savable based on legacy status (missed only 1 day)
       // 2. AND we haven't missed more than 2 days (not truly broken)
-      // 3. AND the user hasn't completed a routine today (which would start a new streak)
-      // This prevents users from thinking they can apply a freeze after a long absence
-      // or after they have already started a new streak
+      // 3. Remove the restriction that prevents applying if user has completed a routine today
+      //    This allows users to restore their previous streak even if they've already started a new one
       
       // When a streak is truly broken, we don't want to show the apply button
-      // If they've already completed a routine today, they're starting a new streak
+      // But now we allow applying even if user has completed a routine today
       setCanSaveStreak(
         status.canSaveYesterdayStreak && 
-        !isTrulyBroken && 
-        !todayActivity
+        !isTrulyBroken
       );
       
       // Start animations only if streak can actually be saved
-      if (status.streakBroken && !recentlySaved && status.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity) {
+      if (status.streakBroken && !recentlySaved && status.canSaveYesterdayStreak && !isTrulyBroken) {
         startPulseAnimation();
         startRotateAnimation();
       }
@@ -425,7 +446,24 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   
   // Handle applying a streak freeze
   const handleApplyStreakFreeze = async () => {
-    if (!canSaveStreak) return;
+    if (!canSaveStreak) {
+      console.log('Cannot apply streak freeze because canSaveStreak is false. Current conditions:', {
+        streakBroken: isStreakBroken,
+        hasTodayActivity,
+        recentlySaved,
+        freezeCount,
+        currentStreak
+      });
+      return;
+    }
+    
+    console.log('Applying streak freeze with conditions:', {
+      streakBroken: isStreakBroken,
+      hasTodayActivity,
+      recentlySaved,
+      freezeCount,
+      currentStreak
+    });
     
     try {
       // Disable the button immediately to prevent double-tap
@@ -454,7 +492,10 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       // Apply the streak freeze with a small artificial delay
       // to ensure animations have time to play smoothly
       setTimeout(async () => {
+        console.log('Calling applyFreeze() from handleApplyStreakFreeze...');
         const result = await streakManager.applyFreeze();
+        
+        console.log('Apply freeze result:', result);
         
         if (result.success) {
           // Apply quick haptic feedback on success
@@ -492,6 +533,12 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
           
         } else {
           console.error('Failed to apply streak freeze');
+          console.log('Freeze apply failure details:', {
+            streakBroken: isStreakBroken,
+            hasTodayActivity,
+            currentStreak,
+            freezeCount
+          });
           // Show error feedback
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           setIsLoading(false);

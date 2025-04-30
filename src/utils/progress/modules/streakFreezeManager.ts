@@ -31,6 +31,18 @@ export const isFreezeAvailable = async (): Promise<boolean> => {
     
     console.log(`[FREEZE DEBUG] Freeze availability check: canFreeze=${streakStatus.canFreeze}, freezesAvailable=${streakStatus.freezesAvailable}, isAvailable=${isAvailable}`);
     
+    // Additional logging to debug today activity issue
+    const today = dateUtils.today();
+    const todayActivity = await simpleStreakManager.hasRoutineToday();
+    console.log(`[FREEZE DEBUG] Today (${today}) activity check: ${todayActivity}`);
+    
+    // Get detailed streak status
+    const legacyStatus = await simpleStreakManager.getLegacyStreakStatus();
+    console.log(`[FREEZE DEBUG] Legacy streak status: canSaveYesterdayStreak=${legacyStatus.canSaveYesterdayStreak}, streakBroken=${legacyStatus.streakBroken}, hasTodayActivity=${legacyStatus.hasTodayActivity}`);
+    
+    const isTrulyBroken = await simpleStreakManager.isStreakBroken();
+    console.log(`[FREEZE DEBUG] Is streak truly broken (3+ days missed): ${isTrulyBroken}`);
+    
     return isAvailable;
   } catch (error) {
     console.error('[FREEZE ERROR] Error checking streak freeze availability:', error);
@@ -149,6 +161,15 @@ export const applyFreeze = async (): Promise<{
   try {
     console.log('[FREEZE DEBUG] Attempting to apply streak freeze');
     
+    // Log detailed streak info before applying
+    const beforeStatus = await simpleStreakManager.getLegacyStreakStatus();
+    console.log(`[FREEZE DEBUG] Status before applying: streakBroken=${beforeStatus.streakBroken}, currentStreak=${beforeStatus.currentStreak}, canSaveYesterdayStreak=${beforeStatus.canSaveYesterdayStreak}, freezesAvailable=${beforeStatus.freezesAvailable}, hasTodayActivity=${beforeStatus.hasTodayActivity}`);
+    
+    // Check today's activity explicitly
+    const todayActivity = await simpleStreakManager.hasRoutineToday();
+    const yestActivity = await simpleStreakManager.hasRoutineYesterday(); 
+    console.log(`[FREEZE DEBUG] Activity checks - Today: ${todayActivity}, Yesterday: ${yestActivity}`);
+    
     // Apply freeze through the simpleStreakManager with retry for version conflicts
     const result = await simpleStreakManager.applyFreeze();
     
@@ -163,6 +184,10 @@ export const applyFreeze = async (): Promise<{
       
       console.log(`[FREEZE DEBUG] Successfully applied freeze for ${yesterdayStr}, remaining freezes: ${result.remainingFreezes}`);
       
+      // Log detailed streak info after applying
+      const afterStatus = await simpleStreakManager.getLegacyStreakStatus();
+      console.log(`[FREEZE DEBUG] Status after applying: streakBroken=${afterStatus.streakBroken}, currentStreak=${afterStatus.currentStreak}, freezesAvailable=${afterStatus.freezesAvailable}`);
+      
       return {
         success: true,
         appliedDate: yesterdayStr,
@@ -170,6 +195,18 @@ export const applyFreeze = async (): Promise<{
       };
     } else {
       console.log(`[FREEZE DEBUG] Failed to apply freeze, remaining freezes: ${result.remainingFreezes}`);
+      
+      // Log reason for failure if possible
+      if (beforeStatus.freezesAvailable <= 0) {
+        console.log(`[FREEZE DEBUG] Failure reason: No freezes available`);
+      } else if (!beforeStatus.canSaveYesterdayStreak) {
+        console.log(`[FREEZE DEBUG] Failure reason: Cannot save yesterday's streak`);
+      } else if (await simpleStreakManager.isStreakBroken()) {
+        console.log(`[FREEZE DEBUG] Failure reason: Streak truly broken (missed more than 2 days)`);
+      } else {
+        console.log(`[FREEZE DEBUG] Failure reason: Unknown`);
+      }
+      
       return {
         success: false,
         appliedDate: '',

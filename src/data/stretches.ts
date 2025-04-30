@@ -656,8 +656,8 @@ const stretches: Stretch[] = [
     level: "beginner",
     image: markAsVideo(require('../../assets/stretchData/id45_thread_the_needle_grass/image.mp4')),
     hasDemo: true,
-    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id46_thread_the_needle_grass/video.mp4' },
-    demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id46_thread_the_needle_grass/audio.mp3' },
+    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id45_thread_the_needle_grass/video.mp4' },
+    demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id45_thread_the_needle_grass/audio.mp3' },
   },
   {
     id: 46,

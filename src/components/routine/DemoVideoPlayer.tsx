@@ -7,7 +7,8 @@ import {
   Dimensions,
   Animated,
   ActivityIndicator,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Audio } from 'expo-av';
@@ -17,6 +18,24 @@ import NetInfo from '@react-native-community/netinfo';
 
 const { width, height } = Dimensions.get('window');
 
+// Define loading state constants
+const LOADING_STATES = {
+  INITIAL: 'initial',
+  CHECKING_NETWORK: 'checking_network',
+  LOADING_METADATA: 'loading_metadata',
+  BUFFERING: 'buffering',
+  READY: 'ready',
+  ERROR: 'error'
+};
+
+// Define network strength constants
+const NETWORK_STRENGTH = {
+  NONE: 'none',
+  WEAK: 'weak',
+  MEDIUM: 'medium',
+  STRONG: 'strong'
+};
+
 export interface DemoVideoPlayerProps {
   videoSource: any;
   audioSource?: any;
@@ -24,6 +43,7 @@ export interface DemoVideoPlayerProps {
   autoPlay?: boolean;
   initialMuted?: boolean;
   onVideoEnd?: () => void;
+  thumbnailSource?: any; // Add thumbnail support
 }
 
 const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
@@ -32,13 +52,22 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
   onClose,
   autoPlay = false,
   initialMuted = false,
-  onVideoEnd
+  onVideoEnd,
+  thumbnailSource
 }) => {
   // State updates counter to prevent excessive re-renders
   const stateUpdateCounterRef = useRef(0);
   
+  // Enhanced loading states
+  const [loadingState, setLoadingState] = useState(LOADING_STATES.INITIAL);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [bufferingProgress, setBufferingProgress] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [errorDetails, setErrorDetails] = useState<{code: string, message: string} | null>(null);
+  
   // Network state
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [networkStrength, setNetworkStrength] = useState<string | null>(null);
   const [networkError, setNetworkError] = useState<boolean>(false);
   
   // Video state
@@ -62,6 +91,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
   const videoRef = useRef<Video>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -76,20 +106,66 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
     isAudioReadyRef.current = isAudioReady;
   }, [isAudioReady]);
   
-  // Check network connectivity on mount
+  // Check network connectivity on mount with enhanced detection
   useEffect(() => {
     const checkConnection = async () => {
+      setLoadingState(LOADING_STATES.CHECKING_NETWORK);
       try {
         const netInfo = await NetInfo.fetch();
         setIsConnected(netInfo.isConnected);
         
-        if (!netInfo.isConnected && isRemoteSource(videoSource)) {
+        // Determine network strength
+        if (!netInfo.isConnected) {
+          setNetworkStrength(NETWORK_STRENGTH.NONE);
+          setLoadingState(LOADING_STATES.ERROR);
+          setErrorDetails({
+            code: 'no_connection',
+            message: 'No internet connection available. Please check your connection and try again.'
+          });
           setNetworkError(true);
           setIsLoading(false);
+          return;
+        }
+        
+        // Assess connection quality
+        if (netInfo.type === 'wifi' || netInfo.type === 'ethernet') {
+          setNetworkStrength(NETWORK_STRENGTH.STRONG);
+        } else if (netInfo.type === 'cellular') {
+          // Check cellular generation (4g, 5g, etc.)
+          if (netInfo.details?.cellularGeneration === '4g' || netInfo.details?.cellularGeneration === '5g') {
+            setNetworkStrength(NETWORK_STRENGTH.STRONG);
+          } else if (netInfo.details?.cellularGeneration === '3g') {
+            setNetworkStrength(NETWORK_STRENGTH.MEDIUM);
+          } else {
+            setNetworkStrength(NETWORK_STRENGTH.WEAK);
+          }
+        } else {
+          setNetworkStrength(NETWORK_STRENGTH.WEAK);
+        }
+        
+        // Only check for remote videos
+        if (isRemoteSource(videoSource)) {
+          if (!netInfo.isConnected) {
+            setNetworkError(true);
+            setIsLoading(false);
+            setLoadingState(LOADING_STATES.ERROR);
+          } else {
+            // Proceed to loading content
+            setLoadingState(LOADING_STATES.LOADING_METADATA);
+          }
+        } else {
+          // Local file, proceed directly
+          setLoadingState(LOADING_STATES.LOADING_METADATA);
         }
       } catch (error) {
         console.error('Error checking network:', error);
         setIsConnected(false);
+        setNetworkStrength(NETWORK_STRENGTH.NONE);
+        setLoadingState(LOADING_STATES.ERROR);
+        setErrorDetails({
+          code: 'network_check_failed',
+          message: 'Unable to check network status. Please ensure you have an active internet connection.'
+        });
       }
     };
     
@@ -102,11 +178,20 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
       if (!state.isConnected && isRemoteSource(videoSource)) {
         setNetworkError(true);
         setIsLoading(false);
+        setLoadingState(LOADING_STATES.ERROR);
+        setErrorDetails({
+          code: 'connection_lost',
+          message: 'Internet connection lost. Please reconnect and try again.'
+        });
       }
     });
     
     return () => {
       unsubscribe();
+      // Clean up any retry attempts
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
     };
   }, [videoSource]);
   
@@ -175,6 +260,58 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
       console.error('Error formatting audio source:', error);
       // Return a placeholder or null
       return null;
+    }
+  };
+  
+  // Error handling with retry mechanism
+  const handleLoadError = (error: any) => {
+    // Determine error type and set appropriate message
+    let errorCode = 'unknown_error';
+    let errorMessage = 'An unknown error occurred while loading the video.';
+    
+    if (error) {
+      if (error.code === -1100) {
+        errorCode = 'file_not_found';
+        errorMessage = 'The video file could not be found. Please try again later.';
+      } else if (error.code === -1001) {
+        errorCode = 'timeout';
+        errorMessage = 'Connection timed out. Please check your internet speed.';
+      } else if (error.code) {
+        errorCode = `error_${error.code}`;
+        errorMessage = `Playback error (${error.code}). Please try again later.`;
+      }
+    }
+    
+    setErrorDetails({ code: errorCode, message: errorMessage });
+    
+    // Implement retry with backoff
+    if (retryCount < 3) {
+      const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+      const updatedMessage = `${errorMessage} Retrying in ${delay/1000} seconds...`;
+      
+      setErrorDetails({
+        code: errorCode,
+        message: updatedMessage
+      });
+      
+      // Clear any existing retry timeout
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+      
+      // Set new retry timeout
+      retryTimeoutRef.current = setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        setLoadingState(LOADING_STATES.LOADING_METADATA);
+        
+        // Attempt to reload the video
+        if (videoRef.current) {
+          videoRef.current.loadAsync(formatVideoSource(videoSource));
+        }
+      }, delay);
+    } else {
+      setLoadingState(LOADING_STATES.ERROR);
+      setNetworkError(true);
     }
   };
   
@@ -302,13 +439,22 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
     }
   };
   
-  // Handle video playback status updates
+  // Handle video playback status updates with enhanced buffering detection
   const handleVideoStatusUpdate = async (status: AVPlaybackStatus) => {
     // Check if video has just loaded
     if ('isLoaded' in status && status.isLoaded) {
-      if (isLoadingRef.current) {
+      // Track buffering state
+      if (status.isBuffering) {
+        setLoadingState(LOADING_STATES.BUFFERING);
+        // Calculate approximate buffering progress
+        if (status.playableDurationMillis && status.durationMillis) {
+          const buffered = (status.playableDurationMillis / status.durationMillis) * 100;
+          setBufferingProgress(Math.min(buffered, 100));
+        }
+      } else if (isLoadingRef.current) {
         setIsLoading(false);
         isLoadingRef.current = false;
+        setLoadingState(LOADING_STATES.READY);
       }
       
       // Update pause state only if it changed to avoid circular updates
@@ -371,7 +517,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
       console.error('Video playback error:', status.error);
       setIsLoading(false);
       isLoadingRef.current = false;
-      setNetworkError(true);
+      handleLoadError(status.error);
     }
   };
   
@@ -563,34 +709,112 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
   
+  // Improved loading UI with state-based content
+  const renderLoadingUI = () => {
+    switch (loadingState) {
+      case LOADING_STATES.CHECKING_NETWORK:
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingText}>Checking connection...</Text>
+            {thumbnailSource && (
+              <Image 
+                source={formatVideoSource(thumbnailSource)} 
+                style={styles.thumbnailImage}
+                resizeMode="contain" 
+              />
+            )}
+          </View>
+        );
+        
+      case LOADING_STATES.LOADING_METADATA:
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingText}>Preparing video...</Text>
+            {thumbnailSource && (
+              <Image 
+                source={formatVideoSource(thumbnailSource)} 
+                style={styles.thumbnailImage} 
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        );
+        
+      case LOADING_STATES.BUFFERING:
+        return (
+          <View style={styles.loadingContainer}>
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressBar, {width: `${bufferingProgress}%`}]} />
+            </View>
+            <Text style={styles.loadingText}>
+              Buffering video... {Math.round(bufferingProgress)}%
+            </Text>
+            {networkStrength === NETWORK_STRENGTH.WEAK && (
+              <Text style={styles.networkText}>
+                Slow connection detected. Video quality may be reduced.
+              </Text>
+            )}
+            {thumbnailSource && (
+              <Image 
+                source={formatVideoSource(thumbnailSource)} 
+                style={styles.thumbnailImage} 
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        );
+        
+      case LOADING_STATES.ERROR:
+        return (
+          <View style={styles.networkErrorContainer}>
+            <Ionicons name="alert-circle" size={50} color="#FFFFFF" />
+            <Text style={styles.networkErrorText}>
+              {errorDetails?.message || 'Error loading video'}
+            </Text>
+            {retryCount < 3 && (
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={() => {
+                  setRetryCount(0);
+                  setLoadingState(LOADING_STATES.LOADING_METADATA);
+                  if (videoRef.current) {
+                    videoRef.current.loadAsync(formatVideoSource(videoSource));
+                  }
+                }}
+              >
+                <Text style={styles.retryText}>Try Again</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.controlButton, { marginTop: 20 }]}
+              onPress={onClose}
+            >
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        );
+        
+      default:
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        );
+    }
+  };
+  
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
-      {/* Loading indicator */}
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-        </View>
-      )}
+      {/* Loading states */}
+      {(isLoading || loadingState === LOADING_STATES.BUFFERING) && renderLoadingUI()}
       
-      {/* Network error indicator */}
-      {networkError && (
-        <View style={styles.networkErrorContainer}>
-          <Ionicons name="cloud-offline" size={50} color="#FFFFFF" />
-          <Text style={styles.networkErrorText}>
-            No internet connection.{'\n'}
-            Demo videos require an internet connection.
-          </Text>
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={onClose}
-          >
-            <Ionicons name="close" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Network/loading error indicator */}
+      {loadingState === LOADING_STATES.ERROR && renderLoadingUI()}
       
       {/* Video player with fade-in animation */}
-      {!networkError && (
+      {loadingState !== LOADING_STATES.ERROR && (
         <Animated.View 
           style={[
             styles.videoWrapper,
@@ -602,7 +826,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
             style={styles.videoContainer}
             activeOpacity={0.9}
             onPress={handleVideoContainerTap}
-            disabled={isLoading}
+            disabled={isLoading || loadingState === LOADING_STATES.BUFFERING}
           >
             <Video
               ref={videoRef}
@@ -618,14 +842,25 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
               positionMillis={0}
               onError={(error) => {
                 console.error('Video playback error:', error);
-                setNetworkError(true);
+                handleLoadError(error);
+              }}
+              onLoadStart={() => {
+                setLoadingState(LOADING_STATES.LOADING_METADATA);
+              }}
+              onLoad={() => {
+                setLoadingState(LOADING_STATES.READY);
+                setIsLoading(false);
+                isLoadingRef.current = false;
+              }}
+              onReadyForDisplay={() => {
+                setLoadingState(LOADING_STATES.READY);
                 setIsLoading(false);
                 isLoadingRef.current = false;
               }}
             />
             
-            {/* Video controls overlay */}
-            {controlsVisible && !isLoading && (
+            {/* Video controls overlay - only show when video is ready */}
+            {controlsVisible && !isLoading && loadingState === LOADING_STATES.READY && (
               <Animated.View 
                 style={[
                   styles.controlsOverlay,
@@ -700,7 +935,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
             )}
             
             {/* Play button overlay (only shown when paused and controls are not visible) */}
-            {isVideoPaused && !isLoading && !controlsVisible && (
+            {isVideoPaused && !isLoading && loadingState === LOADING_STATES.READY && !controlsVisible && (
               <TouchableOpacity 
                 style={styles.playButtonOverlay}
                 onPress={handlePlayPause}
@@ -740,7 +975,40 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     zIndex: 10,
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  networkText: {
+    color: '#FFC107',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    maxWidth: '80%',
+  },
+  progressContainer: {
+    width: '80%',
+    height: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 5,
+    marginTop: 20,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+  },
+  thumbnailImage: {
+    width: '80%',
+    height: 200,
+    marginTop: 20,
+    opacity: 0.6,
+    borderRadius: 8,
   },
   networkErrorContainer: {
     position: 'absolute',
@@ -759,6 +1027,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginVertical: 20,
+    maxWidth: '80%',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 16,
+  },
+  retryText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   videoWrapper: {
     flex: 1,
