@@ -2,6 +2,7 @@
 import * as InAppPurchases from 'expo-in-app-purchases';
 import { Platform } from 'react-native';
 import * as storageService from './storageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define product IDs (using proper App Store IDs)
 export const PRODUCTS = {
@@ -59,6 +60,20 @@ export const initializeIAP = async () => {
         if (results && Array.isArray(results)) {
           results.forEach((purchase, index) => {
             console.log(`Processing purchase result ${index + 1}/${results.length}`);
+            
+            // Save the successful purchase to AsyncStorage so we can verify it later if direct IAP response fails
+            try {
+              const purchaseKey = `last_purchase_${purchase.productId}`;
+              const purchaseData = JSON.stringify({
+                timestamp: Date.now(),
+                purchase: purchase
+              });
+              AsyncStorage.setItem(purchaseKey, purchaseData)
+                .then(() => console.log(`Stored successful purchase data for ${purchase.productId}`))
+                .catch(e => console.error('Error storing purchase data:', e));
+            } catch (e) {
+              console.error('Error preparing purchase data for storage:', e);
+            }
             
             // Complete the transaction after handling it
             if (Platform.OS === 'ios') {
@@ -149,18 +164,83 @@ export const purchaseSubscription = async (productId: string, updateSubscription
     
     // Make the purchase
     let purchaseResponse;
-    try {
-      console.log('Calling purchaseItemAsync...');
-      purchaseResponse = await InAppPurchases.purchaseItemAsync(productId);
-      console.log('Purchase response received:', JSON.stringify(purchaseResponse, null, 2));
-    } catch (e) {
-      console.error('Purchase error (thrown exception):', e);
-      return { success: false, error: e };
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    // Try multiple times in case of sandbox issues
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`Attempt ${retryCount + 1}/${maxRetries}: Calling purchaseItemAsync...`);
+        purchaseResponse = await InAppPurchases.purchaseItemAsync(productId);
+        console.log('Purchase response received:', JSON.stringify(purchaseResponse, null, 2));
+        
+        if (purchaseResponse) {
+          break; // Got a valid response, exit retry loop
+        }
+        
+        // Wait before retry
+        retryCount++;
+        if (retryCount < maxRetries) {
+          console.log(`No valid response, will retry in 1 second (attempt ${retryCount}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (e) {
+        console.error(`Purchase attempt ${retryCount + 1} error:`, e);
+        retryCount++;
+        
+        if (retryCount < maxRetries) {
+          console.log(`Will retry in 1 second (attempt ${retryCount}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          throw e; // Rethrow the last error if all retries failed
+        }
+      }
     }
     
     // Handle case where response might be null
     if (!purchaseResponse) {
-      console.error('Purchase response is null');
+      console.error(`Purchase failed after ${maxRetries} attempts with no valid response`);
+      
+      // Check if purchase might have succeeded but we didn't get the response
+      // Adding a small delay to allow purchase listener to process any transaction
+      console.log('Waiting 2 seconds before checking for successful transaction...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Try to get purchase history to verify if purchase succeeded
+      try {
+        console.log('Checking purchase history for newly completed transaction...');
+        const historyResponse = await InAppPurchases.getPurchaseHistoryAsync();
+        
+        if (historyResponse.responseCode === InAppPurchases.IAPResponseCode.OK && 
+            historyResponse.results && 
+            historyResponse.results.length > 0) {
+            
+          // Look for a very recent purchase of this product
+          const recentPurchase = historyResponse.results.find(purchase => 
+            purchase.productId === productId
+          );
+          
+          if (recentPurchase) {
+            console.log('Found recent purchase in history:', recentPurchase);
+            
+            // Format subscription details
+            const subscriptionDetails = formatSubscriptionDetails(recentPurchase);
+            
+            // Update subscription details and premium status
+            if (updateSubscription) {
+              await updateSubscription(subscriptionDetails);
+            } else {
+              await storageService.saveSubscriptionDetails(subscriptionDetails);
+              await storageService.saveIsPremium(true);
+            }
+            
+            return { success: true, purchase: recentPurchase, subscriptionDetails, recovered: true };
+          }
+        }
+      } catch (historyError) {
+        console.error('Error checking purchase history:', historyError);
+      }
+      
       return { success: false, error: 'No result from purchase' };
     }
     
@@ -211,6 +291,47 @@ export const purchaseSubscription = async (productId: string, updateSubscription
 export const restorePurchases = async (updateSubscription: Function) => {
   try {
     console.log('Restoring purchases...');
+    
+    // First check if we have a recent successful purchase stored in AsyncStorage
+    try {
+      const productIDs = Object.values(PRODUCTS);
+      for (const productId of productIDs) {
+        const purchaseKey = `last_purchase_${productId}`;
+        const storedPurchaseData = await AsyncStorage.getItem(purchaseKey);
+        
+        if (storedPurchaseData) {
+          const parsedData = JSON.parse(storedPurchaseData);
+          const timestamp = parsedData.timestamp || 0;
+          const purchase = parsedData.purchase;
+          
+          // Only consider purchases in the last 5 minutes
+          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+          
+          if (timestamp > fiveMinutesAgo && purchase) {
+            console.log(`Found recent purchase for ${productId} from ${new Date(timestamp).toISOString()}`);
+            
+            // Format subscription details
+            const subscriptionDetails = formatSubscriptionDetails(purchase);
+            
+            // Update subscription details and premium status
+            if (updateSubscription) {
+              await updateSubscription(subscriptionDetails);
+            } else {
+              // Fallback to old method if context function not available
+              await storageService.saveSubscriptionDetails(subscriptionDetails);
+              await storageService.saveIsPremium(true);
+            }
+            
+            // Clean up the stored purchase
+            await AsyncStorage.removeItem(purchaseKey);
+            
+            return { success: true, hasPurchases: true, subscriptionDetails, fromRecent: true };
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error checking for recent purchases:', e);
+    }
     
     // Fetch purchase history
     let historyResponse;

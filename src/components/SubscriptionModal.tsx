@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  SafeAreaView, FlatList, ScrollView, ActivityIndicator
+  SafeAreaView, FlatList, ScrollView, ActivityIndicator, AppState
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -89,17 +89,71 @@ export default function SubscriptionModal({ visible, onClose }){
   const onBuy=async(pid:string)=>{
     setBusy(true);
     console.log(`[SubscriptionModal] Starting purchase for product ID: ${pid}`);
-    const res=await purchaseSubscription(pid,updateSubscription);
-    console.log(`[SubscriptionModal] Purchase result: ${JSON.stringify(res, null, 2)}`);
     
-    if(res.success) {
-      console.log('[SubscriptionModal] Purchase successful, unlocking premium features');
-      await unlockPremiumLocally();
-    } else {
-      console.error('[SubscriptionModal] Purchase failed:', res.error || res.responseCode);
+    // Track if we started a purchase
+    let purchaseStarted = false;
+    
+    try {
+      // Set up app state change listener to detect return from payment sheet
+      const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
+        console.log(`[SubscriptionModal] App state changed to: ${nextAppState}`);
+        
+        // Only proceed if we're returning to the foreground after starting a purchase
+        if (purchaseStarted && nextAppState === 'active') {
+          console.log('[SubscriptionModal] App returned to foreground after purchase attempt, checking purchases');
+          
+          // Remove the listener since we only need it once
+          appStateSubscription.remove();
+          
+          // Check if the purchase was successful by checking purchase history
+          try {
+            const restoreResult = await restorePurchases(updateSubscription);
+            console.log(`[SubscriptionModal] Purchase verification result:`, JSON.stringify(restoreResult, null, 2));
+            
+            if (restoreResult.success && restoreResult.hasPurchases) {
+              console.log('[SubscriptionModal] Purchase verified successfully, unlocking premium features');
+              await unlockPremiumLocally();
+              setBusy(false);
+              onClose();
+              return;
+            }
+          } catch (verifyError) {
+            console.error('[SubscriptionModal] Error verifying purchase:', verifyError);
+          }
+        }
+      });
+      
+      // Mark that we're starting a purchase
+      purchaseStarted = true;
+      
+      // Attempt the purchase
+      const res = await purchaseSubscription(pid, updateSubscription);
+      console.log(`[SubscriptionModal] Purchase result: ${JSON.stringify(res, null, 2)}`);
+      
+      // If the purchase was successful directly
+      if (res.success) {
+        console.log('[SubscriptionModal] Purchase successful, unlocking premium features');
+        await unlockPremiumLocally();
+        // Remove the listener since we succeeded directly
+        appStateSubscription.remove();
+      } else {
+        console.error('[SubscriptionModal] Purchase failed:', res.error || res.responseCode);
+        // Wait for the app state listener to potentially capture the successful purchase
+        // If after 10 seconds we don't get a success, show an error
+        setTimeout(() => {
+          if (busy) {
+            alert('Purchase failed or timed out. Please try again later.');
+            setBusy(false);
+            appStateSubscription.remove();
+          }
+        }, 10000);
+      }
+    } catch (error) {
+      console.error('[SubscriptionModal] Purchase error:', error);
       alert('Purchase failed. Please try again later.');
+      setBusy(false);
+      onClose();
     }
-    setBusy(false); onClose();
   };
 
   const onRestore=async()=>{
@@ -172,6 +226,21 @@ export default function SubscriptionModal({ visible, onClose }){
               <TouchableOpacity onPress={onRestore} disabled={busy} style={{marginTop:18}}>
                 <Text style={styles.restore}>Restore purchase</Text>
               </TouchableOpacity>
+
+              {/* Development-only override (REMOVE IN PRODUCTION) */}
+              {__DEV__ && (
+                <TouchableOpacity 
+                  onPress={async () => {
+                    console.log('[DEV MODE] Force unlocking premium features');
+                    await unlockPremiumLocally();
+                    onClose();
+                  }} 
+                  style={{marginTop:10, padding:8, backgroundColor:'#ffcc00', borderRadius:4}}>
+                  <Text style={{fontSize:12, textAlign:'center', color:'#333'}}>
+                    DEV ONLY: Force Unlock Premium
+                  </Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
         </View>

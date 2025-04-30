@@ -70,6 +70,16 @@ const soundUris: Record<SoundEffect, any> = {
  */
 export const initSoundSystem = async (): Promise<void> => {
   try {
+    // Configure audio mode for iOS and Android
+    await Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      allowsRecordingIOS: false,
+      staysActiveInBackground: false,
+      interruptionModeIOS: 1, // DoNotMix
+      interruptionModeAndroid: 1, // DoNotMix
+      shouldDuckAndroid: true,
+    });
+
     // Load sound preference from storage
     const storedPreference = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
     if (storedPreference !== null) {
