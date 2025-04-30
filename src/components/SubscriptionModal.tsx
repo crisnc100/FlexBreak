@@ -47,39 +47,74 @@ export default function SubscriptionModal({ visible, onClose }){
   useEffect(()=>{ if(!visible) return;
     (async()=>{
       setProducts(null);
+      console.log('[SubscriptionModal] Fetching product information');
       try{
         if(await initializeIAP()){
+          console.log('[SubscriptionModal] Successfully initialized IAP');
           const list=await getProducts();
+          console.log(`[SubscriptionModal] Products retrieved: ${list.length}`);
           setProducts(list);
-        }else setProducts([]);
-      }catch(e){ console.warn('getProducts',e); setProducts([]);}
+        }else {
+          console.error('[SubscriptionModal] Failed to initialize IAP');
+          setProducts([]);
+        }
+      }catch(e){
+        console.error('[SubscriptionModal] Error loading products:',e);
+        setProducts([]);
+      }
     })();
   },[visible]);
 
   /* side-effects after unlock */
   const unlockPremiumLocally=async()=>{
-    const cur=await storageService.getUserProgress();
-    if(!cur.rewards) await storageService.saveUserProgress({
-      ...cur, rewards:createInitialRewards()
-    });
-    await setPremiumStatus(true);
-    await soundEffects.playPremiumUnlockedSound().catch(()=>{});
-    gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
-    await refreshPremiumStatus?.(); refreshAccess?.(); refreshData?.(); refreshTheme?.();
+    console.log('[SubscriptionModal] Unlocking premium features locally');
+    try {
+      const cur=await storageService.getUserProgress();
+      if(!cur.rewards) {
+        console.log('[SubscriptionModal] Creating initial rewards');
+        await storageService.saveUserProgress({
+          ...cur, rewards:createInitialRewards()
+        });
+      }
+      await setPremiumStatus(true);
+      await soundEffects.playPremiumUnlockedSound().catch(()=>{});
+      gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
+      await refreshPremiumStatus?.(); refreshAccess?.(); refreshData?.(); refreshTheme?.();
+      console.log('[SubscriptionModal] Premium unlock completed successfully');
+    } catch (error) {
+      console.error('[SubscriptionModal] Error during premium unlock:',error);
+    }
   };
 
   const onBuy=async(pid:string)=>{
     setBusy(true);
+    console.log(`[SubscriptionModal] Starting purchase for product ID: ${pid}`);
     const res=await purchaseSubscription(pid,updateSubscription);
-    if(res.success) await unlockPremiumLocally(); else alert('Purchase failed');
+    console.log(`[SubscriptionModal] Purchase result: ${JSON.stringify(res, null, 2)}`);
+    
+    if(res.success) {
+      console.log('[SubscriptionModal] Purchase successful, unlocking premium features');
+      await unlockPremiumLocally();
+    } else {
+      console.error('[SubscriptionModal] Purchase failed:', res.error || res.responseCode);
+      alert('Purchase failed. Please try again later.');
+    }
     setBusy(false); onClose();
   };
 
   const onRestore=async()=>{
     setBusy(true);
+    console.log('[SubscriptionModal] Starting restore purchases flow');
     const res=await restorePurchases(updateSubscription);
-    if(res.success&&res.hasPurchases) await unlockPremiumLocally();
-    else alert('No previous purchases found.');
+    console.log(`[SubscriptionModal] Restore result: ${JSON.stringify(res, null, 2)}`);
+    
+    if(res.success&&res.hasPurchases) {
+      console.log('[SubscriptionModal] Restore successful, unlocking premium features');
+      await unlockPremiumLocally();
+    } else {
+      console.log('[SubscriptionModal] No previous purchases found or restore failed');
+      alert('No previous purchases found.');
+    }
     setBusy(false); onClose();
   };
 

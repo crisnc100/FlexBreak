@@ -51,14 +51,14 @@ let soundEnabled = true;
 
 // Map sound types to their URIs
 const soundUris: Record<SoundEffect, any> = {
-  success: require('../../assets/sounds/levelUp.mp3'),
+  success: require('../../assets/sounds/routineCompletion.mp3'),
   failure: require('../../assets/sounds/normalClick.mp3'),
   start: require('../../assets/sounds/intro2.mp3'),
   complete: require('../../assets/sounds/routineCompletion.mp3'),
-  levelUp: require('../../assets/sounds/levelUp.mp3'),
+  levelUp: require('../../assets/sounds/levelUP.mp3'),
   click: require('../../assets/sounds/normalClick.mp3'),
   timerTick: require('../../assets/sounds/normalClick.mp3'),
-  streakFreeze: require('../../assets/sounds/freeze_xboost.mp3'),
+  streakFreeze: require('../../assets/sounds/streakFreeze.mp3'),
   xpBoost: require('../../assets/sounds/freeze_xboost.mp3'),
   intro: require('../../assets/sounds/intro2.mp3'),
   premiumUnlocked: require('../../assets/sounds/unlockedPremium.mp3'),

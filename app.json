@@ -4,6 +4,7 @@
     "slug": "flexbreak",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/potentialLogo2.png",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
@@ -17,7 +18,11 @@
       }
     },
     "android": {
-      "package": "com.cristianortega.flexbreak"
+      "package": "com.cristianortega.flexbreak",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/potentialLogo2.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {},
     "plugins": [

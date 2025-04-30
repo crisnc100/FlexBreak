@@ -27,6 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
+          <string>flexbreak-app</string>
           <string>com.cristianortega.flexbreak</string>
         </array>
       </dict>
