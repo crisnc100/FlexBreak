@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
   demoVideoContainer: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
   },
   demoFooter: {
     padding: 16,

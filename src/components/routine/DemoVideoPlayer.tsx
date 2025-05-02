@@ -8,7 +8,9 @@ import {
   Animated,
   ActivityIndicator,
   Platform,
-  Image
+  Image,
+  Modal,
+  StatusBar
 } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Audio } from 'expo-av';
@@ -92,6 +94,11 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
   const soundRef = useRef<Audio.Sound | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Add fullscreen modal state
+  const [fullscreenModalVisible, setFullscreenModalVisible] = useState(false);
+  const videoPositionRef = useRef(0);
+  const wasPlayingBeforeFullscreen = useRef(false);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -455,12 +462,20 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
         setIsLoading(false);
         isLoadingRef.current = false;
         setLoadingState(LOADING_STATES.READY);
+      } else if (status.isPlaying && loadingState === LOADING_STATES.BUFFERING) {
+        // Make sure we exit buffering state when playback actually starts
+        setLoadingState(LOADING_STATES.READY);
       }
       
       // Update pause state only if it changed to avoid circular updates
       if (status.isPlaying !== !isVideoPausedRef.current) {
         setIsVideoPaused(!status.isPlaying);
         isVideoPausedRef.current = !status.isPlaying;
+        
+        // Reset loading state when play state changes
+        if (status.isPlaying && loadingState === LOADING_STATES.BUFFERING) {
+          setLoadingState(LOADING_STATES.READY);
+        }
       }
       
       // Update position and duration
@@ -483,6 +498,8 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
             const soundStatus = await soundRef.current.getStatusAsync();
             if ('isLoaded' in soundStatus && soundStatus.isLoaded) {
               await soundRef.current.stopAsync();
+              // Reset audio position to beginning for replay
+              await soundRef.current.setPositionAsync(0);
             }
           } catch (error) {
             console.error('Error stopping audio after video end:', error);
@@ -491,6 +508,10 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
         
         setIsVideoPaused(true);
         isVideoPausedRef.current = true;
+        
+        // Don't automatically reset video position - allow user to restart manually
+        // Instead, show the control overlay with play button for easy replay
+        setControlsVisible(true);
         
         // Call onVideoEnd callback if provided
         if (onVideoEnd) {
@@ -521,7 +542,73 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
     }
   };
   
-  // Play/pause the demo video and audio
+  // Toggle fullscreen mode
+  const handleToggleFullscreen = async () => {
+    soundEffects.playClickSound();
+    
+    if (!isFullscreen) {
+      // Going fullscreen - get current video state
+      if (videoRef.current) {
+        try {
+          const status = await videoRef.current.getStatusAsync();
+          if ('isLoaded' in status && status.isLoaded) {
+            // Store playback position and state for fullscreen video
+            videoPositionRef.current = status.positionMillis;
+            wasPlayingBeforeFullscreen.current = status.isPlaying;
+            
+            // Pause the current video while showing fullscreen
+            if (status.isPlaying) {
+              await videoRef.current.pauseAsync();
+            }
+            
+            // Also pause audio if it exists
+            if (soundRef.current && isAudioReadyRef.current) {
+              const soundStatus = await soundRef.current.getStatusAsync();
+              if ('isLoaded' in soundStatus && soundStatus.isLoaded && soundStatus.isPlaying) {
+                await soundRef.current.pauseAsync();
+              }
+            }
+            
+            // Show fullscreen modal
+            setIsFullscreen(true);
+            setFullscreenModalVisible(true);
+          }
+        } catch (error) {
+          console.error('Error checking video status for fullscreen:', error);
+        }
+      }
+    } else {
+      // Exit fullscreen
+      handleExitFullscreen();
+    }
+  };
+  
+  // Exit fullscreen handler
+  const handleExitFullscreen = () => {
+    setIsFullscreen(false);
+    setFullscreenModalVisible(false);
+    soundEffects.playClickSound();
+    
+    // Resume main video playback if it was playing before
+    if (wasPlayingBeforeFullscreen.current) {
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.playAsync().catch(error => {
+            console.error('Error resuming video after fullscreen:', error);
+          });
+          
+          // Also resume audio
+          if (soundRef.current && isAudioReadyRef.current) {
+            soundRef.current.playAsync().catch(error => {
+              console.error('Error resuming audio after fullscreen:', error);
+            });
+          }
+        }
+      }, 300);
+    }
+  };
+  
+  // Handle play/pause button in the regular player
   const handlePlayPause = async () => {
     if (!videoRef.current || isLoadingRef.current || networkError) return;
     
@@ -555,7 +642,29 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
           controlsTimeoutRef.current = null;
         }
       } else {
-        // Play the video
+        // Check if video has ended and needs to be reset
+        const videoStatus = await videoRef.current.getStatusAsync();
+        if ('isLoaded' in videoStatus && videoStatus.isLoaded && 
+            videoStatus.positionMillis > 0 && 
+            videoStatus.positionMillis >= videoStatus.durationMillis - 200) {
+          // Video has ended - reset position to beginning
+          await videoRef.current.setPositionAsync(0);
+          
+          // Also reset audio position if available
+          if (soundRef.current && isAudioReadyRef.current) {
+            try {
+              await soundRef.current.setPositionAsync(0);
+            } catch (error) {
+              console.error('Error resetting audio position:', error);
+            }
+          }
+        }
+        
+        // First ensure loading state is reset when manually pressing play
+        if (loadingState === LOADING_STATES.BUFFERING) {
+          setLoadingState(LOADING_STATES.READY);
+        }
+        
         await videoRef.current.playAsync();
         
         // Play the audio if it's loaded
@@ -653,25 +762,6 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
     }
   };
   
-  // Toggle fullscreen mode
-  const handleToggleFullscreen = () => {
-    soundEffects.playClickSound();
-    const newFullscreenState = !isFullscreen;
-    setIsFullscreen(newFullscreenState);
-    
-    // In fullscreen mode, hide controls immediately to show only the video
-    if (newFullscreenState) {
-      setControlsVisible(false);
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-        controlsTimeoutRef.current = null;
-      }
-    } else {
-      // When exiting fullscreen, show controls briefly
-      showControlsTemporarily();
-    }
-  };
-  
   // Handle muting/unmuting audio
   const handleToggleMute = async () => {
     try {
@@ -701,6 +791,305 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
     }
   };
   
+  // Fullscreen specific controls
+  const fullscreenVideoRef = useRef<Video>(null);
+  const [fullscreenStatus, setFullscreenStatus] = useState<{
+    isPlaying: boolean,
+    positionMillis: number,
+    durationMillis: number
+  }>({
+    isPlaying: false,
+    positionMillis: 0,
+    durationMillis: 0
+  });
+  
+  // Handle fullscreen video status updates
+  const handleFullscreenVideoStatus = (status: AVPlaybackStatus) => {
+    if ('isLoaded' in status && status.isLoaded) {
+      // Update fullscreen status state
+      setFullscreenStatus({
+        isPlaying: status.isPlaying,
+        positionMillis: status.positionMillis || 0,
+        durationMillis: status.durationMillis || 0
+      });
+      
+      // Sync audio with fullscreen video status
+      if (soundRef.current && isAudioReadyRef.current) {
+        try {
+          if (status.isPlaying) {
+            // If fullscreen video is playing, make sure audio is playing too
+            soundRef.current.getStatusAsync().then(soundStatus => {
+              if ('isLoaded' in soundStatus && soundStatus.isLoaded) {
+                if (!soundStatus.isPlaying) {
+                  // If audio is not playing but video is, start audio
+                  soundRef.current?.playAsync();
+                }
+                // Sync positions if they've drifted more than 500ms
+                if (Math.abs(soundStatus.positionMillis - status.positionMillis) > 500) {
+                  soundRef.current?.setPositionAsync(status.positionMillis);
+                }
+              }
+            }).catch(error => {
+              console.error('Error getting audio status in fullscreen:', error);
+            });
+          } else if (status.didJustFinish) {
+            // If video finished, stop audio too
+            soundRef.current.pauseAsync().then(() => {
+              soundRef.current?.setPositionAsync(0);
+            }).catch(error => {
+              console.error('Error stopping audio at end in fullscreen:', error);
+            });
+          } else if (!status.isPlaying) {
+            // If video is paused, pause audio too
+            soundRef.current.pauseAsync().catch(error => {
+              console.error('Error pausing audio in fullscreen:', error);
+            });
+          }
+        } catch (error) {
+          console.error('Error syncing audio with fullscreen video:', error);
+        }
+      }
+    }
+  };
+  
+  // Audio-video sync interval for fullscreen mode
+  useEffect(() => {
+    let syncInterval: NodeJS.Timeout | null = null;
+    
+    if (isFullscreen && fullscreenVideoRef.current && soundRef.current && isAudioReadyRef.current) {
+      // Set up interval to periodically check and sync audio with fullscreen video
+      syncInterval = setInterval(async () => {
+        try {
+          const videoStatus = await fullscreenVideoRef.current?.getStatusAsync();
+          const soundStatus = await soundRef.current?.getStatusAsync();
+          
+          if ('isLoaded' in videoStatus && videoStatus.isLoaded && 
+              'isLoaded' in soundStatus && soundStatus.isLoaded) {
+            
+            // Sync play/pause state
+            if (videoStatus.isPlaying && !soundStatus.isPlaying) {
+              await soundRef.current?.playAsync();
+            } else if (!videoStatus.isPlaying && soundStatus.isPlaying) {
+              await soundRef.current?.pauseAsync();
+            }
+            
+            // Sync positions if they've drifted more than 300ms
+            if (videoStatus.isPlaying && 
+                Math.abs(videoStatus.positionMillis - soundStatus.positionMillis) > 300) {
+              await soundRef.current?.setPositionAsync(videoStatus.positionMillis);
+            }
+          }
+        } catch (error) {
+          console.error('Error in audio-video sync interval:', error);
+        }
+      }, 1000);
+    }
+    
+    return () => {
+      if (syncInterval) {
+        clearInterval(syncInterval);
+      }
+    };
+  }, [isFullscreen]);
+  
+  // Clean up fullscreen state when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clean up any audio and video resources
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
+  
+  // Handle play/pause in fullscreen
+  const handleFullscreenPlayPause = async () => {
+    if (!fullscreenVideoRef.current) return;
+    
+    try {
+      soundEffects.playClickSound();
+      const status = await fullscreenVideoRef.current.getStatusAsync();
+      
+      if (!('isLoaded' in status) || !status.isLoaded) return;
+      
+      if (status.isPlaying) {
+        // Currently playing - pause
+        await fullscreenVideoRef.current.pauseAsync();
+        
+        // Also pause audio
+        if (soundRef.current && isAudioReadyRef.current) {
+          try {
+            const soundStatus = await soundRef.current.getStatusAsync();
+            if ('isLoaded' in soundStatus && soundStatus.isLoaded && soundStatus.isPlaying) {
+              await soundRef.current.pauseAsync();
+            }
+          } catch (error) {
+            console.error('Error pausing audio in fullscreen:', error);
+          }
+        }
+        
+        // Keep controls visible when paused
+        setControlsVisible(true);
+      } else {
+        // Currently paused - play
+        // Check if video is at the end
+        if (status.positionMillis > 0 && 
+            status.durationMillis > 0 &&
+            status.positionMillis >= status.durationMillis - 200) {
+          // Reset to beginning
+          await fullscreenVideoRef.current.setPositionAsync(0);
+          
+          // Also reset audio
+          if (soundRef.current && isAudioReadyRef.current) {
+            try {
+              await soundRef.current.setPositionAsync(0);
+            } catch (error) {
+              console.error('Error resetting audio position:', error);
+            }
+          }
+        }
+        
+        // Play video
+        await fullscreenVideoRef.current.playAsync();
+        
+        // Also play audio if available
+        if (soundRef.current && isAudioReadyRef.current) {
+          try {
+            const soundStatus = await soundRef.current.getStatusAsync();
+            if ('isLoaded' in soundStatus && soundStatus.isLoaded && !soundStatus.isPlaying) {
+              // Sync position first
+              await soundRef.current.setPositionAsync(status.positionMillis);
+              // Then play
+              await soundRef.current.playAsync();
+            }
+          } catch (error) {
+            console.error('Error playing audio in fullscreen:', error);
+          }
+        }
+        
+        // Auto-hide controls after delay
+        if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+        }
+        controlsTimeoutRef.current = setTimeout(() => {
+          setControlsVisible(false);
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('Error toggling fullscreen playback:', error);
+    }
+  };
+  
+  // Handle screen tap in fullscreen mode
+  const handleFullscreenTap = () => {
+    setControlsVisible(!controlsVisible);
+  };
+  
+  // Render the fullscreen modal
+  const renderFullscreenModal = () => {
+    if (!fullscreenModalVisible) return null;
+    
+    return (
+      <Modal
+        animationType="fade"
+        transparent={false}
+        visible={fullscreenModalVisible}
+        onRequestClose={handleExitFullscreen}
+        supportedOrientations={['portrait', 'landscape']}
+        statusBarTranslucent={true}
+        onShow={() => {
+          // When modal is shown, start playback if it was playing before
+          if (wasPlayingBeforeFullscreen.current && fullscreenVideoRef.current) {
+            setTimeout(() => {
+              fullscreenVideoRef.current?.playAsync().then(() => {
+                // Also play audio
+                if (soundRef.current && isAudioReadyRef.current) {
+                  soundRef.current.playAsync().catch(error => {
+                    console.error('Error playing audio on fullscreen start:', error);
+                  });
+                }
+              }).catch(error => {
+                console.error('Error playing video on fullscreen start:', error);
+              });
+            }, 300);
+          }
+        }}
+      >
+        <StatusBar hidden={true} />
+        <View style={styles.fullscreenContainer}>
+          {/* Fullscreen video */}
+          <Video
+            ref={fullscreenVideoRef}
+            source={formatVideoSource(videoSource)}
+            style={styles.fullscreenVideo}
+            resizeMode={ResizeMode.CONTAIN}
+            shouldPlay={wasPlayingBeforeFullscreen.current}
+            isLooping={false}
+            isMuted={true} // Always mute fullscreen video to avoid double audio
+            positionMillis={videoPositionRef.current}
+            onPlaybackStatusUpdate={handleFullscreenVideoStatus}
+            progressUpdateIntervalMillis={250}
+          />
+          
+          {/* Transparent touch layer for showing/hiding controls */}
+          <TouchableOpacity 
+            style={styles.fullscreenOverlay}
+            activeOpacity={1}
+            onPress={handleFullscreenTap}
+          >
+            {/* Empty overlay just for detecting taps */}
+          </TouchableOpacity>
+          
+          {/* Controls - only shown when controlsVisible is true */}
+          {controlsVisible && (
+            <View style={styles.fullscreenControls}>
+              {/* Exit fullscreen button */}
+              <TouchableOpacity
+                style={styles.exitFullscreenButton}
+                onPress={handleExitFullscreen}
+              >
+                <Ionicons name="close" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+              
+              {/* Play/Pause button */}
+              <TouchableOpacity
+                style={styles.fullscreenPlayPauseButton}
+                onPress={handleFullscreenPlayPause}
+              >
+                <Ionicons
+                  name={!fullscreenStatus.isPlaying ? "play" : "pause"}
+                  size={50}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+              
+              {/* Volume control - only if no separate audio */}
+              {!audioSource && (
+                <TouchableOpacity
+                  style={styles.fullscreenVolumeButton}
+                  onPress={handleToggleMute}
+                >
+                  <Ionicons
+                    name={isMuted ? "volume-mute" : "volume-high"}
+                    size={24}
+                    color="#FFFFFF"
+                  />
+                </TouchableOpacity>
+              )}
+              
+              {/* Time indicator */}
+              <View style={styles.fullscreenTimeContainer}>
+                <Text style={styles.fullscreenTimeText}>
+                  {formatTime(fullscreenStatus.positionMillis)} / {formatTime(fullscreenStatus.durationMillis)}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
+    );
+  };
+  
   // Format milliseconds to mm:ss
   const formatTime = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -711,10 +1100,16 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
   
   // Improved loading UI with state-based content
   const renderLoadingUI = () => {
+    // If we're already playing, don't show the loading UI for buffering
+    // This prevents the buffering screen from showing after a pause/play cycle
+    if (loadingState === LOADING_STATES.BUFFERING && !isVideoPaused && !isLoading) {
+      return null;
+    }
+    
     switch (loadingState) {
       case LOADING_STATES.CHECKING_NETWORK:
         return (
-          <View style={styles.loadingContainer}>
+          <View style={[styles.loadingContainer, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <ActivityIndicator size="large" color="#FFFFFF" />
             <Text style={styles.loadingText}>Checking connection...</Text>
             {thumbnailSource && (
@@ -729,7 +1124,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
         
       case LOADING_STATES.LOADING_METADATA:
         return (
-          <View style={styles.loadingContainer}>
+          <View style={[styles.loadingContainer, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <ActivityIndicator size="large" color="#FFFFFF" />
             <Text style={styles.loadingText}>Preparing video...</Text>
             {thumbnailSource && (
@@ -744,7 +1139,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
         
       case LOADING_STATES.BUFFERING:
         return (
-          <View style={styles.loadingContainer}>
+          <View style={[styles.loadingContainer, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <View style={styles.progressContainer}>
               <View style={[styles.progressBar, {width: `${bufferingProgress}%`}]} />
             </View>
@@ -768,7 +1163,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
         
       case LOADING_STATES.ERROR:
         return (
-          <View style={styles.networkErrorContainer}>
+          <View style={[styles.networkErrorContainer, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
             <Ionicons name="alert-circle" size={50} color="#FFFFFF" />
             <Text style={styles.networkErrorText}>
               {errorDetails?.message || 'Error loading video'}
@@ -798,7 +1193,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
         
       default:
         return (
-          <View style={styles.loadingContainer}>
+          <View style={[styles.loadingContainer, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <ActivityIndicator size="large" color="#FFFFFF" />
           </View>
         );
@@ -806,166 +1201,166 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
   };
   
   return (
-    <View style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
-      {/* Loading states */}
-      {(isLoading || loadingState === LOADING_STATES.BUFFERING) && renderLoadingUI()}
-      
-      {/* Network/loading error indicator */}
-      {loadingState === LOADING_STATES.ERROR && renderLoadingUI()}
-      
-      {/* Video player with fade-in animation */}
-      {loadingState !== LOADING_STATES.ERROR && (
-        <Animated.View 
-          style={[
-            styles.videoWrapper,
-            { opacity: fadeAnim },
-            isFullscreen && styles.fullscreenVideo
-          ]}
-        >
-          <TouchableOpacity 
-            style={styles.videoContainer}
-            activeOpacity={0.9}
-            onPress={handleVideoContainerTap}
-            disabled={isLoading || loadingState === LOADING_STATES.BUFFERING}
+    <View style={styles.outerContainer}>
+      <View style={styles.container}>
+        {/* Loading states */}
+        {(isLoading || loadingState === LOADING_STATES.BUFFERING) && renderLoadingUI()}
+        
+        {/* Network/loading error indicator */}
+        {loadingState === LOADING_STATES.ERROR && renderLoadingUI()}
+        
+        {/* Fullscreen modal */}
+        {renderFullscreenModal()}
+        
+        {/* Video player with fade-in animation */}
+        {loadingState !== LOADING_STATES.ERROR && (
+          <Animated.View 
+            style={[
+              styles.videoWrapper,
+              { opacity: fadeAnim }
+            ]}
           >
-            <Video
-              ref={videoRef}
-              source={formatVideoSource(videoSource)}
-              style={[styles.video, isFullscreen && styles.fullscreenVideoElement]}
-              resizeMode={isFullscreen ? ResizeMode.COVER : ResizeMode.CONTAIN}
-              shouldPlay={autoPlay}
-              isLooping={false}
-              isMuted={isMuted}
-              onPlaybackStatusUpdate={handleVideoStatusUpdate}
-              useNativeControls={false}
-              progressUpdateIntervalMillis={250} // Less frequent updates to reduce potential re-renders
-              positionMillis={0}
-              onError={(error) => {
-                console.error('Video playback error:', error);
-                handleLoadError(error);
-              }}
-              onLoadStart={() => {
-                setLoadingState(LOADING_STATES.LOADING_METADATA);
-              }}
-              onLoad={() => {
-                setLoadingState(LOADING_STATES.READY);
-                setIsLoading(false);
-                isLoadingRef.current = false;
-              }}
-              onReadyForDisplay={() => {
-                setLoadingState(LOADING_STATES.READY);
-                setIsLoading(false);
-                isLoadingRef.current = false;
-              }}
-            />
-            
-            {/* Video controls overlay - only show when video is ready */}
-            {controlsVisible && !isLoading && loadingState === LOADING_STATES.READY && (
-              <Animated.View 
-                style={[
-                  styles.controlsOverlay,
-                  { opacity: controlsFadeAnim }
-                ]}
-              >
-                {/* Top row - fullscreen toggle */}
-                <View style={styles.controlsRow}>
-                  <View style={{ flex: 1 }} />
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={handleToggleFullscreen}
-                  >
-                    <Ionicons
-                      name={isFullscreen ? "contract" : "expand"}
-                      size={24}
-                      color="#FFFFFF"
-                    />
-                  </TouchableOpacity>
-                </View>
-                
-                {/* Middle row - skip backward, play/pause, skip forward */}
-                <View style={styles.controlsMainRow}>
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={handleSkipBackward}
-                  >
-                    <Ionicons name="play-back" size={28} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.playPauseButton}
-                    onPress={handlePlayPause}
-                  >
-                    <Ionicons
-                      name={isVideoPaused ? "play" : "pause"}
-                      size={40}
-                      color="#FFFFFF"
-                    />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={handleSkipForward}
-                  >
-                    <Ionicons name="play-forward" size={28} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-                
-                {/* Bottom row - current time and mute toggle */}
-                <View style={styles.controlsRow}>
-                  <View style={styles.timeContainer}>
-                    {videoDuration > 0 && (
-                      <Text style={styles.timeText}>
-                        {formatTime(videoPosition)} / {formatTime(videoDuration)}
-                      </Text>
-                    )}
+            <TouchableOpacity 
+              style={styles.videoContainer}
+              activeOpacity={0.9}
+              onPress={handleVideoContainerTap}
+              disabled={isLoading || loadingState === LOADING_STATES.BUFFERING}
+            >
+              <Video
+                ref={videoRef}
+                source={formatVideoSource(videoSource)}
+                style={styles.video}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={autoPlay}
+                isLooping={false}
+                isMuted={isMuted}
+                onPlaybackStatusUpdate={handleVideoStatusUpdate}
+                useNativeControls={false}
+                progressUpdateIntervalMillis={250}
+                positionMillis={0}
+                onError={(error) => {
+                  console.error('Video playback error:', error);
+                  handleLoadError(error);
+                }}
+                onLoadStart={() => {
+                  setLoadingState(LOADING_STATES.LOADING_METADATA);
+                }}
+                onLoad={() => {
+                  setLoadingState(LOADING_STATES.READY);
+                  setIsLoading(false);
+                  isLoadingRef.current = false;
+                }}
+                onReadyForDisplay={() => {
+                  setLoadingState(LOADING_STATES.READY);
+                  setIsLoading(false);
+                  isLoadingRef.current = false;
+                }}
+              />
+              
+              {/* Video controls overlay - only show when video is ready */}
+              {controlsVisible && !isLoading && loadingState === LOADING_STATES.READY && (
+                <Animated.View 
+                  style={[
+                    styles.controlsOverlay,
+                    { opacity: controlsFadeAnim }
+                  ]}
+                >
+                  {/* Top row - fullscreen toggle */}
+                  <View style={styles.controlsRow}>
+                    <View style={{ flex: 1 }} />
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={handleToggleFullscreen}
+                    >
+                      <Ionicons
+                        name="expand"
+                        size={24}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
                   </View>
                   
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={handleToggleMute}
-                  >
-                    <Ionicons
-                      name={isMuted ? "volume-mute" : "volume-high"}
-                      size={24}
-                      color="#FFFFFF"
-                    />
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            )}
-            
-            {/* Play button overlay (only shown when paused and controls are not visible) */}
-            {isVideoPaused && !isLoading && loadingState === LOADING_STATES.READY && !controlsVisible && (
-              <TouchableOpacity 
-                style={styles.playButtonOverlay}
-                onPress={handlePlayPause}
-              >
-                <View style={styles.playButton}>
-                  <Ionicons name="play" size={50} color="#FFFFFF" />
-                </View>
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+                  {/* Middle row - skip backward, play/pause, skip forward */}
+                  <View style={styles.controlsMainRow}>
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={handleSkipBackward}
+                    >
+                      <Ionicons name="play-back" size={28} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.playPauseButton}
+                      onPress={handlePlayPause}
+                    >
+                      <Ionicons
+                        name={isVideoPaused ? "play" : "pause"}
+                        size={40}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={handleSkipForward}
+                    >
+                      <Ionicons name="play-forward" size={28} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* Bottom row - current time and mute toggle */}
+                  <View style={styles.controlsRow}>
+                    <View style={styles.timeContainer}>
+                      {videoDuration > 0 && (
+                        <Text style={styles.timeText}>
+                          {formatTime(videoPosition)} / {formatTime(videoDuration)}
+                        </Text>
+                      )}
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={handleToggleMute}
+                    >
+                      <Ionicons
+                        name={isMuted ? "volume-mute" : "volume-high"}
+                        size={24}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              )}
+              
+              {/* Play button overlay (only shown when paused and controls are not visible) */}
+              {isVideoPaused && !isLoading && loadingState === LOADING_STATES.READY && !controlsVisible && (
+                <TouchableOpacity 
+                  style={styles.playButtonOverlay}
+                  onPress={handlePlayPause}
+                >
+                  <View style={styles.playButton}>
+                    <Ionicons name="play" size={50} color="#FFFFFF" />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: 'transparent',
+  },
   container: {
     flex: 1,
     position: 'relative',
-    backgroundColor: '#000',
-  },
-  fullscreenContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-    elevation: 10,
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     position: 'absolute',
@@ -975,7 +1370,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     zIndex: 10,
   },
   loadingText: {
@@ -1018,7 +1413,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     zIndex: 20,
     padding: 20,
   },
@@ -1043,27 +1438,22 @@ const styles = StyleSheet.create({
   },
   videoWrapper: {
     flex: 1,
-  },
-  fullscreenVideo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
+    backgroundColor: 'transparent',
   },
   videoContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
   },
   video: {
     width: '100%',
     height: '100%',
-  },
-  fullscreenVideoElement: {
-    width: '100%',
-    height: '100%',
+    backgroundColor: 'transparent',
+    alignSelf: 'center',
   },
   controlsOverlay: {
     position: 'absolute',
@@ -1144,7 +1534,76 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-  }
+  },
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  fullscreenVideo: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  fullscreenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  fullscreenControls: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  exitFullscreenButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 40 : 20,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenPlayPauseButton: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 80,
+    height: 80,
+    marginLeft: -40,
+    marginTop: -40,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenVolumeButton: {
+    position: 'absolute',
+    bottom: 30,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenTimeContainer: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  fullscreenTimeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });
 
 export default DemoVideoPlayer; 
