@@ -39,6 +39,7 @@ import {
   DeskBreakBoost
 } from '../components/home';
 import * as notifications from '../utils/notifications';
+import * as firebaseReminders from '../utils/firebaseReminders';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
 import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
@@ -214,8 +215,8 @@ export default function HomeScreen() {
         // Load user streak
         await loadUserStreak();
 
-        // Load reminder settings
-        const settings = await notifications.getAllReminderSettings();
+        // Load Firebase reminder settings
+        const settings = await firebaseReminders.getReminderSettings();
         setReminderEnabled(settings.enabled);
         setReminderTime(settings.time);
         setReminderDays(settings.days);
@@ -308,32 +309,29 @@ export default function HomeScreen() {
     
     try {
       if (value) {
-        // If enabling reminders, ensure we schedule them
-        console.log('Enabling reminders, requesting permissions...');
-        const hasPermission = await notifications.requestNotificationsPermissions();
-        console.log('Notification permission status:', hasPermission);
+        // If enabling reminders, ensure we initialize Firebase
+        console.log('Enabling reminders, initializing Firebase...');
+        const hasPermission = await firebaseReminders.initializeFirebaseReminders();
+        console.log('Firebase permission status:', hasPermission);
         
         if (hasPermission) {
-          // Update state and storage
+          // Update state
           setReminderEnabled(true);
-          await notifications.saveReminderEnabled(true);
           
-          // Schedule "dummy" reminders with current settings (just saves settings)
-          console.log(`Scheduling reminders for time: ${reminderTime}`);
-          await notifications.scheduleReminders();
+          // Save to Firebase with current settings
+          const settings = {
+            enabled: true,
+            time: reminderTime,
+            frequency: reminderFrequency,
+            days: reminderDays,
+            message: reminderMessage || 'Time for your daily stretch!'
+          };
           
-          // Actually schedule the real notification
-          console.log('Now scheduling a real notification that will appear at the set time');
-          await notifications.scheduleRealReminder();
-          
-          // Get updated settings to verify
-          const updatedSettings = await notifications.getAllReminderSettings();
-          console.log('Updated reminder settings after enabling:', updatedSettings);
-          
-          // No alert - the UI already shows the state has changed
+          console.log('Saving reminder settings to Firebase:', settings);
+          await firebaseReminders.saveReminderSettings(settings);
         } else {
           // If permissions were denied, revert the switch
-          console.log('Notification permissions denied, not enabling reminders');
+          console.log('Firebase permissions denied, not enabling reminders');
           setReminderEnabled(false);
           Alert.alert(
             'Permission Required',
@@ -342,11 +340,20 @@ export default function HomeScreen() {
           );
         }
       } else {
-        // If disabling reminders, cancel any scheduled ones
-        console.log('Disabling reminders, cancelling any scheduled');
+        // If disabling reminders, update Firebase settings
+        console.log('Disabling reminders on Firebase');
         setReminderEnabled(false);
-        await notifications.saveReminderEnabled(false);
-        await notifications.cancelReminders();
+        
+        // Set enabled to false but keep other settings
+        const settings = {
+          enabled: false,
+          time: reminderTime,
+          frequency: reminderFrequency,
+          days: reminderDays,
+          message: reminderMessage
+        };
+        
+        await firebaseReminders.saveReminderSettings(settings);
       }
     } catch (error) {
       console.error('Error toggling reminders:', error);
@@ -354,38 +361,28 @@ export default function HomeScreen() {
     }
   };
 
-  // Helper function to format time from 24h to 12h
-  const formatTimeFor12h = (time24h: string) => {
-    try {
-      const [hours, minutes] = time24h.split(':');
-      const hour = parseInt(hours, 10);
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const hour12 = hour % 12 || 12;
-      return `${hour12}:${minutes} ${ampm}`;
-    } catch (e) {
-      return time24h;
-    }
-  };
-
   // Handle time change
   const handleTimeChange = async (time: string) => {
     console.log(`Setting reminder time to: ${time}`);
     setReminderTime(time);
-    await notifications.saveReminderTime(time);
     setTimePickerVisible(false);
 
     if (reminderEnabled) {
-      // Update the scheduled reminder with the new time
-      console.log('Reminders are enabled, rescheduling with new time');
-      await notifications.scheduleReminders();
+      // Update Firebase settings with new time
+      console.log('Reminders are enabled, updating Firebase with new time');
+      const settings = {
+        enabled: reminderEnabled,
+        time: time,
+        frequency: reminderFrequency,
+        days: reminderDays,
+        message: reminderMessage
+      };
       
-      // Get updated settings to verify
-      const updatedSettings = await notifications.getAllReminderSettings();
-      console.log('Updated reminder settings after time change:', updatedSettings);
-      
-      // No alert - the UI already shows the time has changed
+      await firebaseReminders.saveReminderSettings(settings);
     } else {
-      console.log('Reminders are not enabled, time saved but no scheduling needed');
+      // Still save the time, even if reminders are disabled
+      await firebaseReminders.setReminderTime(time);
+      console.log('Reminders are not enabled, time saved but not active');
     }
   };
 
@@ -402,12 +399,22 @@ export default function HomeScreen() {
   // Handle days selection
   const handleDaysSelected = async (days: string[]) => {
     setReminderDays(days);
-    await notifications.saveReminderDays(days);
     setDaySelectorVisible(false);
 
     if (reminderEnabled) {
-      // Update the scheduled reminder with the new days
-      await notifications.scheduleReminders();
+      // Update Firebase settings with new days
+      const settings = {
+        enabled: reminderEnabled,
+        time: reminderTime,
+        frequency: reminderFrequency,
+        days: days,
+        message: reminderMessage
+      };
+      
+      await firebaseReminders.saveReminderSettings(settings);
+    } else {
+      // Still save the days, even if reminders are disabled
+      await firebaseReminders.setReminderDays(days);
     }
   };
 
@@ -424,22 +431,32 @@ export default function HomeScreen() {
   // Handle frequency change
   const handleFrequencyChange = async (frequency: notifications.ReminderFrequency) => {
     setReminderFrequency(frequency);
-    await notifications.saveReminderFrequency(frequency);
 
     // Update days based on frequency selection
+    let updatedDays = reminderDays;
     if (frequency === 'daily') {
-      const allDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      setReminderDays(allDays);
-      await notifications.saveReminderDays(allDays);
+      updatedDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      setReminderDays(updatedDays);
     } else if (frequency === 'weekdays') {
-      const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri'];
-      setReminderDays(weekdays);
-      await notifications.saveReminderDays(weekdays);
+      updatedDays = ['mon', 'tue', 'wed', 'thu', 'fri'];
+      setReminderDays(updatedDays);
     }
 
     if (reminderEnabled) {
-      // Update the scheduled reminder with the new frequency
-      await notifications.scheduleReminders();
+      // Update Firebase settings with new frequency and days
+      const settings = {
+        enabled: reminderEnabled,
+        time: reminderTime,
+        frequency: frequency,
+        days: updatedDays,
+        message: reminderMessage
+      };
+      
+      await firebaseReminders.saveReminderSettings(settings);
+    } else {
+      // Still save settings, even if reminders are disabled
+      await firebaseReminders.setReminderFrequency(frequency);
+      await firebaseReminders.setReminderDays(updatedDays);
     }
   };
 
@@ -487,12 +504,22 @@ export default function HomeScreen() {
       : message;
     
     setReminderMessage(finalMessage);
-    await notifications.saveReminderMessage(finalMessage);
     setCustomReminderModalVisible(false);
 
     if (reminderEnabled) {
-      // Update the scheduled reminder with the new message
-      await notifications.scheduleReminders();
+      // Update Firebase settings with new message
+      const settings = {
+        enabled: reminderEnabled,
+        time: reminderTime,
+        frequency: reminderFrequency,
+        days: reminderDays,
+        message: finalMessage
+      };
+      
+      await firebaseReminders.saveReminderSettings(settings);
+    } else {
+      // Still save the message, even if reminders are disabled
+      await firebaseReminders.setReminderMessage(finalMessage);
     }
   };
 

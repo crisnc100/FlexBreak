@@ -14,7 +14,8 @@
       "bundleIdentifier": "com.cristianortega.flexbreak",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -22,11 +23,31 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/potentialLogo2.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "googleServicesFile": "./google-services.json"
     },
     "web": {},
     "plugins": [
-      "expo-dev-client"
+      "expo-dev-client",
+      "@react-native-firebase/app",
+      [
+        "@react-native-firebase/auth",
+        {
+          "appId": "1:1033066069126:ios:2b3ecbc0c5ef94df14c06e", 
+          "apiKey": "AIzaSyA5kJDW8QNfkpGJu7QixTIAdnZm4pOi5f8", 
+          "projectId": "flexbreak-28ad0",
+          "androidClientId": "1033066069126-m2r4kofhdqpvs4qfve4gg83ouvnrn6r4.apps.googleusercontent.com", 
+          "iosClientId": "1033066069126-0osjfvf74qa29qdlsnca8vu4j2j3aenk.apps.googleusercontent.com"
+        }
+      ],
+      "@react-native-firebase/firestore",
+      "@react-native-firebase/functions",
+      [
+        "@react-native-firebase/messaging",
+        {
+          "presentationOptions": ["badge", "sound", "alert"]
+        }
+      ]
     ],
     "extra": {
       "eas": {

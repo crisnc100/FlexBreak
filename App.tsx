@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated, Pressable } from 'react-native';
+import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated, Dimensions, Pressable } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -31,6 +31,26 @@ import IntroManager from './src/components/intro/IntroManager';
 import * as streakValidator from './src/utils/progress/modules/streakValidator';
 import * as Haptics from 'expo-haptics';
 import * as performance from './src/utils/performance/performance';
+import * as storageService from './src/services/storageService';
+import * as notifications from './src/utils/notifications';
+import * as firebaseReminders from './src/utils/firebaseReminders';
+
+// Initialize Firebase
+import firebase from '@react-native-firebase/app';
+import '@react-native-firebase/auth';
+import '@react-native-firebase/firestore';
+import '@react-native-firebase/functions';
+import '@react-native-firebase/messaging';
+
+// Your Firebase configuration should be loaded from GoogleService-Info.plist automatically
+// This will verify if Firebase is initialized
+if (!firebase.apps.length) {
+  console.log('Firebase initialization starting...');
+  firebase.app();
+  console.log('Firebase initialization complete');
+} else {
+  console.log('Firebase already initialized');
+}
 
 // Avoid playing intro sound twice
 let introSoundPlayed = false;
@@ -316,8 +336,30 @@ function MainApp() {
     performance.markComponentRender('MainApp');
   }, []);
   
-  // Initialize streaks and streak freezes when app launches
+  // Initialize streak system and notifications when app launches
   useEffect(() => {
+    const initApp = async () => {
+      try {
+        // First initialize local notifications (legacy system)
+        notifications.configureNotifications();
+        
+        // Next initialize Firebase reminders (for premium users)
+        try {
+          await firebaseReminders.initializeFirebaseReminders();
+          console.log('Firebase reminders initialized');
+        } catch (error) {
+          console.error('Error initializing Firebase reminders:', error);
+        }
+        
+        // Then initialize streak system
+        await initStreakSystem();
+      } catch (error) {
+        console.error('Error during app initialization:', error);
+      }
+    };
+    
+    // We need to create a separate function for streak system
+    // to keep the original code structure intact
     const initStreakSystem = async () => {
       try {
         console.log('Initializing streak system...');
@@ -346,7 +388,8 @@ function MainApp() {
       }
     };
     
-    initStreakSystem();
+    // Start app initialization
+    initApp();
   }, []);
   
   // Initialize sound effects system (but don't play intro here - we'll play it in the intro screens)

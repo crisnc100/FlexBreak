@@ -309,7 +309,7 @@ function parseTimeString(timeString: string): { hours: number; minutes: number }
  * Schedule reminder notifications based on settings
  */
 export async function scheduleReminders(): Promise<void> {
-  console.log('DUMMY SCHEDULING - NOT ACTUALLY SCHEDULING ANY NOTIFICATIONS');
+  console.log('Scheduling reminders based on user preferences');
   
   try {
     // Get all reminder settings
@@ -318,7 +318,8 @@ export async function scheduleReminders(): Promise<void> {
     
     // If reminders are not enabled, don't schedule anything
     if (!settings.enabled) {
-      console.log('Reminders not enabled, skipping scheduling');
+      console.log('Reminders not enabled, cancelling any existing reminders');
+      await cancelReminders();
       return;
     }
 
@@ -329,37 +330,115 @@ export async function scheduleReminders(): Promise<void> {
     const { hours, minutes } = parseTimeString(settings.time);
     console.log(`Setting reminders for ${hours}:${minutes}`);
 
-    // Calculate the next target time but DON'T actually schedule anything
-    const now = new Date();
-    const targetTime = new Date();
-    targetTime.setHours(hours);
-    targetTime.setMinutes(minutes);
-    targetTime.setSeconds(0);
-    targetTime.setMilliseconds(0);
+    // Get user's premium level 
+    const userProgress = await storageService.getUserProgress();
+    const isPremium = await storageService.getIsPremium();
+    const premiumLevel = isPremium ? (userProgress.level || 1) : 0;
     
-    let secondsUntilTarget;
+    console.log(`User premium level: ${premiumLevel}`);
     
-    // If the target time has already passed today, it would be scheduled for tomorrow
-    if (targetTime <= now) {
-      console.log('Target time has already passed today, would schedule for tomorrow');
-      targetTime.setDate(targetTime.getDate() + 1);
-      secondsUntilTarget = Math.floor((targetTime.getTime() - now.getTime()) / 1000);
-    } else {
-      console.log('Target time is still ahead today, would schedule for today');
-      secondsUntilTarget = Math.floor((targetTime.getTime() - now.getTime()) / 1000);
+    // Store notification identifiers
+    const scheduledIds: string[] = [];
+    
+    // Get days to schedule based on frequency
+    let daysToSchedule: number[] = [];
+    
+    switch(settings.frequency) {
+      case 'daily':
+        // Schedule for all days (0-6, where 0 is Sunday)
+        daysToSchedule = [0, 1, 2, 3, 4, 5, 6];
+        break;
+      case 'weekdays':
+        // Schedule for Monday-Friday (1-5)
+        daysToSchedule = [1, 2, 3, 4, 5];
+        break;
+      case 'custom':
+        // Convert string day IDs to day numbers
+        daysToSchedule = settings.days.map(dayId => {
+          switch(dayId) {
+            case 'sun': return 0;
+            case 'mon': return 1;
+            case 'tue': return 2;
+            case 'wed': return 3;
+            case 'thu': return 4;
+            case 'fri': return 5;
+            case 'sat': return 6;
+            default: return -1;
+          }
+        }).filter(day => day !== -1);
+        break;
     }
     
-    console.log('Next reminder time would be:', targetTime.toLocaleString());
-    console.log(`Would schedule notification for ${secondsUntilTarget} seconds from now (${Math.floor(secondsUntilTarget/60)} minutes)`);
+    console.log('Scheduling for days:', daysToSchedule);
     
-    // IMPORTANT: We're not actually scheduling any notifications here
-    // This prevents any immediate notifications when toggling or changing time
-    console.log('NOT scheduling any notifications now - will only appear at the exact time');
+    // Get the message (use custom message for premium, default for others)
+    let message = settings.message;
+    if (!isPremium || !message) {
+      message = DEFAULT_REMINDER_MESSAGE;
+    }
     
-    // Save the target time for reference
-    await AsyncStorage.setItem('next_reminder_time', targetTime.toISOString());
+    // Limit to scheduling the next 64 notifications (iOS limit)
+    // For most users this will be enough for 9 weeks of daily notifications
+    const MAX_NOTIFICATIONS = 64;
+    let notificationsScheduled = 0;
     
-    console.log('Reminder settings saved, but no notifications were scheduled');
+    // For each day to schedule
+    for (const dayOfWeek of daysToSchedule) {
+      // Get the next occurrence of this day
+      const nextDate = getNextDayOfWeek(dayOfWeek, hours, minutes);
+      
+      // Calculate trigger
+      const secondsUntilTarget = Math.max(1, Math.floor((nextDate.getTime() - new Date().getTime()) / 1000));
+      
+      // Skip if in the past somehow
+      if (secondsUntilTarget <= 0) continue;
+      
+      console.log(`Scheduling notification for ${nextDate.toLocaleString()} (${secondsUntilTarget} seconds from now)`);
+      
+      // Create notification content
+      const content = {
+        title: 'FlexBreak Reminder',
+        body: message,
+        data: { 
+          type: 'scheduled_reminder',
+          dayOfWeek,
+          premiumLevel
+        },
+        sound: true,
+      };
+      
+      try {
+        // Schedule the notification
+        const id = await Notifications.scheduleNotificationAsync({
+          content,
+          trigger: { 
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: secondsUntilTarget,
+            repeats: false // We'll manage repeat logic ourselves for better control
+          },
+        });
+        
+        console.log(`Scheduled notification with ID: ${id} for ${nextDate.toLocaleString()}`);
+        scheduledIds.push(id);
+        notificationsScheduled++;
+        
+        // If we've hit the limit, stop scheduling more
+        if (notificationsScheduled >= MAX_NOTIFICATIONS) {
+          console.log(`Reached maximum of ${MAX_NOTIFICATIONS} scheduled notifications`);
+          break;
+        }
+      } catch (err) {
+        console.error(`Error scheduling notification for ${nextDate.toLocaleString()}:`, err);
+      }
+    }
+    
+    // If premium level 3+, schedule additional custom reminders if configured
+    // This would be implemented when the UI for multiple reminders is added
+    
+    // Save the scheduled notification IDs
+    await saveReminderIdentifiers(scheduledIds);
+    console.log(`Successfully scheduled ${scheduledIds.length} reminders`);
+    
   } catch (error) {
     console.error('Error in scheduleReminders:', error);
   }
