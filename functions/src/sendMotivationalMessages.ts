@@ -1,4 +1,3 @@
-import * as functionsV1 from 'firebase-functions';
 import * as functionsV2 from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
 
@@ -264,19 +263,30 @@ export const sendPersonalReminders = functionsV2.scheduler.onSchedule(
         // Parse reminder time (stored as "HH:MM" in UTC)
         const [reminderHour, reminderMinute] = time.split(':').map((num: string) => parseInt(num, 10));
         
+        // Detailed logging for debugging
+        console.log(`Processing reminder for user ${userId}:`);
+        console.log(`- Reminder time (UTC): ${reminderHour}:${reminderMinute}`);
+        console.log(`- Current time (UTC): ${currentHour}:${currentMinute}`);
+        console.log(`- User timezone offset: ${timeZoneOffset} minutes west of UTC`);
+        
         // Adjust for user's timezone (stored as minutes offset from UTC)
-        const userHour = (currentHour + Math.floor(timeZoneOffset / 60)) % 24;
-        const userMinute = (currentMinute + (timeZoneOffset % 60)) % 60;
+        // getTimezoneOffset returns minutes WEST of UTC, so we need to subtract it
+        const userHour = (24 + currentHour - Math.floor(timeZoneOffset / 60)) % 24;
+        const userMinute = (60 + currentMinute - (timeZoneOffset % 60)) % 60;
+        
+        console.log(`- Calculated user's local time: ${userHour}:${userMinute}`);
         
         // Calculate user's local day (accounting for timezone offset)
         let userDay = currentDay;
-        if (userHour < 0) {
+        // Adjust day calculation accordingly
+        if (timeZoneOffset > 0 && (currentHour - Math.floor(timeZoneOffset / 60) < 0)) {
           userDay = (userDay - 1 + 7) % 7; // Adjust day if time goes to previous day
-        } else if (userHour >= 24) {
+        } else if (timeZoneOffset < 0 && (currentHour - Math.floor(timeZoneOffset / 60) >= 24)) {
           userDay = (userDay + 1) % 7; // Adjust day if time goes to next day
         }
         
         const userDayName = dayMap[userDay];
+        console.log(`- User's local day: ${userDayName} (day ${userDay})`);
         
         // Check if this reminder should be sent now
         const shouldSendReminder = 
@@ -287,6 +297,13 @@ export const sendPersonalReminders = functionsV2.scheduler.onSchedule(
             (frequency === 'weekdays' && userDay >= 1 && userDay <= 5) ||
             (frequency === 'custom' && days && days.includes(userDayName))
           );
+        
+        console.log(`- Should send reminder now? ${shouldSendReminder}`);
+        console.log(`  - Time match: ${reminderHour === userHour && reminderMinute === userMinute}`);
+        console.log(`  - Frequency: ${frequency}`);
+        if (frequency === 'custom') {
+          console.log(`  - Custom days: [${days}], includes ${userDayName}: ${days.includes(userDayName)}`);
+        }
         
         if (shouldSendReminder) {
           console.log(`Sending reminder to user ${userId}`);
@@ -400,6 +417,63 @@ export const saveUserReminders = functionsV2.https.onCall({
     return { success: true };
   } catch (error) {
     console.error('Error saving user reminders:', error);
+    throw new functionsV2.https.HttpsError('internal', (error as Error).message);
+  }
+});
+
+/**
+ * HTTP callable function to test push notifications with a specific token
+ * Used during development to verify push notification setup
+ */
+export const testPushNotification = functionsV2.https.onCall({
+  cors: true,
+  region: 'us-central1',
+  maxInstances: 10
+}, async (request) => {
+  try {
+    const data = request.data;
+    
+    // Get parameters
+    const token = data.token as string;
+    const title = data.title as string || 'FlexBreak Test';
+    const body = data.body as string || 'This is a test notification!';
+    const customData = data.data as Record<string, string> || {};
+    
+    // Validate token
+    if (!token) {
+      throw new functionsV2.https.HttpsError(
+        'invalid-argument',
+        'Push token is required'
+      );
+    }
+    
+    console.log(`Sending test push notification to token: ${token.substring(0, 15)}...`);
+    
+    // Create the notification
+    const message: admin.messaging.Message = {
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        type: 'test',
+        timestamp: Date.now().toString(),
+        ...customData
+      },
+      token,
+    };
+    
+    // Send the message
+    const response = await admin.messaging().send(message);
+    console.log('Successfully sent test push notification:', response);
+    
+    return { 
+      success: true, 
+      messageId: response,
+      timestamp: Date.now()
+    };
+  } catch (error) {
+    console.error('Error sending test push notification:', error);
     throw new functionsV2.https.HttpsError('internal', (error as Error).message);
   }
 }); 

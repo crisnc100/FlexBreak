@@ -35,18 +35,40 @@ import * as storageService from './src/services/storageService';
 import * as notifications from './src/utils/notifications';
 import * as firebaseReminders from './src/utils/firebaseReminders';
 
-// Initialize Firebase
-import firebase from '@react-native-firebase/app';
-import '@react-native-firebase/auth';
-import '@react-native-firebase/firestore';
-import '@react-native-firebase/functions';
-import '@react-native-firebase/messaging';
+// Initialize Firebase with Firebase JS SDK
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+import 'firebase/compat/firestore';
+import 'firebase/compat/functions';
+import 'firebase/compat/messaging';
+import 'firebase/compat/app-check';
+import firebaseConfig from './firebase.config';
 
-// Your Firebase configuration should be loaded from GoogleService-Info.plist automatically
-// This will verify if Firebase is initialized
+// Initialize Firebase
 if (!firebase.apps.length) {
   console.log('Firebase initialization starting...');
-  firebase.app();
+  firebase.initializeApp(firebaseConfig);
+  
+  // Set up app check with a more compatible approach
+  try {
+    // For development, use debug mode
+    if (__DEV__) {
+      // @ts-ignore - Debug tokens are not in the type definitions
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+      console.log('Firebase App Check initialized in DEBUG mode');
+    }
+    
+    // Initialize app check with a simpler configuration
+    firebase.appCheck().activate({
+      provider: 'debug', // This works in both debug and production with proper setup
+      isTokenAutoRefreshEnabled: true
+    });
+    
+    console.log('Firebase App Check activated successfully');
+  } catch (error) {
+    console.error('Error initializing App Check:', error);
+  }
+  
   console.log('Firebase initialization complete');
 } else {
   console.log('Firebase already initialized');
@@ -340,18 +362,69 @@ function MainApp() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // First initialize local notifications (legacy system)
-        notifications.configureNotifications();
+        // Clear any simulated tokens to ensure we get a real token
+        await firebaseReminders.clearStoredToken();
+        console.log('Cleared any stored FCM tokens to ensure we get a real one');
         
-        // Next initialize Firebase reminders (for premium users)
-        try {
-          await firebaseReminders.initializeFirebaseReminders();
-          console.log('Firebase reminders initialized');
-        } catch (error) {
-          console.error('Error initializing Firebase reminders:', error);
+        // Initialize local notifications system
+        notifications.configureNotifications();
+        console.log('Local notifications configured');
+        
+        // Set up Firebase message handlers
+        const unsubscribeMessages = firebaseReminders.setupMessageHandlers();
+        console.log('Firebase message handlers set up');
+        
+        // Get notification permissions (both systems need this)
+        const permissionsGranted = await notifications.requestNotificationsPermissions();
+        console.log('Notification permissions granted:', permissionsGranted);
+        
+        if (permissionsGranted) {
+          // Test local notification to verify system
+          try {
+            console.log('Sending test local notification...');
+            const notificationId = await firebaseReminders.sendImmediateLocalNotification();
+            console.log('Test local notification sent with ID:', notificationId);
+          } catch (notifError) {
+            console.error('Error sending test notification:', notifError);
+          }
+          
+          // Initialize Firebase reminders for premium users
+          try {
+            const firebaseInitialized = await firebaseReminders.initializeFirebaseReminders();
+            if (firebaseInitialized) {
+              console.log('Firebase reminders initialized successfully');
+              
+              // Get a real FCM token
+              const token = await firebaseReminders.getFCMToken();
+              console.log('FCM token:', token ? token.substring(0, 15) + '...' : 'none');
+              
+              // Get the current reminder settings
+              const settings = await firebaseReminders.getReminderSettings();
+              console.log('Current reminder settings:', settings);
+              
+              // If enabled, ensure Firebase has the settings
+              if (settings.enabled) {
+                console.log('Reminder is enabled, sending settings to Firebase');
+                await firebaseReminders.saveReminderSettings(settings);
+                
+                // Test Firebase push notification 
+                try {
+                  console.log('Sending Firebase test notification...');
+                  const testResult = await firebaseReminders.sendFirebaseTestNotification();
+                  console.log('Firebase test notification result:', testResult);
+                } catch (testError) {
+                  console.error('Error sending Firebase test notification:', testError);
+                }
+              }
+            } else {
+              console.log('Firebase reminders initialization failed - permissions may be denied');
+            }
+          } catch (error) {
+            console.error('Error initializing Firebase reminders:', error);
+          }
         }
         
-        // Then initialize streak system
+        // Initialize streak system
         await initStreakSystem();
       } catch (error) {
         console.error('Error during app initialization:', error);

@@ -328,7 +328,21 @@ export default function HomeScreen() {
           };
           
           console.log('Saving reminder settings to Firebase:', settings);
-          await firebaseReminders.saveReminderSettings(settings);
+          const success = await firebaseReminders.saveReminderSettings(settings);
+          
+          if (success) {
+            Alert.alert(
+              'Reminders Enabled',
+              `You will receive reminders at ${reminderTime} ${reminderFrequency === 'daily' ? 'every day' : reminderFrequency === 'weekdays' ? 'on weekdays' : 'on selected days'}.`,
+              [{ text: 'OK' }]
+            );
+          } else {
+            Alert.alert(
+              'Reminders Partially Enabled',
+              'Your reminders were set up, but you may only receive them when the app is open. For reliable background notifications, please try again later.',
+              [{ text: 'OK' }]
+            );
+          }
         } else {
           // If permissions were denied, revert the switch
           console.log('Firebase permissions denied, not enabling reminders');
@@ -357,7 +371,17 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('Error toggling reminders:', error);
-      Alert.alert('Error', 'Could not set reminder');
+      
+      // If we were trying to enable, revert the UI state
+      if (value) {
+        setReminderEnabled(false);
+      }
+      
+      Alert.alert(
+        'Error',
+        'Could not set reminder. Please try again later.',
+        [{ text: 'OK' }]
+      );
     }
   };
 

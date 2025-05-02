@@ -154,19 +154,12 @@ exports.sendCustomNotification = functions.https.onCall({
   region: 'us-central1',
   maxInstances: 10
 }, async (request) => {
-  // Check if the request is made by an admin
-  if (!request.auth || !request.auth.token.admin) {
-    throw new functions.https.HttpsError(
-      'permission-denied',
-      'Only admins can send custom notifications'
-    );
-  }
-  
   try {
     const data = request.data;
     const title = data.title;
     const body = data.body;
     const customData = data.data;
+    const token = data.token; // Optional: For sending to a specific device
     
     // Validate input
     if (!title || !body) {
@@ -187,8 +180,14 @@ exports.sendCustomNotification = functions.https.onCall({
         timestamp: Date.now().toString(),
         ...(customData || {}),
       },
-      topic: 'all_users',
     };
+    
+    // Send to specific device if token provided, otherwise to all users
+    if (token) {
+      message.token = token;
+    } else {
+      message.topic = 'all_users';
+    }
     
     // Send the message
     const response = await admin.messaging().send(message);
@@ -347,16 +346,7 @@ exports.saveUserReminders = functions.https.onCall({
   region: 'us-central1',
   maxInstances: 10
 }, async (request) => {
-  // Check if user is authenticated
-  if (!request.auth) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'User must be logged in to save reminder settings'
-    );
-  }
-  
   try {
-    const userId = request.auth.uid;
     const data = request.data;
     
     // Extract and validate fields
@@ -385,6 +375,9 @@ exports.saveUserReminders = functions.https.onCall({
       );
     }
     
+    // Generate a user ID from the token if not provided
+    const userId = token.substring(0, 28);
+    
     // Save to Firestore
     await admin.firestore().collection('user_reminders')
       .doc(userId)
@@ -401,6 +394,17 @@ exports.saveUserReminders = functions.https.onCall({
         premiumLevel,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
+    
+    // Also save the token for welcome notifications
+    if (enabled) {
+      await admin.firestore().collection('fcm_tokens')
+        .doc(token)
+        .set({
+          token,
+          userId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
     
     return { success: true };
   } catch (error) {

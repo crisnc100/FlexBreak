@@ -13,6 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as firebaseReminders from '../../utils/firebaseReminders';
 import { useTheme } from '../../context/ThemeContext';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/functions';
 
 /**
  * Simple screen for testing Firebase notifications
@@ -201,22 +203,38 @@ const NotificationTester = () => {
   // Send test notification
   const sendTestNotification = async () => {
     try {
+      console.log('Attempting to send test notification...');
       const success = await firebaseReminders.sendTestNotification();
       
       if (success) {
         Alert.alert(
           'Test Notification Sent',
-          'You should receive a notification shortly. Try closing the app completely to test if it appears when the app is not running.'
+          'You should receive a notification shortly. If you don\'t see it while the app is open, try closing the app completely to test if it appears when the app is not running.'
         );
       } else {
         Alert.alert(
-          'Failed',
-          'Could not send test notification. Make sure Firebase is properly set up.'
+          'Notification Sent Locally',
+          'Firebase notification could not be sent, but a local notification was scheduled instead. This will only work when the app is open or in the background.'
         );
       }
     } catch (error) {
       console.error('Error sending test notification:', error);
-      Alert.alert('Error', 'Failed to send test notification');
+      
+      // Check if it's a Firebase permission-denied error
+      const errorMessage = error instanceof Error ? error.toString() : 'Unknown error';
+      const isPermissionError = errorMessage.includes('permission-denied');
+      
+      if (isPermissionError) {
+        Alert.alert(
+          'Firebase Permission Error',
+          'Your notification was sent as a local notification only. For Firebase notifications to work, the database needs to be properly set up. Contact the developer if this persists.'
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          'Failed to send test notification. Please make sure notifications are enabled in your device settings.'
+        );
+      }
     }
   };
   
@@ -444,6 +462,48 @@ const NotificationTester = () => {
           onPress={sendTestNotification}
         >
           <Text style={styles.buttonText}>Send Test Notification Now</Text>
+        </TouchableOpacity>
+        
+        {/* Direct Firebase Function Call - Bypasses App Check */}
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: theme.accent, marginTop: 10 }]}
+          onPress={async () => {
+            try {
+              console.log('Directly calling Firebase function without App Check...');
+              
+              // Create a new Firebase app instance without App Check
+              const directApp = firebase.initializeApp(
+                firebase.app().options,
+                'direct-' + Date.now()
+              );
+              
+              const directFunctions = directApp.functions();
+              const testFunction = directFunctions.httpsCallable('sendCustomNotification');
+              
+              const result = await testFunction({
+                title: 'Direct Test',
+                body: 'This is a direct test that bypasses App Check!',
+                data: { type: 'direct_test' }
+              });
+              
+              console.log('Direct function call result:', result);
+              Alert.alert(
+                'Direct Function Call Succeeded',
+                'The test notification was sent successfully by directly calling the Firebase function.'
+              );
+              
+              // Clean up the temporary app
+              directApp.delete();
+            } catch (error) {
+              console.error('Error with direct function call:', error);
+              Alert.alert(
+                'Direct Function Call Failed',
+                `Error: ${error.message}`
+              );
+            }
+          }}
+        >
+          <Text style={styles.buttonText}>Direct Function Call (No App Check)</Text>
         </TouchableOpacity>
         
         <View style={styles.customTimeContainer}>

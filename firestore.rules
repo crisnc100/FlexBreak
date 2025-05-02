@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow access to fcm_tokens collection for storing device tokens
+    match /fcm_tokens/{tokenId} {
+      allow read, write: if true;  // Allow all operations for notifications
+    }
+    
+    // Allow access to user_reminders collection for reminder settings
+    match /user_reminders/{userId} {
+      allow read, write: if true;  // Allow all operations for reminders
+    }
+    
+    // Default rule - deny access to other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 

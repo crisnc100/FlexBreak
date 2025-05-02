@@ -34,13 +34,23 @@ export const getReminderTime = storageService.getReminderTime;
 
 // Configure notifications
 export function configureNotifications(): void {
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+  
+  // Set up notification received handler
+  Notifications.addNotificationReceivedListener((notification) => {
+    console.log('Notification received in foreground!', notification);
+  });
+  
+  // Set up notification response handler (when user taps notification)
+  Notifications.addNotificationResponseReceivedListener((response) => {
+    console.log('Notification response received!', response);
+  });
   
   console.log('Notifications handler configured');
 }
