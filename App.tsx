@@ -362,32 +362,15 @@ function MainApp() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // Clear any simulated tokens to ensure we get a real token
-        await firebaseReminders.clearStoredToken();
-        console.log('Cleared any stored FCM tokens to ensure we get a real one');
-        
         // Initialize local notifications system
         notifications.configureNotifications();
         console.log('Local notifications configured');
-        
-        // Set up Firebase message handlers
-        const unsubscribeMessages = firebaseReminders.setupMessageHandlers();
-        console.log('Firebase message handlers set up');
         
         // Get notification permissions (both systems need this)
         const permissionsGranted = await notifications.requestNotificationsPermissions();
         console.log('Notification permissions granted:', permissionsGranted);
         
         if (permissionsGranted) {
-          // Test local notification to verify system
-          try {
-            console.log('Sending test local notification...');
-            const notificationId = await firebaseReminders.sendImmediateLocalNotification();
-            console.log('Test local notification sent with ID:', notificationId);
-          } catch (notifError) {
-            console.error('Error sending test notification:', notifError);
-          }
-          
           // Initialize Firebase reminders for premium users
           try {
             const firebaseInitialized = await firebaseReminders.initializeFirebaseReminders();
@@ -406,16 +389,16 @@ function MainApp() {
               if (settings.enabled) {
                 console.log('Reminder is enabled, sending settings to Firebase');
                 await firebaseReminders.saveReminderSettings(settings);
-                
-                // Test Firebase push notification 
-                try {
-                  console.log('Sending Firebase test notification...');
-                  const testResult = await firebaseReminders.sendFirebaseTestNotification();
-                  console.log('Firebase test notification result:', testResult);
-                } catch (testError) {
-                  console.error('Error sending Firebase test notification:', testError);
-                }
               }
+              
+              // Start local motivational messages as a fallback for Firebase Cloud Functions
+              // Use the production mode (2 messages per day) instead of test mode
+              const cleanupMotivationalMessages = firebaseReminders.startLocalMotivationalMessages(false);
+              
+              // Return cleanup function
+              return () => {
+                cleanupMotivationalMessages();
+              };
             } else {
               console.log('Firebase reminders initialization failed - permissions may be denied');
             }

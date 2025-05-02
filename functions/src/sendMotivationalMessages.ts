@@ -48,7 +48,7 @@ const MOTIVATIONAL_MESSAGES = [
  */
 export const sendMotivationalMessage = functionsV2.scheduler.onSchedule(
   {
-    schedule: 'every day 09:00',
+    schedule: 'every 15 minutes',
     timeZone: 'America/New_York',
   },
   async (event) => {
@@ -423,7 +423,7 @@ export const saveUserReminders = functionsV2.https.onCall({
 
 /**
  * HTTP callable function to test push notifications with a specific token
- * Used during development to verify push notification setup
+ * Uses Expo Push API directly for compatibility with Expo clients
  */
 export const testPushNotification = functionsV2.https.onCall({
   cors: true,
@@ -447,30 +447,63 @@ export const testPushNotification = functionsV2.https.onCall({
       );
     }
     
-    console.log(`Sending test push notification to token: ${token.substring(0, 15)}...`);
+    // Check if it's an Expo token
+    const isExpoToken = token.startsWith('ExponentPushToken[');
+    console.log(`Sending test notification to ${isExpoToken ? 'Expo' : 'Firebase'} token: ${token.substring(0, 15)}...`);
     
-    // Create the notification
-    const message: admin.messaging.Message = {
-      notification: {
+    let response;
+    
+    if (isExpoToken) {
+      // Use Expo Push API
+      const axios = require('axios');
+      
+      // Prepare message for Expo Push API
+      const message = {
+        to: token,
+        sound: 'default',
         title,
         body,
-      },
-      data: {
-        type: 'test',
-        timestamp: Date.now().toString(),
-        ...customData
-      },
-      token,
-    };
-    
-    // Send the message
-    const response = await admin.messaging().send(message);
-    console.log('Successfully sent test push notification:', response);
+        data: {
+          type: 'test',
+          timestamp: Date.now().toString(),
+          ...customData
+        }
+      };
+      
+      // Send to Expo's Push API
+      response = await axios.post('https://exp.host/--/api/v2/push/send', message, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('Successfully sent Expo push notification:', response.data);
+    } else {
+      // Use Firebase Cloud Messaging
+      const message: admin.messaging.Message = {
+        notification: {
+          title,
+          body,
+        },
+        data: {
+          type: 'test',
+          timestamp: Date.now().toString(),
+          ...customData
+        },
+        token,
+      };
+      
+      // Send the message
+      response = await admin.messaging().send(message);
+      console.log('Successfully sent Firebase push notification:', response);
+    }
     
     return { 
       success: true, 
-      messageId: response,
-      timestamp: Date.now()
+      messageId: isExpoToken ? 'expo-push' : response,
+      timestamp: Date.now(),
+      method: isExpoToken ? 'expo' : 'firebase'
     };
   } catch (error) {
     console.error('Error sending test push notification:', error);
