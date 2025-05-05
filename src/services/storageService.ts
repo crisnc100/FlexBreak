@@ -930,50 +930,77 @@ export const clearRoutines = async (): Promise<boolean> => {
 };
 
 /**
- * Clears any custom reminder messages
- * @returns {Promise<boolean>} True if successful
- */
-export const clearCustomReminderMessage = async (): Promise<boolean> => {
-  try {
-    await AsyncStorage.removeItem('@flexbreak:custom_reminder_message');
-    return true;
-  } catch (error) {
-    console.error('Error clearing custom reminder message:', error);
-    return false;
-  }
-};
-
-/**
- * Reset all simulation data for testing
- * @returns {Promise<boolean>} True if reset was successful
+ * Reset simulation data for testers
+ * This is similar to clearAllData but with extra precautions to preserve tester status and premium access
+ * @returns Success boolean
  */
 export const resetSimulationData = async (): Promise<boolean> => {
   try {
-    // Clear all routines
-    await clearRoutines();
+    // First, backup premium and testing status
+    const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
+    const regularPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
     
-    // Clear user progress
-    await AsyncStorage.removeItem('@flexbreak:user_progress');
+    // Get all keys for simulation data
+    const simulationKeys = [
+      ...Object.values(KEYS.PROGRESS),
+      ...Object.values(KEYS.ROUTINES),
+      ...Object.values(KEYS.UI),
+      '@user_routines', 
+      '@all_routines', 
+      '@visible_routines',
+      '@user_progress',
+      '@gamification',
+      '@achievements',
+      '@challenges'
+    ];
     
-    // Clear challenges
-    await AsyncStorage.removeItem('@flexbreak:challenges');
+    // Define keys to preserve (testing and premium related)
+    const keysToPreserve = [
+      KEYS.USER.PREMIUM,
+      KEYS.USER.TESTING_PREMIUM,
+      '@flexbreak:testing_phase',
+      '@flexbreak:testing_access',
+      '@flexbreak:bob_simulator_access',
+      '@flexbreak:testing_return_phase',
+      '@flexbreak:simulator_scenario',
+      '@flexbreak:testing_feedback',
+      '@flexbreak:testing_checklist_progress',
+      '@flexbreak:testing_checklist_p2_progress',
+      '@flexbreak:testing_feedback_submitted',
+      'testing_access_granted',
+      'testing_current_stage'
+    ];
     
-    // Clear achievements
-    await AsyncStorage.removeItem('@flexbreak:achievements');
+    // Get all keys from AsyncStorage
+    const allKeys = await AsyncStorage.getAllKeys();
     
-    // Clear rewards
-    await AsyncStorage.removeItem('@flexbreak:rewards');
+    // Filter to get just the keys we want to remove (simulation data)
+    const keysToRemove = allKeys.filter(key => 
+      simulationKeys.includes(key) && !keysToPreserve.includes(key)
+    );
     
-    // Clear custom reminder messages from all possible storage locations
+    // Clear simulation keys except preserved ones
+    await AsyncStorage.multiRemove(keysToRemove);
+    
+    // Safety check - restore premium status if somehow lost
+    if (testingPremium === 'true' || regularPremium) {
+      await AsyncStorage.setItem(KEYS.USER.TESTING_PREMIUM, testingPremium || 'false');
+      await setData(KEYS.USER.PREMIUM, regularPremium);
+    }
+    
+    // Re-initialize user progress with defaults
+    await initializeUserProgressIfEmpty();
+    
+    // Additionally, clear custom reminder messages from all possible storage locations
     await AsyncStorage.removeItem('@flexbreak:custom_reminder_message');
     await AsyncStorage.removeItem('reminder_message');
     await AsyncStorage.removeItem('firebase_reminder_message');
-    await AsyncStorage.removeItem(KEYS.SETTINGS.REMINDER_TIME);
     
-    console.log('All simulation data reset successfully');
+    console.log('Simulation data reset and custom reminder messages cleared');
+    
     return true;
-  } catch (error) {
-    console.error('Error resetting simulation data:', error);
+  } catch (e) {
+    console.error('Error resetting simulation data:', e);
     return false;
   }
 };
