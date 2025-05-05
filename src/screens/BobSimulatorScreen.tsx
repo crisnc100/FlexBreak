@@ -175,30 +175,41 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   // Initialize Bob's progress when authenticated
   useEffect(() => {
     if (isAuthenticated && !isInitialized) {
-    initializeBob();
+      logWithTimestamp('Authentication confirmed, initializing Bob');
+      initializeBob();
     }
   }, [isAuthenticated, isInitialized]);
   
+  // Add comprehensive logging
+  const logWithTimestamp = (message: string) => {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS format
+    console.log(`[BobSim ${timestamp}] ${message}`);
+  };
+  
   // Add log entry with current date
   const addLog = (message: string) => {
+    logWithTimestamp(message);
     const dateStr = currentDate.toLocaleDateString();
     setActivityLog(prev => [`[${dateStr}] ${message}`, ...prev]);
   };
   
   // Initialize Bob with fresh progress
   const initializeBob = async () => {
+    const initStartTime = Date.now();
+    logWithTimestamp('Starting initializeBob');
     setIsLoading(true);
     
     try {
       // Clear any existing routines in storage first to ensure clean start
+      logWithTimestamp('Clearing existing routines before initialization');
       await storageService.clearRoutines();
-      console.log("Cleared existing routines before initialization");
-      
       
       // Create a fresh progress for Bob
+      logWithTimestamp('Creating fresh progress for Bob');
       const freshProgress = await gamificationManager.initializeUserProgress();
       
       // Ensure statistics are properly reset to 0
+      logWithTimestamp('Resetting statistics to 0');
       freshProgress.statistics = {
         totalRoutines: 0,
         currentStreak: 0,
@@ -210,172 +221,312 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       };
       
       // Ensure XP and level are at initial values
+      logWithTimestamp('Setting initial XP and level values');
       freshProgress.totalXP = 0;
       freshProgress.level = 1;
       freshProgress.hasReceivedWelcomeBonus = false;
       
       // Override Date for simulation if a specific date is selected
       if (selectedDate) {
+        logWithTimestamp(`Selected date exists, patching Date for simulation: ${selectedDate.toLocaleDateString()}`);
         patchDateForSimulation(selectedDate);
       }
       
       // Save fresh progress
+      logWithTimestamp('Saving fresh progress to storage');
       await storageService.saveUserProgress(freshProgress);
-      console.log("Saved fresh progress with statistics reset to 0");
 
       // Verify storage is empty
+      logWithTimestamp('Verifying routine storage is empty');
       const routineCheck1 = await storageService.getAllRoutines();
-      console.log(`After progress reset - routine count: ${routineCheck1.length}`);
+      logWithTimestamp(`After progress reset - routine count: ${routineCheck1.length}`);
       if (routineCheck1.length > 0) {
-        console.warn("WARNING: Routines still exist after reset!");
+        logWithTimestamp(`WARNING: Routines still exist after reset! Count: ${routineCheck1.length}`);
         await storageService.clearRoutines();
       }
 
       // Initialize and refresh challenges explicitly
+      logWithTimestamp('Initializing and refreshing challenges');
+      const refreshStartTime = Date.now();
       await challengeManager.refreshChallenges(freshProgress);
+      logWithTimestamp(`Challenges refreshed in ${Date.now() - refreshStartTime}ms`);
       
       // After refreshing in initialization, also call updateUserChallenges
+      logWithTimestamp('Checking for initially completed challenges');
+      const updateChallengesStartTime = Date.now();
       const initialCompletedChallenges = await challengeManager.updateUserChallenges(freshProgress);
+      logWithTimestamp(`Challenge update completed in ${Date.now() - updateChallengesStartTime}ms`);
+      
       if (initialCompletedChallenges.length > 0) {
-        console.log(`Completed ${initialCompletedChallenges.length} challenges during initialization`);
+        logWithTimestamp(`Found ${initialCompletedChallenges.length} completed challenges during initialization`);
         addLog(`Found ${initialCompletedChallenges.length} completed challenges on first setup`);
+      } else {
+        logWithTimestamp('No initially completed challenges found');
       }
       
       // Always check for challenges updates on day change
+      logWithTimestamp('Checking for challenges with user progress');
       const progress = await storageService.getUserProgress();
       const completedChallenges = await challengeManager.updateUserChallenges(progress);
       if (completedChallenges.length > 0) {
-        console.log(`Found ${completedChallenges.length} challenges completed during day change`);
+        logWithTimestamp(`Found ${completedChallenges.length} challenges completed during day change`);
         addLog(`Completed ${completedChallenges.length} challenges with the day change`);
         completedChallenges.forEach(challenge => {
+          logWithTimestamp(`Challenge completed: ${challenge.id} - ${challenge.title}`);
           addLog(`  ✅ Completed: ${challenge.title}`);
         });
+      } else {
+        logWithTimestamp('No challenges completed during day change');
       }
       
       // Update Bob's data
+      logWithTimestamp('Refreshing Bob stats after initialization');
       await refreshBobStats();
       
       // Force one more refresh to ensure everything is in sync
+      logWithTimestamp('Performing final sync of user progress');
       const currentProgress = await storageService.getUserProgress();
+      logWithTimestamp('Ensuring core challenge count');
       await challengeManager.ensureChallengeCount(currentProgress, CORE_CHALLENGES);
+      logWithTimestamp('Saving final user progress');
       await storageService.saveUserProgress(currentProgress);
       
       // Verify Bob starts with 0 routines
+      logWithTimestamp('Verifying final statistics');
       const finalStats = await storageService.getUserProgress();
-      console.log(`Bob initialized with stats: Total routines: ${finalStats.statistics.totalRoutines}, XP: ${finalStats.totalXP}, Streak: ${finalStats.statistics.currentStreak}`);
+      logWithTimestamp(`Bob initialized with stats: Total routines: ${finalStats.statistics.totalRoutines}, XP: ${finalStats.totalXP}, Streak: ${finalStats.statistics.currentStreak}`);
       addLog(`Bob has ${finalStats.statistics.totalRoutines} routines to start`);
       
       // Verify routines storage
+      logWithTimestamp('Final routine storage verification');
       const routineCheck2 = await storageService.getAllRoutines();
-      console.log(`Final routine check - count in storage: ${routineCheck2.length}`);
+      logWithTimestamp(`Final routine check - count in storage: ${routineCheck2.length}`);
       
       if (finalStats.statistics.totalRoutines !== 0 || routineCheck2.length !== 0) {
-        console.warn("ERROR: Bob's routine count is not 0 after initialization!");
+        logWithTimestamp(`ERROR: Bob's routine count is not 0 after initialization! Stats show ${finalStats.statistics.totalRoutines}, storage has ${routineCheck2.length}`);
         finalStats.statistics.totalRoutines = 0;
         await storageService.saveUserProgress(finalStats);
         await storageService.clearRoutines();
         addLog("⚠️ Forced routine count to 0");
       }
       
+      logWithTimestamp('Setting isInitialized to true');
       setIsInitialized(true);
       addLog(`Initialized ${BOB_NAME}'s progress on ${currentDate.toLocaleDateString()}`);
       addLog(`Daily, weekly, and monthly challenges are now active`);
+      logWithTimestamp(`Initialization complete in ${Date.now() - initStartTime}ms`);
     } catch (error) {
+      logWithTimestamp(`Error initializing Bob: ${error}`);
       console.error('Error initializing Bob:', error);
       Alert.alert('Error', 'Failed to initialize simulation');
     } finally {
+      logWithTimestamp('Setting isLoading to false after initialization');
       setIsLoading(false);
     }
   };
   
-  // Override JavaScript's Date object for simulation
+  // Date patching for simulation
   const patchDateForSimulation = (targetDate: Date) => {
     const originalDate = Date;
-    const targetTime = targetDate.getTime();
+    logWithTimestamp(`Patching Date for simulation: ${targetDate.toISOString()}`);
     
-    console.log(`Patching JavaScript Date to: ${targetDate.toISOString()} (${targetDate.toLocaleDateString()})`);
-    
-    // @ts-ignore - Override Date constructor
-    global.Date = class extends originalDate {
-      constructor(...args: any[]) {
-        if (args.length === 0) {
-          // When called with no args, return the simulation date
-          super(targetTime);
-        } else if (args[0] === 'now') {
-          // Special case for getting the real current date (not simulated)
-          super();
-        } else {
-          // Otherwise use the provided args
-          // @ts-ignore
-          super(...args);
+    try {
+      const targetTime = targetDate.getTime();
+      logWithTimestamp(`Target time: ${targetTime}`);
+      
+      // Store the original date
+      // @ts-ignore - hack for simulation
+      global.OriginalDate = originalDate;
+      logWithTimestamp('Original Date stored in global.OriginalDate');
+      
+      // Override the Date constructor
+      // @ts-ignore - hack for simulation
+      global.Date = class extends originalDate {
+        constructor() {
+          if (arguments.length === 0) {
+            super(targetTime);
+            // Only log occasionally to avoid flooding
+            if (Math.random() < 0.01) {
+              logWithTimestamp(`New Date() created (sampled log): ${super.toString()}`);
+            }
+          } else {
+            // @ts-ignore - we need to pass through arguments
+            super(...arguments);
+          }
         }
-      }
+      };
       
-      // Override Date.now()
-      static now() {
-        return targetTime;
-      }
+      // Copy all properties and methods from the original Date
+      Object.getOwnPropertyNames(originalDate).forEach(prop => {
+        // @ts-ignore - hack for simulation
+        if (prop !== 'prototype' && prop !== 'length' && prop !== 'name') {
+          // @ts-ignore - hack for simulation
+          global.Date[prop] = originalDate[prop];
+        }
+      });
+
+      // Copy now method explicitly
+      // @ts-ignore - hack for simulation
+      global.Date.now = () => targetTime;
       
-      // Provide a way to get the actual current date
-      static realNow() {
-        return originalDate.now();
-      }
+      // Verify the patch
+      const newDate = new Date();
+      logWithTimestamp(`Verification - new Date(): ${newDate.toISOString()}`);
+      logWithTimestamp(`Verification - Date.now(): ${Date.now()}`);
       
-      // Get the real current date as a date object
-      static getRealCurrentDate() {
-        return new originalDate();
+      addLog(`Simulation date set to: ${newDate.toLocaleDateString()}`);
+      return true;
+    } catch (error) {
+      logWithTimestamp(`Error patching Date: ${error}`);
+      console.error('Error patching Date:', error);
+      return false;
+    }
+  };
+
+  // Restore original Date after simulation
+  const restoreOriginalDate = () => {
+    logWithTimestamp('Attempting to restore original Date');
+    try {
+      // @ts-ignore - hack for simulation
+      if (global.OriginalDate) {
+        // @ts-ignore - hack for simulation
+        global.Date = global.OriginalDate;
+        // @ts-ignore - hack for simulation
+        global.OriginalDate = undefined;
+        logWithTimestamp('Original Date successfully restored');
+        
+        // Verify the restoration
+        const nowTime = Date.now();
+        const currentTime = new Date();
+        logWithTimestamp(`Verification after restore - Date.now(): ${nowTime}`);
+        logWithTimestamp(`Verification after restore - new Date(): ${currentTime.toISOString()}`);
+        
+        addLog(`Restored to current date: ${currentTime.toLocaleDateString()}`);
+        return true;
+      } else {
+        logWithTimestamp('No original Date found to restore');
+        return false;
       }
-    };
-    
-    // Verify the patch
-    const newDate = new Date();
-    const realDate = (Date as any).getRealCurrentDate();
-    console.log(`Simulation date: ${newDate.toLocaleDateString()}, Real date: ${realDate.toLocaleDateString()}`);
-    
-    // Set the current date for the component state
-    setCurrentDate(targetDate);
+    } catch (error) {
+      logWithTimestamp(`Error restoring original Date: ${error}`);
+      console.error('Error restoring original Date:', error);
+      return false;
+    }
   };
   
   // Refresh Bob's stats
   const refreshBobStats = async () => {
-    const progress = await storageService.getUserProgress();
-    setBobProgress(progress);
+    const startTime = Date.now();
+    logWithTimestamp('Starting refreshBobStats');
     
-    const levelInfo = await gamificationManager.getUserLevelInfo();
-    
-    setStats({
-      level: levelInfo.level,
-      totalXP: levelInfo.totalXP,
-      xpToNextLevel: levelInfo.xpToNextLevel || 0,
-      percentToNextLevel: levelInfo.percentToNextLevel,
-      currentStreak: progress.statistics?.currentStreak || 0
-    });
-    
-    return progress;
+    try {
+      // Get the latest progress
+      logWithTimestamp('Fetching latest user progress');
+      const progress = await storageService.getUserProgress();
+      setBobProgress(progress);
+      
+      // Get latest routines
+      logWithTimestamp('Fetching all routines');
+      const fetchStartTime = Date.now();
+      const routines = await storageService.getAllRoutines();
+      logWithTimestamp(`Fetched ${routines.length} routines in ${Date.now() - fetchStartTime}ms`);
+      
+      // Calculate level info
+      logWithTimestamp('Calculating level info');
+      const levelInfo = await gamificationManager.getUserLevelInfo();
+      
+      // Update state with level and streak info
+      logWithTimestamp('Setting stats from progress data');
+      setStats({
+        level: levelInfo.level,
+        totalXP: levelInfo.totalXP,
+        xpToNextLevel: levelInfo.xpToNextLevel || 0,
+        percentToNextLevel: levelInfo.percentToNextLevel,
+        currentStreak: progress.statistics?.currentStreak || 0
+      });
+      
+      // Calculate today's routines
+      const todayRoutines = routines.filter(r => {
+        const routineDate = new Date(r.date);
+        const today = new Date();
+        return (
+          routineDate.getDate() === today.getDate() &&
+          routineDate.getMonth() === today.getMonth() &&
+          routineDate.getFullYear() === today.getFullYear()
+        );
+      }).length;
+      
+      logWithTimestamp(`Today's routines: ${todayRoutines}, Total routines: ${routines.length}`);
+      logWithTimestamp(`User level: ${levelInfo.level}, XP: ${levelInfo.totalXP}, Streak: ${progress.statistics?.currentStreak || 0}`);
+      
+      // Challenges and achievements stats would be added here if those APIs existed
+      
+      logWithTimestamp(`refreshBobStats completed in ${Date.now() - startTime}ms`);
+      return progress;
+    } catch (error) {
+      logWithTimestamp(`Error in refreshBobStats: ${error}`);
+      console.error('Error refreshing Bob stats:', error);
+      throw error;
+    }
   };
   
   // Handle simulation for a single day
-  const handleSingleDaySimulation = async (config: StretchConfig, simulationDate?: Date) => {
+  const handleSingleDaySimulation = async (config: StretchConfig, simulationDate?: Date): Promise<void> => {
+    const simulationStartTime = Date.now();
+    logWithTimestamp('Starting handleSingleDaySimulation');
+    logWithTimestamp(`Config: ${JSON.stringify(config)}`);
+    
     // Use either the passed date or the selected date from state
     const dateToSimulate = simulationDate || selectedDate;
+    logWithTimestamp(`Date to simulate: ${dateToSimulate?.toLocaleDateString() || 'NONE'}`);
     
     if (!dateToSimulate) {
+      logWithTimestamp('Error: No date selected for simulation');
       Alert.alert('Error', 'No date selected for simulation');
-      return;
+      return Promise.reject(new Error('No date selected'));
     }
     
-    setIsLoading(true);
+    // Note: We're not setting isLoading=true here anymore, because it should be set by the caller
+    // This allows the UI to update before the heavy processing starts
     
     try {
       // Use the selected date for simulation
+      logWithTimestamp('About to patch Date object for simulation');
       patchDateForSimulation(dateToSimulate);
       
-      // Get initial state for comparison
-      const initialProgress = await storageService.getUserProgress();
+      // Get initial state for comparison - add timeout protection
+      logWithTimestamp('Getting initial user progress with timeout protection');
+      const initialProgressStartTime = Date.now();
+      
+      const initialPromise = new Promise(async (resolve, reject) => {
+        try {
+          const initialProgress = await storageService.getUserProgress();
+          logWithTimestamp(`Got initial progress in ${Date.now() - initialProgressStartTime}ms`);
+          resolve(initialProgress);
+        } catch (error) {
+          logWithTimestamp(`Error getting initial progress: ${error}`);
+          reject(error);
+        }
+      });
+      
+      // Add 10 second timeout to avoid hanging
+      const initialProgress = await Promise.race([
+        initialPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const errorMsg = 'Timed out getting initial progress';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 10000)
+        )
+      ]) as any;
+      
       const initialXP = initialProgress.totalXP || 0;
       const initialStreak = initialProgress.statistics?.currentStreak || 0;
+      logWithTimestamp(`Initial XP: ${initialXP}, Initial streak: ${initialStreak}`);
       
       // Create the routine with proper types
+      logWithTimestamp('Creating routine object');
       const routine = {
         id: `simulated-stretch-${Date.now()}`,
         date: new Date().toISOString(),
@@ -386,46 +537,104 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         status: "completed"
       } as any;
       
-      // Process the routine
-      console.log(`Processing simulated routine for ${dateToSimulate.toLocaleDateString()}`);
-      const result = await gamificationManager.processCompletedRoutine(routine);
+      // Process the routine - add timeout protection
+      logWithTimestamp(`Processing simulated routine for ${dateToSimulate.toLocaleDateString()}`);
+      const routineProcessStartTime = Date.now();
+      
+      const routinePromise = new Promise(async (resolve, reject) => {
+        try {
+          logWithTimestamp('Calling processCompletedRoutine');
+          const result = await gamificationManager.processCompletedRoutine(routine);
+          logWithTimestamp(`Completed routine processing in ${Date.now() - routineProcessStartTime}ms`);
+          resolve(result);
+        } catch (error) {
+          logWithTimestamp(`Error processing routine: ${error}`);
+          reject(error);
+        }
+      });
+      
+      // Add 20 second timeout to avoid hanging
+      const result = await Promise.race([
+        routinePromise,
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const errorMsg = 'Timed out processing routine';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 20000)
+        )
+      ]) as any;
       
       // Calculate XP gained
+      logWithTimestamp('Getting updated user progress to calculate XP gain');
       const afterProgress = await storageService.getUserProgress();
       const xpGained = afterProgress.totalXP - initialXP;
+      logWithTimestamp(`XP gained: ${xpGained} (from ${initialXP} to ${afterProgress.totalXP})`);
       
       // Check for completed challenges
       let completedChallenges: any[] = result.completedChallenges || [];
+      logWithTimestamp(`Found ${completedChallenges.length} initially completed challenges`);
       
       // Explicitly claim each challenge to ensure XP is awarded
+      if (completedChallenges.length > 0) {
+        logWithTimestamp(`Claiming ${completedChallenges.length} initially completed challenges`);
+      }
+      
       for (const challenge of completedChallenges) {
-        await gamificationManager.claimChallenge(challenge.id);
+        try {
+          logWithTimestamp(`Claiming challenge: ${challenge.id} - ${challenge.title}`);
+          await gamificationManager.claimChallenge(challenge.id);
+          logWithTimestamp(`Successfully claimed challenge: ${challenge.id}`);
+        } catch (err) {
+          logWithTimestamp(`Error claiming challenge ${challenge.id}: ${err}`);
+        }
       }
       
       // Force check for additional challenges that might be completed
+      logWithTimestamp('Checking for additional completed challenges');
+      const additionalChallengeStartTime = Date.now();
       const additionalChallenges = await challengeManager.updateUserChallenges(afterProgress);
+      logWithTimestamp(`Found ${additionalChallenges.length} additional challenges in ${Date.now() - additionalChallengeStartTime}ms`);
       completedChallenges = [...completedChallenges, ...additionalChallenges];
       
       // Claim each additional challenge
+      if (additionalChallenges.length > 0) {
+        logWithTimestamp(`Claiming ${additionalChallenges.length} additional challenges`);
+      }
+      
       for (const challenge of additionalChallenges) {
-        await gamificationManager.claimChallenge(challenge.id);
+        try {
+          logWithTimestamp(`Claiming additional challenge: ${challenge.id} - ${challenge.title}`);
+          await gamificationManager.claimChallenge(challenge.id);
+          logWithTimestamp(`Successfully claimed additional challenge: ${challenge.id}`);
+        } catch (err) {
+          logWithTimestamp(`Error claiming additional challenge ${challenge.id}: ${err}`);
+        }
       }
       
       // Check for newly completed achievements
+      logWithTimestamp('Checking for newly completed achievements');
       const achievements = Object.values(afterProgress.achievements || {});
       const newlyCompleted = achievements.filter(a => 
         a.completed && a.dateCompleted === new Date().toISOString().split('T')[0]
       );
+      logWithTimestamp(`Found ${newlyCompleted.length} newly completed achievements`);
       
       // Get final progress after all operations
+      logWithTimestamp('Refreshing Bob stats');
       await refreshBobStats();
+      logWithTimestamp(`Refreshed stats in ${Date.now() - simulationStartTime}ms`);
+      
       const finalProgress = await storageService.getUserProgress();
+      logWithTimestamp(`Final XP: ${finalProgress.totalXP}, Final level: ${finalProgress.level}`);
       
       // Add date to simulated dates
       const dateStr = dateToSimulate.toISOString();
+      logWithTimestamp(`Adding date to simulated dates: ${dateStr}`);
       setSimulatedDates(prev => [...prev, dateStr]);
       
       // Store the last configuration and date for quick simulation
+      logWithTimestamp('Storing config and date for quick simulation');
       setLastConfig(config);
       setLastSimulatedDate(dateToSimulate);
       
@@ -433,12 +642,15 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       if (consecutiveDaysCount > 0 && 
           lastSimulatedDate && 
           Math.abs(dateToSimulate.getTime() - lastSimulatedDate.getTime()) < 86400000 * 2) {
+        logWithTimestamp(`Incrementing consecutive days count from ${consecutiveDaysCount}`);
         setConsecutiveDaysCount(prev => prev + 1);
       } else {
+        logWithTimestamp('Setting consecutive days count to 1');
         setConsecutiveDaysCount(1);
       }
       
       // Prepare simulation result for confirmation modal
+      logWithTimestamp('Preparing simulation result for confirmation modal');
       const simulationResult: SimulationResult = {
         date: dateStr,
         bodyArea: config.bodyArea,
@@ -459,39 +671,81 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       };
       
       // Show the confirmation modal
+      logWithTimestamp('Showing confirmation modal');
       setSimulationResult(simulationResult);
       setShowConfirmationModal(true);
       
       // Reset selected date if it was from the state
       if (!simulationDate) {
+        logWithTimestamp('Resetting selected date');
         setSelectedDate(null);
       }
+      
+      logWithTimestamp(`Simulation completed successfully in ${Date.now() - simulationStartTime}ms`);
+      return Promise.resolve();
     } catch (error) {
+      logWithTimestamp(`Error in single day simulation: ${error}`);
       console.error('Error in single day simulation:', error);
-      Alert.alert('Simulation Error', 'An error occurred during simulation');
+      Alert.alert('Simulation Error', 'An error occurred during simulation. Try again with a different date or a shorter duration.');
+      return Promise.reject(error);
     } finally {
+      // Always restore the original Date object to prevent issues
+      logWithTimestamp('Restoring Date object in finally block');
+      restoreOriginalDate();
+      logWithTimestamp('Setting isLoading to false');
       setIsLoading(false);
     }
   };
   
   // Handle quick simulation of the previous day
   const handleQuickSimulation = () => {
+    logWithTimestamp('Quick simulation button pressed');
+    
     if (!lastSimulatedDate || !lastConfig) {
+      logWithTimestamp('No previous simulation data available for quick simulation');
       Alert.alert('Error', 'No previous simulation data available');
-        return;
-      }
-      
+      return;
+    }
+    
+    // Safety check - don't allow starting if already loading
+    if (isLoading) {
+      logWithTimestamp('Already loading, ignoring quick simulation request');
+      return;
+    }
+    
+    // Immediately show loading state
+    logWithTimestamp('Setting loading state for quick simulation');
+    setIsLoading(true);
+    
     // Calculate the previous day
     const previousDay = new Date(lastSimulatedDate);
     previousDay.setDate(previousDay.getDate() - 1);
+    logWithTimestamp(`Quick simulation target date: ${previousDay.toLocaleDateString()}`);
     
-    // Directly pass the date to the simulation function
-    handleSingleDaySimulation(lastConfig, previousDay);
+    // Add a small delay to let the UI update before starting the heavy computation
+    logWithTimestamp('Adding delay before starting quick simulation');
+    setTimeout(() => {
+      logWithTimestamp('Starting quick simulation after delay');
+      // Directly pass the date to the simulation function
+      handleSingleDaySimulation(lastConfig, previousDay)
+        .catch((error) => {
+          logWithTimestamp(`Error in quick simulation: ${error}`);
+          console.error('Error in quick simulation:', error);
+          Alert.alert('Simulation Error', 'The quick simulation failed. Please try a different approach.');
+          setIsLoading(false);
+          restoreOriginalDate();
+        });
+    }, 100);
   };
   
   // Handle batch simulation for 7 consecutive days
-  const handleBatchSimulation = async (config: StretchConfig) => {
-    setIsLoading(true);
+  const handleBatchSimulation = async (config: StretchConfig): Promise<void> => {
+    const batchStartTime = Date.now();
+    logWithTimestamp('Starting handleBatchSimulation');
+    logWithTimestamp(`Batch config: ${JSON.stringify(config)}`);
+    
+    // Note: We're not setting isLoading=true here anymore, because it should be set by the caller
+    // This allows the UI to update before the heavy processing starts
     
     try {
       // Calculate date range based on lastBatchEndDate
@@ -506,55 +760,125 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       if (!lastBatchEndDate) {
         // First batch: use yesterday as end date
         endDate = yesterday;
-        } else {
+        logWithTimestamp(`First batch simulation, end date: ${yesterday.toLocaleDateString()}`);
+      } else {
         // Subsequent batches: use 7 days before the last end date
         endDate = new Date(lastBatchEndDate);
         endDate.setDate(endDate.getDate() - 1);
+        logWithTimestamp(`Subsequent batch, end date: ${endDate.toLocaleDateString()}`);
       }
       
       // Start date is always 7 days before end date
       startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - 6);
       
-      console.log(`Batch simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+      logWithTimestamp(`Batch simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
       
       // Keep track of total XP earned
       let totalXpEarned = 0;
       let allCompletedChallenges: any[] = [];
       let allCompletedAchievements: any[] = [];
       
-      // Get initial state for comparison
-      const initialProgress = await storageService.getUserProgress();
+      // Get initial state for comparison - with timeout protection
+      logWithTimestamp('Getting initial user progress for batch simulation');
+      const initialProgressStartTime = Date.now();
+      
+      const initialPromise = new Promise(async (resolve, reject) => {
+        try {
+          const initialProgress = await storageService.getUserProgress();
+          logWithTimestamp(`Got initial batch progress in ${Date.now() - initialProgressStartTime}ms`);
+          resolve(initialProgress);
+        } catch (error) {
+          logWithTimestamp(`Error getting initial batch progress: ${error}`);
+          reject(error);
+        }
+      });
+      
+      // Add 10 second timeout to avoid hanging
+      const initialProgress = await Promise.race([
+        initialPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const errorMsg = 'Timed out getting initial progress for batch';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 10000)
+        )
+      ]) as any;
+      
       const initialXP = initialProgress.totalXP || 0;
+      logWithTimestamp(`Initial XP before batch: ${initialXP}`);
       
       // Simulate each day in the range
       const batchDates: string[] = [];
       
       // Simulate from start date to end date (inclusive)
       let currentDate = new Date(startDate);
+      let dayCount = 0;
+      const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+      
       while (currentDate <= endDate) {
+        dayCount++;
+        logWithTimestamp(`Processing day ${dayCount} of ${totalDays}: ${currentDate.toLocaleDateString()}`);
+        
+        // Restore original Date before patching for the new day
+        restoreOriginalDate();
+        
         // Patch date for simulation
         patchDateForSimulation(currentDate);
         
         // Create routine for this day
-      const routine = {
+        logWithTimestamp('Creating batch routine object');
+        const routine = {
           id: `batch-stretch-${Date.now()}-${currentDate.getTime()}`,
-        date: new Date().toISOString(),
+          date: new Date().toISOString(),
           duration: config.duration.toString() as any,
           area: config.bodyArea as any,
           difficulty: config.difficulty as any,
           stretches: ["Batch Simulation Stretch"],
-        status: "completed"
+          status: "completed"
         } as any;
       
-      // Process the routine
-      const result = await gamificationManager.processCompletedRoutine(routine);
+        // Process the routine with timeout protection
+        logWithTimestamp(`Processing batch routine for ${currentDate.toLocaleDateString()}`);
+        const routineProcessStartTime = Date.now();
+        
+        const processPromise = new Promise(async (resolve, reject) => {
+          try {
+            logWithTimestamp('Calling processCompletedRoutine for batch day');
+            const result = await gamificationManager.processCompletedRoutine(routine);
+            logWithTimestamp(`Completed batch routine processing in ${Date.now() - routineProcessStartTime}ms`);
+            resolve(result);
+          } catch (error) {
+            logWithTimestamp(`Error processing batch routine: ${error}`);
+            reject(error);
+          }
+        });
+        
+        // Add 15 second timeout to avoid hanging
+        const result = await Promise.race([
+          processPromise,
+          new Promise((_, reject) => 
+            setTimeout(() => {
+              const errorMsg = `Timed out processing routine for ${currentDate.toLocaleDateString()}`;
+              logWithTimestamp(errorMsg);
+              reject(new Error(errorMsg));
+            }, 15000)
+          )
+        ]) as any;
         
         // Claim any completed challenges
         if (result.completedChallenges && result.completedChallenges.length > 0) {
+          logWithTimestamp(`Found ${result.completedChallenges.length} completed challenges for batch day ${dayCount}`);
           for (const challenge of result.completedChallenges) {
-            await gamificationManager.claimChallenge(challenge.id);
-            allCompletedChallenges.push(challenge);
+            try {
+              logWithTimestamp(`Claiming batch challenge: ${challenge.id} - ${challenge.title}`);
+              await gamificationManager.claimChallenge(challenge.id);
+              allCompletedChallenges.push(challenge);
+              logWithTimestamp(`Successfully claimed batch challenge: ${challenge.id}`);
+            } catch (error) {
+              logWithTimestamp(`Error claiming batch challenge ${challenge.id}: ${error}`);
+            }
           }
         }
         
@@ -562,35 +886,61 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         batchDates.push(currentDate.toISOString());
         
         // Check for additional challenges
+        logWithTimestamp('Checking for additional batch challenges');
+        const additionalChallengeStartTime = Date.now();
         const progress = await storageService.getUserProgress();
         const additionalChallenges = await challengeManager.updateUserChallenges(progress);
+        logWithTimestamp(`Found ${additionalChallenges.length} additional batch challenges in ${Date.now() - additionalChallengeStartTime}ms`);
         
         if (additionalChallenges.length > 0) {
+          logWithTimestamp(`Claiming ${additionalChallenges.length} additional batch challenges`);
           for (const challenge of additionalChallenges) {
-            await gamificationManager.claimChallenge(challenge.id);
-            allCompletedChallenges.push(challenge);
+            try {
+              logWithTimestamp(`Claiming additional batch challenge: ${challenge.id} - ${challenge.title}`);
+              await gamificationManager.claimChallenge(challenge.id);
+              allCompletedChallenges.push(challenge);
+              logWithTimestamp(`Successfully claimed additional batch challenge: ${challenge.id}`);
+            } catch (error) {
+              logWithTimestamp(`Error claiming additional batch challenge ${challenge.id}: ${error}`);
+            }
           }
         }
+        
+        // Restore original Date before moving to the next day
+        logWithTimestamp(`Finished processing day ${dayCount}, restoring Date before next day`);
+        restoreOriginalDate();
         
         // Move to next day
         currentDate = new Date(currentDate);
         currentDate.setDate(currentDate.getDate() + 1);
       }
       
+      // Make sure we restore the original Date
+      logWithTimestamp('All batch days processed, final Date restoration');
+      restoreOriginalDate();
+      
       // Store the last batch end date for subsequent simulations
+      logWithTimestamp(`Setting last batch end date to ${startDate.toLocaleDateString()}`);
       setLastBatchEndDate(startDate);
       
       // Update simulated dates
+      logWithTimestamp(`Adding ${batchDates.length} dates to simulated dates`);
       setSimulatedDates(prev => [...prev, ...batchDates]);
       
       // Get final state after all simulations
+      logWithTimestamp('Refreshing final batch stats');
+      const refreshStartTime = Date.now();
       await refreshBobStats();
+      logWithTimestamp(`Refreshed batch stats in ${Date.now() - refreshStartTime}ms`);
+      
       const finalProgress = await storageService.getUserProgress();
       
       // Calculate total XP earned
       totalXpEarned = finalProgress.totalXP - initialXP;
+      logWithTimestamp(`Batch XP gained: ${totalXpEarned} (from ${initialXP} to ${finalProgress.totalXP})`);
       
       // Check for newly completed achievements
+      logWithTimestamp('Checking for newly completed achievements from batch');
       const achievements = Object.values(finalProgress.achievements || {});
       allCompletedAchievements = achievements.filter(a => 
         a.completed && batchDates.some(dateStr => {
@@ -598,8 +948,10 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
           return a.dateCompleted === batchDate;
         })
       );
+      logWithTimestamp(`Found ${allCompletedAchievements.length} achievements completed during batch`);
       
       // Prepare simulation result for confirmation modal
+      logWithTimestamp('Preparing batch simulation result for confirmation modal');
       const simulationResult: SimulationResult = {
         date: batchDates[0], // Use first date for reference
         bodyArea: config.bodyArea,
@@ -622,12 +974,22 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       };
       
       // Show the confirmation modal
+      logWithTimestamp('Showing batch confirmation modal');
       setSimulationResult(simulationResult);
       setShowConfirmationModal(true);
+      logWithTimestamp(`Batch simulation completed successfully in ${Date.now() - batchStartTime}ms`);
+      return Promise.resolve();
     } catch (error) {
+      logWithTimestamp(`Error in batch simulation: ${error}`);
       console.error('Error in batch simulation:', error);
-      Alert.alert('Batch Simulation Error', 'An error occurred during batch simulation');
+      Alert.alert('Batch Simulation Error', 'An error occurred during batch simulation. Try again with a different configuration or fewer days.');
+      
+      // Ensure we restore the original Date object
+      logWithTimestamp('Restoring Date object in batch error handler');
+      restoreOriginalDate();
+      return Promise.reject(error);
     } finally {
+      logWithTimestamp('Setting isLoading to false in batch finally');
       setIsLoading(false);
     }
   };
@@ -799,15 +1161,22 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     );
   };
   
-  // Add cleanup when leaving the screen
+  // Add a special check to log navigation params for debugging
   useEffect(() => {
+    logWithTimestamp(`Bob Simulator screen mounted, from testing: ${fromTesting}`);
+    logWithTimestamp(`Navigation params: ${JSON.stringify(route?.params)}`);
+    
     return () => {
-      // Clean up when component unmounts
-      try {
-        AsyncStorage.removeItem('@flexbreak:bob_simulator_access');
-      } catch (error) {
-        console.error('Error removing simulator access:', error);
+      logWithTimestamp('Bob Simulator screen unmounting');
+      // Restore original Date object if it was overridden
+      if ((global as any).__originalDate) {
+        global.Date = (global as any).__originalDate;
+        delete (global as any).__originalDate;
+        logWithTimestamp('[BobSimulator] Restored original Date object during cleanup');
       }
+      
+      // Clear simulator access
+      AsyncStorage.removeItem('@flexbreak:bob_simulator_access');
     };
   }, []);
   
@@ -891,6 +1260,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
               <ActivityIndicator size="large" color={theme.accent} />
               <Text style={[styles.loadingText, { color: theme.text }]}>
                 Processing simulation...
+              </Text>
+              <Text style={[styles.loadingSubText, { color: theme.textSecondary }]}>
+                Please wait, this may take a few moments as we simulate your routine and process all related challenges and rewards.
               </Text>
           </View>
           ) : (
@@ -1154,9 +1526,17 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         visible={showDateModal}
         onClose={() => setShowDateModal(false)}
         onDateSelected={(date) => {
+          // Immediately close the modal and show loading indicator
+          logWithTimestamp(`Date selected from modal: ${date.toLocaleDateString()}`);
           setSelectedDate(date);
           setShowDateModal(false);
-          setShowConfigModal(true);
+          
+          // Add a small delay to allow UI to update before opening the config modal
+          logWithTimestamp('Adding delay before showing config modal');
+          setTimeout(() => {
+            logWithTimestamp('Showing config modal after delay');
+            setShowConfigModal(true);
+          }, 100);
         }}
         simulatedDates={simulatedDates}
       />
@@ -1166,8 +1546,32 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         visible={showConfigModal}
         onClose={() => setShowConfigModal(false)}
         onConfirm={(config) => {
+          // Safety check - don't allow starting if already loading
+          logWithTimestamp(`Config confirmed: ${JSON.stringify(config)}`);
+          
+          if (isLoading) {
+            logWithTimestamp('Already loading, ignoring config confirmation');
+            return;
+          }
+          
+          // Immediately close modal and show loading state
+          logWithTimestamp('Closing config modal and setting loading state');
           setShowConfigModal(false);
-          handleSingleDaySimulation(config, selectedDate);
+          setIsLoading(true);
+          
+          // Add a small delay to let the UI update before starting the heavy computation
+          logWithTimestamp('Adding delay before starting simulation');
+          setTimeout(() => {
+            logWithTimestamp('Starting simulation after delay');
+            handleSingleDaySimulation(config, selectedDate)
+              .catch((error) => {
+                logWithTimestamp(`Error in simulation after delay: ${error}`);
+                console.error('Error in simulation:', error);
+                Alert.alert('Simulation Error', 'The simulation process failed. Please try again with different settings.');
+                setIsLoading(false);
+                restoreOriginalDate();
+              });
+          }, 100);
         }}
         title="Configure Stretch Routine"
       />
@@ -1177,8 +1581,25 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         visible={showBatchConfigModal}
         onClose={() => setShowBatchConfigModal(false)}
         onConfirm={(config) => {
+          // Safety check - don't allow starting if already loading
+          if (isLoading) {
+            return;
+          }
+          
+          // Immediately close modal and show loading state
           setShowBatchConfigModal(false);
-          handleBatchSimulation(config);
+          setIsLoading(true);
+          
+          // Add a small delay to let the UI update before starting the heavy computation
+          setTimeout(() => {
+            handleBatchSimulation(config)
+              .catch((error) => {
+                console.error('Error in batch simulation:', error);
+                Alert.alert('Batch Simulation Error', 'The batch simulation process failed. Please try again with different settings or fewer days.');
+                setIsLoading(false);
+                restoreOriginalDate();
+              });
+          }, 100);
         }}
         title="Configure 7-Day Simulation"
         isBatchMode={true}
@@ -1358,6 +1779,11 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 14,
+  },
+  loadingSubText: {
+    marginTop: 8,
+    fontSize: 12,
+    textAlign: 'center',
   },
   datesContainer: {
     maxHeight: 200,

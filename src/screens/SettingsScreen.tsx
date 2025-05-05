@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { clearAllData } from '../services/storageService';
+import { clearAllData, clearAllPremiumStatus } from '../services/storageService';
 import { resetSimulationData } from '../services/storageService';
 
 import DiagnosticsScreen from './DiagnosticsScreen';
@@ -142,6 +142,25 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             Alert.alert('Success', 'All app data has been reset');
           } else {
             Alert.alert('Error', 'Failed to reset app data');
+          }
+        }}
+      ]
+    );
+  };
+
+  // Handle clear premium status
+  const handleClearPremiumStatus = async () => {
+    Alert.alert(
+      'Clear Premium Status',
+      'This will remove your premium status, useful for testing subscription flows. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear Premium', style: 'destructive', onPress: async () => {
+          const success = await clearAllPremiumStatus();
+          if (success) {
+            Alert.alert('Success', 'Premium status has been cleared. Please restart the app for changes to take effect.');
+          } else {
+            Alert.alert('Error', 'Failed to clear premium status');
           }
         }}
       ]
@@ -606,22 +625,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
             
-            
             <TouchableOpacity 
-              style={[styles.settingItem, styles.lastItem]}
-              onPress={handleResetData}
+              style={styles.settingItem}
+              onPress={handleClearPremiumStatus}
             >
               <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
-                  <Ionicons name="trash-outline" size={22} color="#F44336" />
+                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FEEBEF'}]}>
+                  <Ionicons name="star-outline" size={22} color="#F4A261" />
                 </View>
                 <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
+                  <Text style={[styles.settingTitle, {color: theme.text}]}>Clear Premium Status</Text>
+                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Remove premium subscription (for testing)</Text>
                 </View>
               </View>
             </TouchableOpacity>
-
             <TouchableOpacity 
               style={[styles.settingItem, styles.lastItem]}
               onPress={handleResetSimulationData}
@@ -636,6 +653,23 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 </View>
               </View>
             </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleResetData}
+            >
+              <View style={styles.settingContent}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                  <Ionicons name="trash-outline" size={22} color="#F44336" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
+                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+       
             
           </View>
         )}

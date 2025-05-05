@@ -63,27 +63,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
     }
   };
   
-  // Test notification function
-  const handleTestNotification = async () => {
-    try {
-      // Check if the user has reminders enabled
-      if (!reminderEnabled) {
-        alert('Please enable reminders first');
-        return;
-      }
-      
-      // Send a test notification using Firebase
-      const success = await firebaseReminders.sendTestNotification();
-      if (success) {
-        alert('Test notification sent! Close the app completely to see it appear.');
-      } else {
-        alert('Failed to send test notification. Make sure Firebase is properly set up.');
-      }
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      alert('Error sending test notification');
-    }
-  };
+
   
   return (
     <View style={[
@@ -246,18 +226,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
           </TouchableOpacity>
         )}
         
-        {/* Test notification button */}
-        {isPremium && reminderEnabled && (
-          <TouchableOpacity
-            onPress={handleTestNotification}
-            style={[
-              styles.testButton,
-              { backgroundColor: theme.accent }
-            ]}
-          >
-            <Text style={styles.testButtonText}>Test Notification</Text>
-          </TouchableOpacity>
-        )}
+       
       </View>
       
       {/* Feature explanations based on user status */}
