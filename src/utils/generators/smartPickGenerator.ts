@@ -1,5 +1,6 @@
 import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../../types';
 import * as rewardManager from '../progress/modules/rewardManager';
+import stretches from '../../data/stretches';
 
 // Type for routine recommendation
 export interface RoutineRecommendation {
@@ -10,7 +11,35 @@ export interface RoutineRecommendation {
   isPremiumEnabled?: boolean;
 }
 
+// Get available body areas (areas that have stretches with demos)
+function getAvailableBodyAreas(): BodyArea[] {
+  const areasWithDemos = new Set<BodyArea>();
+  
+  stretches.forEach(stretch => {
+    if (stretch.hasDemo === true) {
+      stretch.tags.forEach(tag => {
+        if (tag !== 'Full Body') {
+          areasWithDemos.add(tag as BodyArea);
+        }
+      });
+    }
+  });
+  
+  // Check if Full Body has any demos
+  const hasFullBodyDemos = stretches.some(stretch => 
+    stretch.hasDemo === true && 
+    stretch.tags.includes('Full Body')
+  );
+  
+  if (hasFullBodyDemos) {
+    areasWithDemos.add('Full Body');
+  }
+  
+  return Array.from(areasWithDemos);
+}
+
 // Define beginner-friendly sequence for new users (Phase 1)
+// This will be dynamically filtered based on available demos
 const DEFAULT_ROUTINE_SEQUENCE: RoutineRecommendation[] = [
   {
     area: 'Neck',
@@ -44,6 +73,14 @@ const DEFAULT_ROUTINE_SEQUENCE: RoutineRecommendation[] = [
   }
 ];
 
+// Get filtered default routines sequence (only those with demo videos)
+function getFilteredDefaultSequence(): RoutineRecommendation[] {
+  const availableAreas = getAvailableBodyAreas();
+  return DEFAULT_ROUTINE_SEQUENCE.filter(routine => 
+    availableAreas.includes(routine.area)
+  );
+}
+
 // Get total routine count for a specific body area
 function getAreaRoutineCount(routines: ProgressEntry[], area: BodyArea): number {
   return routines.filter(routine => routine.area === area).length;
@@ -61,17 +98,20 @@ function getTodayRoutineCount(routines: ProgressEntry[]): number {
   }).length;
 }
 
-// Get most common area from user history
+// Get most common area from user history that has demo videos
 function getMostUsedArea(routines: ProgressEntry[]): BodyArea | null {
   if (routines.length === 0) return null;
   
   const areaCounts: Record<string, number> = {};
+  const availableAreas = getAvailableBodyAreas();
   
   routines.forEach(routine => {
-    if (!areaCounts[routine.area]) {
-      areaCounts[routine.area] = 0;
+    if (availableAreas.includes(routine.area as BodyArea)) {
+      if (!areaCounts[routine.area]) {
+        areaCounts[routine.area] = 0;
+      }
+      areaCounts[routine.area]++;
     }
-    areaCounts[routine.area]++;
   });
   
   let maxCount = 0;
@@ -87,28 +127,23 @@ function getMostUsedArea(routines: ProgressEntry[]): BodyArea | null {
   return mostUsedArea;
 }
 
-// Get least used area from user history
+// Get least used area from user history that has demo videos
 function getLeastUsedArea(routines: ProgressEntry[]): BodyArea | null {
   if (routines.length === 0) return null;
   
-  // All possible body areas
-  const allAreas: BodyArea[] = [
-    'Neck',
-    'Shoulders & Arms',
-    'Upper Back & Chest',
-    'Lower Back',
-    'Hips & Legs',
-    'Full Body'
-  ];
+  // Get areas that have stretches with demo videos
+  const availableAreas = getAvailableBodyAreas();
   
   // Count occurrences of each area
   const areaCounts: Record<string, number> = {};
-  allAreas.forEach(area => {
+  availableAreas.forEach(area => {
     areaCounts[area] = 0;
   });
   
   routines.forEach(routine => {
-    areaCounts[routine.area]++;
+    if (availableAreas.includes(routine.area as BodyArea)) {
+      areaCounts[routine.area]++;
+    }
   });
   
   // Find the area with the minimum count
@@ -145,6 +180,12 @@ function getAverageDuration(routines: ProgressEntry[]): Duration {
 function isReadyForProgression(routines: ProgressEntry[], area: BodyArea): boolean {
   if (!area) return false;
   
+  // Check if the area has stretches with demos
+  const availableAreas = getAvailableBodyAreas();
+  if (!availableAreas.includes(area)) {
+    return false;
+  }
+  
   // User is ready for progression if they've done at least 3 routines in the area
   const areaRoutineCount = getAreaRoutineCount(routines, area);
   return areaRoutineCount >= 3;
@@ -173,10 +214,31 @@ export async function generateSmartPick(routines: ProgressEntry[]): Promise<Rout
   // Check if premium stretches are unlocked (available at level 7)
   const premiumEnabled = await hasPremiumStretchesAccess();
   
+  // Get available body areas that have stretches with demo videos
+  const availableAreas = getAvailableBodyAreas();
+  
+  // Log available areas for debugging
+  console.log(`[DEBUG] Areas with demo videos: ${availableAreas.join(', ')}`);
+  
+  // Get filtered default sequence
+  const filteredDefaultSequence = getFilteredDefaultSequence();
+  
   // Phase 1: Default Mode (0-4 Routines)
   if (routines.length < 5) {
-    const index = Math.min(routines.length, DEFAULT_ROUTINE_SEQUENCE.length - 1);
-    const recommendation = DEFAULT_ROUTINE_SEQUENCE[index];
+    if (filteredDefaultSequence.length === 0) {
+      // If no default routines have demos, create a fallback recommendation
+      const fallbackArea = availableAreas.length > 0 ? availableAreas[0] : 'Full Body';
+      return {
+        area: fallbackArea,
+        duration: '5',
+        level: 'beginner',
+        reason: 'Here\'s a routine to get you started',
+        isPremiumEnabled: premiumEnabled
+      };
+    }
+    
+    const index = Math.min(routines.length, filteredDefaultSequence.length - 1);
+    const recommendation = filteredDefaultSequence[index];
     return {
       ...recommendation,
       isPremiumEnabled: premiumEnabled
@@ -193,36 +255,43 @@ export async function generateSmartPick(routines: ProgressEntry[]): Promise<Rout
     const leastUsedArea = getLeastUsedArea(routines);
     const preferredDuration = getAverageDuration(routines);
     
+    // Fallback to any available area if no least used area
+    const fallbackArea = availableAreas.length > 0 ? availableAreas[0] : 'Full Body';
+    
     return {
-      area: leastUsedArea || 'Neck', // Fallback to Neck if no least used area
+      area: leastUsedArea || fallbackArea,
       duration: preferredDuration,
       level: 'beginner',
-      reason: `You've already done ${todayRoutineCount} routine${todayRoutineCount > 1 ? 's' : ''} today! Try this ${leastUsedArea} routine for more variety.`,
+      reason: `You've already done ${todayRoutineCount} routine${todayRoutineCount > 1 ? 's' : ''} today! Try this ${leastUsedArea || fallbackArea} routine for more variety.`,
       isPremiumEnabled: premiumEnabled
     };
   }
   
   // PROGRESSION: Otherwise, suggest progression in a popular area
   const mostUsedArea = getMostUsedArea(routines);
-  const readyForProgression = isReadyForProgression(routines, mostUsedArea || 'Neck');
+  
+  // If no most used area or it doesn't have demo videos, use any available area
+  const targetArea = mostUsedArea || (availableAreas.length > 0 ? availableAreas[0] : 'Full Body');
+  
+  const readyForProgression = isReadyForProgression(routines, targetArea);
   const preferredDuration = getAverageDuration(routines);
   
   if (readyForProgression) {
     return {
-      area: mostUsedArea || 'Neck',
+      area: targetArea,
       duration: preferredDuration,
       level: 'intermediate', // Suggest moving up to intermediate
-      reason: `You've mastered ${mostUsedArea} stretches! Try this intermediate routine to challenge yourself.`,
+      reason: `You've mastered ${targetArea} stretches! Try this intermediate routine to challenge yourself.`,
       isPremiumEnabled: premiumEnabled
     };
   }
   
   // Default recommendation if no other condition is met
   return {
-    area: mostUsedArea || 'Neck',
+    area: targetArea,
     duration: preferredDuration,
     level: 'beginner',
-    reason: `Based on your history, here's a ${mostUsedArea} routine that's just right for you today.`,
+    reason: `Based on your history, here's a ${targetArea} routine that's just right for you today.`,
     isPremiumEnabled: premiumEnabled
   };
 } 

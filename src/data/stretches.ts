@@ -1486,7 +1486,7 @@ const stretches: Stretch[] = [
     duration: 60,
     bilateral: false,
     premium: false,
-    tags: ["Full Body"],v
+    tags: ["Full Body"],
     level: "intermediate",
     image: markAsVideo(require('../../assets/stretchData/id103_sun_salutation_grass/image.mov')),
     hasDemo: true,

@@ -50,7 +50,8 @@ export const generateRoutine = async (
         !selectedIds.includes(stretch.id) && 
         (stretch.tags.includes(area) || 
          (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))) &&
-        (!stretch.premium || premiumUnlocked) // Filter out premium stretches if not unlocked
+        (!stretch.premium || premiumUnlocked) && // Filter out premium stretches if not unlocked
+        stretch.hasDemo === true // Only include stretches with demo videos
       );
       
       // Shuffle available stretches
@@ -87,17 +88,18 @@ export const generateRoutine = async (
   // Define max stretch counts
   const maxStretches = { 5: 7, 10: 12, 15: 16 }[durationMinutes] || Math.ceil(durationMinutes / 1.7);
 
-  // Filter by area and premium status
+  // Filter by area, premium status and demo availability
   let filteredStretches = stretches.filter(stretch => 
     (stretch.tags.includes(area) || 
     (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))) &&
-    (!stretch.premium || premiumUnlocked) // Filter out premium stretches if not unlocked
+    (!stretch.premium || premiumUnlocked) && // Filter out premium stretches if not unlocked
+    stretch.hasDemo === true // Only include stretches with demo videos
   );
 
   // Debug logging
   console.log(`[DEBUG] Generating routine for area: ${area}, level: ${level}, duration: ${duration}`);
   console.log(`[DEBUG] Total stretches: ${stretches.length}`);
-  console.log(`[DEBUG] Filtered by area and premium status: ${filteredStretches.length}`);
+  console.log(`[DEBUG] Filtered by area, premium status, and demo availability: ${filteredStretches.length}`);
   console.log(`[DEBUG] Premium stretches unlocked: ${premiumUnlocked}`);
   
   const advancedCount = filteredStretches.filter(s => s.level === 'advanced').length;
@@ -279,7 +281,10 @@ function shuffleArray<T>(array: T[]): T[] {
  * This function returns 5 random premium stretches for users to try in the rewards screen
  */
 export const getRandomPremiumStretches = (sampleSize: number = 5): Stretch[] => {
-  const premiumStretches = stretches.filter(stretch => stretch.premium);
+  const premiumStretches = stretches.filter(stretch => 
+    stretch.premium && 
+    stretch.hasDemo === true // Only include stretches with demo videos
+  );
   
   if (premiumStretches.length <= sampleSize) {
     return premiumStretches;
@@ -667,17 +672,19 @@ export const selectStretches = (
   config: SmartRoutineConfig,
   availableStretches: Stretch[],
 ): Stretch[] => {
-  // Filter stretches by area and level
+  // Filter stretches by area, level, and demo availability
   let filtered = availableStretches.filter(stretch =>
     config.areas.some(area => stretch.tags.includes(area)) &&
-    stretch.level === config.level
+    stretch.level === config.level &&
+    stretch.hasDemo === true // Only include stretches with demo videos
   );
   
   // If no stretches match the criteria, fall back to any stretches for these areas
   if (filtered.length === 0) {
     console.log('No stretches found for specific level, falling back to any level');
     filtered = availableStretches.filter(stretch =>
-      config.areas.some(area => stretch.tags.includes(area))
+      config.areas.some(area => stretch.tags.includes(area)) &&
+      stretch.hasDemo === true // Only include stretches with demo videos
     );
   }
   
@@ -685,14 +692,17 @@ export const selectStretches = (
   if (filtered.length === 0) {
     console.log('No stretches found for areas, falling back to Full Body');
     filtered = availableStretches.filter(stretch =>
-      stretch.tags.includes('Full Body')
+      stretch.tags.includes('Full Body') &&
+      stretch.hasDemo === true // Only include stretches with demo videos
     );
   }
   
-  // Final fallback - just use any stretches
+  // Final fallback - just use any stretches with demos
   if (filtered.length === 0) {
-    console.log('Using all stretches as fallback');
-    filtered = [...availableStretches];
+    console.log('Using all stretches with demos as fallback');
+    filtered = availableStretches.filter(stretch => 
+      stretch.hasDemo === true
+    );
   }
   
   // If desk-friendly is required, prioritize those stretches
