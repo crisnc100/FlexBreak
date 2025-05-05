@@ -22,7 +22,6 @@
     "expo-constants": "~17.0.8",
     "expo-dev-client": "~5.0.20",
     "expo-device": "~7.0.3",
-    "expo-firebase-core": "^8.0.0",
     "expo-haptics": "^14.0.1",
     "expo-in-app-purchases": "^14.5.0",
     "expo-linear-gradient": "^14.0.2",

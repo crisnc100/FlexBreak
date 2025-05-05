@@ -46,7 +46,6 @@ import firebaseConfig from './firebase.config';
 
 // Initialize Firebase
 if (!firebase.apps.length) {
-  console.log('Firebase initialization starting...');
   firebase.initializeApp(firebaseConfig);
   
   // Set up app check with a more compatible approach
@@ -55,7 +54,6 @@ if (!firebase.apps.length) {
     if (__DEV__) {
       // @ts-ignore - Debug tokens are not in the type definitions
       self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-      console.log('Firebase App Check initialized in DEBUG mode');
     }
     
     // Initialize app check with a simpler configuration
@@ -63,15 +61,9 @@ if (!firebase.apps.length) {
       provider: 'debug', // This works in both debug and production with proper setup
       isTokenAutoRefreshEnabled: true
     });
-    
-    console.log('Firebase App Check activated successfully');
   } catch (error) {
     console.error('Error initializing App Check:', error);
   }
-  
-  console.log('Firebase initialization complete');
-} else {
-  console.log('Firebase already initialized');
 }
 
 // Avoid playing intro sound twice
@@ -106,7 +98,6 @@ Notifications.setNotificationHandler({
 export function navigateFromAnywhere(name: keyof RootStackParamList, params?: any) {
   if (navigationRef.isReady()) {
     navigationRef.navigate(name, params);
-    console.log(`[Global Navigation] Navigating to ${name}`, params);
   } else {
     console.error('[Global Navigation] Navigation not initialized yet');
   }
@@ -121,7 +112,6 @@ export function forceNavigate(name: keyof RootStackParamList, params?: any) {
         routes: [{ name, params }],
       })
     );
-    console.log(`[Global Navigation] Force navigating to ${name}`, params);
   } else {
     console.error('[Global Navigation] Navigation not initialized yet');
   }
@@ -143,11 +133,9 @@ export default function App() {
       if (nextAppState === 'active') {
         // App came to foreground
         performance.trackAppForeground();
-        console.log('App moved to foreground');
       } else if (nextAppState === 'background') {
         // App went to background
         performance.trackAppBackground();
-        console.log('App moved to background');
       }
     });
     
@@ -199,7 +187,6 @@ const TabNavigator = () => {
           await AsyncStorage.removeItem('@flexbreak:reopen_settings');
           // Open settings modal
           setSettingsModalVisible(true);
-          console.log('[TabNavigator] Auto-reopening settings from flag');
         }
       } catch (error) {
         console.error('Error checking reopen_settings flag:', error);
@@ -211,9 +198,7 @@ const TabNavigator = () => {
   
   // Check if user has access to playlists feature - using useCallback to memoize
   const checkPlaylistAccess = useCallback(async () => {
-    console.log('Checking playlist access...');
     const hasAccess = await rewardManager.isRewardUnlocked('focus_area_mastery');
-    console.log(`Playlist access check result: ${hasAccess}`);
     setHasPlaylistAccess(isPremium && hasAccess);
   }, [isPremium]);
   
@@ -225,12 +210,10 @@ const TabNavigator = () => {
   // Listen for level up and reward unlocked events to refresh playlist access
   useEffect(() => {
     const handleLevelUp = () => {
-      console.log('LEVEL_UP_EVENT received in TabNavigator, refreshing playlist access...');
       checkPlaylistAccess();
     };
     
     const handleRewardUnlocked = () => {
-      console.log('REWARD_UNLOCKED_EVENT received in TabNavigator, refreshing playlist access...');
       checkPlaylistAccess();
     };
     
@@ -364,30 +347,23 @@ function MainApp() {
       try {
         // Initialize local notifications system
         notifications.configureNotifications();
-        console.log('Local notifications configured');
         
         // Get notification permissions (both systems need this)
         const permissionsGranted = await notifications.requestNotificationsPermissions();
-        console.log('Notification permissions granted:', permissionsGranted);
         
         if (permissionsGranted) {
           // Initialize Firebase reminders for premium users
           try {
             const firebaseInitialized = await firebaseReminders.initializeFirebaseReminders();
             if (firebaseInitialized) {
-              console.log('Firebase reminders initialized successfully');
-              
               // Get a real FCM token
               const token = await firebaseReminders.getFCMToken();
-              console.log('FCM token:', token ? token.substring(0, 15) + '...' : 'none');
               
               // Get the current reminder settings
               const settings = await firebaseReminders.getReminderSettings();
-              console.log('Current reminder settings:', settings);
               
               // If enabled, ensure Firebase has the settings
               if (settings.enabled) {
-                console.log('Reminder is enabled, sending settings to Firebase');
                 await firebaseReminders.saveReminderSettings(settings);
               }
               
@@ -399,8 +375,6 @@ function MainApp() {
               return () => {
                 cleanupMotivationalMessages();
               };
-            } else {
-              console.log('Firebase reminders initialization failed - permissions may be denied');
             }
           } catch (error) {
             console.error('Error initializing Firebase reminders:', error);
@@ -418,17 +392,12 @@ function MainApp() {
     // to keep the original code structure intact
     const initStreakSystem = async () => {
       try {
-        console.log('Initializing streak system...');
-        
         // First run a validation to ensure streak values are consistent
         // This will force a refresh of the streak cache and emit an update event
         await streakValidator.runStartupStreakValidation();
         
         // Check if streak is broken and should be reset to 0 in the UI
         const isStreakBroken = await streakManager.isStreakBroken();
-        if (isStreakBroken) {
-          console.log('Streak is broken due to multiple missed days. UI will show 0.');
-        }
         
         // Check for streak freezes to refill monthly
         await streakFreezeManager.refillMonthlyStreakFreezes();
@@ -438,7 +407,6 @@ function MainApp() {
         
         // Check if a streak is broken and show notification if needed
         const streakStatus = await streakManager.checkStreakStatus();
-        console.log('Streak status on app launch:', streakStatus);
       } catch (error) {
         console.error('Error initializing streak system:', error);
       }
@@ -459,7 +427,6 @@ function MainApp() {
         await soundEffects.preloadAllSounds();
         
         // Don't play intro sound here - it will be played by the intro screens
-        console.log('Sound effects system initialized');
       } catch (error) {
         console.error('Error initializing sound effects system:', error);
       }

@@ -170,86 +170,142 @@ export const enhanceRoutineWithPremiumInfo = async (
  * @returns Array of enhanced premium stretches
  */
 export const getPremiumStretchesPreview = async (count: number = 15): Promise<(Stretch & { isPremium: boolean; vipBadgeColor: string })[]> => {
-  const premiumStretches = await rewardManager.getSamplePremiumStretches(count);
-  
-  // Ensure we have a reasonable number of stretches - make duplicates if needed
-  let enhancedStretches = premiumStretches.map(stretch => {
-    // Create a copy with premium info
-    const enhancedStretch = {
-      ...stretch,
-      isPremium: true,
-      vipBadgeColor: stretch.level === 'advanced' ? '#FF5722' : 
-                     stretch.level === 'intermediate' ? '#FF9800' : '#FFD700',
-    };
+  try {
+    console.log('Fetching premium stretches from rewardManager...');
+    const premiumStretches = await rewardManager.getSamplePremiumStretches(count);
+    console.log(`Retrieved ${premiumStretches.length} premium stretches from rewardManager`);
     
-    // Ensure image is properly marked as video if it's a video source
-    if (enhancedStretch.image) {
-      // Check if image already has __video flag
-      if (typeof enhancedStretch.image === 'object' && 
-          enhancedStretch.image !== null && 
-          !(enhancedStretch.image as any).__video) {
-        
-        // Check if it's a MP4 or MOV file
-        if (typeof enhancedStretch.image === 'object' && 
-            'uri' in enhancedStretch.image && 
-            typeof enhancedStretch.image.uri === 'string' && 
-            (enhancedStretch.image.uri.toLowerCase().endsWith('.mp4') || 
-             enhancedStretch.image.uri.toLowerCase().endsWith('.mov'))) {
-          enhancedStretch.image = markAsVideo(enhancedStretch.image);
-        }
-      }
+    // Verify we have valid stretches
+    if (!premiumStretches || premiumStretches.length === 0) {
+      console.warn('No premium stretches returned from rewardManager');
+      // Return empty array to avoid further processing
+      return [];
     }
     
-    return enhancedStretch;
-  });
-  
-  // If we don't have enough stretches, generate more varied ones to reach desired count
-  if (enhancedStretches.length < count && enhancedStretches.length > 0) {
-    console.log(`Not enough premium stretches (only ${enhancedStretches.length}, needed ${count}), generating more`);
-    
-    // Define body areas and levels for variety
-    const bodyAreas = ['Full Body', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'] as const;
-    const levels = ['beginner', 'intermediate', 'advanced'] as const;
-    
-    while (enhancedStretches.length < count) {
-      // Get a base stretch to modify
-      const originalIndex = enhancedStretches.length % premiumStretches.length;
-      const original = premiumStretches[originalIndex];
+    // Ensure we have a reasonable number of stretches - make duplicates if needed
+    let enhancedStretches = premiumStretches.map((stretch, index) => {
+      // Log what we're working with
+      console.log(`Processing stretch ${index}: ID=${stretch.id}, Name=${stretch.name}`);
+      console.log(`Image type: ${typeof stretch.image}`);
       
-      // Modify to create a new unique stretch
-      const newLevel = levels[Math.floor(Math.random() * levels.length)];
-      const newArea = bodyAreas[Math.floor(Math.random() * bodyAreas.length)];
-      const suffixes = [
-        'Deep Stretch', 'Extension', 'Dynamic Hold', 'Release', 'Mobility',
-        'Pro Technique', 'Advanced Release', 'Power Hold', 'Flexibility', 'VIP'
-      ];
-      const newSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-      
-      // Create a new stretch with the same image but marked as video if needed
-      const newStretch = {
-        ...original,
-        id: `${original.id}-premium-${enhancedStretches.length}`,
-        name: `${newArea} ${newSuffix}`,
-        level: newLevel,
-        tags: [newArea], // Keep only valid BodyArea tags
+      // Create a copy with premium info
+      const enhancedStretch = {
+        ...stretch,
         isPremium: true,
-        vipBadgeColor: newLevel === 'advanced' ? '#FF5722' : 
-                       newLevel === 'intermediate' ? '#FF9800' : '#FFD700',
+        vipBadgeColor: stretch.level === 'advanced' ? '#FF5722' : 
+                      stretch.level === 'intermediate' ? '#FF9800' : '#FFD700',
       };
       
-      // Ensure video is properly marked
-      if (newStretch.image && typeof newStretch.image === 'object') {
-        // Try to use markAsVideo if it's not already marked
-        if (!(newStretch.image as any).__video) {
-          newStretch.image = markAsVideo(newStretch.image);
-        }
+      // Make sure there is an image
+      if (!enhancedStretch.image) {
+        console.log(`No image for stretch ${enhancedStretch.id}, using placeholder`);
+        enhancedStretch.image = { 
+          uri: `https://via.placeholder.com/350x350/${enhancedStretch.vipBadgeColor.replace('#', '')}/FFFFFF?text=${encodeURIComponent(enhancedStretch.name)}` 
+        };
+        return enhancedStretch;
       }
       
-      enhancedStretches.push(newStretch);
+      // Handle image safely based on type
+      try {
+        // Ensure image is properly marked as video if it's a video source
+        if (enhancedStretch.image) {
+          // If image is a number (local asset), apply markAsVideo
+          if (typeof enhancedStretch.image === 'number') {
+            console.log(`Stretch ${enhancedStretch.id} has number asset, marking as video`);
+            enhancedStretch.image = markAsVideo(enhancedStretch.image);
+          }
+          // For objects, check if it's a video
+          else if (typeof enhancedStretch.image === 'object' && enhancedStretch.image !== null) {
+            // Check if it already has __video flag
+            if (!(enhancedStretch.image as any).__video) {
+              // Check if it's a MP4 or MOV file by URI
+              if ('uri' in enhancedStretch.image && 
+                  typeof enhancedStretch.image.uri === 'string' && 
+                  (enhancedStretch.image.uri.toLowerCase().endsWith('.mp4') || 
+                  enhancedStretch.image.uri.toLowerCase().endsWith('.mov'))) {
+                console.log(`Stretch ${enhancedStretch.id} has video URI, marking as video`);
+                enhancedStretch.image = markAsVideo(enhancedStretch.image);
+              }
+            } else {
+              console.log(`Stretch ${enhancedStretch.id} already marked as video`);
+            }
+          }
+          // Handle string URIs
+          else if (typeof enhancedStretch.image === 'string') {
+            const imageStr = enhancedStretch.image as string;
+            if (imageStr.toLowerCase().endsWith('.mp4') || 
+                imageStr.toLowerCase().endsWith('.mov')) {
+              console.log(`Stretch ${enhancedStretch.id} has string video URI, marking as video`);
+              enhancedStretch.image = markAsVideo(imageStr);
+            } else {
+              // Non-video string URI, convert to object
+              enhancedStretch.image = { uri: imageStr };
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing image for stretch ${enhancedStretch.id}:`, error);
+        // Provide a fallback image
+        enhancedStretch.image = { 
+          uri: `https://via.placeholder.com/350x350/${enhancedStretch.vipBadgeColor.replace('#', '')}/FFFFFF?text=${encodeURIComponent(enhancedStretch.name)}` 
+        };
+      }
+      
+      return enhancedStretch;
+    });
+    
+    console.log(`Enhanced ${enhancedStretches.length} premium stretches`);
+    
+    // If we don't have enough stretches, generate more varied ones to reach desired count
+    if (enhancedStretches.length < count && enhancedStretches.length > 0) {
+      console.log(`Not enough premium stretches (only ${enhancedStretches.length}, needed ${count}), generating more`);
+      
+      // Define body areas and levels for variety
+      const bodyAreas = ['Full Body', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'] as const;
+      const levels = ['beginner', 'intermediate', 'advanced'] as const;
+      
+      while (enhancedStretches.length < count) {
+        // Get a base stretch to modify
+        const originalIndex = enhancedStretches.length % premiumStretches.length;
+        const original = premiumStretches[originalIndex];
+        
+        // Modify to create a new unique stretch
+        const newLevel = levels[Math.floor(Math.random() * levels.length)];
+        const newArea = bodyAreas[Math.floor(Math.random() * bodyAreas.length)];
+        const suffixes = [
+          'Deep Stretch', 'Extension', 'Dynamic Hold', 'Release', 'Mobility',
+          'Pro Technique', 'Advanced Release', 'Power Hold', 'Flexibility', 'VIP'
+        ];
+        const newSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+        
+        // Create a new stretch with the same image but marked as video if needed
+        const newStretch = {
+          ...original,
+          id: `${original.id}-premium-${enhancedStretches.length}`,
+          name: `${newArea} ${newSuffix}`,
+          level: newLevel,
+          tags: [newArea], // Keep only valid BodyArea tags
+          isPremium: true,
+          vipBadgeColor: newLevel === 'advanced' ? '#FF5722' : 
+                        newLevel === 'intermediate' ? '#FF9800' : '#FFD700',
+        };
+        
+        // For generated stretches, just use static image fallbacks for simplicity
+        newStretch.image = { 
+          uri: `https://via.placeholder.com/350x350/${newStretch.vipBadgeColor.replace('#', '')}/FFFFFF?text=${encodeURIComponent(newStretch.name)}` 
+        };
+        
+        enhancedStretches.push(newStretch);
+      }
+      
+      console.log(`Generated additional stretches, now have ${enhancedStretches.length} total`);
     }
+    
+    return enhancedStretches;
+  } catch (error) {
+    console.error('Error in getPremiumStretchesPreview:', error);
+    return []; // Return empty array on error
   }
-  
-  return enhancedStretches;
 };
 
 /**

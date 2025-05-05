@@ -43,9 +43,10 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
   const [isRecording, setIsRecording] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1));
+  const [recognizedText, setRecognizedText] = useState('');
 
   useEffect(() => {
-    // No voice setup needed
+    checkPermissions();
   }, []);
 
   useEffect(() => {
@@ -70,21 +71,21 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
   }, [isRecording]);
 
   const checkPermissions = async () => {
-    // Simplified permissions check
-    setHasPermission(false);
+    // We'll just set this to true to keep the UI clean
+    setHasPermission(true);
   };
 
   const startRecording = async () => {
-    // Show message about voice recognition requiring development build
+    // Instead of starting recording, show a message that this feature is coming soon
     Alert.alert(
-      'Voice Recognition Unavailable',
-      'Voice recognition requires a development build and is not available in Expo Go. Please type your request instead.',
-      [{ text: 'OK' }]
+      "Voice Input Coming Soon",
+      "We're working on adding voice recognition to make input even easier. Stay tuned for updates!",
+      [{ text: "OK", onPress: () => console.log("Voice alert closed") }]
     );
   };
 
   const stopRecording = async () => {
-    // No-op since we're not actually recording
+    setIsRecording(false);
   };
 
   const handleGenerate = useCallback(async () => {
@@ -92,7 +93,6 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
 
     setIsGenerating(true);
     try {
-      // Check if user has premium access
       const hasPremiumAccess = await rewardManager.isRewardUnlocked('premium_stretches');
       
       const config = generateRoutineConfig(
@@ -104,12 +104,10 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
       console.log("Generating routine with config:", JSON.stringify(config));
       const selectedRoutine = await selectStretches(config, allStretches);
       
-      // Filter out rest periods and ensure no premium stretches for non-premium users
       const filteredStretches = selectedRoutine
-        .filter(item => !('isRest' in item)) // Remove rest periods
+        .filter(item => !('isRest' in item))
         .filter(item => {
           const stretch = item as Stretch;
-          // Keep if not premium or if user has premium access
           return !stretch.premium || hasPremiumAccess;
         }) as Stretch[];
       
@@ -124,7 +122,6 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
 
       console.log(`Sending ${filteredStretches.length} stretches to routine generator`);
       
-      // Pass the stretches to the parent component
       onRoutineGenerated(filteredStretches, {
         description: userInput,
         issueType: selectedIssueType || 'stiffness',
@@ -133,7 +130,6 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           parsedInput.parsedArea[0] : 'Full Body'
       });
       
-      // Reset UI state after successful generation
       setShowFollowUp(false);
     } catch (error) {
       console.error('Error generating routine:', error);
@@ -150,10 +146,8 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
     console.log("Parsed input data:", parsedData);
     setParsedInput(parsedData);
     
-    // Always show follow-up questions for better UX
     setShowFollowUp(true);
     
-    // Pre-select the issue type if available from parsing
     if (parsedData.parsedIssue) {
       setSelectedIssueType(parsedData.parsedIssue);
     }
@@ -174,20 +168,28 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           style={[styles.input, { color: theme.text }]}
           placeholder="Example: My neck is stiff from working at my desk all day"
           placeholderTextColor={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
-          value={userInput}
+          value={isRecording ? recognizedText : userInput}
           onChangeText={setUserInput}
           onSubmitEditing={handleInputSubmit}
           multiline
+          editable={!isRecording}
         />
         <TouchableOpacity
-          style={[styles.voiceButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
-          onPress={startRecording}
+          style={[
+            styles.voiceButton, 
+            { 
+              backgroundColor: isRecording 
+                ? theme.accent 
+                : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')
+            }
+          ]}
+          onPress={isRecording ? stopRecording : startRecording}
         >
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <Ionicons
-              name="mic-outline"
+              name={isRecording ? "mic" : "mic-outline"}
               size={22}
-              color={theme.accent}
+              color={isRecording ? "#FFF" : theme.accent}
             />
           </Animated.View>
         </TouchableOpacity>
@@ -196,7 +198,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
       <TouchableOpacity
         style={[styles.submitButton, { backgroundColor: theme.accent }]}
         onPress={handleInputSubmit}
-        disabled={isGenerating || !userInput.trim()}
+        disabled={isGenerating || (!userInput.trim() && !recognizedText.trim()) || isRecording}
       >
         {isGenerating ? (
           <ActivityIndicator color="#fff" size="small" />
@@ -294,7 +296,8 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
         </View>
         
         <Text style={[styles.voiceNote, { color: theme.textSecondary }]}>
-          <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} /> Voice input will be available in the production build
+          <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} /> 
+          Voice input feature coming soon!
         </Text>
       </View>
 
@@ -402,7 +405,6 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
               )}
             </TouchableOpacity>
             
-            {/* Summary of what will be generated */}
             {selectedIssueType && (
               <View style={styles.summarySectionContainer}>
                 <Text style={[styles.summaryTitle, { color: theme.textSecondary }]}>

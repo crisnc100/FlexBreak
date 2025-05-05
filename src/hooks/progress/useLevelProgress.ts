@@ -59,13 +59,9 @@ export function useLevelProgress(): LevelProgressInfo {
   
   // Public function for refreshing data only (no processing)
   const refreshLevelData = useCallback(async () => {
-    console.log('useLevelProgress: refreshLevelData called');
     try {
       // Get the latest gamification data
       const levelInfo = await gamificationManager.getUserLevelInfo();
-      if (levelInfo) {
-        console.log(`useLevelProgress: Updated level data - Level ${levelInfo.level}, XP ${levelInfo.totalXP}, Next: ${levelInfo.xpToNextLevel}`);
-      }
       await refreshData();
     } catch (error) {
       console.error('Error refreshing level data:', error);

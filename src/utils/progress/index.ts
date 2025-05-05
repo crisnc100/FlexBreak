@@ -26,11 +26,6 @@ export * from './modules/challengeManager';
 // Import and re-export from storageService for accessing user data
 import * as storageService from '../../services/storageService';
 
-// Console warning about migration
-console.warn(
-  'WARNING: The progress system has been migrated. Please use the useGamification hook instead of direct imports from utils/progress.'
-);
-
 // Create stub implementations for backward compatibility
 // These are temporary and will be removed after all components are migrated
 

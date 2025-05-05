@@ -38,6 +38,10 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
   // Track visible items for optimizing video playback
   const [visibleItems, setVisibleItems] = useState<string[]>([]);
   const flatListRef = useRef<FlatList>(null);
+  
+  // Track retry attempts for videos
+  const [retryAttempts, setRetryAttempts] = useState<Record<string, number>>({});
+  const MAX_RETRIES = 2;
 
   useEffect(() => {
     const loadPremiumStretches = async () => {
@@ -46,19 +50,24 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
         const stretches = await getPremiumStretchesPreview(PREVIEW_COUNT);
         setPremiumStretches(stretches);
         
-        // Initialize loading states for all videos
+        // Initialize loading states, error states and retry counts
         const initialLoadingStates: Record<string, boolean> = {};
         const initialErrorStates: Record<string, boolean> = {};
+        const initialRetryAttempts: Record<string, number> = {};
+        
         stretches.forEach(stretch => {
           if (isVideoSource(stretch)) {
             initialLoadingStates[stretch.id.toString()] = true;
             initialErrorStates[stretch.id.toString()] = false;
+            initialRetryAttempts[stretch.id.toString()] = 0;
           }
         });
+        
         setVideoLoadingStates(initialLoadingStates);
         setVideoErrorStates(initialErrorStates);
+        setRetryAttempts(initialRetryAttempts);
       } catch (error) {
-        console.error('Error loading premium stretches preview:', error);
+        // Silent error handling
       } finally {
         setLoading(false);
       }
@@ -96,6 +105,28 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
     
     return false;
   };
+  
+  // Format video source for Video component
+  const formatVideoSource = (source: any) => {
+    try {
+      // If it's a number (direct asset), use it directly
+      if (typeof source === 'number') {
+        return source;
+      } 
+      // If it has __asset property, use that asset number directly
+      else if (source && typeof source === 'object' && '__asset' in source) {
+        return (source as any).__asset; 
+      }
+      // Regular URI object
+      else if (source && typeof source === 'object' && 'uri' in source) {
+        return source;
+      }
+      
+      return source;
+    } catch (error) {
+      return null;
+    }
+  };
 
   // Handle video load complete
   const handleVideoLoad = (stretchId: string | number) => {
@@ -107,15 +138,35 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
 
   // Handle video load error
   const handleVideoError = (stretchId: string | number, error: string) => {
-    console.warn(`Error loading video for stretch ${stretchId}:`, error);
-    setVideoLoadingStates(prev => ({
-      ...prev,
-      [stretchId.toString()]: false
-    }));
-    setVideoErrorStates(prev => ({
-      ...prev,
-      [stretchId.toString()]: true
-    }));
+    // Check if we should retry
+    const currentRetries = retryAttempts[stretchId.toString()] || 0;
+    
+    if (currentRetries < MAX_RETRIES) {
+      // Increment retry count
+      setRetryAttempts(prev => ({
+        ...prev,
+        [stretchId.toString()]: currentRetries + 1
+      }));
+      
+      // Keep in loading state for retry
+      setVideoLoadingStates(prev => ({
+        ...prev,
+        [stretchId.toString()]: true
+      }));
+      
+      // Force component update to retry loading
+      setPremiumStretches(prev => [...prev]);
+    } else {
+      // Max retries reached, show error state
+      setVideoLoadingStates(prev => ({
+        ...prev,
+        [stretchId.toString()]: false
+      }));
+      setVideoErrorStates(prev => ({
+        ...prev,
+        [stretchId.toString()]: true
+      }));
+    }
   };
 
   // Track which items are visible on screen
@@ -153,7 +204,7 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
             {shouldRenderVideo && !hasVideoError ? (
               <>
                 <Video
-                  source={item.image}
+                  source={formatVideoSource(item.image)}
                   style={styles.stretchImage}
                   resizeMode={ResizeMode.CONTAIN}
                   shouldPlay={isVisible}
@@ -170,7 +221,6 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
                       setVideoLoadingStates(prev => {
                         // Only update if still loading after timeout
                         if (prev[item.id.toString()]) {
-                          console.warn(`Video load timeout for ${item.id}`);
                           return {
                             ...prev,
                             [item.id.toString()]: false
@@ -202,7 +252,8 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
               <Image
                 source={hasVideoError ? 
                   { uri: `https://via.placeholder.com/350x350/${item.vipBadgeColor.replace('#', '')}/FFFFFF?text=${encodeURIComponent(item.name)}` } : 
-                  item.image}
+                  typeof item.image === 'object' && item.image && '__asset' in item.image ? 
+                    (item.image as any).__asset : item.image}
                 style={styles.stretchImage}
                 resizeMode="contain"
               />
@@ -303,8 +354,10 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
           onViewableItemsChanged={handleViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           initialNumToRender={3}
-          maxToRenderPerBatch={3}
+          maxToRenderPerBatch={2}
           windowSize={5}
+          updateCellsBatchingPeriod={100}
+          removeClippedSubviews={true}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="fitness-outline" size={60} color={isDark ? theme.textSecondary : '#ccc'} />
@@ -496,7 +549,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 8,
-  },
+  }
 });
 
 export default PremiumStretchesPreview; 

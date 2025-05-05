@@ -83,8 +83,6 @@ export function useGamification() {
     setIsLoading(true);
     setChallengesLoading(true);
     try {
-      console.log('Loading gamification data...');
-      
       // Get user progress and ensure achievements are initialized
       const userProgress = await storageService.getUserProgress();
       achievementManager.initializeAchievements(userProgress);
@@ -102,18 +100,11 @@ export function useGamification() {
       // Update achievements and save if needed
       const updatedCount = await achievementManager.updateAchievements(userProgress);
       if (updatedCount > 0) {
-        console.log(`Updated ${updatedCount} achievements, saving progress...`);
         await storageService.saveUserProgress(userProgress);
       }
       
       // Get achievements summary
       const achievementsSummary = achievementManager.getAchievementsSummary(userProgress);
-      console.log('Achievement summary loaded:', {
-        total: Object.keys(userProgress.achievements).length,
-        completed: achievementsSummary.completed.length,
-        inProgress: achievementsSummary.inProgress.length,
-        categories: Object.keys(achievementsSummary.byCategory).length
-      });
       
       // Get full summary and update with achievement data
       const summary = await gamificationManager.getGamificationSummary();
@@ -129,20 +120,6 @@ export function useGamification() {
       // Get claimable challenges
       const claimable = await gamificationManager.getClaimableChallenges();
       setClaimableChallenges(claimable);
-      
-      console.log('Gamification data loaded:', {
-        daily: active.daily.length,
-        weekly: active.weekly.length,
-        monthly: active.monthly.length,
-        special: active.special.length,
-        claimable: claimable.length,
-        achievements: {
-          total: Object.keys(userProgress.achievements).length,
-          completed: achievementsSummary.completed.length,
-          inProgress: achievementsSummary.inProgress.length,
-          categories: Object.keys(achievementsSummary.byCategory).length
-        }
-      });
       
       // Clear any previously displayed notifications
       setRecentlyUnlockedAchievements([]);
@@ -200,8 +177,6 @@ export function useGamification() {
         );
       }
       
-      console.log(`processRoutine results: XP: ${levelInfo.totalXP - totalXP}, Level: ${prevLevel}->${levelInfo.level}, Achievements: ${unlockedAchievements.length}, Challenges: ${completedChallenges.length}, Rewards: ${newlyUnlockedRewards.length}`);
-      
       // Create proper result object
       const result: RoutineProcessResult = {
         success: true,
@@ -228,7 +203,6 @@ export function useGamification() {
       }
       
       if (result.levelUp) {
-        console.log('Level up detected in useGamification.processRoutine!');
         setLevel(result.newLevel);
         
         // Play level up sound
@@ -248,7 +222,6 @@ export function useGamification() {
       
       // If challenges were completed, emit challenge completed event
       if (completedChallenges && completedChallenges.length > 0) {
-        console.log(`Emitting CHALLENGE_COMPLETED_EVENT for ${completedChallenges.length} challenges`);
         gamificationEvents.emit(CHALLENGE_COMPLETED_EVENT, completedChallenges);
       }
       
@@ -327,8 +300,6 @@ export function useGamification() {
             originalXp: result.originalXp,
             xpBoostApplied: result.xpBoostApplied
           });
-          
-          console.log(`Level up triggered by challenge ${challengeTitle} - Level ${oldLevel} to ${result.newLevel}`);
         }
         
         // Refresh data
@@ -606,8 +577,6 @@ export function useGamification() {
   const refreshChallenges = useCallback(async (): Promise<void> => {
     setChallengesLoading(true);
     try {
-      console.log('Refreshing challenges in useGamification...');
-      
       // Get the current user progress
       const userProgress = await storageService.getUserProgress();
       
@@ -617,48 +586,11 @@ export function useGamification() {
       }
       const streakStatus = await streakManager.getStreakStatus();
       
-      console.log('STREAK STATUS in refreshChallenges:', {
-        currentStreak: streakStatus.currentStreak,
-        maintainedToday: streakStatus.maintainedToday,
-        freezesAvailable: streakStatus.freezesAvailable,
-        lastUpdated: userProgress.statistics.lastUpdated
-      });
-      
-      // Look specifically for streak challenges before refresh
-      const streakChallengesBefore = Object.values(userProgress.challenges)
-        .filter(c => c.type === 'streak' && !c.completed);
-      
-      if (streakChallengesBefore.length > 0) {
-        console.log('STREAK CHALLENGES BEFORE REFRESH:', 
-          streakChallengesBefore.map(c => ({
-            title: c.title,
-            progress: c.progress,
-            requirement: c.requirement,
-            status: c.status
-          }))
-        );
-      }
-      
       // Refresh challenges
       await gamificationManager.refreshChallenges(userProgress);
       
       // Get fresh user progress to see changes
       const updatedProgress = await storageService.getUserProgress();
-      
-      // Look for streak challenges after refresh
-      const streakChallengesAfter = Object.values(updatedProgress.challenges)
-        .filter(c => c.type === 'streak' && !c.completed);
-      
-      if (streakChallengesAfter.length > 0) {
-        console.log('STREAK CHALLENGES AFTER REFRESH:', 
-          streakChallengesAfter.map(c => ({
-            title: c.title,
-            progress: c.progress,
-            requirement: c.requirement,
-            status: c.status
-          }))
-        );
-      }
       
       // Clear existing challenges first to avoid overlap
       setActiveChallenges({
@@ -671,21 +603,12 @@ export function useGamification() {
       // Update the challenge states - get fresh data
       const active = await gamificationManager.getActiveChallenges();
       
-      console.log('Active challenges after refresh:', {
-        daily: (active.daily || []).length,
-        weekly: (active.weekly || []).length,
-        monthly: (active.monthly || []).length,
-        special: (active.special || []).length
-      });
-      
       // Update state with new challenge data
       setActiveChallenges(active);
       
       // Get claimable challenges separately
       const claimable = await gamificationManager.getClaimableChallenges();
       setClaimableChallenges(claimable);
-      
-      console.log(`Found ${claimable.length} claimable challenges`);
     } catch (error) {
       console.error('Error refreshing challenges:', error);
     } finally {

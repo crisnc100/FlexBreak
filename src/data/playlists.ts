@@ -15,10 +15,10 @@ const playlists: Playlist[] = [
       3: 30, // Seated Hamstring Stretch (bilateral, 30s each side)
       5: 30, // Butterfly Stretch
       6: 30, // Pigeon Pose (bilateral, 30s each side)
-      12: 60, // Supine Hamstring Stretch with Towel (bilateral, 30s each side)
-      21: 60, // Seated Inner Thigh Reach (bilateral, 30s each side)
+      12: 30, // Supine Hamstring Stretch with Towel (bilateral, 30s each side)
+      21: 30, // Seated Inner Thigh Reach (bilateral, 30s each side)
       22: 30, // Deep Desk Squat Stretch
-      23: 60  // Split Prep with Desk (bilateral, 30s each side)
+      23: 30  // Split Prep with Desk (bilateral, 30s each side)
     }
   },
   {
@@ -28,7 +28,7 @@ const playlists: Playlist[] = [
     duration: 10,
     focusArea: "Lower Back",
     image: { uri: 'https://images.pexels.com/photos/3094230/pexels-photo-3094230.jpeg?auto=compress&cs=tinysrgb&w=500' },
-    stretchIds: [25, 24, 26, 35, 39, 33],
+    stretchIds: [25, 24, 26, 35, 39, 40],
     stretchDurations: {
       25: 60, // Cat-Cow Stretch
       24: 30, // Child's Pose
@@ -45,7 +45,7 @@ const playlists: Playlist[] = [
     duration: 15,
     focusArea: "Upper Back & Chest",
     image: { uri: 'https://images.pexels.com/photos/4498362/pexels-photo-4498362.jpeg?auto=compress&cs=tinysrgb&w=500' },
-    stretchIds: [42, 53, 56, 47, 58, 61, 96, 90],
+    stretchIds: [42, 53, 56, 47, 58, 61, 95, 90],
     stretchDurations: {
       42: 30, // Thoracic Extension (15s x 2)
       53: 30, // Desk Edge Chest Stretch
@@ -64,7 +64,7 @@ const playlists: Playlist[] = [
     duration: 10,
     focusArea: "Shoulders & Arms",
     image: { uri: 'https://images.pexels.com/photos/4065158/pexels-photo-4065158.jpeg?auto=compress&cs=tinysrgb&w=500' },
-    stretchIds: [62, 63, 65, 66, 67, 75],
+    stretchIds: [62, 63, 65, 66, 67, 79],
     stretchDurations: {
       62: 30, // Shoulder Rolls
       63: 30, // Overhead Tricep Stretch (bilateral, 30s each side)
@@ -81,7 +81,7 @@ const playlists: Playlist[] = [
     duration: 15,
     focusArea: "Full Body",
     image: { uri: 'https://images.pexels.com/photos/3822906/pexels-photo-3822906.jpeg?auto=compress&cs=tinysrgb&w=500' },
-    stretchIds: [99, 101, 103, 105, 106, 108, 109],
+    stretchIds: [99, 100, 103, 104, 105, 108, 115],
     stretchDurations: {
       99: 30,  // Downward Dog
       100: 30, // Standing Forward Fold with Shoulder Opener

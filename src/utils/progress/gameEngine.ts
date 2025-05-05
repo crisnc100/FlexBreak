@@ -154,12 +154,10 @@ export const processCompletedRoutine = async (routine: ProgressEntry): Promise<{
   if (routine.date) {
     const routineDate = routine.date.split('T')[0];
     await streakManager.completeRoutine(routineDate);
-    console.log(`Completed routine for date ${routineDate} through streakManager`);
   }
   
   // Update challenges and capture newly completed ones
   const completedChallenges = await challengeManager.updateUserChallenges(userProgress);
-  console.log(`Found ${completedChallenges.length} newly completed challenges`);
 
   // Update achievements
   await achievementManager.updateAchievements(userProgress);
@@ -222,11 +220,6 @@ const handleStreakChanges = async (userProgress: UserProgress, allRoutines: Prog
   if (userProgress.statistics.currentStreak === 0 && oldStreak > 0) {
     // Reset incomplete streak achievements using achievementManager
     achievementManager.resetStreakAchievements(userProgress);
-    
-    console.log(`Streak broken! Old streak was ${oldStreak} days.`);
-    // We don't auto-apply streak freezes anymore
-    // Instead we'll show a prompt to the user to manually use streak freeze
-    // This is handled by the streakManager module during app start and routine checks
   }
   
   // Ensure the streakManager is updated with the latest streak value
@@ -315,7 +308,6 @@ export const getGamificationSummary = async () => {
  * Used to fix inconsistencies or update statistics after changes
  */
 export const recalculateStatistics = async (): Promise<UserProgress> => {
-  console.log('Recalculating all statistics from stored routines');
   let userProgress = await storageService.getUserProgress();
   userProgress = normalizeUserProgress(userProgress);
   const allRoutines = await cacheUtils.getCachedRoutines();
@@ -379,7 +371,6 @@ export const recalculateStatistics = async (): Promise<UserProgress> => {
  * Used when a user's streak is broken
  */
 export const handleStreakReset = async (): Promise<UserProgress> => {
-  console.log('Handling streak reset for challenges');
   const userProgress = await storageService.getUserProgress();
   
   // Reset progress on all active streak-related challenges
@@ -390,22 +381,17 @@ export const handleStreakReset = async (): Promise<UserProgress> => {
       // Reset the challenge progress
       const oldProgress = challenge.progress;
       challenge.progress = 0;
-      
-      console.log(`Reset streak challenge: ${challenge.title} (${oldProgress} → 0)`);
       updatedAny = true;
     }
   });
   
   // Reset progress on incomplete streak achievements
   achievementManager.resetStreakAchievements(userProgress);
-      updatedAny = true;
+  updatedAny = true;
   
   // Save changes if any were made
   if (updatedAny) {
     await storageService.saveUserProgress(userProgress);
-    console.log('Saved user progress after resetting streak challenges and achievements');
-  } else {
-    console.log('No streak challenges or achievements needed resetting');
   }
   
   return userProgress;
@@ -416,15 +402,13 @@ export const handleStreakReset = async (): Promise<UserProgress> => {
  * Used when a streak is broken
  */
 export const resetStreakAchievements = async (): Promise<UserProgress> => {
-  console.log('Resetting streak-related achievements');
   const userProgress = await storageService.getUserProgress();
   
   // Use the achievementManager to reset streak achievements
   achievementManager.resetStreakAchievements(userProgress);
   
   // Save user progress
-    await storageService.saveUserProgress(userProgress);
-    console.log('Saved user progress after resetting streak achievements');
+  await storageService.saveUserProgress(userProgress);
   
   return userProgress;
 };
@@ -467,7 +451,6 @@ const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean,
     let baseXp = duration <= 5 ? 30 : duration <= 10 ? 60 : 90;
     const originalBaseXp = baseXp;
     baseXp = Math.floor(baseXp * xpMultiplier);
-    console.log(`Base XP for ${duration}-minute routine: ${originalBaseXp} -> ${baseXp} (${xpMultiplier}x)`);
     
     breakdown.push({ 
       source: 'routine', 
@@ -476,7 +459,6 @@ const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean,
     });
     totalXp += baseXp;
   } else {
-    console.log('Not first routine of day - no base XP awarded');
     breakdown.push({ 
       source: 'routine', 
       amount: 0, 
@@ -486,7 +468,6 @@ const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean,
 
   if (isFirstEver) {
     const welcomeBonus = 50;
-    console.log(`First ever routine! Adding welcome bonus: ${welcomeBonus} XP`);
     breakdown.push({ 
       source: 'first_ever', 
       amount: welcomeBonus, 
@@ -494,10 +475,6 @@ const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean,
     });
     totalXp += welcomeBonus;
   }
-
-  breakdown.forEach((item, i) => {
-    console.log(`  ${i+1}. ${item.source}: ${item.amount} XP - ${item.description}`);
-  });
 
   return { xp: totalXp, breakdown };
 };
