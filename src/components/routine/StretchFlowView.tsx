@@ -514,12 +514,54 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           )}
         </View>
         
+        {/* Enhanced Instructions Panel */}
+        <View style={[
+          styles.demoInstructionsPanel, 
+          { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }
+        ]}>
+          <View style={styles.instructionsHeader}>
+            <Ionicons name="information-circle" size={22} color={isDark ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.instructionsTitle, { color: isDark ? theme.accent : '#4CAF50' }]}>
+              How to perform this stretch
+            </Text>
+          </View>
+          
+          {/* Stretch description with formatted steps */}
+          <View style={styles.instructionsContent}>
+            <Text style={[styles.instructionsText, { color: isDark ? theme.text : '#333' }]}>
+              {stretchObj.description || 'Follow along with the demonstration video.'}
+            </Text>
+            
+            {/* Display tips if available */}
+            {hasTips && (
+              <View style={styles.tipsList}>
+                <Text style={[styles.tipsListHeader, { color: isDark ? theme.text : '#333', marginTop: 12 }]}>
+                  Tips for best results:
+                </Text>
+                {(stretchObj as any).tips.map((tip: string, index: number) => (
+                  <View key={index} style={styles.tipListItem}>
+                    <View style={[styles.tipItemBullet, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
+                    <Text style={[styles.tipItemText, { color: isDark ? theme.textSecondary : '#555' }]}>
+                      {tip}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* Duration indication */}
+            <View style={styles.durationIndicator}>
+              <Ionicons name="time-outline" size={18} color={isDark ? theme.textSecondary : '#666'} />
+              <Text style={[styles.durationText, { color: isDark ? theme.textSecondary : '#666' }]}>
+                Hold for {stretchObj.duration} seconds
+                {stretchObj.bilateral ? ' per side' : ''}
+              </Text>
+            </View>
+          </View>
+        </View>
+        
         {/* Footer with ready button */}
         <View style={styles.demoFooter}>
-          <Text style={[styles.demoInstructions, { color: isDark ? theme.textSecondary : '#666' }]}>
-            Watch the demo to learn how to perform this stretch correctly
-          </Text>
-          
           <TouchableOpacity
             style={[styles.readyButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
             onPress={handleReadyToStretch}
@@ -710,11 +752,6 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
-  demoInstructions: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
   readyButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -903,6 +940,73 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  // Enhanced instructions panel styles
+  demoInstructionsPanel: {
+    margin: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    padding: 16,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  instructionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  instructionsTitle: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    marginLeft: 8,
+  },
+  instructionsContent: {
+    paddingLeft: 4,
+  },
+  instructionsText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  tipsList: {
+    marginTop: 8,
+  },
+  tipsListHeader: {
+    fontWeight: '600',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  tipListItem: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    alignItems: 'flex-start',
+  },
+  tipItemBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 8,
+    marginRight: 8,
+  },
+  tipItemText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  durationIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  durationText: {
+    fontSize: 15,
+    marginLeft: 8,
+    fontWeight: '500',
   },
 });
 

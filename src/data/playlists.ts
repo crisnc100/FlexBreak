@@ -11,10 +11,10 @@ const playlists: Playlist[] = [
     image: { uri: 'https://images.pexels.com/photos/4056535/pexels-photo-4056535.jpeg?auto=compress&cs=tinysrgb&w=500' },
     stretchIds: [2, 3, 5, 6, 12, 21, 22, 23],
     stretchDurations: {
-      2: 60, // Standing Quad Stretch (bilateral, 30s each side)
-      3: 60, // Seated Hamstring Stretch (bilateral, 30s each side)
+      2: 30, // Standing Quad Stretch (bilateral, 30s each side)
+      3: 30, // Seated Hamstring Stretch (bilateral, 30s each side)
       5: 30, // Butterfly Stretch
-      6: 60, // Pigeon Pose (bilateral, 30s each side)
+      6: 30, // Pigeon Pose (bilateral, 30s each side)
       12: 60, // Supine Hamstring Stretch with Towel (bilateral, 30s each side)
       21: 60, // Seated Inner Thigh Reach (bilateral, 30s each side)
       22: 30, // Deep Desk Squat Stretch
@@ -34,8 +34,8 @@ const playlists: Playlist[] = [
       24: 30, // Child's Pose
       26: 30, // Seated Forward Bend
       35: 30, // Standing Desk Lean
-      39: 60, // Seated Lower Back Twist (bilateral, 30s each side)
-      33: 60  // Threaded Supine Twist (bilateral, 30s each side)
+      39: 30, // Seated Lower Back Twist (bilateral, 30s each side)
+      40: 30  // Threaded Supine Twist (bilateral, 30s each side)
     }
   },
   {
@@ -50,10 +50,10 @@ const playlists: Playlist[] = [
       42: 30, // Thoracic Extension (15s x 2)
       53: 30, // Desk Edge Chest Stretch
       56: 30, // Seated Rhomboid Squeeze (15s x 2)
-      47: 60, // Eagle Arms (bilateral, 30s each side)
-      58: 60, // Desk Rhomboid Stretch (bilateral, 30s each side)
+      47: 30, // Eagle Arms (bilateral, 30s each side)
+      58: 30, // Desk Rhomboid Stretch (bilateral, 30s each side)
       61: 30, // Reverse Desk Arch
-      96: 60, // Upper Trap Desk Stretch (bilateral, 30s each side)
+      95: 30, // Banded Overhead Stretch (bilateral, 30s each side)
       90: 30  // Deep Neck Flexor Stretch
     }
   },
@@ -67,11 +67,11 @@ const playlists: Playlist[] = [
     stretchIds: [62, 63, 65, 66, 67, 75],
     stretchDurations: {
       62: 30, // Shoulder Rolls
-      63: 60, // Overhead Tricep Stretch (bilateral, 30s each side)
-      65: 60, // Wrist Flexor Stretch (bilateral, 30s each side)
-      66: 60, // Wrist Extensor Stretch (bilateral, 30s each side)
-      67: 60, // Cross-Body Shoulder Stretch (bilateral, 30s each side)
-      75: 60  // Wrist Twist with Desk (bilateral, 30s each side)
+      63: 30, // Overhead Tricep Stretch (bilateral, 30s each side)
+      65: 30, // Wrist Flexor Stretch (bilateral, 30s each side)
+      66: 30, // Wrist Extensor Stretch (bilateral, 30s each side)
+      67: 30, // Cross-Body Shoulder Stretch (bilateral, 30s each side)
+      79: 30  // Wrist Twist with Desk (bilateral, 30s each side)
     }
   },
   {
@@ -84,12 +84,12 @@ const playlists: Playlist[] = [
     stretchIds: [99, 101, 103, 105, 106, 108, 109],
     stretchDurations: {
       99: 30,  // Downward Dog
-      101: 30, // Standing Forward Fold with Shoulder Opener
-      103: 60, // Reclining Bound Angle Pose
-      105: 60, // World's Greatest Stretch (bilateral, 30s each side)
-      106: 60, // Seated Twist (bilateral, 30s each side)
-      108: 30, // Deep Downward Dog
-      109: 60  // Twisted Lunge (bilateral, 30s each side)
+      100: 30, // Standing Forward Fold with Shoulder Opener
+      103: 30, // Sun Salutation
+      104: 30, // World's Greatest Stretch (bilateral, 30s each side)
+      105: 30, // Seated Twist (bilateral, 30s each side)
+      108: 30, // Dynamic Twisted Lunge
+      115: 30  // Towel Overhead Lunge
     }
   }
 ];
