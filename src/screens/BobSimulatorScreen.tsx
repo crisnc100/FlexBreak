@@ -494,32 +494,22 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       logWithTimestamp('About to patch Date object for simulation');
       patchDateForSimulation(dateToSimulate);
       
-      // Get initial state for comparison - add timeout protection
+      // Get initial state for comparison with shorter timeout protection (5 seconds)
       logWithTimestamp('Getting initial user progress with timeout protection');
       const initialProgressStartTime = Date.now();
       
-      const initialPromise = new Promise(async (resolve, reject) => {
-        try {
-          const initialProgress = await storageService.getUserProgress();
-          logWithTimestamp(`Got initial progress in ${Date.now() - initialProgressStartTime}ms`);
-          resolve(initialProgress);
-        } catch (error) {
-          logWithTimestamp(`Error getting initial progress: ${error}`);
-          reject(error);
-        }
-      });
-      
-      // Add 10 second timeout to avoid hanging
       const initialProgress = await Promise.race([
-        initialPromise,
+        storageService.getUserProgress(),
         new Promise((_, reject) => 
           setTimeout(() => {
             const errorMsg = 'Timed out getting initial progress';
             logWithTimestamp(errorMsg);
             reject(new Error(errorMsg));
-          }, 10000)
+          }, 5000)
         )
       ]) as any;
+      
+      logWithTimestamp(`Got initial progress in ${Date.now() - initialProgressStartTime}ms`);
       
       const initialXP = initialProgress.totalXP || 0;
       const initialStreak = initialProgress.statistics?.currentStreak || 0;
@@ -537,37 +527,36 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         status: "completed"
       } as any;
       
-      // Process the routine - add timeout protection
+      // Process the routine with shorter timeout protection (8 seconds)
       logWithTimestamp(`Processing simulated routine for ${dateToSimulate.toLocaleDateString()}`);
       const routineProcessStartTime = Date.now();
       
-      const routinePromise = new Promise(async (resolve, reject) => {
-        try {
-          logWithTimestamp('Calling processCompletedRoutine');
-          const result = await gamificationManager.processCompletedRoutine(routine);
-          logWithTimestamp(`Completed routine processing in ${Date.now() - routineProcessStartTime}ms`);
-          resolve(result);
-        } catch (error) {
-          logWithTimestamp(`Error processing routine: ${error}`);
-          reject(error);
-        }
-      });
-      
-      // Add 20 second timeout to avoid hanging
       const result = await Promise.race([
-        routinePromise,
+        gamificationManager.processCompletedRoutine(routine),
         new Promise((_, reject) => 
           setTimeout(() => {
             const errorMsg = 'Timed out processing routine';
             logWithTimestamp(errorMsg);
             reject(new Error(errorMsg));
-          }, 20000)
+          }, 8000)
         )
       ]) as any;
       
-      // Calculate XP gained
+      logWithTimestamp(`Completed routine processing in ${Date.now() - routineProcessStartTime}ms`);
+      
+      // Calculate XP gained with timeout protection (3 seconds)
       logWithTimestamp('Getting updated user progress to calculate XP gain');
-      const afterProgress = await storageService.getUserProgress();
+      const afterProgress = await Promise.race([
+        storageService.getUserProgress(),
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const errorMsg = 'Timed out getting after-routine progress';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 3000)
+        )
+      ]) as any;
+      
       const xpGained = afterProgress.totalXP - initialXP;
       logWithTimestamp(`XP gained: ${xpGained} (from ${initialXP} to ${afterProgress.totalXP})`);
       
@@ -583,17 +572,40 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       for (const challenge of completedChallenges) {
         try {
           logWithTimestamp(`Claiming challenge: ${challenge.id} - ${challenge.title}`);
-          await gamificationManager.claimChallenge(challenge.id);
+          // Add timeout protection for claiming challenges (3 seconds)
+          await Promise.race([
+            gamificationManager.claimChallenge(challenge.id),
+            new Promise((_, reject) => 
+              setTimeout(() => {
+                const errorMsg = `Timed out claiming challenge ${challenge.id}`;
+                logWithTimestamp(errorMsg);
+                reject(new Error(errorMsg));
+              }, 3000)
+            )
+          ]);
           logWithTimestamp(`Successfully claimed challenge: ${challenge.id}`);
         } catch (err) {
           logWithTimestamp(`Error claiming challenge ${challenge.id}: ${err}`);
+          // Continue with next challenge even if this one fails
         }
       }
       
       // Force check for additional challenges that might be completed
       logWithTimestamp('Checking for additional completed challenges');
       const additionalChallengeStartTime = Date.now();
-      const additionalChallenges = await challengeManager.updateUserChallenges(afterProgress);
+      
+      // Add timeout protection for updating challenges (5 seconds)
+      const additionalChallenges = await Promise.race([
+        challengeManager.updateUserChallenges(afterProgress),
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const errorMsg = 'Timed out checking for additional challenges';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 5000)
+        )
+      ]) as any[];
+      
       logWithTimestamp(`Found ${additionalChallenges.length} additional challenges in ${Date.now() - additionalChallengeStartTime}ms`);
       completedChallenges = [...completedChallenges, ...additionalChallenges];
       
@@ -605,27 +617,57 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       for (const challenge of additionalChallenges) {
         try {
           logWithTimestamp(`Claiming additional challenge: ${challenge.id} - ${challenge.title}`);
-          await gamificationManager.claimChallenge(challenge.id);
+          // Add timeout protection for claiming challenges (3 seconds)
+          await Promise.race([
+            gamificationManager.claimChallenge(challenge.id),
+            new Promise((_, reject) => 
+              setTimeout(() => {
+                const errorMsg = `Timed out claiming additional challenge ${challenge.id}`;
+                logWithTimestamp(errorMsg);
+                reject(new Error(errorMsg));
+              }, 3000)
+            )
+          ]);
           logWithTimestamp(`Successfully claimed additional challenge: ${challenge.id}`);
         } catch (err) {
           logWithTimestamp(`Error claiming additional challenge ${challenge.id}: ${err}`);
+          // Continue with next challenge even if this one fails
         }
       }
       
       // Check for newly completed achievements
       logWithTimestamp('Checking for newly completed achievements');
       const achievements = Object.values(afterProgress.achievements || {});
-      const newlyCompleted = achievements.filter(a => 
+      const newlyCompleted = achievements.filter((a: any) => 
         a.completed && a.dateCompleted === new Date().toISOString().split('T')[0]
       );
       logWithTimestamp(`Found ${newlyCompleted.length} newly completed achievements`);
       
-      // Get final progress after all operations
+      // Get final progress after all operations with timeout protection (5 seconds)
       logWithTimestamp('Refreshing Bob stats');
-      await refreshBobStats();
+      await Promise.race([
+        refreshBobStats(),
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const errorMsg = 'Timed out refreshing stats';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 5000)
+        )
+      ]);
       logWithTimestamp(`Refreshed stats in ${Date.now() - simulationStartTime}ms`);
       
-      const finalProgress = await storageService.getUserProgress();
+      const finalProgress = await Promise.race([
+        storageService.getUserProgress(),
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const errorMsg = 'Timed out getting final progress';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 3000)
+        )
+      ]) as any;
+      
       logWithTimestamp(`Final XP: ${finalProgress.totalXP}, Final level: ${finalProgress.level}`);
       
       // Add date to simulated dates
@@ -665,7 +707,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
           title: c.title,
           xp: c.xp
         })),
-        achievements: newlyCompleted.map(a => ({
+        achievements: newlyCompleted.map((a: any) => ({
           title: a.title
         }))
       };
@@ -783,26 +825,15 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       logWithTimestamp('Getting initial user progress for batch simulation');
       const initialProgressStartTime = Date.now();
       
-      const initialPromise = new Promise(async (resolve, reject) => {
-        try {
-          const initialProgress = await storageService.getUserProgress();
-          logWithTimestamp(`Got initial batch progress in ${Date.now() - initialProgressStartTime}ms`);
-          resolve(initialProgress);
-        } catch (error) {
-          logWithTimestamp(`Error getting initial batch progress: ${error}`);
-          reject(error);
-        }
-      });
-      
-      // Add 10 second timeout to avoid hanging
+      // Initial progress promise with 5 second timeout
       const initialProgress = await Promise.race([
-        initialPromise,
+        storageService.getUserProgress(),
         new Promise((_, reject) => 
           setTimeout(() => {
             const errorMsg = 'Timed out getting initial progress for batch';
             logWithTimestamp(errorMsg);
             reject(new Error(errorMsg));
-          }, 10000)
+          }, 5000)
         )
       ]) as any;
       
@@ -821,98 +852,150 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         dayCount++;
         logWithTimestamp(`Processing day ${dayCount} of ${totalDays}: ${currentDate.toLocaleDateString()}`);
         
-        // Restore original Date before patching for the new day
+        // Make sure we restore the original date between iterations
+        logWithTimestamp('Restoring original Date before patching for next day');
         restoreOriginalDate();
         
-        // Patch date for simulation
-        patchDateForSimulation(currentDate);
+        try {
+          // Patch date for simulation
+          patchDateForSimulation(currentDate);
+          
+          // Create routine for this day
+          logWithTimestamp('Creating batch routine object');
+          const routine = {
+            id: `batch-stretch-${Date.now()}-${currentDate.getTime()}`,
+            date: new Date().toISOString(),
+            duration: config.duration.toString() as any,
+            area: config.bodyArea as any,
+            difficulty: config.difficulty as any,
+            stretches: ["Batch Simulation Stretch"],
+            status: "completed"
+          } as any;
         
-        // Create routine for this day
-        logWithTimestamp('Creating batch routine object');
-        const routine = {
-          id: `batch-stretch-${Date.now()}-${currentDate.getTime()}`,
-          date: new Date().toISOString(),
-          duration: config.duration.toString() as any,
-          area: config.bodyArea as any,
-          difficulty: config.difficulty as any,
-          stretches: ["Batch Simulation Stretch"],
-          status: "completed"
-        } as any;
-      
-        // Process the routine with timeout protection
-        logWithTimestamp(`Processing batch routine for ${currentDate.toLocaleDateString()}`);
-        const routineProcessStartTime = Date.now();
-        
-        const processPromise = new Promise(async (resolve, reject) => {
-          try {
-            logWithTimestamp('Calling processCompletedRoutine for batch day');
-            const result = await gamificationManager.processCompletedRoutine(routine);
-            logWithTimestamp(`Completed batch routine processing in ${Date.now() - routineProcessStartTime}ms`);
-            resolve(result);
-          } catch (error) {
-            logWithTimestamp(`Error processing batch routine: ${error}`);
-            reject(error);
-          }
-        });
-        
-        // Add 15 second timeout to avoid hanging
-        const result = await Promise.race([
-          processPromise,
-          new Promise((_, reject) => 
-            setTimeout(() => {
-              const errorMsg = `Timed out processing routine for ${currentDate.toLocaleDateString()}`;
-              logWithTimestamp(errorMsg);
-              reject(new Error(errorMsg));
-            }, 15000)
-          )
-        ]) as any;
-        
-        // Claim any completed challenges
-        if (result.completedChallenges && result.completedChallenges.length > 0) {
-          logWithTimestamp(`Found ${result.completedChallenges.length} completed challenges for batch day ${dayCount}`);
-          for (const challenge of result.completedChallenges) {
-            try {
-              logWithTimestamp(`Claiming batch challenge: ${challenge.id} - ${challenge.title}`);
-              await gamificationManager.claimChallenge(challenge.id);
-              allCompletedChallenges.push(challenge);
-              logWithTimestamp(`Successfully claimed batch challenge: ${challenge.id}`);
-            } catch (error) {
-              logWithTimestamp(`Error claiming batch challenge ${challenge.id}: ${error}`);
+          // Process the routine with shorter timeout (10 seconds)
+          logWithTimestamp(`Processing batch routine for ${currentDate.toLocaleDateString()}`);
+          const routineProcessStartTime = Date.now();
+          
+          const result = await Promise.race([
+            gamificationManager.processCompletedRoutine(routine),
+            new Promise((_, reject) => 
+              setTimeout(() => {
+                const errorMsg = `Timed out processing routine for ${currentDate.toLocaleDateString()}`;
+                logWithTimestamp(errorMsg);
+                reject(new Error(errorMsg));
+              }, 10000)
+            )
+          ]) as any;
+          
+          logWithTimestamp(`Completed batch routine processing in ${Date.now() - routineProcessStartTime}ms`);
+          
+          // Claim any completed challenges (if there are any)
+          if (result.completedChallenges && result.completedChallenges.length > 0) {
+            logWithTimestamp(`Found ${result.completedChallenges.length} completed challenges for batch day ${dayCount}`);
+            for (const challenge of result.completedChallenges) {
+              try {
+                // Claim challenge with timeout protection (5 seconds)
+                logWithTimestamp(`Claiming batch challenge: ${challenge.id} - ${challenge.title}`);
+                await Promise.race([
+                  gamificationManager.claimChallenge(challenge.id),
+                  new Promise((_, reject) =>
+                    setTimeout(() => {
+                      const errorMsg = `Timed out claiming challenge ${challenge.id}`;
+                      logWithTimestamp(errorMsg);
+                      reject(new Error(errorMsg));
+                    }, 5000)
+                  )
+                ]);
+                
+                allCompletedChallenges.push(challenge);
+                logWithTimestamp(`Successfully claimed batch challenge: ${challenge.id}`);
+              } catch (error) {
+                logWithTimestamp(`Error claiming batch challenge ${challenge.id}: ${error}`);
+                // Continue with next challenge even if this one fails
+              }
             }
           }
-        }
-        
-        // Add date to batch
-        batchDates.push(currentDate.toISOString());
-        
-        // Check for additional challenges
-        logWithTimestamp('Checking for additional batch challenges');
-        const additionalChallengeStartTime = Date.now();
-        const progress = await storageService.getUserProgress();
-        const additionalChallenges = await challengeManager.updateUserChallenges(progress);
-        logWithTimestamp(`Found ${additionalChallenges.length} additional batch challenges in ${Date.now() - additionalChallengeStartTime}ms`);
-        
-        if (additionalChallenges.length > 0) {
-          logWithTimestamp(`Claiming ${additionalChallenges.length} additional batch challenges`);
-          for (const challenge of additionalChallenges) {
-            try {
-              logWithTimestamp(`Claiming additional batch challenge: ${challenge.id} - ${challenge.title}`);
-              await gamificationManager.claimChallenge(challenge.id);
-              allCompletedChallenges.push(challenge);
-              logWithTimestamp(`Successfully claimed additional batch challenge: ${challenge.id}`);
-            } catch (error) {
-              logWithTimestamp(`Error claiming additional batch challenge ${challenge.id}: ${error}`);
+          
+          // Add date to batch
+          batchDates.push(currentDate.toISOString());
+          
+          // Less frequent checking for additional challenges to reduce processing load
+          // Only check on days 1, 4, and 7 of the batch
+          if (dayCount === 1 || dayCount === 4 || dayCount === totalDays) {
+            logWithTimestamp(`Checking for additional batch challenges on day ${dayCount}`);
+            const additionalChallengeStartTime = Date.now();
+            
+            // Get progress with 5 second timeout
+            const progress = await Promise.race([
+              storageService.getUserProgress(),
+              new Promise((_, reject) =>
+                setTimeout(() => {
+                  const errorMsg = 'Timed out getting user progress for challenge check';
+                  logWithTimestamp(errorMsg);
+                  reject(new Error(errorMsg));
+                }, 5000)
+              )
+            ]) as any;
+            
+            // Update challenges with 5 second timeout
+            const additionalChallenges = await Promise.race([
+              challengeManager.updateUserChallenges(progress),
+              new Promise((_, reject) =>
+                setTimeout(() => {
+                  const errorMsg = 'Timed out updating user challenges';
+                  logWithTimestamp(errorMsg);
+                  reject(new Error(errorMsg));
+                }, 5000)
+              )
+            ]) as any[];
+            
+            logWithTimestamp(`Found ${additionalChallenges.length} additional batch challenges in ${Date.now() - additionalChallengeStartTime}ms`);
+            
+            if (additionalChallenges.length > 0) {
+              logWithTimestamp(`Claiming ${additionalChallenges.length} additional batch challenges`);
+              for (const challenge of additionalChallenges) {
+                try {
+                  // Claim challenge with timeout protection (5 seconds)
+                  logWithTimestamp(`Claiming additional batch challenge: ${challenge.id} - ${challenge.title}`);
+                  await Promise.race([
+                    gamificationManager.claimChallenge(challenge.id),
+                    new Promise((_, reject) =>
+                      setTimeout(() => {
+                        const errorMsg = `Timed out claiming additional challenge ${challenge.id}`;
+                        logWithTimestamp(errorMsg);
+                        reject(new Error(errorMsg));
+                      }, 5000)
+                    )
+                  ]);
+                  
+                  allCompletedChallenges.push(challenge);
+                  logWithTimestamp(`Successfully claimed additional batch challenge: ${challenge.id}`);
+                } catch (error) {
+                  logWithTimestamp(`Error claiming additional batch challenge ${challenge.id}: ${error}`);
+                  // Continue with next challenge even if this one fails
+                }
+              }
             }
+          } else {
+            logWithTimestamp(`Skipping additional challenge check on day ${dayCount} to improve performance`);
           }
+          
+        } catch (error) {
+          // Log the error but CONTINUE processing next days
+          logWithTimestamp(`Error processing day ${dayCount} (${currentDate.toLocaleDateString()}): ${error}`);
+          addLog(`⚠️ Error on day ${dayCount}: ${currentDate.toLocaleDateString()}`);
+        } finally {
+          // Always restore date before moving to next day
+          logWithTimestamp(`Finished processing day ${dayCount}, restoring Date before next day`);
+          restoreOriginalDate();
+          
+          // Move to next day
+          currentDate = new Date(currentDate);
+          currentDate.setDate(currentDate.getDate() + 1);
+          
+          // Add a small delay between days to let the JS engine breathe
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
-        
-        // Restore original Date before moving to the next day
-        logWithTimestamp(`Finished processing day ${dayCount}, restoring Date before next day`);
-        restoreOriginalDate();
-        
-        // Move to next day
-        currentDate = new Date(currentDate);
-        currentDate.setDate(currentDate.getDate() + 1);
       }
       
       // Make sure we restore the original Date
@@ -927,22 +1010,44 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       logWithTimestamp(`Adding ${batchDates.length} dates to simulated dates`);
       setSimulatedDates(prev => [...prev, ...batchDates]);
       
-      // Get final state after all simulations
+      // Get final state after all simulations with timeout protection
       logWithTimestamp('Refreshing final batch stats');
       const refreshStartTime = Date.now();
-      await refreshBobStats();
+      
+      // Refresh stats with 10 second timeout
+      await Promise.race([
+        refreshBobStats(),
+        new Promise((_, reject) =>
+          setTimeout(() => {
+            const errorMsg = 'Timed out refreshing bob stats';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 10000)
+        )
+      ]);
+      
       logWithTimestamp(`Refreshed batch stats in ${Date.now() - refreshStartTime}ms`);
       
-      const finalProgress = await storageService.getUserProgress();
+      // Get final progress with 5 second timeout
+      const finalProgress = await Promise.race([
+        storageService.getUserProgress(),
+        new Promise((_, reject) =>
+          setTimeout(() => {
+            const errorMsg = 'Timed out getting final progress';
+            logWithTimestamp(errorMsg);
+            reject(new Error(errorMsg));
+          }, 5000)
+        )
+      ]) as any;
       
       // Calculate total XP earned
       totalXpEarned = finalProgress.totalXP - initialXP;
       logWithTimestamp(`Batch XP gained: ${totalXpEarned} (from ${initialXP} to ${finalProgress.totalXP})`);
       
-      // Check for newly completed achievements
+      // Simplified achievement check to improve performance
       logWithTimestamp('Checking for newly completed achievements from batch');
       const achievements = Object.values(finalProgress.achievements || {});
-      allCompletedAchievements = achievements.filter(a => 
+      allCompletedAchievements = achievements.filter((a: any) => 
         a.completed && batchDates.some(dateStr => {
           const batchDate = new Date(dateStr).toISOString().split('T')[0];
           return a.dateCompleted === batchDate;
@@ -982,7 +1087,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     } catch (error) {
       logWithTimestamp(`Error in batch simulation: ${error}`);
       console.error('Error in batch simulation:', error);
-      Alert.alert('Batch Simulation Error', 'An error occurred during batch simulation. Try again with a different configuration or fewer days.');
+      Alert.alert('Batch Simulation Error', 'An error occurred during batch simulation. Some days may have been processed successfully.');
       
       // Ensure we restore the original Date object
       logWithTimestamp('Restoring Date object in batch error handler');
