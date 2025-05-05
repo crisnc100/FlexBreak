@@ -327,14 +327,17 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   
   // Date patching for simulation
   const patchDateForSimulation = (targetDate: Date) => {
-    const originalDate = Date;
     logWithTimestamp(`Patching Date for simulation: ${targetDate.toISOString()}`);
     
     try {
+      // First, make sure any previous patch is cleaned up
+      restoreOriginalDate();
+      
+      // Store the original date
+      const originalDate = Date;
       const targetTime = targetDate.getTime();
       logWithTimestamp(`Target time: ${targetTime}`);
       
-      // Store the original date
       // @ts-ignore - hack for simulation
       global.OriginalDate = originalDate;
       logWithTimestamp('Original Date stored in global.OriginalDate');
@@ -369,6 +372,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       // @ts-ignore - hack for simulation
       global.Date.now = () => targetTime;
       
+      // Set the current date for the component
+      setCurrentDate(new Date(targetTime));
+      
       // Verify the patch
       const newDate = new Date();
       logWithTimestamp(`Verification - new Date(): ${newDate.toISOString()}`);
@@ -379,6 +385,21 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     } catch (error) {
       logWithTimestamp(`Error patching Date: ${error}`);
       console.error('Error patching Date:', error);
+      
+      // Try to restore original date in case of error
+      try {
+        // @ts-ignore - hack for simulation
+        if (global.OriginalDate) {
+          // @ts-ignore - hack for simulation
+          global.Date = global.OriginalDate;
+          // @ts-ignore - hack for simulation
+          global.OriginalDate = undefined;
+          logWithTimestamp('Restored original Date after patching error');
+        }
+      } catch (restoreError) {
+        logWithTimestamp(`Error restoring Date after patch error: ${restoreError}`);
+      }
+      
       return false;
     }
   };
@@ -486,8 +507,13 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       return Promise.reject(new Error('No date selected'));
     }
     
-    // Note: We're not setting isLoading=true here anymore, because it should be set by the caller
-    // This allows the UI to update before the heavy processing starts
+    // Set up a safety timeout to abort if the entire operation takes too long
+    const safetyTimeoutId = setTimeout(() => {
+      logWithTimestamp('SAFETY TIMEOUT: Simulation taking too long, forcing cleanup');
+      restoreOriginalDate();
+      setIsLoading(false);
+      Alert.alert('Simulation Error', 'The simulation was taking too long and was automatically cancelled. Please try a different date.');
+    }, 30000); // 30 second absolute maximum
     
     try {
       // Use the selected date for simulation
@@ -514,6 +540,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       const initialXP = initialProgress.totalXP || 0;
       const initialStreak = initialProgress.statistics?.currentStreak || 0;
       logWithTimestamp(`Initial XP: ${initialXP}, Initial streak: ${initialStreak}`);
+      
+      // Add a small delay to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 50));
       
       // Create the routine with proper types
       logWithTimestamp('Creating routine object');
@@ -544,6 +573,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
       logWithTimestamp(`Completed routine processing in ${Date.now() - routineProcessStartTime}ms`);
       
+      // Add a small delay to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       // Calculate XP gained with timeout protection (3 seconds)
       logWithTimestamp('Getting updated user progress to calculate XP gain');
       const afterProgress = await Promise.race([
@@ -560,16 +592,33 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       const xpGained = afterProgress.totalXP - initialXP;
       logWithTimestamp(`XP gained: ${xpGained} (from ${initialXP} to ${afterProgress.totalXP})`);
       
-      // Check for completed challenges
+      // Limit challenge processing to reduce workload
+      // Start by handling only the challenges directly from the routine result
+      logWithTimestamp('Processing completed challenges from routine result');
       let completedChallenges: any[] = result.completedChallenges || [];
-      logWithTimestamp(`Found ${completedChallenges.length} initially completed challenges`);
+      logWithTimestamp(`Found ${completedChallenges.length} initial completed challenges`);
       
-      // Explicitly claim each challenge to ensure XP is awarded
-      if (completedChallenges.length > 0) {
-        logWithTimestamp(`Claiming ${completedChallenges.length} initially completed challenges`);
+      // Add a small delay to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Limit the number of challenges we process to avoid freezing
+      const maxChallenges = 10;
+      if (completedChallenges.length > maxChallenges) {
+        logWithTimestamp(`Limiting challenge processing to ${maxChallenges} of ${completedChallenges.length} to prevent freezing`);
+        completedChallenges = completedChallenges.slice(0, maxChallenges);
       }
       
+      // Claim challenges with a maximum time limit
+      const claimChallengesStartTime = Date.now();
+      let claimCount = 0;
+      
       for (const challenge of completedChallenges) {
+        // Stop claiming if it's taking too long
+        if (Date.now() - claimChallengesStartTime > 3000) {
+          logWithTimestamp(`Stopping challenge claiming after ${claimCount} challenges (taking too long)`);
+          break;
+        }
+        
         try {
           logWithTimestamp(`Claiming challenge: ${challenge.id} - ${challenge.title}`);
           // Add timeout protection for claiming challenges (3 seconds)
@@ -580,62 +629,103 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                 const errorMsg = `Timed out claiming challenge ${challenge.id}`;
                 logWithTimestamp(errorMsg);
                 reject(new Error(errorMsg));
-              }, 3000)
+              }, 2000)
             )
           ]);
+          claimCount++;
           logWithTimestamp(`Successfully claimed challenge: ${challenge.id}`);
         } catch (err) {
           logWithTimestamp(`Error claiming challenge ${challenge.id}: ${err}`);
           // Continue with next challenge even if this one fails
         }
+        
+        // Add a tiny delay between challenge claims
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
       
-      // Force check for additional challenges that might be completed
-      logWithTimestamp('Checking for additional completed challenges');
-      const additionalChallengeStartTime = Date.now();
-      
-      // Add timeout protection for updating challenges (5 seconds)
-      const additionalChallenges = await Promise.race([
-        challengeManager.updateUserChallenges(afterProgress),
-        new Promise((_, reject) => 
-          setTimeout(() => {
-            const errorMsg = 'Timed out checking for additional challenges';
-            logWithTimestamp(errorMsg);
-            reject(new Error(errorMsg));
-          }, 5000)
-        )
-      ]) as any[];
-      
-      logWithTimestamp(`Found ${additionalChallenges.length} additional challenges in ${Date.now() - additionalChallengeStartTime}ms`);
-      completedChallenges = [...completedChallenges, ...additionalChallenges];
-      
-      // Claim each additional challenge
-      if (additionalChallenges.length > 0) {
-        logWithTimestamp(`Claiming ${additionalChallenges.length} additional challenges`);
-      }
-      
-      for (const challenge of additionalChallenges) {
+      // Only check for additional challenges if we haven't spent too much time already
+      let additionalChallenges: any[] = [];
+      if (Date.now() - simulationStartTime < 15000) {
+        // Force check for additional challenges that might be completed
+        logWithTimestamp('Checking for additional completed challenges');
+        const additionalChallengeStartTime = Date.now();
+        
+        // Add timeout protection for updating challenges (5 seconds)
         try {
-          logWithTimestamp(`Claiming additional challenge: ${challenge.id} - ${challenge.title}`);
-          // Add timeout protection for claiming challenges (3 seconds)
-          await Promise.race([
-            gamificationManager.claimChallenge(challenge.id),
+          additionalChallenges = await Promise.race([
+            challengeManager.updateUserChallenges(afterProgress),
             new Promise((_, reject) => 
               setTimeout(() => {
-                const errorMsg = `Timed out claiming additional challenge ${challenge.id}`;
+                const errorMsg = 'Timed out checking for additional challenges';
                 logWithTimestamp(errorMsg);
                 reject(new Error(errorMsg));
-              }, 3000)
+              }, 5000)
             )
-          ]);
-          logWithTimestamp(`Successfully claimed additional challenge: ${challenge.id}`);
-        } catch (err) {
-          logWithTimestamp(`Error claiming additional challenge ${challenge.id}: ${err}`);
-          // Continue with next challenge even if this one fails
+          ]) as any[];
+          
+          logWithTimestamp(`Found ${additionalChallenges.length} additional challenges in ${Date.now() - additionalChallengeStartTime}ms`);
+          
+          // Limit additional challenges to prevent freezing
+          if (additionalChallenges.length > maxChallenges) {
+            logWithTimestamp(`Limiting additional challenge processing to ${maxChallenges} of ${additionalChallenges.length} to prevent freezing`);
+            additionalChallenges = additionalChallenges.slice(0, maxChallenges);
+          }
+          
+          // Add a small delay to allow UI updates
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Only claim additional challenges if we have time
+          if (Date.now() - simulationStartTime < 20000 && additionalChallenges.length > 0) {
+            logWithTimestamp(`Claiming ${additionalChallenges.length} additional challenges`);
+            const additionalClaimStartTime = Date.now();
+            let additionalClaimCount = 0;
+            
+            for (const challenge of additionalChallenges) {
+              // Stop claiming if it's taking too long
+              if (Date.now() - additionalClaimStartTime > 3000) {
+                logWithTimestamp(`Stopping additional challenge claiming after ${additionalClaimCount} challenges (taking too long)`);
+                break;
+              }
+              
+              try {
+                logWithTimestamp(`Claiming additional challenge: ${challenge.id} - ${challenge.title}`);
+                // Add timeout protection for claiming challenges (2 seconds)
+                await Promise.race([
+                  gamificationManager.claimChallenge(challenge.id),
+                  new Promise((_, reject) => 
+                    setTimeout(() => {
+                      const errorMsg = `Timed out claiming additional challenge ${challenge.id}`;
+                      logWithTimestamp(errorMsg);
+                      reject(new Error(errorMsg));
+                    }, 2000)
+                  )
+                ]);
+                additionalClaimCount++;
+                completedChallenges.push(challenge);
+                logWithTimestamp(`Successfully claimed additional challenge: ${challenge.id}`);
+              } catch (err) {
+                logWithTimestamp(`Error claiming additional challenge ${challenge.id}: ${err}`);
+                // Continue with next challenge even if this one fails
+              }
+              
+              // Add a tiny delay between challenge claims
+              await new Promise(resolve => setTimeout(resolve, 20));
+            }
+          } else {
+            logWithTimestamp(`Skipping additional challenge claiming to prevent freezing`);
+          }
+        } catch (error) {
+          logWithTimestamp(`Error while checking additional challenges: ${error}`);
+          // Continue with simulation even if additional challenges fail
         }
+      } else {
+        logWithTimestamp(`Skipping additional challenge check to prevent freezing (simulation has been running for ${Date.now() - simulationStartTime}ms)`);
       }
       
-      // Check for newly completed achievements
+      // Add a small delay to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Quick check for newly completed achievements
       logWithTimestamp('Checking for newly completed achievements');
       const achievements = Object.values(afterProgress.achievements || {});
       const newlyCompleted = achievements.filter((a: any) => 
@@ -643,32 +733,49 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       );
       logWithTimestamp(`Found ${newlyCompleted.length} newly completed achievements`);
       
+      // Add a small delay to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       // Get final progress after all operations with timeout protection (5 seconds)
       logWithTimestamp('Refreshing Bob stats');
-      await Promise.race([
-        refreshBobStats(),
-        new Promise((_, reject) => 
-          setTimeout(() => {
-            const errorMsg = 'Timed out refreshing stats';
-            logWithTimestamp(errorMsg);
-            reject(new Error(errorMsg));
-          }, 5000)
-        )
-      ]);
+      try {
+        await Promise.race([
+          refreshBobStats(),
+          new Promise((_, reject) => 
+            setTimeout(() => {
+              const errorMsg = 'Timed out refreshing stats';
+              logWithTimestamp(errorMsg);
+              reject(new Error(errorMsg));
+            }, 5000)
+          )
+        ]);
+      } catch (error) {
+        logWithTimestamp(`Error refreshing Bob stats: ${error}`);
+        // Continue even if refreshing stats fails
+      }
+      
       logWithTimestamp(`Refreshed stats in ${Date.now() - simulationStartTime}ms`);
       
-      const finalProgress = await Promise.race([
-        storageService.getUserProgress(),
-        new Promise((_, reject) => 
-          setTimeout(() => {
-            const errorMsg = 'Timed out getting final progress';
-            logWithTimestamp(errorMsg);
-            reject(new Error(errorMsg));
-          }, 3000)
-        )
-      ]) as any;
-      
-      logWithTimestamp(`Final XP: ${finalProgress.totalXP}, Final level: ${finalProgress.level}`);
+      // Get final user progress for UI display
+      let finalProgress;
+      try {
+        finalProgress = await Promise.race([
+          storageService.getUserProgress(),
+          new Promise((_, reject) => 
+            setTimeout(() => {
+              const errorMsg = 'Timed out getting final progress';
+              logWithTimestamp(errorMsg);
+              reject(new Error(errorMsg));
+            }, 3000)
+          )
+        ]) as any;
+        
+        logWithTimestamp(`Final XP: ${finalProgress.totalXP}, Final level: ${finalProgress.level}`);
+      } catch (error) {
+        logWithTimestamp(`Error getting final progress: ${error}`);
+        // Use the afterProgress as a fallback
+        finalProgress = afterProgress;
+      }
       
       // Add date to simulated dates
       const dateStr = dateToSimulate.toISOString();
@@ -690,6 +797,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         logWithTimestamp('Setting consecutive days count to 1');
         setConsecutiveDaysCount(1);
       }
+      
+      // Add a small delay to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 50));
       
       // Prepare simulation result for confirmation modal
       logWithTimestamp('Preparing simulation result for confirmation modal');
@@ -731,6 +841,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       Alert.alert('Simulation Error', 'An error occurred during simulation. Try again with a different date or a shorter duration.');
       return Promise.reject(error);
     } finally {
+      // Always clear the safety timeout
+      clearTimeout(safetyTimeoutId);
+      
       // Always restore the original Date object to prevent issues
       logWithTimestamp('Restoring Date object in finally block');
       restoreOriginalDate();
