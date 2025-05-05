@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stretch } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { getPremiumStretchesPreview } from '../../utils/generators/premiumUtils';
+import { Video, ResizeMode } from 'expo-av';
 
 interface PremiumStretchesPreviewProps {
   onClose?: () => void;
@@ -31,6 +32,12 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
   const { theme, isDark } = useTheme();
   const [premiumStretches, setPremiumStretches] = useState<(Stretch & { isPremium: boolean; vipBadgeColor: string })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [videoLoadingStates, setVideoLoadingStates] = useState<Record<string, boolean>>({});
+  const [videoErrorStates, setVideoErrorStates] = useState<Record<string, boolean>>({});
+  
+  // Track visible items for optimizing video playback
+  const [visibleItems, setVisibleItems] = useState<string[]>([]);
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     const loadPremiumStretches = async () => {
@@ -38,6 +45,18 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
       try {
         const stretches = await getPremiumStretchesPreview(PREVIEW_COUNT);
         setPremiumStretches(stretches);
+        
+        // Initialize loading states for all videos
+        const initialLoadingStates: Record<string, boolean> = {};
+        const initialErrorStates: Record<string, boolean> = {};
+        stretches.forEach(stretch => {
+          if (isVideoSource(stretch)) {
+            initialLoadingStates[stretch.id.toString()] = true;
+            initialErrorStates[stretch.id.toString()] = false;
+          }
+        });
+        setVideoLoadingStates(initialLoadingStates);
+        setVideoErrorStates(initialErrorStates);
       } catch (error) {
         console.error('Error loading premium stretches preview:', error);
       } finally {
@@ -48,7 +67,75 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
     loadPremiumStretches();
   }, []);
 
+  // Check if a stretch has video content
+  const isVideoSource = (item: Stretch): boolean => {
+    if (!item.image) return false;
+    
+    // Check for the __video flag
+    if (typeof item.image === 'object' && 
+        item.image !== null && 
+        (item.image as any).__video === true) {
+      return true;
+    }
+    
+    // Check for .mp4 extension in uri
+    if (typeof item.image === 'object' && 
+        item.image !== null && 
+        'uri' in item.image && 
+        typeof item.image.uri === 'string' && 
+        (item.image.uri.toLowerCase().endsWith('.mp4') || 
+         item.image.uri.toLowerCase().endsWith('.mov'))) {
+      return true;
+    }
+    
+    // Check for require asset with MP4 reference
+    if (typeof item.image === 'object' && 
+        (item.image as any).__asset) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Handle video load complete
+  const handleVideoLoad = (stretchId: string | number) => {
+    setVideoLoadingStates(prev => ({
+      ...prev,
+      [stretchId.toString()]: false
+    }));
+  };
+
+  // Handle video load error
+  const handleVideoError = (stretchId: string | number, error: string) => {
+    console.warn(`Error loading video for stretch ${stretchId}:`, error);
+    setVideoLoadingStates(prev => ({
+      ...prev,
+      [stretchId.toString()]: false
+    }));
+    setVideoErrorStates(prev => ({
+      ...prev,
+      [stretchId.toString()]: true
+    }));
+  };
+
+  // Track which items are visible on screen
+  const handleViewableItemsChanged = React.useCallback(({ viewableItems }) => {
+    const visibleIds = viewableItems.map(item => item.key);
+    setVisibleItems(visibleIds);
+  }, []);
+
+  // Setup viewability config for FlatList
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 50, // Item is considered visible when 50% is visible
+    minimumViewTime: 300 // Item must be visible for at least 300ms
+  };
+
   const renderStretchItem = ({ item }: { item: Stretch & { isPremium: boolean; vipBadgeColor: string } }) => {
+    const shouldRenderVideo = isVideoSource(item);
+    const isVideoLoading = shouldRenderVideo && videoLoadingStates[item.id.toString()];
+    const hasVideoError = shouldRenderVideo && videoErrorStates[item.id.toString()];
+    const isVisible = visibleItems.includes(item.id.toString());
+    
     return (
       <View style={[styles.stretchCard, { backgroundColor: isDark ? theme.cardBackground : '#FFF' }]}>
         <View style={styles.stretchHeader}>
@@ -63,11 +150,70 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
 
         <View style={styles.mainContent}>
           <View style={[styles.imageContainer, { borderColor: item.vipBadgeColor }]}>
-            <Image
-              source={item.image}
-              style={styles.stretchImage}
-              resizeMode="contain"
-            />
+            {shouldRenderVideo && !hasVideoError ? (
+              <>
+                <Video
+                  source={item.image}
+                  style={styles.stretchImage}
+                  resizeMode={ResizeMode.CONTAIN}
+                  shouldPlay={isVisible}
+                  isLooping={true}
+                  isMuted={true}
+                  useNativeControls={false}
+                  onReadyForDisplay={() => handleVideoLoad(item.id)}
+                  onLoad={() => handleVideoLoad(item.id)}
+                  onError={(error) => handleVideoError(item.id, error.toString())}
+                  // Set a timeout for video loading
+                  onLoadStart={() => {
+                    // Set a 10-second timeout for video loading
+                    setTimeout(() => {
+                      setVideoLoadingStates(prev => {
+                        // Only update if still loading after timeout
+                        if (prev[item.id.toString()]) {
+                          console.warn(`Video load timeout for ${item.id}`);
+                          return {
+                            ...prev,
+                            [item.id.toString()]: false
+                          };
+                        }
+                        return prev;
+                      });
+                      setVideoErrorStates(prev => {
+                        // Mark as error if still loading after timeout
+                        if (videoLoadingStates[item.id.toString()]) {
+                          return {
+                            ...prev,
+                            [item.id.toString()]: true
+                          };
+                        }
+                        return prev;
+                      });
+                    }, 10000); // 10-second timeout
+                  }}
+                />
+                {isVideoLoading && (
+                  <View style={styles.videoLoadingContainer}>
+                    <ActivityIndicator size="small" color={item.vipBadgeColor} />
+                    <Text style={styles.videoLoadingText}>Loading</Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <Image
+                source={hasVideoError ? 
+                  { uri: `https://via.placeholder.com/350x350/${item.vipBadgeColor.replace('#', '')}/FFFFFF?text=${encodeURIComponent(item.name)}` } : 
+                  item.image}
+                style={styles.stretchImage}
+                resizeMode="contain"
+              />
+            )}
+            
+            {/* Play button overlay for videos that are paused */}
+            {shouldRenderVideo && !isVideoLoading && !hasVideoError && !isVisible && (
+              <View style={styles.pausedVideoOverlay}>
+                <Ionicons name="play-circle" size={40} color="#FFFFFF" />
+              </View>
+            )}
           </View>
 
           <View style={styles.infoContainer}>
@@ -148,11 +294,17 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
         </View>
       ) : (
         <FlatList
+          ref={flatListRef}
           data={premiumStretches}
           renderItem={renderStretchItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={true}
+          onViewableItemsChanged={handleViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={5}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="fitness-outline" size={60} color={isDark ? theme.textSecondary : '#ccc'} />
@@ -255,6 +407,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 2,
+    position: 'relative',
   },
   stretchImage: {
     width: '100%',
@@ -315,6 +468,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     marginTop: 16,
+  },
+  videoLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 8,
+  },
+  videoLoadingText: {
+    color: '#FFF',
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: 'bold',
+  },
+  pausedVideoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 8,
   },
 });
 

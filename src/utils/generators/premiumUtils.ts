@@ -1,5 +1,6 @@
 import { Stretch, RestPeriod } from '../../types';
 import * as rewardManager from '../progress/modules/rewardManager';
+import { markAsVideo } from './routineGenerator';
 
 /**
  * Check if an item is a premium stretch
@@ -172,12 +173,35 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
   const premiumStretches = await rewardManager.getSamplePremiumStretches(count);
   
   // Ensure we have a reasonable number of stretches - make duplicates if needed
-  let enhancedStretches = premiumStretches.map(stretch => ({
-    ...stretch,
-    isPremium: true,
-    vipBadgeColor: stretch.level === 'advanced' ? '#FF5722' : 
-                   stretch.level === 'intermediate' ? '#FF9800' : '#FFD700',
-  }));
+  let enhancedStretches = premiumStretches.map(stretch => {
+    // Create a copy with premium info
+    const enhancedStretch = {
+      ...stretch,
+      isPremium: true,
+      vipBadgeColor: stretch.level === 'advanced' ? '#FF5722' : 
+                     stretch.level === 'intermediate' ? '#FF9800' : '#FFD700',
+    };
+    
+    // Ensure image is properly marked as video if it's a video source
+    if (enhancedStretch.image) {
+      // Check if image already has __video flag
+      if (typeof enhancedStretch.image === 'object' && 
+          enhancedStretch.image !== null && 
+          !(enhancedStretch.image as any).__video) {
+        
+        // Check if it's a MP4 or MOV file
+        if (typeof enhancedStretch.image === 'object' && 
+            'uri' in enhancedStretch.image && 
+            typeof enhancedStretch.image.uri === 'string' && 
+            (enhancedStretch.image.uri.toLowerCase().endsWith('.mp4') || 
+             enhancedStretch.image.uri.toLowerCase().endsWith('.mov'))) {
+          enhancedStretch.image = markAsVideo(enhancedStretch.image);
+        }
+      }
+    }
+    
+    return enhancedStretch;
+  });
   
   // If we don't have enough stretches, generate more varied ones to reach desired count
   if (enhancedStretches.length < count && enhancedStretches.length > 0) {
@@ -201,7 +225,8 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
       ];
       const newSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
       
-      enhancedStretches.push({
+      // Create a new stretch with the same image but marked as video if needed
+      const newStretch = {
         ...original,
         id: `${original.id}-premium-${enhancedStretches.length}`,
         name: `${newArea} ${newSuffix}`,
@@ -210,7 +235,17 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
         isPremium: true,
         vipBadgeColor: newLevel === 'advanced' ? '#FF5722' : 
                        newLevel === 'intermediate' ? '#FF9800' : '#FFD700',
-      });
+      };
+      
+      // Ensure video is properly marked
+      if (newStretch.image && typeof newStretch.image === 'object') {
+        // Try to use markAsVideo if it's not already marked
+        if (!(newStretch.image as any).__video) {
+          newStretch.image = markAsVideo(newStretch.image);
+        }
+      }
+      
+      enhancedStretches.push(newStretch);
     }
   }
   

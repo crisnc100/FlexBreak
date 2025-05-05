@@ -180,7 +180,7 @@ const stretches: Stretch[] = [
     premium: true,
     tags: ["Hips & Legs"],
     level: "advanced",
-    image: { uri: 'https://via.placeholder.com/200/E91E63/FFFFFF?text=Reclining+Hero+Pose' },
+    image: markAsVideo(require('../../assets/stretchData/id13_reclining_hero_pose_grass/image.mp4')),
     hasDemo: true,
     demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id13_reclining_hero_pose_grass/video.mp4' },
     demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media/main/stretchData/id13_reclining_hero_pose_grass/audio.mp3' },
