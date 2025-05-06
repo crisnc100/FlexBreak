@@ -111,6 +111,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   const [batchSimulationDateRange, setBatchSimulationDateRange] = useState<string>('');
   const [simulate7DaysDateRange, setSimulate7DaysDateRange] = useState<string>('');
   const [simulate3DaysDateRange, setSimulate3DaysDateRange] = useState<string>('');
+  const [isSimulationRunning, setIsSimulationRunning] = useState<boolean>(false);
+  const [simulationAbortController, setSimulationAbortController] = useState<AbortController | null>(null);
   
   // Check if we have authentication from testing flow stored in AsyncStorage
   useEffect(() => {
@@ -634,16 +636,36 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     setShowBatchConfigModal(true);
   };
   
+  // Add a function to cancel ongoing simulations
+  const cancelOngoingSimulations = () => {
+    if (isSimulationRunning && simulationAbortController) {
+      logWithTimestamp('Cancelling ongoing simulation');
+      simulationAbortController.abort();
+      setSimulationAbortController(null);
+    }
+    
+    // Always make sure date is restored
+    restoreOriginalDate();
+  };
+  
   // Handle batch simulation for 7 consecutive days
-  const handleBatchSimulation = async (config: StretchConfig): Promise<void> => {
+  const handleBatchSimulation = async (config: StretchConfig, signal?: AbortSignal): Promise<void> => {
     const batchStartTime = Date.now();
     setIsLoading(true);
+    
+    // Always ensure Date is restored at the beginning
+    restoreOriginalDate();
     
     // Log that we're starting batch simulation
     logWithTimestamp('Starting batch simulation');
     logWithTimestamp(`Config: ${JSON.stringify(config)}`);
     
     try {
+      // Check if aborted
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      
       // First get user progress for comparison
       logWithTimestamp('Getting initial user progress');
       let initialProgress;
@@ -710,6 +732,11 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
       // Simulate each day
       for (let i = 0; i < daysToSimulate; i++) {
+        // Check if aborted
+        if (signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        
         const currentDate = new Date(startDate);
         currentDate.setDate(currentDate.getDate() + i);
         
@@ -852,31 +879,52 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
     } catch (error) {
       logWithTimestamp(`Error in batch simulation: ${error}`);
-      console.error('Error in batch simulation:', error);
-      Alert.alert('Simulation Error', 'An error occurred during batch simulation.');
+      
+      // Special handling for abort errors
+      if (error.name === 'AbortError') {
+        logWithTimestamp('Batch simulation was aborted');
+      } else {
+        console.error('Error in batch simulation:', error);
+        Alert.alert('Simulation Error', 'An error occurred during batch simulation.');
+      }
+      
+      // Ensure date is restored in case of error
+      restoreOriginalDate();
+      
       return Promise.reject(error);
     } finally {
-      setIsLoading(false);
+      // Final date restoration and cleanup
+      restoreOriginalDate();
+      
+      // Don't set loading state here - do it in the calling function's finally block
     }
   };
   
   // Handle 3-day simulation
-  const handle3DaySimulation = async (config: StretchConfig): Promise<void> => {
+  const handle3DaySimulation = async (config: StretchConfig, signal?: AbortSignal): Promise<void> => {
     const batchStartTime = Date.now();
     setIsLoading(true);
+    
+    // Always ensure Date is restored at the beginning
+    restoreOriginalDate();
     
     // Log that we're starting 3-day simulation
     logWithTimestamp('Starting 3-day simulation');
     logWithTimestamp(`Config: ${JSON.stringify(config)}`);
     
     try {
-      // First get user progress for comparison
+      // Check if aborted
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      
+      // First get user progress for comparison with shorter timeout
       logWithTimestamp('Getting initial user progress');
       let initialProgress;
       try {
         initialProgress = await Promise.race([
           storageService.getUserProgress(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
         ]) as any;
         
         logWithTimestamp(`Initial XP: ${initialProgress.totalXP || 0}`);
@@ -936,6 +984,14 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
       // Simulate each day
       for (let i = 0; i < daysToSimulate; i++) {
+        // Check if aborted
+        if (signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        
+        // Always ensure Date is restored between days
+        restoreOriginalDate();
+        
         const currentDate = new Date(startDate);
         currentDate.setDate(currentDate.getDate() + i);
         
@@ -943,84 +999,54 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         
         // Patch date
         try {
-          const originalDate = Date;
-          
-          // @ts-ignore
-          global.OriginalDate = originalDate;
-          
-          // @ts-ignore
-          global.Date = class extends originalDate {
-            constructor() {
-              if (arguments.length === 0) {
-                super(currentDate.getTime());
-              } else {
-                // @ts-ignore
-                super(...arguments);
-              }
-            }
-          };
-          
-          // @ts-ignore
-          global.Date.now = () => currentDate.getTime();
-          
-        } catch (error) {
-          logWithTimestamp(`Error patching date: ${error}`);
-          continue; // Skip this day but try to continue batch
-        }
+        patchDateForSimulation(currentDate);
         
-        // Process routine for this day
-        try {
-          // Create basic routine object
+          // Process routine for this day
+          try {
+            // Create basic routine object with more unique ID to prevent conflicts
       const routine = {
-            id: `3day-stretch-${Date.now()}-${i}`,
+              id: `3day-stretch-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
         date: new Date().toISOString(),
           duration: config.duration.toString() as any,
           area: config.bodyArea as any,
           difficulty: config.difficulty as any,
-            stretches: ["3-Day Simulation Stretch"],
+              stretches: ["3-Day Simulation Stretch"],
         status: "completed"
         } as any;
       
-          // Process with limited timeout
-          const result = await Promise.race([
-            gamificationManager.processCompletedRoutine(routine),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Processing timeout')), 1500))
-          ]) as any;
-          
-          // Add to simulated dates
-          const dateStr = currentDate.toISOString().split('T')[0];
-          simulatedDateStrings.push(dateStr);
-          
-          logWithTimestamp(`Day ${i+1} simulation successful`);
-        } catch (error) {
-          logWithTimestamp(`Error processing day ${i+1}: ${error}`);
-          // Continue batch despite errors
-        } finally {
-          // Restore date after each day to prevent memory leaks
-          try {
-            // @ts-ignore
-            if (global.OriginalDate) {
-              // @ts-ignore
-              global.Date = global.OriginalDate;
-              // @ts-ignore
-              global.OriginalDate = undefined;
-            }
-          } catch (dateRestoreError) {
-            logWithTimestamp(`Error restoring date: ${dateRestoreError}`);
+            // Process with limited timeout (shorter than 7-day simulation)
+            const result = await Promise.race([
+              gamificationManager.processCompletedRoutine(routine),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Processing timeout')), 1000))
+            ]) as any;
+            
+            // Add to simulated dates
+            const dateStr = currentDate.toISOString().split('T')[0];
+            simulatedDateStrings.push(dateStr);
+            
+            logWithTimestamp(`Day ${i+1} simulation successful`);
+          } catch (error) {
+            logWithTimestamp(`Error processing day ${i+1}: ${error}`);
+            // Continue batch despite errors
           }
+        } catch (error) {
+          logWithTimestamp(`Error patching date for day ${i+1}: ${error}`);
+        } finally {
+          // Ensure date is ALWAYS restored after each day
+          restoreOriginalDate();
+          
+          // Brief pause between days to let system process (slightly longer than 7-day)
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-        
-        // Brief pause between days to let system process
-        await new Promise(resolve => setTimeout(resolve, 50));
       }
       
-      // Get final progress
-      logWithTimestamp('Getting final progress after batch');
+      // Get final progress with shorter timeout
+      logWithTimestamp('Getting final progress after 3-day simulation');
       let finalProgress;
       try {
         finalProgress = await Promise.race([
           storageService.getUserProgress(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
         ]) as any;
         
         totalXpGained = (finalProgress.totalXP || 0) - (initialProgress.totalXP || 0);
@@ -1029,7 +1055,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         finalPercentToNextLevel = finalProgress.percentToNextLevel || 0;
         finalStreak = finalProgress.statistics?.currentStreak || 0;
         
-        logWithTimestamp(`Total XP gained in batch: ${totalXpGained}`);
+        logWithTimestamp(`Total XP gained in 3-day batch: ${totalXpGained}`);
         logWithTimestamp(`Final level: ${finalLevel}, Streak: ${finalStreak}`);
       } catch (error) {
         logWithTimestamp(`Error getting final progress: ${error}`);
@@ -1039,6 +1065,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         finalPercentToNextLevel = 0;
         finalStreak = 0;
       }
+      
+      // Ensure date is restored one more time before updating state
+      restoreOriginalDate();
       
       // Update state for next batch
       setLastBatchEndDate(startDate);
@@ -1066,23 +1095,40 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
       // Show confirmation
       setSimulationResult(batchResult);
-      setShowConfirmationModal(true);
       
-      // Refresh stats in background
-      refreshBobStats().catch(error => {
-        logWithTimestamp(`Error refreshing stats: ${error}`);
-      });
+      // Use setTimeout to ensure UI is not blocked
+      setTimeout(() => {
+      setShowConfirmationModal(true);
+        
+        // Refresh stats in background with error handling
+        refreshBobStats().catch(error => {
+          logWithTimestamp(`Error refreshing stats: ${error}`);
+        });
+      }, 100);
       
       logWithTimestamp(`3-day simulation completed in ${Date.now() - batchStartTime}ms`);
       return Promise.resolve();
       
     } catch (error) {
       logWithTimestamp(`Error in 3-day simulation: ${error}`);
-      console.error('Error in 3-day simulation:', error);
-      Alert.alert('Simulation Error', 'An error occurred during simulation.');
+      
+      // Special handling for abort errors
+      if (error.name === 'AbortError') {
+        logWithTimestamp('3-day simulation was aborted');
+      } else {
+        console.error('Error in 3-day simulation:', error);
+        Alert.alert('Simulation Error', 'An error occurred during simulation.');
+      }
+      
+      // Ensure date is restored in case of error
+      restoreOriginalDate();
+      
       return Promise.reject(error);
     } finally {
-      setIsLoading(false);
+      // Final date restoration and cleanup
+      restoreOriginalDate();
+      
+      // Don't set loading state here - do it in the calling function's finally block
     }
   };
   
@@ -1453,6 +1499,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       <StretchConfigModal
         visible={showBatchConfigModal}
         onClose={() => {
+          cancelOngoingSimulations();
           setShowBatchConfigModal(false);
           setSelectedScenario(null); // Reset selected scenario when closing
         }}
@@ -1462,28 +1509,52 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
             return;
           }
           
+          // Cancel any ongoing simulations
+          cancelOngoingSimulations();
+          
           // Immediately close modal and show loading state
           setShowBatchConfigModal(false);
           setIsLoading(true);
+          
+          // Create new abort controller for this simulation
+          const abortController = new AbortController();
+          setSimulationAbortController(abortController);
+          setIsSimulationRunning(true);
           
           // Add a small delay to let the UI update before starting the heavy computation
           setTimeout(() => {
             // Check which scenario was selected
             if (selectedScenario === '3day') {
-              handle3DaySimulation(config)
+              handle3DaySimulation(config, abortController.signal)
                 .catch((error) => {
-                  console.error('Error in 3-day simulation:', error);
-                  Alert.alert('3-Day Simulation Error', 'The simulation process failed. Please try again with different settings.');
+                  if (error.name === 'AbortError') {
+                    logWithTimestamp('3-day simulation was cancelled');
+                  } else {
+                    console.error('Error in 3-day simulation:', error);
+                    Alert.alert('3-Day Simulation Error', 'The simulation process failed. Please try again with different settings.');
+                  }
+                })
+                .finally(() => {
                   setIsLoading(false);
+                  setIsSimulationRunning(false);
+                  setSimulationAbortController(null);
                   restoreOriginalDate();
                 });
             } else {
               // Default to 7-day simulation
-              handleBatchSimulation(config)
+              handleBatchSimulation(config, abortController.signal)
                 .catch((error) => {
-                  console.error('Error in batch simulation:', error);
-                  Alert.alert('Batch Simulation Error', 'The batch simulation process failed. Please try again with different settings or fewer days.');
+                  if (error.name === 'AbortError') {
+                    logWithTimestamp('7-day simulation was cancelled');
+                  } else {
+                    console.error('Error in batch simulation:', error);
+                    Alert.alert('Batch Simulation Error', 'The batch simulation process failed. Please try again with different settings or fewer days.');
+                  }
+                })
+                .finally(() => {
                   setIsLoading(false);
+                  setIsSimulationRunning(false);
+                  setSimulationAbortController(null);
                   restoreOriginalDate();
                 });
             }

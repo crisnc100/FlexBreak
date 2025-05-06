@@ -152,17 +152,36 @@ const TestingChecklistPart1: React.FC<TestingChecklistPart1Props> = ({ onComplet
   const completedCount = checklist.filter(item => item.isCompleted).length;
   const progress = (completedCount / checklist.length) * 100;
 
-  const sendFeedbackAndContinue = () => {
+  const sendFeedbackAndContinue = async () => {
     // Prepare feedback email content
     let feedbackContent = '[ANONYMOUS PART 1 TESTING FEEDBACK]\n\n';
     
     // Add privacy notice at the top
     feedbackContent += 'NOTE: For privacy, you may want to remove your email address or personal info before sending.\n\n';
     
+    // Add the checklist feedback
+    feedbackContent += '=== TASK FEEDBACK ===\n\n';
     checklist.forEach(item => {
       feedbackContent += `${item.id}. ${item.title}\n`;
       feedbackContent += `User Feedback: ${item.feedback || 'No feedback provided'}\n\n`;
     });
+    
+    // Add the optional general feedback
+    feedbackContent += '\n=== GENERAL FEEDBACK ===\n\n';
+    
+    // Get optional feedback from storage
+    try {
+      const uiFeedback = await AsyncStorage.getItem('@flexbreak:ui_feedback') || 'No feedback provided';
+      const stretchesFeedback = await AsyncStorage.getItem('@flexbreak:stretches_feedback') || 'No feedback provided';
+      const experienceFeedback = await AsyncStorage.getItem('@flexbreak:experience_feedback') || 'No feedback provided';
+      
+      feedbackContent += `UI & Design Feedback:\n${uiFeedback}\n\n`;
+      feedbackContent += `Stretches & Content Feedback:\n${stretchesFeedback}\n\n`;
+      feedbackContent += `Personal Experience:\n${experienceFeedback}\n\n`;
+    } catch (error) {
+      console.error('Error retrieving optional feedback:', error);
+      feedbackContent += 'Error retrieving optional feedback.\n\n';
+    }
     
     const subject = encodeURIComponent('ANONYMOUS - FlexBreak Part 1 Testing Feedback');
     const body = encodeURIComponent(feedbackContent);
@@ -426,6 +445,91 @@ const TestingChecklistPart1: React.FC<TestingChecklistPart1Props> = ({ onComplet
             </View>
           </View>
         ))}
+        
+        {/* Optional General Feedback Section */}
+        <View 
+          style={[
+            styles.checklistItem, 
+            { 
+              backgroundColor: theme.cardBackground,
+              borderLeftColor: theme.accent,
+              marginTop: 20
+            }
+          ]}
+        >
+          <View style={styles.itemHeader}>
+            <View style={styles.titleContainer}>
+              <Text style={[styles.itemTitle, { color: theme.text }]}>
+                Optional General Feedback
+              </Text>
+              <Text style={[styles.itemNumber, { color: theme.textSecondary }]}>
+                Help us improve
+              </Text>
+            </View>
+            
+            <View style={[styles.itemIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.accent} />
+            </View>
+          </View>
+          
+          <Text style={[styles.itemDescription, { color: theme.textSecondary }]}>
+            We'd love to hear your overall thoughts about FlexBreak. This feedback is optional but very valuable to us.
+          </Text>
+          
+          {/* UI Feedback */}
+          <View style={[styles.feedbackContainer, { backgroundColor: theme.backgroundLight }]}>
+            <Text style={[styles.feedbackLabel, { color: theme.text }]}>
+              UI & Design Feedback:
+            </Text>
+            <TextInput
+              style={[styles.feedbackInput, { color: theme.text }]}
+              placeholder="What do you think about the app's design, navigation, and ease of use?"
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              onChangeText={(text) => {
+                // Save the UI feedback
+                AsyncStorage.setItem('@flexbreak:ui_feedback', text)
+                  .catch(error => console.error('Error saving UI feedback:', error));
+              }}
+            />
+          </View>
+          
+          {/* Stretch Content Feedback */}
+          <View style={[styles.feedbackContainer, { backgroundColor: theme.backgroundLight, borderTopWidth: 0 }]}>
+            <Text style={[styles.feedbackLabel, { color: theme.text }]}>
+              Stretches & Content Feedback:
+            </Text>
+            <TextInput
+              style={[styles.feedbackInput, { color: theme.text }]}
+              placeholder="How are the stretches themselves? Are they effective, appropriate difficulty, and well-explained?"
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              onChangeText={(text) => {
+                // Save the stretches feedback
+                AsyncStorage.setItem('@flexbreak:stretches_feedback', text)
+                  .catch(error => console.error('Error saving stretches feedback:', error));
+              }}
+            />
+          </View>
+          
+          {/* Personal Experience Feedback */}
+          <View style={[styles.feedbackContainer, { backgroundColor: theme.backgroundLight, borderTopWidth: 0 }]}>
+            <Text style={[styles.feedbackLabel, { color: theme.text }]}>
+              Personal Experience:
+            </Text>
+            <TextInput
+              style={[styles.feedbackInput, { color: theme.text }]}
+              placeholder="Personal opinion of the app overall? Any suggestions for improvement? Dislike anything?"
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              onChangeText={(text) => {
+                // Save the personal experience feedback
+                AsyncStorage.setItem('@flexbreak:experience_feedback', text)
+                  .catch(error => console.error('Error saving experience feedback:', error));
+              }}
+            />
+          </View>
+        </View>
         
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
