@@ -32,8 +32,13 @@ import {
   DateSelectionModal,
   StretchConfigModal,
   ConfirmationModal,
-  SimulationResult,
-  StretchConfig
+  StatsCard,
+  SimulatedDatesCard,
+  WelcomeCard,
+  NoticeCard,
+  ScenarioCard,
+  SimulationActions,
+  LoadingOverlay
 } from '../components/simulator';
 
 // Constants
@@ -53,6 +58,29 @@ const DURATIONS = [5, 10, 15];
 const BODY_AREAS = ['Neck', 'Lower Back', 'Upper Back & Chest', 'Shoulders & Arms', 'Hips & Legs', 'Full Body'];
 const DURATION_TYPES = ['5', '10', '15'];
 const DIFFICULTY_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+
+// Define the StretchConfig and SimulationResult types since we're not exporting them anymore
+interface StretchConfig {
+  bodyArea: string;
+  difficulty: string;
+  duration: number;
+}
+
+interface SimulationResult {
+  date: string;
+  bodyArea: string;
+  difficulty: string;
+  duration: number;
+  xpEarned: number;
+  totalXp: number;
+  level: number;
+  percentToNextLevel: number;
+  streakDays: number;
+  completedChallenges: Array<{title: string, xp: number}>;
+  achievements: Array<{title: string}>;
+  isBatchMode?: boolean;
+  daysSimulated?: number;
+}
 
 const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any }) => {
   const { theme, isDark } = useTheme();
@@ -159,13 +187,6 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     xpToNextLevel: 100,
     percentToNextLevel: 0,
     currentStreak: 0
-  });
-  
-  // Modal for challenge/reward details
-  const [detailsModal, setDetailsModal] = useState({
-    visible: false,
-    title: '',
-    content: [] as {title: string, description: string, progress?: string}[]
   });
   
   // Activity log
@@ -1385,79 +1406,6 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     }
   };
   
-  // Show details for challenges
-  const handleShowChallenges = async () => {
-    try {
-      const activeChallenges = await challengeManager.getActiveChallenges();
-      const flatChallenges = Object.values(activeChallenges).flat();
-      
-      if (flatChallenges.length === 0) {
-        Alert.alert('No Challenges', 'There are no active challenges at the moment.');
-        return;
-      }
-      
-      const challengeDetails = flatChallenges.map(challenge => ({
-        title: challenge.title,
-        description: challenge.description,
-        progress: `${challenge.progress || 0}/${challenge.requirement} (${challenge.status})`
-      }));
-      
-      setDetailsModal({
-        visible: true,
-        title: 'Active Challenges',
-        content: challengeDetails
-      });
-    } catch (error) {
-      console.error('Error fetching challenges:', error);
-      Alert.alert('Error', 'Failed to fetch challenge details');
-    }
-  };
-  
-  // Show details for rewards
-  const handleShowRewards = async () => {
-    try {
-      const allRewards = await rewardManager.getAllRewards();
-      
-      const rewardDetails = allRewards.map(reward => ({
-        title: reward.title,
-        description: `Unlocks at Level ${reward.levelRequired}`,
-        progress: reward.unlocked ? 'UNLOCKED' : `Locked (Level ${reward.levelRequired})`
-      }));
-      
-      setDetailsModal({
-        visible: true,
-        title: 'Rewards',
-        content: rewardDetails
-      });
-    } catch (error) {
-      console.error('Error fetching rewards:', error);
-      Alert.alert('Error', 'Failed to fetch reward details');
-    }
-  };
-  
-  // Show details for achievements
-  const handleShowAchievements = async () => {
-    try {
-      const achievementsProgress = await storageService.getUserProgress();
-      const achievements = Object.values(achievementsProgress.achievements || {});
-      
-      const achievementDetails = achievements.map(achievement => ({
-        title: achievement.title,
-        description: achievement.description,
-        progress: achievement.completed ? 'COMPLETED' : 'Not completed yet'
-      }));
-      
-      setDetailsModal({
-        visible: true,
-        title: 'Achievements',
-        content: achievementDetails
-      });
-    } catch (error) {
-      console.error('Error fetching achievements:', error);
-      Alert.alert('Error', 'Failed to fetch achievement details');
-    }
-  };
-  
   // Reset the simulation
   const handleReset = async () => {
     Alert.alert(
@@ -1501,55 +1449,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   
   // Also update the renderBobStats function to include additional stats
   const renderBobStats = () => {
-    // If there's no progress yet, return a placeholder
     if (!bobProgress) return null;
-    
-    // Get stats from progress
-    const statistics = bobProgress.statistics || {};
-    const routines = statistics.totalRoutines || 0;
-    const minutes = statistics.totalMinutes || 0;
-    
-    return (
-      <View style={[styles.statsCard, { backgroundColor: theme.cardBackground }]}>
-        <Text style={[styles.statsTitle, { color: theme.text }]}>Current Stats</Text>
-        
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>{stats.level}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Level</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>{stats.totalXP}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total XP</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>{stats.currentStreak}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Streak</Text>
-          </View>
-        </View>
-        
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>{routines}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Routines</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>{minutes}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Minutes</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>{stats.xpToNextLevel}</Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>To Next</Text>
-          </View>
-        </View>
-        
-        {renderLevelProgress()}
-      </View>
-    );
+    return <StatsCard stats={stats} bobProgress={bobProgress} />;
   };
   
   // Add a special check to log navigation params for debugging
@@ -1647,324 +1548,43 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       {isAuthenticated ? (
         <ScrollView style={styles.container}>
           {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.accent} />
-              <Text style={[styles.loadingText, { color: theme.text }]}>
-                Processing simulation...
-              </Text>
-              <Text style={[styles.loadingSubText, { color: theme.textSecondary }]}>
-                Please wait, this may take a few moments as we simulate your routine and process all related challenges and rewards.
-              </Text>
-          </View>
+            <LoadingOverlay isLoading={isLoading} />
           ) : (
             <>
-              {/* Notice about testing screens */}
-              <View style={[styles.noticeCard, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)' }]}>
-                <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
-                <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
-                  Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
-                </Text>
-        </View>
-        
-              {/* Testing Scenario Card - Only show if scenario data exists */}
-              {scenarioInstructions && (
-                <View style={[styles.scenarioCard, { backgroundColor: theme.cardBackground }]}>
-                  <View style={styles.scenarioCardHeader}>
-                    <Ionicons name="flask-outline" size={24} color={theme.accent} />
-                    <Text style={[styles.scenarioCardTitle, { color: theme.text }]}>
-                      Scenario #{scenarioInstructions.id}: {scenarioInstructions.title}
-                    </Text>
-        </View>
-        
-                  <View style={[styles.scenarioSetupContainer, { backgroundColor: theme.backgroundLight }]}>
-                    <Text style={[styles.scenarioSetupLabel, { color: theme.accent }]}>Setup Instructions:</Text>
-                    <Text style={[styles.scenarioSetupText, { color: theme.text }]}>
-                      {scenarioInstructions.setup}
-              </Text>
-                  </View>
-                  
-                  <Text style={[styles.verificationLabel, { color: theme.text }]}>
-                    Verification Points:
-              </Text>
-                  
-                  {scenarioInstructions.verification.map((point, index) => (
-                    <View key={index} style={styles.verificationItem}>
-                      <Ionicons name="checkmark-circle" size={20} color={theme.accent} style={{ marginRight: 8 }} />
-                      <Text style={[styles.verificationText, { color: theme.text }]}>
-                        {point}
-              </Text>
-          </View>
-                  ))}
-                  
-                  <View style={styles.scenarioFooter}>
-                    <Text style={[styles.scenarioFooterText, { color: theme.textSecondary }]}>
-                      Complete this scenario and return to the testing screen to provide feedback.
-              </Text>
-        </View>
-        </View>
-              )}
+              <NoticeCard />
               
-              {/* Welcome and Instructions Card */}
-              <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-                <View style={styles.cardHeader}>
-                  <Ionicons name="information-circle" size={24} color={theme.accent} />
-                  <Text style={[styles.cardTitle, { color: theme.text }]}>
-                    Stretching Simulator
-                  </Text>
-                </View>
-                
-                <Text style={[styles.instructionsText, { color: theme.textSecondary }]}>
-                  This tool lets you simulate stretching routines for testing purposes. Simulated routines 
-                  will affect XP, levels, and unlock achievements just like real routines.
-          </Text>
-          
-                <View style={styles.stepsContainer}>
-                  <View style={styles.stepItem}>
-                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
-                      <Text style={styles.stepNumberText}>1</Text>
-                    </View>
-                    <Text style={[styles.stepText, { color: theme.text }]}>
-                      Choose a date to simulate a routine
-                  </Text>
-            </View>
-                  
-                  <View style={styles.stepItem}>
-                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
-                      <Text style={styles.stepNumberText}>2</Text>
-                    </View>
-                    <Text style={[styles.stepText, { color: theme.text }]}>
-                      Configure the routine details (area, difficulty, duration)
-          </Text>
-                  </View>
-                  
-                  <View style={styles.stepItem}>
-                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
-                      <Text style={styles.stepNumberText}>3</Text>
-                    </View>
-                    <Text style={[styles.stepText, { color: theme.text }]}>
-                      Review the results and continue simulating
-                </Text>
-          </View>
-                  <View style={styles.stepItem}>
-                    <View style={[styles.stepNumber, { backgroundColor: theme.accent }]}>
-                      <Text style={styles.stepNumberText}>4</Text>
-                    </View>
-                    <Text style={[styles.stepText, { color: theme.text }]}>
-                      Once you're done, close out the app and reopen it to see the results.
-          </Text>
-                  </View>
-                </View>
-              </View>
+              <ScenarioCard scenarioInstructions={scenarioInstructions} />
               
-              {/* Stats Overview Card */}
-              {bobProgress && (
-                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-                  <View style={styles.cardHeader}>
-                    <Ionicons name="stats-chart" size={24} color={theme.accent} />
-                    <Text style={[styles.cardTitle, { color: theme.text }]}>
-                      Current Stats
-                </Text>
-          </View>
-          
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: theme.text }]}>{stats.level}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Level</Text>
-        </View>
-        
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: theme.text }]}>{stats.totalXP}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total XP</Text>
-                    </View>
-                    
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: theme.text }]}>{stats.currentStreak}</Text>
-                      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Streak</Text>
-                    </View>
-          </View>
-          
-                  <View style={styles.progressBarContainer}>
-                    <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>
-                      Progress to Level {stats.level + 1}
-              </Text>
-                    <View style={[styles.progressBarBg, { backgroundColor: isDark ? '#333' : '#e0e0e0' }]}>
-                      <View 
-                  style={[
-                          styles.progressBarFill, 
-                          { 
-                            width: `${Math.min(100, Math.max(0, stats.percentToNextLevel))}%`, 
-                            backgroundColor: theme.accent 
-                          }
-                        ]} 
-                      />
-                    </View>
-                    <Text style={[styles.progressText, { color: theme.textSecondary }]}>
-                      {stats.totalXP} / {stats.totalXP + stats.xpToNextLevel} XP
-                </Text>
-          </View>
-        </View>
-              )}
+              <WelcomeCard />
               
-              {/* Simulation Actions Card */}
-              <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-                <View style={styles.cardHeader}>
-                  <Ionicons name="fitness" size={24} color={theme.accent} />
-                  <Text style={[styles.cardTitle, { color: theme.text }]}>
-                    Simulation Actions
-                  </Text>
-                </View>
-                
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: theme.accent }]}
-                  onPress={handleShowSingleDaySimulation}
-                >
-                  <Ionicons name="calendar" size={20} color="#FFF" />
-                  <Text style={styles.actionButtonText}>Simulate Yesterday</Text>
-                </TouchableOpacity>
-                
-                {/* Add Quick Simulate Button if we have a last config */}
-                {lastConfig && lastSimulatedDate && (
-                <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
-                    onPress={handleQuickSimulation}
-                  >
-                    <Ionicons name="time" size={20} color="#FFF" />
-                    <Text style={styles.actionButtonText}>
-                      Quick Simulate Previous Day 
-                      {consecutiveDaysCount > 0 ? ` (Day ${consecutiveDaysCount + 1})` : ''}
-                    </Text>
-                </TouchableOpacity>
-                )}
-                
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
-                  onPress={() => {
-                    setSelectedScenario('7day');
-                    setShowBatchConfigModal(true);
-                  }}
-                >
-                  <Ionicons name="calendar-outline" size={20} color={theme.accent} />
-                  <Text style={[styles.actionButtonText, { color: theme.text }]}>
-                    Simulate 7 Days 
-                    {lastBatchEndDate ? 
-                      ` (${new Date(lastBatchEndDate.getTime() - 6 * 86400000).toLocaleDateString()} - ${new Date(lastBatchEndDate).toLocaleDateString()})` : 
-                      ' Before Today'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
-                  onPress={() => {
-                    setSelectedScenario('3day');
-                    setShowBatchConfigModal(true);
-                  }}
-                >
-                  <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
-                  <Text style={[styles.actionButtonText, { color: theme.text }]}>
-                    Simulate 3 Days Before Today
-                  </Text>
-                </TouchableOpacity>
-                
-                {/* Show streak freeze test options if the scenario is 4.1 or 4.2 */}
-                {scenarioInstructions && (scenarioInstructions.id === '4.1' || scenarioInstructions.id === '4.2') && (
-                  <>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, { backgroundColor: isDark ? '#424242' : '#e3f2fd' }]}
-                      onPress={() => {
-                        // Streak Freeze Test 4.1 - 1 day gap
-                        setSelectedScenario('freeze4.1');
-                        Alert.alert(
-                          'Streak Freeze Test 4.1',
-                          'This will simulate 14 days of activity with XP=1800, plus a 1-day gap (missing yesterday).',
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { 
-                              text: 'Run Test', 
-                              onPress: () => handleStreakFreezeTest('4.1')
-                            }
-                          ]
-                        );
-                      }}
-                    >
-                      <Ionicons name="snow-outline" size={20} color={theme.accent} />
-                      <Text style={[styles.actionButtonText, { color: theme.text }]}>
-                        Streak Freeze Test 4.1 (1-Day Gap)
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.actionButton, { backgroundColor: isDark ? '#424242' : '#e3f2fd' }]}
-                      onPress={() => {
-                        // Streak Freeze Test 4.2 - 2 day gap
-                        setSelectedScenario('freeze4.2');
-                        Alert.alert(
-                          'Streak Freeze Test 4.2',
-                          'This will simulate 14 days of activity with XP=1800, plus a 2-day gap (missing yesterday and day before).',
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { 
-                              text: 'Run Test', 
-                              onPress: () => handleStreakFreezeTest('4.2')
-                            }
-                          ]
-                        );
-                      }}
-                    >
-                      <Ionicons name="snow-outline" size={20} color="#2196F3" />
-                      <Text style={[styles.actionButtonText, { color: theme.text }]}>
-                        Streak Freeze Test 4.2 (2-Day Gap)
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-                
-                <TouchableOpacity 
-                  style={[styles.resetButtonStyle, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
-                  onPress={handleReset}
-                >
-                  <Ionicons name="refresh" size={20} color="#F44336" />
-                  <Text style={[styles.resetButtonText, { color: '#F44336' }]}>
-                    Reset Simulation Data
-                      </Text>
-                </TouchableOpacity>
-              </View>
+              {renderBobStats()}
               
-              {/* Simulated Dates Card (if any) */}
+              <SimulationActions
+                onShowSingleDaySimulation={handleShowSingleDaySimulation}
+                onQuickSimulation={handleQuickSimulation}
+                onSimulate7Days={() => {
+                  setSelectedScenario('7day');
+                  setShowBatchConfigModal(true);
+                }}
+                onSimulate3Days={() => {
+                  setSelectedScenario('3day');
+                  setShowBatchConfigModal(true);
+                }}
+                onStreakFreezeTest={handleStreakFreezeTest}
+                onReset={handleReset}
+                lastConfig={lastConfig}
+                lastSimulatedDate={lastSimulatedDate}
+                lastBatchEndDate={lastBatchEndDate}
+                consecutiveDaysCount={consecutiveDaysCount}
+                scenarioId={scenarioInstructions?.id}
+              />
+              
               {simulatedDates.length > 0 && (
-                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-                  <View style={styles.cardHeader}>
-                    <Ionicons name="checkmark-circle" size={24} color={theme.accent} />
-                    <Text style={[styles.cardTitle, { color: theme.text }]}>
-                      Simulated Dates
-                    </Text>
-                  </View>
-                  
-                  <ScrollView style={styles.datesContainer}>
-                    {simulatedDates.slice(0, 10).map((dateStr, index) => (
-                      <View key={index} style={styles.dateItem}>
-                        <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
-                        <Text style={[styles.dateText, { color: theme.text }]}>
-                          {new Date(dateStr).toLocaleDateString(undefined, {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </Text>
-                  </View>
-                ))}
-                    
-                    {simulatedDates.length > 10 && (
-                      <Text style={[styles.moreDatesText, { color: theme.textSecondary }]}>
-                        +{simulatedDates.length - 10} more dates simulated
-                      </Text>
-                    )}
-              </ScrollView>
-            </View>
+                <SimulatedDatesCard dates={simulatedDates} />
               )}
             </>
           )}
-      </ScrollView>
+        </ScrollView>
       ) : null}
       
       {/* Authentication Modal */}
@@ -2128,86 +1748,7 @@ const styles = StyleSheet.create({
   resetButton: {
     padding: 8,
   },
-  card: {
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  instructionsText: {
-    padding: 16,
-    paddingTop: 8,
-    lineHeight: 20,
-    fontSize: 14,
-  },
-  stepsContainer: {
-    padding: 16,
-    paddingTop: 0,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  stepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  stepNumberText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  stepText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    paddingBottom: 8,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 4,
-  },
   progressBarContainer: {
-    padding: 16,
-    paddingTop: 8,
-  },
-  progressLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  progressBarBg: {
     height: 8,
     borderRadius: 4,
     overflow: 'hidden',
@@ -2215,171 +1756,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-  },
-  progressText: {
-    fontSize: 12,
-    textAlign: 'right',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 16,
-    marginBottom: 8,
-    padding: 14,
-    borderRadius: 8,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  resetButtonStyle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 16,
-    marginTop: 8,
-    padding: 14,
-    borderRadius: 8,
-  },
-  resetButtonText: {
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 14,
-  },
-  loadingSubText: {
-    marginTop: 8,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  datesContainer: {
-    maxHeight: 200,
-    padding: 16,
-  },
-  dateItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  dateText: {
-    marginLeft: 8,
-    fontSize: 14,
-  },
-  moreDatesText: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  statsCard: {
-    marginTop: 16,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 8,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    padding: 16,
-  },
-  statsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  scenarioCard: {
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    padding: 16,
-  },
-  scenarioCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
-    paddingBottom: 12,
-  },
-  scenarioCardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-    flex: 1,
-  },
-  scenarioSetupContainer: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  scenarioSetupLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  scenarioSetupText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  verificationLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  verificationItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-    paddingHorizontal: 4,
-  },
-  verificationText: {
-    fontSize: 14,
-    lineHeight: 20,
-    flex: 1,
-  },
-  scenarioFooter: {
-    marginTop: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    paddingBottom: 8,
-  },
-  scenarioFooterText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  noticeCard: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  noticeIcon: {
-    marginRight: 12,
-  },
-  noticeText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  }
 });
 
 export default BobSimulatorScreen; 
