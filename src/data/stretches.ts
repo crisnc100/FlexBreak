@@ -712,9 +712,9 @@ const stretches: Stretch[] = [
     premium: false,
     tags: ["Upper Back & Chest", "Shoulders & Arms"],
     level: "intermediate",
-    image: markAsVideo(require('../../assets/stretchData/id47_eagle_arms_office/image.mp4')),
+    image: markAsVideo(require('../../assets/stretchData/id47_eagle_arms_office/image.mov')),
     hasDemo: true,
-    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id47_eagle_arms_office/video.mp4' },
+    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id47_eagle_arms_office/video.mov' },
     demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id47_eagle_arms_office/audio.mp3' },
   },
   {

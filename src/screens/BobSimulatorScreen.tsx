@@ -171,6 +171,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   // Activity log
   const [activityLog, setActivityLog] = useState<string[]>([]);
   
+  // Add new state variables after the existing loading state variables
+  const [showScenarioOptions, setShowScenarioOptions] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   
   // Initialize Bob's progress when authenticated
   useEffect(() => {
@@ -491,22 +494,44 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     }
   };
   
-  // Handle simulation for a single day - MINIMAL VERSION
+  // Update the showDateModal handler to automatically use yesterday
+  const handleShowSingleDaySimulation = () => {
+    logWithTimestamp('Single day simulation requested');
+    
+    // Instead of showing the date modal, automatically use yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    
+    logWithTimestamp(`Using yesterday (${yesterday.toLocaleDateString()}) as default date`);
+    
+    // Set the selected date and show config modal directly
+    setSelectedDate(yesterday);
+    
+    // Wait a moment before showing the config modal
+    setTimeout(() => {
+      setShowConfigModal(true);
+    }, 100);
+  };
+
+  // Handle simulation for a single day - SIMPLIFIED VERSION
   const handleSingleDaySimulation = async (config: StretchConfig, simulationDate?: Date): Promise<void> => {
     const simulationStartTime = Date.now();
-    logWithTimestamp('Starting MINIMAL handleSingleDaySimulation');
+    logWithTimestamp('Starting SIMPLIFIED handleSingleDaySimulation');
     logWithTimestamp(`Config: ${JSON.stringify(config)}`);
     
     // Use either the passed date or the selected date from state
-    const dateToSimulate = simulationDate || selectedDate;
-    logWithTimestamp(`Date to simulate: ${dateToSimulate?.toLocaleDateString() || 'NONE'}`);
-    
+    // If neither is available, use yesterday
+    let dateToSimulate = simulationDate || selectedDate;
     if (!dateToSimulate) {
-      logWithTimestamp('Error: No date selected for simulation');
-      Alert.alert('Error', 'No date selected for simulation');
-      setIsLoading(false);
-      return Promise.reject(new Error('No date selected'));
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      dateToSimulate = yesterday;
+      logWithTimestamp(`No date selected, using yesterday: ${dateToSimulate.toLocaleDateString()}`);
     }
+    
+    logWithTimestamp(`Date to simulate: ${dateToSimulate.toLocaleDateString()}`);
     
     // Emergency abort timeout
     const safetyTimeoutId = setTimeout(() => {
@@ -517,8 +542,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     }, 20000);
     
     try {
-      // Simplified approach that follows the batch simulation pattern
-      logWithTimestamp('Starting minimal simulation approach');
+      // Simplified approach
+      logWithTimestamp('Starting simplified simulation approach');
       
       // First get initial progress for comparison
       logWithTimestamp('Getting initial user progress');
@@ -535,21 +560,44 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         initialProgress = { totalXP: 0, statistics: { currentStreak: 0 } };
       }
       
-      // Patch date for simulation
+      // Patch date for simulation - using a shorter patch method similar to batch
       logWithTimestamp('Patching date for simulation');
-      const patchResult = patchDateForSimulation(dateToSimulate);
-      if (!patchResult) {
+      try {
+        // Simple patch approach
+        const originalDate = Date;
+        
+        // @ts-ignore
+        global.OriginalDate = originalDate;
+        
+        // @ts-ignore
+        global.Date = class extends originalDate {
+          constructor() {
+            if (arguments.length === 0) {
+              super(dateToSimulate.getTime());
+            } else {
+              // @ts-ignore
+              super(...arguments);
+            }
+          }
+        };
+        
+        // @ts-ignore
+        global.Date.now = () => dateToSimulate.getTime();
+        
+        logWithTimestamp('Date patched successfully using simplified approach');
+      } catch (error) {
+        logWithTimestamp(`Error in simplified date patching: ${error}`);
         throw new Error('Failed to patch date for simulation');
       }
       
       // Create basic routine object
       const routine = {
-        id: `minimal-stretch-${Date.now()}`,
+        id: `simplified-stretch-${Date.now()}`,
         date: new Date().toISOString(),
         duration: config.duration.toString() as any,
         area: config.bodyArea as any,
         difficulty: config.difficulty as any,
-        stretches: ["Minimal Simulation Stretch"],
+        stretches: ["Simplified Simulation Stretch"],
         status: "completed"
       } as any;
       
@@ -562,9 +610,6 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         ]) as any;
         
         logWithTimestamp('Routine processed successfully');
-        
-        // Don't process challenges - skip this step which may be causing the freeze
-        logWithTimestamp('Skipping detailed challenge processing to prevent freezing');
       } catch (error) {
         logWithTimestamp(`Error processing routine: ${error}`);
         // Continue despite error
@@ -603,7 +648,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         logWithTimestamp(`Error refreshing stats: ${error}`);
       });
       
-      // Create minimal simulation result
+      // Create simplified simulation result
       const simulationResult: SimulationResult = {
         date: dateStr,
         bodyArea: config.bodyArea,
@@ -624,22 +669,34 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       setShowConfirmationModal(true);
       
       // Reset selected date
-      if (!simulationDate) {
-        setSelectedDate(null);
-      }
+      setSelectedDate(null);
       
-      logWithTimestamp(`Minimal simulation completed in ${Date.now() - simulationStartTime}ms`);
+      logWithTimestamp(`Simplified simulation completed in ${Date.now() - simulationStartTime}ms`);
       return Promise.resolve();
       
     } catch (error) {
-      logWithTimestamp(`Error in minimal simulation: ${error}`);
-      console.error('Error in minimal simulation:', error);
+      logWithTimestamp(`Error in simplified simulation: ${error}`);
+      console.error('Error in simplified simulation:', error);
       Alert.alert('Simulation Error', 'An error occurred during simulation. Please try again.');
       return Promise.reject(error);
     } finally {
       // Always clean up
       clearTimeout(safetyTimeoutId);
-      restoreOriginalDate();
+      
+      // Restore original date
+      try {
+        // @ts-ignore
+        if (global.OriginalDate) {
+          // @ts-ignore
+          global.Date = global.OriginalDate;
+          // @ts-ignore
+          global.OriginalDate = undefined;
+          logWithTimestamp('Original Date restored');
+        }
+      } catch (error) {
+        logWithTimestamp(`Error restoring Date: ${error}`);
+      }
+      
       setIsLoading(false);
       logWithTimestamp('Simulation cleanup completed');
     }
@@ -1001,6 +1058,329 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       return Promise.reject(error);
     } finally {
       logWithTimestamp('Setting isLoading to false in batch finally');
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle 3-day simulation
+  const handle3DaySimulation = async (config: StretchConfig): Promise<void> => {
+    const batchStartTime = Date.now();
+    logWithTimestamp('Starting handle3DaySimulation');
+    logWithTimestamp(`3-day config: ${JSON.stringify(config)}`);
+    
+    try {
+      // Calculate date range - 3 days before today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() - 1); // yesterday
+      
+      // Start date is 3 days before end date
+      const startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 2);
+      
+      logWithTimestamp(`3-day simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+      
+      // Get initial state for comparison
+      logWithTimestamp('Getting initial user progress for 3-day simulation');
+      const initialProgress = await Promise.race([
+        storageService.getUserProgress(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timed out getting initial progress')), 5000)
+        )
+      ]) as any;
+      
+      const initialXP = initialProgress.totalXP || 0;
+      logWithTimestamp(`Initial XP before 3-day batch: ${initialXP}`);
+      
+      let totalXpEarned = 0;
+      let allCompletedChallenges: any[] = [];
+      let allCompletedAchievements: any[] = [];
+      const batchDates: string[] = [];
+      
+      // Simulate each day in the range
+      let currentDate = new Date(startDate);
+      let dayCount = 0;
+      const totalDays = 3;
+      
+      while (currentDate <= endDate) {
+        dayCount++;
+        logWithTimestamp(`Processing day ${dayCount} of ${totalDays}: ${currentDate.toLocaleDateString()}`);
+        
+        // Restore the original date between iterations
+        restoreOriginalDate();
+        
+        try {
+          // Patch date for simulation
+          patchDateForSimulation(currentDate);
+          
+          // Create routine for this day
+          const routine = {
+            id: `3day-stretch-${Date.now()}-${currentDate.getTime()}`,
+            date: new Date().toISOString(),
+            duration: config.duration.toString() as any,
+            area: config.bodyArea as any,
+            difficulty: config.difficulty as any,
+            stretches: ["3-Day Simulation Stretch"],
+            status: "completed"
+          } as any;
+        
+          // Process the routine
+          logWithTimestamp(`Processing 3-day routine for ${currentDate.toLocaleDateString()}`);
+          const result = await Promise.race([
+            gamificationManager.processCompletedRoutine(routine),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Routine processing timeout')), 10000)
+            )
+          ]) as any;
+          
+          // Claim any completed challenges
+          if (result.completedChallenges && result.completedChallenges.length > 0) {
+            for (const challenge of result.completedChallenges) {
+              try {
+                await Promise.race([
+                  gamificationManager.claimChallenge(challenge.id),
+                  new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Challenge claim timeout')), 5000)
+                  )
+                ]);
+                
+                allCompletedChallenges.push(challenge);
+              } catch (error) {
+                logWithTimestamp(`Error claiming challenge: ${error}`);
+              }
+            }
+          }
+          
+          // Add date to batch
+          batchDates.push(currentDate.toISOString());
+          
+        } catch (error) {
+          logWithTimestamp(`Error processing day ${dayCount}: ${error}`);
+          addLog(`⚠️ Error on day ${dayCount}: ${currentDate.toLocaleDateString()}`);
+        } finally {
+          // Always restore date before moving to next day
+          restoreOriginalDate();
+          
+          // Move to next day
+          currentDate = new Date(currentDate);
+          currentDate.setDate(currentDate.getDate() + 1);
+          
+          // Add a small delay between days
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
+      // Restore the original Date
+      restoreOriginalDate();
+      
+      // Update simulated dates
+      setSimulatedDates(prev => [...prev, ...batchDates]);
+      
+      // Refresh stats
+      await Promise.race([
+        refreshBobStats(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Stats refresh timeout')), 10000)
+        )
+      ]);
+      
+      // Get final progress
+      const finalProgress = await Promise.race([
+        storageService.getUserProgress(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Final progress timeout')), 5000)
+        )
+      ]) as any;
+      
+      // Calculate total XP earned
+      totalXpEarned = finalProgress.totalXP - initialXP;
+      
+      // Prepare simulation result
+      const simulationResult: SimulationResult = {
+        date: batchDates[0], // Use first date for reference
+        bodyArea: config.bodyArea,
+        difficulty: config.difficulty,
+        duration: config.duration,
+        xpEarned: totalXpEarned,
+        totalXp: finalProgress.totalXP,
+        level: finalProgress.level,
+        percentToNextLevel: stats.percentToNextLevel,
+        streakDays: finalProgress.statistics?.currentStreak || 0,
+        completedChallenges: allCompletedChallenges.map(c => ({
+          title: c.title,
+          xp: c.xp
+        })),
+        achievements: allCompletedAchievements.map(a => ({
+          title: a.title
+        })),
+        isBatchMode: true,
+        daysSimulated: batchDates.length
+      };
+      
+      // Show the confirmation modal
+      setSimulationResult(simulationResult);
+      setShowConfirmationModal(true);
+      logWithTimestamp(`3-day simulation completed successfully in ${Date.now() - batchStartTime}ms`);
+      return Promise.resolve();
+    } catch (error) {
+      logWithTimestamp(`Error in 3-day simulation: ${error}`);
+      console.error('Error in 3-day simulation:', error);
+      Alert.alert('3-Day Simulation Error', 'An error occurred during simulation. Some days may have been processed successfully.');
+      
+      // Ensure we restore the original Date object
+      restoreOriginalDate();
+      return Promise.reject(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle streak freeze tests
+  const handleStreakFreezeTest = async (testId: string): Promise<void> => {
+    logWithTimestamp(`Starting streak freeze test ${testId}`);
+    setIsLoading(true);
+    
+    try {
+      // First, reset simulation data to start fresh
+      await resetSimulationData();
+      logWithTimestamp('Reset simulation data for streak freeze test');
+      addLog(`Reset data for streak freeze test ${testId}`);
+      
+      // Set XP to 1800 to reach Level 6 (when streak freeze unlocks)
+      let progress = await storageService.getUserProgress();
+      progress.totalXP = 1800;
+      progress.level = 6; // Ensure level is set correctly
+      await storageService.saveUserProgress(progress);
+      logWithTimestamp('Set XP to 1800 (Level 6) for streak freeze test');
+      addLog(`Set XP to 1800 (Level 6) for streak freeze test`);
+      
+      // Number of days to simulate a streak
+      const streakDays = 14;
+      
+      // Calculate the gap based on test ID
+      const gapDays = testId === '4.1' ? 1 : 2;
+      
+      // Calculate start date: streakDays + gapDays before today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // End date is gapDays+1 days ago (day before the gap)
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() - (gapDays + 1));
+      
+      // Start date is streakDays before end date
+      const startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - (streakDays - 1));
+      
+      logWithTimestamp(`Streak freeze test ${testId}: simulating from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()} with ${gapDays}-day gap`);
+      addLog(`Starting streak simulation for ${streakDays} days ending ${gapDays} days ago`);
+      
+      // Default config for all simulated days
+      const config = {
+        bodyArea: 'Full Body',
+        difficulty: 'Intermediate',
+        duration: 10
+      } as StretchConfig;
+      
+      // Simulate each day in the streak
+      let currentDate = new Date(startDate);
+      let dayCount = 0;
+      const batchDates: string[] = [];
+      
+      while (currentDate <= endDate) {
+        dayCount++;
+        logWithTimestamp(`Processing streak day ${dayCount} of ${streakDays}: ${currentDate.toLocaleDateString()}`);
+        
+        // Restore the original date between iterations
+        restoreOriginalDate();
+        
+        try {
+          // Patch date for simulation
+          patchDateForSimulation(currentDate);
+          
+          // Create routine for this day
+          const routine = {
+            id: `streak-test-${testId}-${Date.now()}-${currentDate.getTime()}`,
+            date: new Date().toISOString(),
+            duration: config.duration.toString() as any,
+            area: config.bodyArea as any,
+            difficulty: config.difficulty as any,
+            stretches: [`Streak Test ${testId} Day ${dayCount}`],
+            status: "completed"
+          } as any;
+        
+          // Process the routine
+          logWithTimestamp(`Processing streak routine for ${currentDate.toLocaleDateString()}`);
+          await Promise.race([
+            gamificationManager.processCompletedRoutine(routine),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Routine processing timeout')), 10000)
+            )
+          ]);
+          
+          // Add date to batch
+          batchDates.push(currentDate.toISOString());
+          
+        } catch (error) {
+          logWithTimestamp(`Error processing streak day ${dayCount}: ${error}`);
+          addLog(`⚠️ Error on streak day ${dayCount}: ${currentDate.toLocaleDateString()}`);
+        } finally {
+          // Always restore date before moving to next day
+          restoreOriginalDate();
+          
+          // Move to next day
+          currentDate = new Date(currentDate);
+          currentDate.setDate(currentDate.getDate() + 1);
+          
+          // Add a small delay between days
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
+      // Restore the original Date
+      restoreOriginalDate();
+      
+      // Update simulated dates
+      setSimulatedDates(prev => [...prev, ...batchDates]);
+      
+      // Refresh stats
+      await refreshBobStats();
+      
+      // Get streak status
+      const finalProgress = await storageService.getUserProgress();
+      const currentStreak = finalProgress.statistics?.currentStreak || 0;
+      
+      // Add a summary message based on the test
+      if (testId === '4.1') {
+        addLog(`✅ Streak Freeze Test 4.1 (1-day gap) completed`);
+        addLog(`Current streak is ${currentStreak}. Check if streak freeze option is available in Progress tab.`);
+        Alert.alert(
+          'Streak Freeze Test 4.1 Complete',
+          `Set up a ${streakDays}-day streak ending 2 days ago with 1-day gap (yesterday).\n\nCurrent streak: ${currentStreak}\n\nNow:\n1. Close the simulator\n2. Restart the app\n3. Go to Progress tab\n4. Check if streak freeze option is available\n5. Apply streak freeze\n6. Verify streak is restored +1 day.`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      } else { // 4.2
+        addLog(`✅ Streak Freeze Test 4.2 (2-day gap) completed`);
+        addLog(`Current streak is ${currentStreak}. Check that streak freeze option is NOT available in Progress tab.`);
+        Alert.alert(
+          'Streak Freeze Test 4.2 Complete',
+          `Set up a ${streakDays}-day streak ending 3 days ago with 2-day gap (yesterday and day before).\n\nCurrent streak: ${currentStreak}\n\nNow:\n1. Close the simulator\n2. Restart the app\n3. Go to Progress tab\n4. Verify streak freeze option is NOT available\n5. Confirm streak has reset (should be 0).`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+      
+      return Promise.resolve();
+    } catch (error) {
+      logWithTimestamp(`Error in streak freeze test ${testId}: ${error}`);
+      console.error(`Error in streak freeze test ${testId}:`, error);
+      Alert.alert('Streak Freeze Test Error', 'An error occurred during the streak freeze test setup.');
+      
+      // Ensure we restore the original Date object
+      restoreOriginalDate();
+      return Promise.reject(error);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -1436,10 +1816,10 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                 
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: theme.accent }]}
-                  onPress={() => setShowDateModal(true)}
+                  onPress={handleShowSingleDaySimulation}
                 >
                   <Ionicons name="calendar" size={20} color="#FFF" />
-                  <Text style={styles.actionButtonText}>Simulate Single Day</Text>
+                  <Text style={styles.actionButtonText}>Simulate Yesterday</Text>
                 </TouchableOpacity>
                 
                 {/* Add Quick Simulate Button if we have a last config */}
@@ -1458,7 +1838,10 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                 
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
-                  onPress={() => setShowBatchConfigModal(true)}
+                  onPress={() => {
+                    setSelectedScenario('7day');
+                    setShowBatchConfigModal(true);
+                  }}
                 >
                   <Ionicons name="calendar-outline" size={20} color={theme.accent} />
                   <Text style={[styles.actionButtonText, { color: theme.text }]}>
@@ -1466,8 +1849,74 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                     {lastBatchEndDate ? 
                       ` (${new Date(lastBatchEndDate.getTime() - 6 * 86400000).toLocaleDateString()} - ${new Date(lastBatchEndDate).toLocaleDateString()})` : 
                       ' Before Today'}
-                    </Text>
+                  </Text>
                 </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
+                  onPress={() => {
+                    setSelectedScenario('3day');
+                    setShowBatchConfigModal(true);
+                  }}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                  <Text style={[styles.actionButtonText, { color: theme.text }]}>
+                    Simulate 3 Days Before Today
+                  </Text>
+                </TouchableOpacity>
+                
+                {/* Show streak freeze test options if the scenario is 4.1 or 4.2 */}
+                {scenarioInstructions && (scenarioInstructions.id === '4.1' || scenarioInstructions.id === '4.2') && (
+                  <>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: isDark ? '#424242' : '#e3f2fd' }]}
+                      onPress={() => {
+                        // Streak Freeze Test 4.1 - 1 day gap
+                        setSelectedScenario('freeze4.1');
+                        Alert.alert(
+                          'Streak Freeze Test 4.1',
+                          'This will simulate 14 days of activity with XP=1800, plus a 1-day gap (missing yesterday).',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { 
+                              text: 'Run Test', 
+                              onPress: () => handleStreakFreezeTest('4.1')
+                            }
+                          ]
+                        );
+                      }}
+                    >
+                      <Ionicons name="snow-outline" size={20} color={theme.accent} />
+                      <Text style={[styles.actionButtonText, { color: theme.text }]}>
+                        Streak Freeze Test 4.1 (1-Day Gap)
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.actionButton, { backgroundColor: isDark ? '#424242' : '#e3f2fd' }]}
+                      onPress={() => {
+                        // Streak Freeze Test 4.2 - 2 day gap
+                        setSelectedScenario('freeze4.2');
+                        Alert.alert(
+                          'Streak Freeze Test 4.2',
+                          'This will simulate 14 days of activity with XP=1800, plus a 2-day gap (missing yesterday and day before).',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { 
+                              text: 'Run Test', 
+                              onPress: () => handleStreakFreezeTest('4.2')
+                            }
+                          ]
+                        );
+                      }}
+                    >
+                      <Ionicons name="snow-outline" size={20} color="#2196F3" />
+                      <Text style={[styles.actionButtonText, { color: theme.text }]}>
+                        Streak Freeze Test 4.2 (2-Day Gap)
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
                 
                 <TouchableOpacity 
                   style={[styles.resetButtonStyle, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}
@@ -1590,7 +2039,10 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       {/* Batch Config Modal */}
       <StretchConfigModal
         visible={showBatchConfigModal}
-        onClose={() => setShowBatchConfigModal(false)}
+        onClose={() => {
+          setShowBatchConfigModal(false);
+          setSelectedScenario(null); // Reset selected scenario when closing
+        }}
         onConfirm={(config) => {
           // Safety check - don't allow starting if already loading
           if (isLoading) {
@@ -1603,16 +2055,30 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
           
           // Add a small delay to let the UI update before starting the heavy computation
           setTimeout(() => {
-            handleBatchSimulation(config)
-              .catch((error) => {
-                console.error('Error in batch simulation:', error);
-                Alert.alert('Batch Simulation Error', 'The batch simulation process failed. Please try again with different settings or fewer days.');
-                setIsLoading(false);
-                restoreOriginalDate();
-              });
+            // Check which scenario was selected
+            if (selectedScenario === '3day') {
+              handle3DaySimulation(config)
+                .catch((error) => {
+                  console.error('Error in 3-day simulation:', error);
+                  Alert.alert('3-Day Simulation Error', 'The simulation process failed. Please try again with different settings.');
+                  setIsLoading(false);
+                  restoreOriginalDate();
+                });
+            } else {
+              // Default to 7-day simulation
+              handleBatchSimulation(config)
+                .catch((error) => {
+                  console.error('Error in batch simulation:', error);
+                  Alert.alert('Batch Simulation Error', 'The batch simulation process failed. Please try again with different settings or fewer days.');
+                  setIsLoading(false);
+                  restoreOriginalDate();
+                });
+            }
+            // Reset selected scenario after starting
+            setSelectedScenario(null);
           }, 100);
         }}
-        title="Configure 7-Day Simulation"
+        title={selectedScenario === '3day' ? "Configure 3-Day Simulation" : "Configure 7-Day Simulation"}
         isBatchMode={true}
       />
       
