@@ -4,35 +4,52 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 
 interface SimulationActionsProps {
-  onShowSingleDaySimulation: () => void;
-  onQuickSimulation: () => void;
   onSimulate7Days: () => void;
   onSimulate3Days: () => void;
   onStreakFreezeTest: (testId: string) => void;
   onReset: () => void;
-  lastConfig: any | null;
-  lastSimulatedDate: Date | null;
-  lastBatchEndDate: Date | null;
-  consecutiveDaysCount: number;
   scenarioId?: string;
+  simulate7DaysDateRange?: string;
+  simulate3DaysDateRange?: string;
 }
 
 const SimulationActions: React.FC<SimulationActionsProps> = ({
-  onShowSingleDaySimulation,
-  onQuickSimulation,
   onSimulate7Days,
   onSimulate3Days,
   onStreakFreezeTest,
   onReset,
-  lastConfig,
-  lastSimulatedDate,
-  lastBatchEndDate,
-  consecutiveDaysCount,
-  scenarioId
+  scenarioId,
+  simulate7DaysDateRange,
+  simulate3DaysDateRange
 }) => {
   const { theme, isDark } = useTheme();
   
   const isStreakFreezeScenario = scenarioId === '4.1' || scenarioId === '4.2';
+
+  // Calculate date ranges if not provided
+  const get7DayDateRange = () => {
+    if (simulate7DaysDateRange) return simulate7DaysDateRange;
+    
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    return `${sevenDaysAgo.toLocaleDateString()} - ${yesterday.toLocaleDateString()}`;
+  };
+  
+  const get3DayDateRange = () => {
+    if (simulate3DaysDateRange) return simulate3DaysDateRange;
+    
+    const today = new Date();
+    const threeDaysAgo = new Date(today);
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    return `${threeDaysAgo.toLocaleDateString()} - ${yesterday.toLocaleDateString()}`;
+  };
 
   return (
     <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
@@ -42,25 +59,6 @@ const SimulationActions: React.FC<SimulationActionsProps> = ({
       </View>
 
       <View style={styles.buttonsContainer}>
-        {/* Single Day Simulation */}
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: theme.accent }]}
-          onPress={onShowSingleDaySimulation}
-        >
-          <Ionicons name="calendar" size={20} color="white" />
-          <Text style={styles.actionButtonText}>Simulate Yesterday</Text>
-        </TouchableOpacity>
-
-        {/* Quick Simulation - only show if there's previous simulation data */}
-        {lastSimulatedDate && lastConfig && (
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.accent }]}
-            onPress={onQuickSimulation}
-          >
-            <Ionicons name="time" size={20} color="white" />
-            <Text style={styles.actionButtonText}>Quick Simulation</Text>
-          </TouchableOpacity>
-        )}
 
         {/* 7-Day Simulation */}
         <TouchableOpacity
@@ -68,7 +66,10 @@ const SimulationActions: React.FC<SimulationActionsProps> = ({
           onPress={onSimulate7Days}
         >
           <Ionicons name="calendar-outline" size={20} color="white" />
-          <Text style={styles.actionButtonText}>Simulate 7 Days</Text>
+          <View style={styles.buttonTextContainer}>
+            <Text style={styles.actionButtonText}>Simulate 7 Days</Text>
+            <Text style={styles.dateRangeText}>{get7DayDateRange()}</Text>
+          </View>
         </TouchableOpacity>
 
         {/* 3-Day Simulation */}
@@ -77,7 +78,10 @@ const SimulationActions: React.FC<SimulationActionsProps> = ({
           onPress={onSimulate3Days}
         >
           <Ionicons name="calendar-outline" size={20} color="white" />
-          <Text style={styles.actionButtonText}>Simulate 3 Days Before Today</Text>
+          <View style={styles.buttonTextContainer}>
+            <Text style={styles.actionButtonText}>Simulate 3 Days</Text>
+            <Text style={styles.dateRangeText}>{get3DayDateRange()}</Text>
+          </View>
         </TouchableOpacity>
 
         {/* Section Divider */}
@@ -150,15 +154,23 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     marginBottom: 12,
     padding: 14,
     borderRadius: 8,
   },
+  buttonTextContainer: {
+    flexDirection: 'column',
+    marginLeft: 8,
+  },
   actionButtonText: {
     color: 'white',
     fontWeight: '600',
-    marginLeft: 8,
+  },
+  dateRangeText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    marginTop: 2,
   },
   resetButtonStyle: {
     flexDirection: 'row',

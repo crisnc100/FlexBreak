@@ -103,7 +103,7 @@ const Snowflake: React.FC<{
         ],
       }}
     >
-      <Ionicons name="snow-outline" size={Math.random() * 10 + 10} color="#90CAF9" />
+      <Ionicons name="snow-outline" size={Math.random() * 10 + 10} color="#2196F3" />
     </Animated.View>
   );
 };
@@ -146,16 +146,23 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   
   // Get user progress on component mount
   useEffect(() => {
-    const loadUserProgress = async () => {
+    const loadUserProgressData = async () => {
       try {
         const progress = await storageService.getUserProgress();
+        console.log('[PROMPT DEBUG] Loaded user progress at mount:', {
+          level: progress?.level || 0,
+          isPremium: await storageService.getIsPremium()
+        });
         setUserProgress(progress);
+        
+        // Now check streak status after we have user progress
+        checkStreak();
       } catch (error) {
         console.error('Error loading user progress:', error);
       }
     };
     
-    loadUserProgress();
+    loadUserProgressData();
   }, []);
   
   // Snow sparkle effect
@@ -182,6 +189,19 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     setTimeout(() => {
       setShowSnowflakes(false);
     }, 3000);
+  };
+  
+  // Format the time since last prompt in a more readable way
+  const formatTimeSinceLastPrompt = (ms: number): string => {
+    const minutes = Math.floor(ms / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      const remainingMinutes = minutes % 60;
+      return `${hours} hour${hours !== 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
+    } else {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
   };
   
   // Check if we can show the prompt based on rate limiting
@@ -223,11 +243,13 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         (lastPromptTimeStr === null) || 
         (timeSinceLastPrompt > PROMPT_COOLDOWN_MS && promptCount < MAX_PROMPTS_PER_DAY);
       
-      console.log('Streak prompt rate limiting check:', {
-        lastPromptTime: new Date(lastPromptTime).toLocaleString(),
-        timeSinceLastPrompt: Math.floor(timeSinceLastPrompt / 1000 / 60) + ' minutes',
-        promptCount,
-        canShow
+      // Log the check results in a more user-friendly way
+      console.log('[PROMPT DEBUG] Rate limiting check:', {
+        lastShown: lastPromptTime ? new Date(lastPromptTime).toLocaleString() : 'never',
+        timeSince: formatTimeSinceLastPrompt(timeSinceLastPrompt),
+        cooldownPeriod: formatTimeSinceLastPrompt(PROMPT_COOLDOWN_MS),
+        promptsToday: `${promptCount}/${MAX_PROMPTS_PER_DAY}`,
+        canShowPrompt: canShow
       });
       
       return canShow;
@@ -268,9 +290,11 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         date: countDate
       }));
       
-      console.log('Updated streak prompt rate limits:', {
-        lastShownTime: new Date(now).toLocaleString(),
-        todayCount: promptCount
+      // Log the update with the same format as our other logs
+      console.log('[PROMPT DEBUG] Updated rate limits:', {
+        lastShown: new Date(now).toLocaleString(),
+        promptsToday: `${promptCount}/${MAX_PROMPTS_PER_DAY}`,
+        nextAllowedAt: new Date(now + PROMPT_COOLDOWN_MS).toLocaleString()
       });
     } catch (error) {
       console.error('Error updating prompt rate limits:', error);
@@ -280,8 +304,19 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   // Check if streak is broken and prompt user
   const checkStreak = async () => {
     try {
+      // Always get fresh user progress from storage
+      const freshUserProgress = await storageService.getUserProgress();
+      setUserProgress(freshUserProgress);
+      
+      // Log user level for debugging
+      console.log('[PROMPT DEBUG] User level check:', {
+        level: freshUserProgress?.level || 0,
+        requiredLevel: 6,
+        meetsRequirement: (freshUserProgress?.level || 0) >= 6
+      });
+      
       // Check if the user meets the level requirement (level 6)
-      if (!userProgress || userProgress.level < 6) {
+      if (!freshUserProgress || freshUserProgress.level < 6) {
         console.log('User does not meet level requirement for streak freezes (requires level 6)');
         return;
       }
@@ -302,14 +337,24 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         await streakManager.initializeStreak();
       }
       
-      // Get the streak status
+      // Get the streak status using the newer API
       const status = await streakManager.getStreakStatus();
       
-      // Get freeze availability
-      const freezeAvailable = await streakFreezeManager.isFreezeAvailable();
-      
-      // Get legacy streak status for backwards compatibility
+      // Get legacy streak status for backcompat/additional checks
       const legacyStatus = await streakManager.getLegacyStreakStatus();
+      
+      // Get direct freeze availability
+      const freezeCount = status.freezesAvailable;
+      
+      // Check if there's any recent activity within the past 2 weeks
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      const twoWeeksAgoStr = dateUtils.formatDateYYYYMMDD(twoWeeksAgo);
+
+      // Find most recent routine date
+      const routineDates = [...streakManager.streakCache.routineDates].sort().reverse();
+      const mostRecentRoutineDate = routineDates[0] || '';
+      const hasRecentActivity = mostRecentRoutineDate >= twoWeeksAgoStr;
       
       // Check if streak is truly broken by checking the last 3 days
       const isTrulyBroken = await streakManager.isStreakBroken();
@@ -318,30 +363,24 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       const todayActivity = status.maintainedToday;
       setHasTodayActivity(todayActivity);
       
-      console.log('Streak freeze prompt check:', {
-        uiStreak: status.currentStreak,
-        legacyStreakBroken: legacyStatus.streakBroken,
-        canSaveYesterday: legacyStatus.canSaveYesterdayStreak,
+      // Log detailed streak status for debugging
+      console.log('[PROMPT DEBUG] Streak status check results:', {
+        currentStreak: status.currentStreak,
+        freezesAvailable: freezeCount,
+        maintainedToday: status.maintainedToday,
+        canFreeze: status.canFreeze,
+        legacyCanSaveYesterday: legacyStatus.canSaveYesterdayStreak,
+        hasRecentActivity,
         isTrulyBroken,
-        todayActivity,
-        freezesAvailable: status.freezesAvailable
+        mostRecentRoutineDate
       });
-
+      
       // More detailed logs to debug today's activity issue
       console.log('[PROMPT DEBUG] Activity details:');
-      const today = dateUtils.today ? dateUtils.today() : new Date().toISOString().split('T')[0];
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const today = dateUtils.today();
+      const yesterday = dateUtils.yesterdayString();
       
-      // Check direct routine dates
-      if (streakManager.streakCache && streakManager.streakCache.routineDates) {
-        console.log('[PROMPT DEBUG] Routine dates in cache:', streakManager.streakCache.routineDates);
-        console.log(`[PROMPT DEBUG] Has today (${today}) in cache:`, streakManager.streakCache.routineDates.includes(today));
-        console.log(`[PROMPT DEBUG] Has yesterday (${yesterdayStr}) in cache:`, streakManager.streakCache.routineDates.includes(yesterdayStr));
-      }
-      
-      // Gather more conditions and explain the decision logic
+      // Get direct activity checks
       const hasRoutineToday = await streakManager.hasRoutineToday();
       const hasRoutineYesterday = await streakManager.hasRoutineYesterday();
       const hasYesterdayFreeze = await streakManager.hasFreezeYesterday();
@@ -351,49 +390,74 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         hasRoutineYesterday,
         hasYesterdayFreeze,
         currentStreak: status.currentStreak,
-        bestStreak: userProgress?.statistics?.bestStreak || 0
+        bestStreak: freshUserProgress?.statistics?.bestStreak || 0
       });
+      
+      // Determine if user had a meaningful streak (3+) or recent activity
+      const hadMeaningfulStreak = status.currentStreak >= 3 || freshUserProgress?.statistics?.bestStreak >= 3;
+      
+      // Even if not a meaningful streak, check for recent activity in the past 7 days
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const oneWeekAgoStr = dateUtils.formatDateYYYYMMDD(oneWeekAgo);
 
-      // The key check should be canSaveYesterdayStreak from legacyStatus
-      // This applies even when the UI still shows a streak number
-      // This is what StreakFreezeCard uses as the primary check
-      const hadMeaningfulStreak = status.currentStreak >= 3 || userProgress?.statistics?.bestStreak >= 3;
+      // Find if there's any activity within the last week
+      const hasRecentActivityLastWeek = routineDates.some(date => date >= oneWeekAgoStr);
+
+      // Count this as valuable if there's been recent activity
+      const hasValuableActivity = hadMeaningfulStreak || hasRecentActivityLastWeek;
+
+      console.log('[PROMPT DEBUG] Streak value assessment:', {
+        hadMeaningfulStreak,
+        hasRecentActivityLastWeek,
+        hasValuableActivity,
+        currentStreak: status.currentStreak
+      });
       
-      // Modified logic to allow saving streak even with today's activity
-      const canSave = legacyStatus.canSaveYesterdayStreak && !isTrulyBroken;
+      // Allow fixing streak if:
+      // 1. Streak is 0 but there's recent activity OR streak > 0
+      // 2. Yesterday doesn't have activity or freeze
+      // 3. Not truly broken (hasn't missed 3+ days)
+      // 4. Freezes are available
+      const canSaveFromLegacy = legacyStatus.canSaveYesterdayStreak;
       
-      // Log the reason why canSave is true or false
+      // Use matching logic from StreakFreezeCard
+      const canSave = canSaveFromLegacy && !isTrulyBroken;
+      
+      // Log the reason for the canSave decision
       console.log('[PROMPT DEBUG] Can save streak decision:', {
         canSave,
-        legacyCanSaveYesterday: legacyStatus.canSaveYesterdayStreak,
+        canSaveFromLegacy,
         notTrulyBroken: !isTrulyBroken,
-        todayBlockingFreeze: legacyStatus.canSaveYesterdayStreak && !isTrulyBroken && todayActivity
+        hasFreezesAvailable: freezeCount > 0,
+        hasValuableActivity,
+        currentStreak: status.currentStreak
       });
       
       setCanSaveStreak(canSave);
       
-      // Show prompt if:
-      // 1. There are streak freezes available
-      // 2. User had a meaningful streak (3+ days)
-      // 3. We can save yesterday's streak (missing activity yesterday)
-      // 4. Streak is not truly broken (not missing more than 2 days)
-      // 5. No activity today (can't save after starting new streak)
-      // 6. Rate limiting allows it
-      if (status.freezesAvailable > 0 && hadMeaningfulStreak && freezeAvailable && canSave) {
-        // First check if we should show the prompt based on rate limiting
+      // PROMPT WILL APPEAR WHEN ALL THESE CONDITIONS ARE MET:
+      // 1. Freezes are available (freezeCount > 0)
+      // 2. User had a valuable streak/activity (meaningful streak or recent activity)
+      // 3. Streak can be saved (only missed yesterday, not multiple days)
+      // 4. User hasn't completed a routine today
+      // 5. Rate limiting allows it (not shown too many times recently)
+      if (freezeCount > 0 && hasValuableActivity && canSave && !todayActivity) {
+        // Check rate limiting
         const shouldShow = await canShowPrompt();
         
         if (!shouldShow) {
-          console.log('Not showing streak prompt due to rate limiting');
+          console.log('[PROMPT DEBUG] Not showing due to rate limiting. Next prompt available after cooldown period.');
           return;
         }
         
-        // Show and track the prompt
+        // Update rate limits and proceed
         updatePromptRateLimits();
         
+        // Set the streak data for display
         setStreakData({
-          currentStreak: status.currentStreak,
-          freezesAvailable: status.freezesAvailable
+          currentStreak: Math.max(status.currentStreak, freshUserProgress?.statistics?.bestStreak || 0),
+          freezesAvailable: freezeCount
         });
         
         // Start rotation animation for snowflake icon
@@ -434,12 +498,12 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         }, 2 * 60 * 1000); // 2 minutes
       } else {
         console.log('Not showing streak prompt - conditions not met:', {
-          freezesAvailable: status.freezesAvailable,
+          freezeCount,
           currentStreak: status.currentStreak,
-          hadMeaningfulStreak,
+          hasValuableActivity,
           isTrulyBroken,
-          todayActivity,
-          canSave
+          canSave,
+          hasRecentActivity
         });
       }
     } catch (error) {
@@ -447,22 +511,37 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     }
   };
   
-  // Listen for streak broken events
+  // Listen for streak broken events and updates
   useEffect(() => {
-    // Check streak status on mount
-    checkStreak();
-    
     // Subscribe to streak broken event
     const handleStreakBroken = async (data: any) => {
+      console.log('[PROMPT DEBUG] STREAK_BROKEN_EVENT received:', data);
       // Simply call our centralized check function
       await checkStreak();
     };
     
+    // Also subscribe to streak updated event to catch initialization
+    const handleStreakUpdated = async (data: any) => {
+      console.log('[PROMPT DEBUG] streak_updated event received');
+      // Delayed check to ensure streak manager has fully initialized
+      setTimeout(() => {
+        checkStreak();
+      }, 1000);
+    };
+    
     streakManager.streakEvents.on(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
+    streakManager.streakEvents.on('streak_updated', handleStreakUpdated);
+    
+    // Check again after a short delay to make sure initialization is complete
+    setTimeout(() => {
+      console.log('[PROMPT DEBUG] Running delayed streak check after initialization');
+      checkStreak();
+    }, 2000);
     
     // Cleanup listener
     return () => {
       streakManager.streakEvents.off(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
+      streakManager.streakEvents.off('streak_updated', handleStreakUpdated);
     };
   }, []);
   
@@ -520,7 +599,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     // Provide haptic feedback
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
-    // Save streak with freeze using the new implementation
+    // Call the newer API to apply freeze
     console.log('[PROMPT DEBUG] Calling applyFreeze()...');
     const result = await streakManager.applyFreeze();
     console.log('[PROMPT DEBUG] applyFreeze result:', result);
@@ -528,10 +607,17 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     if (result.success) {
       console.log('Streak saved with freeze!');
       
+      // Update the streakData with the new freeze count from the result
+      setStreakData(prevData => ({
+        ...prevData,
+        freezesAvailable: result.remainingFreezes
+      }));
+      
       // Emit the streak saved event so other components can refresh
       streakManager.streakEvents.emit(streakManager.STREAK_SAVED_EVENT, {
         currentStreak: streakData.currentStreak,
-        freezeApplied: true
+        freezeApplied: true,
+        remainingFreezes: result.remainingFreezes
       });
       
       // Show success message
@@ -558,11 +644,20 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     } else {
       console.log('Failed to save streak with freeze.');
       console.log('[PROMPT DEBUG] Failure details:', {
+        errorMessage: 'Failed to apply streak freeze',
         hasTodayActivity,
         currentStreak: streakData.currentStreak,
-        freezesAvailable: streakData.freezesAvailable
+        freezesAvailable: streakData.freezesAvailable,
+        remainingFreezes: result.remainingFreezes
       });
-      handleClose();
+      
+      // Provide error feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Close the prompt after a short delay
+      setTimeout(() => {
+        handleClose();
+      }, 500);
     }
   };
   
@@ -631,6 +726,162 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     });
   };
   
+  // Force check the streak status, bypassing rate limiting
+  // This is exposed for easier testing
+  const forceCheckStreak = async () => {
+    try {
+      console.log('[PROMPT DEBUG] Forcing streak check, bypassing rate limiting');
+      
+      // Always get fresh user progress from storage
+      const freshUserProgress = await storageService.getUserProgress();
+      setUserProgress(freshUserProgress);
+      
+      // Log user level for debugging
+      console.log('[PROMPT DEBUG] Force check - User level:', {
+        level: freshUserProgress?.level || 0,
+        requiredLevel: 6,
+        meetsRequirement: (freshUserProgress?.level || 0) >= 6
+      });
+      
+      // Check if the user meets the level requirement (level 6)
+      if (!freshUserProgress || freshUserProgress.level < 6) {
+        console.log('User does not meet level requirement for streak freezes (requires level 6)');
+        return false;
+      }
+      
+      // Also check premium status
+      const directPremiumCheck = await storageService.getIsPremium();
+      if (!directPremiumCheck) {
+        console.log('User is not premium, not showing streak freeze prompt');
+        return false;
+      }
+      
+      // Initialize streak if needed
+      if (!streakManager.streakCache.initialized) {
+        await streakManager.initializeStreak();
+      }
+      
+      // Get the streak status using the newer API
+      const status = await streakManager.getStreakStatus();
+      
+      // Get legacy streak status for backcompat/additional checks
+      const legacyStatus = await streakManager.getLegacyStreakStatus();
+      
+      // Check if streak is truly broken by checking the last 3 days
+      const isTrulyBroken = await streakManager.isStreakBroken();
+      
+      // Check for recent activity
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const oneWeekAgoStr = dateUtils.formatDateYYYYMMDD(oneWeekAgo);
+
+      // Find if there's any activity within the last week
+      const routineDates = [...streakManager.streakCache.routineDates].sort().reverse();
+      const hasRecentActivityLastWeek = routineDates.some(date => date >= oneWeekAgoStr);
+
+      // Determine valuable activity
+      const hadMeaningfulStreak = status.currentStreak >= 3 || await storageService.getUserProgress().then(progress => progress?.statistics?.bestStreak >= 3);
+      const hasValuableActivity = hadMeaningfulStreak || hasRecentActivityLastWeek;
+
+      // Log the current status
+      console.log('[PROMPT DEBUG] Current streak status (force check):', {
+        currentStreak: status.currentStreak,
+        freezesAvailable: status.freezesAvailable,
+        legacyCanSaveYesterday: legacyStatus.canSaveYesterdayStreak,
+        maintainedToday: status.maintainedToday,
+        isTrulyBroken,
+        hasValuableActivity
+      });
+      
+      // Use the same logic as regular checkStreak but bypass rate limiting
+      const canSave = legacyStatus.canSaveYesterdayStreak && !isTrulyBroken;
+      
+      console.log('[PROMPT DEBUG] Streak save check for force prompt:', {
+        canSaveYesterdayStreak: legacyStatus.canSaveYesterdayStreak,
+        isTrulyBroken,
+        canSave,
+        freezesAvailable: status.freezesAvailable,
+        hasValuableActivity
+      });
+      
+      // PROMPT CONDITIONS (same as normal check but bypassing rate limiting):
+      // 1. Freezes are available (status.freezesAvailable > 0)
+      // 2. User had a valuable streak/activity (meaningful streak or recent activity)
+      // 3. Streak can be saved (only missed yesterday, not multiple days)
+      // 4. User hasn't completed a routine today
+      if (status.freezesAvailable > 0 && hasValuableActivity && canSave && !status.maintainedToday) {
+        console.log('[PROMPT DEBUG] Force showing streak prompt');
+        
+        // Set the streak data
+        setStreakData({
+          currentStreak: status.currentStreak || 3,
+          freezesAvailable: status.freezesAvailable
+        });
+        
+        // Start rotation animation for snowflake icon
+        Animated.loop(
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 8000,
+            useNativeDriver: true,
+          })
+        ).start();
+        
+        // Show the prompt
+        setCanSaveStreak(true);
+        setVisible(true);
+        
+        // Haptic feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        
+        // Animate in
+        Animated.parallel([
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true
+          })
+        ]).start();
+        
+        return true;
+      } else {
+        console.log('[PROMPT DEBUG] Not showing streak prompt even with force (conditions not met):', {
+          freezeCount: status.freezesAvailable,
+          canSave,
+          isTrulyBroken
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error in force checking streak:', error);
+      return false;
+    }
+  };
+  
+  // Reset rate limiting data (for testing only)
+  const resetRateLimiting = async () => {
+    try {
+      await AsyncStorage.removeItem(PROMPT_KEY);
+      await AsyncStorage.removeItem(PROMPT_COUNT_KEY);
+      console.log('[PROMPT DEBUG] Rate limiting data has been reset for testing');
+      return true;
+    } catch (error) {
+      console.error('Error resetting rate limiting data:', error);
+      return false;
+    }
+  };
+  
+  // Expose testing functions globally
+  if (typeof global !== 'undefined') {
+    (global as any).forceStreakFreezePrompt = forceCheckStreak;
+    (global as any).resetStreakPromptRateLimits = resetRateLimiting;
+  };
+  
   return (
     <Modal
       visible={visible && isPremium && (userProgress?.level >= 6)}
@@ -641,7 +892,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       <View 
         style={[
           styles.modalBackground, 
-          { backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)' }
+          { backgroundColor: isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)' }
         ]}
       >
         {/* Snowflake particle effect */}
@@ -668,12 +919,12 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
             ]}
           >
             <LinearGradient
-              colors={['#2196F3', '#4CAF50']}
+              colors={['#2196F3', '#1976D2']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.successGradient}
             >
-              <Ionicons name="checkmark-circle" size={40} color="#FFFFFF" />
+              <Ionicons name="shield-checkmark" size={40} color="#FFFFFF" />
               <Text style={styles.successTitle}>Streak Saved!</Text>
               <Text style={styles.successMessage}>
                 Your {streakData.currentStreak}-day streak is preserved. Complete a routine today to continue your streak!
@@ -701,18 +952,16 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               <Ionicons 
                 name="snow" 
                 size={28} 
-                color={isDark ? '#90CAF9' : theme.accent} 
+                color={'#2196F3'} 
               />
             </Animated.View>
-            <Text style={[styles.title, { color: theme.text }]}>Streak at Risk!</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Streak Freeze</Text>
           </View>
           
           <View style={styles.content}>
             <Text style={[styles.message, { color: theme.text }]}>
-              {hasTodayActivity ? (
-                "You've already completed a routine today! Your streak will start fresh."
-              ) : canSaveStreak ? (
-                `You missed yesterday's exercise and your ${streakData.currentStreak}-day streak is at risk. Use a streak freeze to preserve your progress!`
+              {canSaveStreak ? (
+                `You missed yesterday's stretch and your streak is at risk. Use a streak freeze to preserve it!`
               ) : (
                 `Your ${streakData.currentStreak}-day streak can't be saved because you've missed more than one day.`
               )}
@@ -722,20 +971,18 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               styles.freezeInfo, 
               { 
                 backgroundColor: isDark 
-                  ? 'rgba(144, 202, 249, 0.1)' 
-                  : 'rgba(144, 202, 249, 0.2)' 
+                  ? 'rgba(33, 150, 243, 0.1)' 
+                  : 'rgba(33, 150, 243, 0.1)' 
               }
             ]}>
               <Ionicons 
                 name="information-circle" 
                 size={20} 
-                color={isDark ? '#90CAF9' : theme.accent} 
+                color={'#2196F3'} 
               />
               <Text style={[styles.freezeText, { color: theme.text }]}>
                 {canSaveStreak ? (
                   `You have ${streakData.freezesAvailable} streak ${streakData.freezesAvailable === 1 ? 'freeze' : 'freezes'} available.`
-                ) : hasTodayActivity ? (
-                  "Complete today's routine to start a new streak!"
                 ) : (
                   "Streak freezes only work for 1-day gaps. Complete a routine today to start fresh!"
                 )}
@@ -748,15 +995,15 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               style={[
                 styles.button,
                 styles.denyButton,
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }
+                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F5F5F5' }
               ]}
               onPress={handleLetStreakBreak}
             >
               <Text style={[
                 styles.buttonText,
-                { color: isDark ? 'rgba(255,255,255,0.7)' : '#757575' }
+                { color: isDark ? 'rgba(255,255,255,0.8)' : '#757575' }
               ]}>
-                {hasTodayActivity ? 'Got it' : 'No thanks'}
+                Not now
               </Text>
             </TouchableOpacity>
             
@@ -765,16 +1012,18 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                 style={[
                   styles.button,
                   styles.acceptButton,
-                  { backgroundColor: theme.accent }
+                  { backgroundColor: '#2196F3' }
                 ]}
                 onPress={handleUseStreakFreeze}
               >
                 <Text style={styles.buttonText}>
-                  Use Streak Freeze
+                  Use Freeze
                 </Text>
-                <Text style={styles.buttonBadge}>
-                  {streakData.freezesAvailable}
-                </Text>
+                <View style={styles.buttonBadgeContainer}>
+                  <Text style={styles.buttonBadge}>
+                    {streakData.freezesAvailable}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
           </View>
@@ -792,68 +1041,72 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   container: {
-    width: '85%',
-    maxWidth: 340,
-    borderRadius: 16,
+    width: '90%',
+    maxWidth: 360,
+    borderRadius: 20,
     backgroundColor: '#FFF',
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 10,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-    gap: 8,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+    gap: 12,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginLeft: 8,
   },
   content: {
-    padding: 16,
+    padding: 20,
+    paddingTop: 16,
   },
   message: {
     fontSize: 16,
     marginBottom: 16,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
   },
   freezeInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   freezeText: {
-    marginLeft: 8,
-    fontSize: 14,
+    marginLeft: 10,
+    fontSize: 15,
     flex: 1,
+    lineHeight: 20,
   },
   buttonContainer: {
     flexDirection: 'row',
     padding: 16,
-    paddingTop: 0,
+    paddingTop: 8,
+    justifyContent: 'space-between',
   },
   button: {
     flex: 1,
-    padding: 12,
-    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: 6,
     flexDirection: 'row',
   },
   denyButton: {
-    backgroundColor: '#EEEEEE',
+    backgroundColor: '#F5F5F5',
   },
   acceptButton: {
     backgroundColor: '#2196F3',
@@ -863,18 +1116,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  buttonBadge: {
-    marginLeft: 4,
+  buttonBadgeContainer: {
+    marginLeft: 8,
     backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonBadge: {
     color: '#2196F3',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    textAlign: 'center',
     fontSize: 12,
     fontWeight: 'bold',
-    lineHeight: 20,
-    overflow: 'hidden',
   },
   snowflakeContainer: {
     position: 'absolute',
@@ -883,33 +1137,34 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
   successContainer: {
-    width: '85%',
-    maxWidth: 340,
-    borderRadius: 16,
+    width: '90%',
+    maxWidth: 360,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 10,
   },
   successGradient: {
-    padding: 24,
+    padding: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
   successTitle: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 16,
+    marginBottom: 12,
   },
   successMessage: {
     color: '#FFFFFF',
     fontSize: 16,
     textAlign: 'center',
-    opacity: 0.9,
+    opacity: 0.95,
+    lineHeight: 24,
   }
 });
 

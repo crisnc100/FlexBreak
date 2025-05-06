@@ -227,8 +227,17 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         return;
       }
       
-      // Get the current count of streak freezes
-      const count = await streakFreezeManager.getFreezesAvailable();
+      // Get direct confirmation from storage for current state
+      const streakStatus = await streakManager.getStreakStatus();
+      const count = streakStatus.freezesAvailable;
+      
+      // For additional validation, get the direct count from storage as well
+      const directCount = await streakFreezeManager.getFreezesAvailable();
+      
+      // If there's a mismatch, log it for debugging but use the streakManager's value
+      if (count !== directCount) {
+        console.log(`[FREEZE DEBUG] Mismatch in freeze counts: streakManager=${count}, direct=${directCount}, using streakManager value`);
+      }
       
       // Only update the UI if we're not in a recently saved state
       if (!recentlySaved) {
@@ -242,8 +251,8 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       startPulseAnimation();
       
       // Check if a streak freeze was recently applied
-      const wasUsedToday = await streakFreezeManager.wasStreakFreezeUsedForCurrentDay();
-      console.log('Was streak freeze used today?', wasUsedToday);
+      const wasUsedToday = await streakFreezeManager.wasStreakFreezeAppliedRecently();
+      console.log('Was streak freeze used recently?', wasUsedToday);
       
       // Only update recentlySaved if it's not already true
       if (!recentlySaved) {
@@ -289,6 +298,38 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       const isTrulyBroken = await streakManager.isStreakBroken();
       console.log('Streak freeze card - isTrulyBroken check:', isTrulyBroken);
       
+      // CHECK FOR SPECIFIC MULTI-DAY GAP ISSUE
+      // Get dates to check recent activity
+      const todayStr = new Date().toISOString().split('T')[0];
+      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const twoDaysAgoStr = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+      
+      // Get the sorted routine dates to check for gaps
+      const routineDates = [...streakManager.streakCache.routineDates].sort().reverse();
+      
+      // Check if today has activity
+      const hasTodayActivity = routineDates.includes(todayStr);
+      
+      // Check for activity on yesterday and two days ago
+      const hasYesterdayActivity = routineDates.includes(yesterdayStr) || 
+                                 streakManager.streakCache.freezeDates.includes(yesterdayStr);
+      const hasTwoDaysAgoActivity = routineDates.includes(twoDaysAgoStr) || 
+                                  streakManager.streakCache.freezeDates.includes(twoDaysAgoStr);
+      
+      // If there's no activity for yesterday AND no activity for two days ago, it's a multi-day gap
+      const hasMultiDayGap = !hasYesterdayActivity && !hasTwoDaysAgoActivity;
+      
+      console.log('[STREAK DEBUG] Gap check:', {
+        hasTodayActivity,
+        hasYesterdayActivity,
+        hasTwoDaysAgoActivity,
+        hasMultiDayGap,
+        today: todayStr,
+        yesterday: yesterdayStr,
+        twoDaysAgo: twoDaysAgoStr,
+        recentDates: routineDates.slice(0, 5)
+      });
+      
       // Cache the result
       streakStatusCache.current = {
         lastChecked: now,
@@ -311,7 +352,8 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         freezesAvailable: status.freezesAvailable,
         hasTodayActivity: todayActivity,
         isTrulyBroken,
-        maintainedToday: newStatus.maintainedToday
+        maintainedToday: newStatus.maintainedToday,
+        hasMultiDayGap
       });
       
       // Current logic - prevents showing apply button if user did activity today
@@ -323,24 +365,27 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       console.log('STREAK DEBUG - Applying logic:', {
         currentLogic: originalCanSave,
         newPotentialLogic: newLogicCanSave,
-        todayActivityBlockingApply: (newLogicCanSave && !originalCanSave)
+        todayActivityBlockingApply: (newLogicCanSave && !originalCanSave),
+        hasMultiDayGap
       });
       
       // Only allow saving if:
       // 1. It's technically savable based on legacy status (missed only 1 day)
       // 2. AND we haven't missed more than 2 days (not truly broken)
-      // 3. Remove the restriction that prevents applying if user has completed a routine today
+      // 3. AND we don't have a multi-day gap
+      // 4. Remove the restriction that prevents applying if user has completed a routine today
       //    This allows users to restore their previous streak even if they've already started a new one
       
       // When a streak is truly broken, we don't want to show the apply button
-      // But now we allow applying even if user has completed a routine today
+      // Also don't show if there's a multi-day gap
       setCanSaveStreak(
         status.canSaveYesterdayStreak && 
-        !isTrulyBroken
+        !isTrulyBroken &&
+        !hasMultiDayGap
       );
       
       // Start animations only if streak can actually be saved
-      if (status.streakBroken && !recentlySaved && status.canSaveYesterdayStreak && !isTrulyBroken) {
+      if (status.streakBroken && !recentlySaved && status.canSaveYesterdayStreak && !isTrulyBroken && !hasMultiDayGap) {
         startPulseAnimation();
         startRotateAnimation();
       }
@@ -501,7 +546,10 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
           // Apply quick haptic feedback on success
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           
-          // Animate the freeze counter to show it decreased - slower for smoother animation
+          // Update the freeze count immediately with the result
+          setFreezeCount(result.remainingFreezes);
+          
+          // Animate the freeze counter to show it decreased
           Animated.sequence([
             Animated.timing(freezeCounterAnim, {
               toValue: 0.5,
@@ -522,22 +570,13 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
           
           // Set state to show saved message
           setRecentlySaved(true);
-          
-          // Update the freeze count (force refresh from storage)
-          setTimeout(async () => {
-            const newCount = await streakFreezeManager.getFreezesAvailable();
-            console.log(`Updated freeze count after applying: ${newCount}/2`);
-            setFreezeCount(newCount);
-            setIsLoading(false);
-          }, 1000); // Give more time for storage to update and animations to complete
-          
+          setIsLoading(false);
         } else {
           console.error('Failed to apply streak freeze');
           console.log('Freeze apply failure details:', {
-            streakBroken: isStreakBroken,
-            hasTodayActivity,
             currentStreak,
-            freezeCount
+            freezeCount,
+            remainingFreezes: result.remainingFreezes
           });
           // Show error feedback
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

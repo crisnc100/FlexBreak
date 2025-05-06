@@ -242,6 +242,7 @@ export const getMostActiveDay = (dayOfWeekBreakdown: number[], dayNames: string[
  * @returns The current streak based on consecutive days
  */
 export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: string[]): number => {
+  // Check for empty arrays
   if ((!routineDates || routineDates.length === 0) && (!freezeDates || freezeDates.length === 0)) {
     return 0;
   }
@@ -256,15 +257,32 @@ export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: 
     return 0;
   }
   
-  // Today and yesterday check for debugging
-  const today = new Date();
-  const todayStr = dateUtils.formatDateYYYYMMDD(today);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
+  // Today and yesterday check
+  const today = dateUtils.today();
+  const yesterday = dateUtils.yesterdayString();
+  
+  // Check if we have activity today
+  const hasTodayActivity = uniqueDates.includes(today);
+  
+  // Check if we have activity yesterday
+  const hasYesterdayActivity = uniqueDates.includes(yesterday);
+  
+  console.log(`[STREAK DEBUG] Calculating streak with freezes. Activity today: ${hasTodayActivity}, yesterday: ${hasYesterdayActivity}`);
+  
+  // Check if the most recent activity is too old (more than 2 days ago)
+  const mostRecentDate = uniqueDates[0];
+  const mostRecentDateObj = new Date(mostRecentDate);
+  const todayObj = new Date(today);
+  const daysSinceLastActivity = dateUtils.daysBetween(mostRecentDateObj, todayObj);
+  
+  // If we haven't had activity in more than 2 days, streak is broken
+  if (daysSinceLastActivity > 1 && !hasTodayActivity && !hasYesterdayActivity) {
+    console.log(`[STREAK DEBUG] Streak broken - last activity was ${daysSinceLastActivity} days ago (${mostRecentDate})`);
+    return 0;
+  }
   
   // Count consecutive days starting from most recent date
-  let streakCount = 1;  // Start with 1 for the most recent date
+  let streakCount = 1; // Start with 1 for the most recent date
   let currentDate = new Date(uniqueDates[0]);
   
   // Start from the second date in our unique dates list
@@ -282,9 +300,6 @@ export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: 
     }
   }
   
-  // Also check for streak-breaking gaps from today
-  const mostRecentDate = new Date(uniqueDates[0]);
-  const daysSinceLastActivity = dateUtils.daysBetween(mostRecentDate, new Date());
-  
+  console.log(`[STREAK DEBUG] Calculated streak: ${streakCount}`);
   return streakCount;
 }; 

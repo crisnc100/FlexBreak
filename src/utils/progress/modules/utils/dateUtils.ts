@@ -189,4 +189,15 @@ export const isYesterday = (date: Date): boolean => {
  */
 export const parseDate = (dateStr: string): Date => {
   return new Date(dateStr);
-}; 
+};
+
+/**
+ * Get a date string for a specified number of days ago
+ * @param daysAgo Number of days ago
+ * @returns Date string in YYYY-MM-DD format
+ */
+export function getDaysAgoString(daysAgo: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return formatDateYYYYMMDD(date);
+} 

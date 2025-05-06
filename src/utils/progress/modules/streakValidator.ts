@@ -72,23 +72,19 @@ export const validateAndCorrectStreak = async (): Promise<{
     // 5. Determine correct streak (prefer calculated streak with freezes)
     const correctedStreak = calculatedStreak;
     
-    // 6. Determine correct freeze count - if there's a discrepancy, prefer the stored value
-    // unless it's over the maximum of 2
+    // 6. Determine correct freeze count
+    // IMPORTANT: Always respect the stored freeze count unless there's a significant issue
     const MAX_FREEZES = 2;
     let correctedFreezeCount = storedFreezeCount;
     
+    // Only cap if it exceeds the maximum
     if (correctedFreezeCount > MAX_FREEZES) {
       correctedFreezeCount = MAX_FREEZES;
       corrections.push(`Capped freeze count to maximum ${MAX_FREEZES}`);
       console.log(`[VALIDATOR DEBUG] Capping freeze count from ${storedFreezeCount} to max ${MAX_FREEZES}`);
     }
     
-    if (storedFreezeCount !== managerFreezeCount) {
-      corrections.push(`Freeze count mismatch: stored=${storedFreezeCount}, manager=${managerFreezeCount}, using ${correctedFreezeCount}`);
-      console.log(`[VALIDATOR DEBUG] Freeze count mismatch: stored=${storedFreezeCount}, manager=${managerFreezeCount}, corrected=${correctedFreezeCount}`);
-    }
-    
-    // 7. Fix any discrepancies
+    // 7. Fix any streak discrepancies
     if (storedStreak !== correctedStreak) {
       console.log(`[VALIDATOR DEBUG] Correcting stored streak: ${storedStreak} → ${correctedStreak}`);
       userProgress.statistics.currentStreak = correctedStreak;
@@ -101,28 +97,31 @@ export const validateAndCorrectStreak = async (): Promise<{
       corrections.push(`Manager streak corrected: ${managerStreak} → ${correctedStreak}`);
     }
     
-    // 8. Fix freeze count if needed
-    if (storedFreezeCount !== correctedFreezeCount) {
-      console.log(`[VALIDATOR DEBUG] Correcting stored freeze count: ${storedFreezeCount} → ${correctedFreezeCount}`);
+    // 8. Fix freeze count only if it exceeds the maximum
+    if (storedFreezeCount > MAX_FREEZES) {
+      console.log(`[VALIDATOR DEBUG] Correcting excessive stored freeze count: ${storedFreezeCount} → ${correctedFreezeCount}`);
       
       if (userProgress.rewards?.streak_freezes) {
         userProgress.rewards.streak_freezes.uses = correctedFreezeCount;
-        corrections.push(`Stored freeze count corrected: ${storedFreezeCount} → ${correctedFreezeCount}`);
+        corrections.push(`Stored freeze count capped: ${storedFreezeCount} → ${correctedFreezeCount}`);
       }
-    }
-    
-    if (managerFreezeCount !== correctedFreezeCount) {
-      console.log(`[VALIDATOR DEBUG] Correcting manager freeze count: ${managerFreezeCount} → ${correctedFreezeCount}`);
+    } else if (storedFreezeCount !== managerFreezeCount) {
+      // If manager cache doesn't match storage, update the cache to match storage
+      // This specifically prevents the manager from overriding the storage
+      console.log(`[VALIDATOR DEBUG] Syncing manager freeze count with storage: ${managerFreezeCount} → ${storedFreezeCount}`);
       
-      // Update storage with corrected count to fix manager cache
-      await streakManager.updateStorage(correctedStreak, routineDates, freezeDates, correctedFreezeCount);
-      corrections.push(`Manager freeze count corrected: ${managerFreezeCount} → ${correctedFreezeCount}`);
+      streakManager.streakCache.freezesAvailable = storedFreezeCount;
+      corrections.push(`Manager freeze count synced with storage: ${managerFreezeCount} → ${storedFreezeCount}`);
     }
     
     // 9. Save any changes
     if (corrections.length > 0) {
       console.log(`[VALIDATOR DEBUG] Saving corrections to storage: ${corrections.length} fixes applied`);
       await storageService.saveUserProgress(userProgress);
+      
+      // Ensure streak manager cache is updated
+      streakManager.streakCache.currentStreak = correctedStreak;
+      streakManager.streakCache.freezesAvailable = correctedFreezeCount;
     } else {
       console.log('[VALIDATOR DEBUG] No corrections needed, streak data is consistent');
     }
@@ -296,37 +295,58 @@ export const fixFreezeCountBasedOnUsage = async (): Promise<{
     const currentCount = userProgress.rewards?.streak_freezes?.uses || 0;
     const appliedDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
     
-    // Count freezes used this month
+    // IMPORTANT: Always respect the current usage count in storage
+    // This prevents overriding user-applied freezes that haven't been accounted for yet
+    // Only refill freezes if we've changed months or if there's a major discrepancy
+    
+    // Check if we need to do a month refill
     const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastRefillDate = userProgress.rewards?.streak_freezes?.lastRefill 
+      ? new Date(userProgress.rewards?.streak_freezes?.lastRefill)
+      : new Date(0);
     
-    const freezesUsedThisMonth = appliedDates.filter(dateStr => {
-      const freezeDate = new Date(dateStr);
-      return freezeDate >= firstDayOfMonth;
-    }).length;
+    const isNewMonth = 
+      lastRefillDate.getMonth() !== today.getMonth() || 
+      lastRefillDate.getFullYear() !== today.getFullYear();
     
-    // Calculate what the count should be based on monthly freezes used
-    const correctedCount = Math.max(0, MAX_FREEZES - freezesUsedThisMonth);
+    console.log(`[VALIDATOR DEBUG] Freeze count: current=${currentCount}, applied dates=${appliedDates.length}, is new month=${isNewMonth}`);
     
-    console.log(`[VALIDATOR DEBUG] Freeze count analysis: current=${currentCount}, applied this month=${freezesUsedThisMonth}, calculated corrected=${correctedCount}`);
-    
-    // Update if different
-    if (correctedCount !== currentCount) {
-      console.log(`[VALIDATOR DEBUG] Applying freeze count correction: ${currentCount} → ${correctedCount}`);
-      // Update using the setter function
-      await setFreezeCount(correctedCount);
+    // If it's a new month, reset to max freezes
+    if (isNewMonth) {
+      console.log(`[VALIDATOR DEBUG] New month detected - resetting freezes to ${MAX_FREEZES}`);
+      await setFreezeCount(MAX_FREEZES);
+      
+      // Update the lastRefill date
+      if (userProgress.rewards?.streak_freezes) {
+        userProgress.rewards.streak_freezes.lastRefill = today.toISOString();
+        await storageService.saveUserProgress(userProgress);
+      }
       
       return {
         success: true,
         originalCount: currentCount,
-        correctedCount
+        correctedCount: MAX_FREEZES
       };
     }
     
+    // Not a new month - only correct if there's a major discrepancy
+    // specifically if currentCount > MAX_FREEZES
+    if (currentCount > MAX_FREEZES) {
+      console.log(`[VALIDATOR DEBUG] Freeze count exceeds maximum (${currentCount} > ${MAX_FREEZES}), capping to ${MAX_FREEZES}`);
+      await setFreezeCount(MAX_FREEZES);
+      return {
+        success: true,
+        originalCount: currentCount,
+        correctedCount: MAX_FREEZES
+      };
+    }
+    
+    // Otherwise, respect the current count
+    console.log(`[VALIDATOR DEBUG] Current freeze count (${currentCount}) is valid, no correction needed`);
     return {
       success: true,
       originalCount: currentCount,
-      correctedCount: currentCount // No change needed
+      correctedCount: currentCount
     };
   } catch (error) {
     console.error('[VALIDATOR ERROR] Error fixing freeze count:', error);

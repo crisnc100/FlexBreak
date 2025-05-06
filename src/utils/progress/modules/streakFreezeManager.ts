@@ -263,27 +263,40 @@ export const refillFreezes = async (): Promise<boolean> => {
     const isDifferentMonth = lastRefillMonth !== currentMonth || lastRefillYear !== currentYear;
     const needsRefill = isDifferentMonth && currentFreezes < MAX_FREEZES;
     
-    if (needsRefill) {
+    if (needsRefill || currentFreezes === 0) {  // Added condition to refill if freezes are 0
       console.log(`[FREEZE DEBUG] Refilling freezes: ${currentFreezes} → ${MAX_FREEZES} for month ${currentMonth + 1}/${currentYear}`);
       
-      // Use simpleStreakManager to refill freezes with version checking
-      const result = await simpleStreakManager.refillFreezes();
-      
-      if (result) {
-        // Update the lastRefill date in UserProgress
-        const updatedUserProgress = await storageService.getUserProgress();
-        
-        if (updatedUserProgress.rewards[STREAK_FREEZE_REWARD_ID]) {
-          updatedUserProgress.rewards[STREAK_FREEZE_REWARD_ID].lastRefill = today.toISOString();
-          
-          // Save with version check
-          await saveUserProgressWithVersionCheck(updatedUserProgress, 'streak_freeze_refill');
-          console.log(`[FREEZE DEBUG] Updated lastRefill date to ${today.toISOString()}`);
-        }
-        
-        console.log(`[FREEZE DEBUG] Successfully refilled streak freezes to ${MAX_FREEZES} for ${currentMonth + 1}/${currentYear}`);
-        return true;
+      // Set value directly in UserProgress first
+      if (userProgress.rewards[STREAK_FREEZE_REWARD_ID]) {
+        userProgress.rewards[STREAK_FREEZE_REWARD_ID].uses = MAX_FREEZES;
+        userProgress.rewards[STREAK_FREEZE_REWARD_ID].lastRefill = today.toISOString();
+      } else {
+        // Create the reward if it doesn't exist
+        userProgress.rewards[STREAK_FREEZE_REWARD_ID] = {
+          id: STREAK_FREEZE_REWARD_ID,
+          title: "Streak Freezes",
+          description: "Freeze your streak to protect it when you miss a day",
+          icon: "snow",
+          unlocked: true,
+          levelRequired: 6,
+          type: "consumable",
+          uses: MAX_FREEZES,
+          appliedDates: [],
+          lastRefill: today.toISOString()
+        };
       }
+      
+      // Save to storage first
+      await storageService.saveUserProgress(userProgress);
+      
+      // Then update the cache
+      simpleStreakManager.streakCache.freezesAvailable = MAX_FREEZES;
+      
+      // Use simpleStreakManager to refill freezes as a backup
+      await simpleStreakManager.refillFreezes();
+      
+      console.log(`[FREEZE DEBUG] Successfully refilled streak freezes to ${MAX_FREEZES} for ${currentMonth + 1}/${currentYear}`);
+      return true;
     } else {
       if (currentFreezes >= MAX_FREEZES) {
         console.log(`[FREEZE DEBUG] Streak freezes already at maximum: ${currentFreezes}/${MAX_FREEZES}`);

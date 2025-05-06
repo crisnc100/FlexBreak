@@ -112,7 +112,7 @@ const StretchConfigModal = ({
               <Ionicons name="fitness-outline" size={24} color={theme.accent} />
               <Text style={[styles.instructions, { color: theme.textSecondary }]}>
                 {isBatchMode 
-                  ? 'Configure the stretches for a 7-day simulation. This will simulate one stretch per day with these settings.'
+                  ? 'Configure the stretches for a simulation. This will simulate one stretch per day with these settings.'
                   : 'Configure the stretch routine parameters for this simulation. Select "Random" for any option to have the system choose for you.'}
               </Text>
             </View>
@@ -331,7 +331,7 @@ const StretchConfigModal = ({
               onPress={handleSubmit}
             >
               <Text style={styles.confirmButtonText}>
-                {isBatchMode ? 'Start 7-Day Simulation' : 'Confirm'}
+                {isBatchMode ? 'Start Simulation' : 'Confirm'}
               </Text>
             </TouchableOpacity>
           </View>

@@ -107,9 +107,10 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   
   // Add new state variables for improved simulation
   const [lastBatchEndDate, setLastBatchEndDate] = useState<Date | null>(null);
-  const [lastConfig, setLastConfig] = useState<StretchConfig | null>(null);
-  const [lastSimulatedDate, setLastSimulatedDate] = useState<Date | null>(null);
   const [consecutiveDaysCount, setConsecutiveDaysCount] = useState<number>(0);
+  const [batchSimulationDateRange, setBatchSimulationDateRange] = useState<string>('');
+  const [simulate7DaysDateRange, setSimulate7DaysDateRange] = useState<string>('');
+  const [simulate3DaysDateRange, setSimulate3DaysDateRange] = useState<string>('');
   
   // Check if we have authentication from testing flow stored in AsyncStorage
   useEffect(() => {
@@ -200,7 +201,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   useEffect(() => {
     if (isAuthenticated && !isInitialized) {
       logWithTimestamp('Authentication confirmed, initializing Bob');
-      initializeBob();
+    initializeBob();
     }
   }, [isAuthenticated, isInitialized]);
   
@@ -358,25 +359,25 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       restoreOriginalDate();
       
       // Store the original date
-      const originalDate = Date;
-      const targetTime = targetDate.getTime();
+    const originalDate = Date;
+    const targetTime = targetDate.getTime();
       logWithTimestamp(`Target time: ${targetTime}`);
-      
+    
       // @ts-ignore - hack for simulation
       global.OriginalDate = originalDate;
       logWithTimestamp('Original Date stored in global.OriginalDate');
-      
+    
       // Override the Date constructor
       // @ts-ignore - hack for simulation
-      global.Date = class extends originalDate {
+    global.Date = class extends originalDate {
         constructor() {
           if (arguments.length === 0) {
-            super(targetTime);
+          super(targetTime);
             // Only log occasionally to avoid flooding
             if (Math.random() < 0.01) {
               logWithTimestamp(`New Date() created (sampled log): ${super.toString()}`);
             }
-          } else {
+        } else {
             // @ts-ignore - we need to pass through arguments
             super(...arguments);
           }
@@ -467,9 +468,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     try {
       // Get the latest progress
       logWithTimestamp('Fetching latest user progress');
-      const progress = await storageService.getUserProgress();
-      setBobProgress(progress);
-      
+    const progress = await storageService.getUserProgress();
+    setBobProgress(progress);
+    
       // Get latest routines
       logWithTimestamp('Fetching all routines');
       const fetchStartTime = Date.now();
@@ -478,18 +479,18 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
       // Calculate level info
       logWithTimestamp('Calculating level info');
-      const levelInfo = await gamificationManager.getUserLevelInfo();
-      
+    const levelInfo = await gamificationManager.getUserLevelInfo();
+    
       // Update state with level and streak info
       logWithTimestamp('Setting stats from progress data');
-      setStats({
-        level: levelInfo.level,
-        totalXP: levelInfo.totalXP,
-        xpToNextLevel: levelInfo.xpToNextLevel || 0,
-        percentToNextLevel: levelInfo.percentToNextLevel,
-        currentStreak: progress.statistics?.currentStreak || 0
-      });
-      
+    setStats({
+      level: levelInfo.level,
+      totalXP: levelInfo.totalXP,
+      xpToNextLevel: levelInfo.xpToNextLevel || 0,
+      percentToNextLevel: levelInfo.percentToNextLevel,
+      currentStreak: progress.statistics?.currentStreak || 0
+    });
+    
       // Calculate today's routines
       const todayRoutines = routines.filter(r => {
         const routineDate = new Date(r.date);
@@ -507,7 +508,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       // Challenges and achievements stats would be added here if those APIs existed
       
       logWithTimestamp(`refreshBobStats completed in ${Date.now() - startTime}ms`);
-      return progress;
+    return progress;
     } catch (error) {
       logWithTimestamp(`Error in refreshBobStats: ${error}`);
       console.error('Error refreshing Bob stats:', error);
@@ -515,58 +516,135 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     }
   };
   
-  // Update the showDateModal handler to automatically use yesterday
-  const handleShowSingleDaySimulation = () => {
-    logWithTimestamp('Single day simulation requested');
-    
-    // Instead of showing the date modal, automatically use yesterday
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    
-    logWithTimestamp(`Using yesterday (${yesterday.toLocaleDateString()}) as default date`);
-    
-    // Set the selected date and show config modal directly
-    setSelectedDate(yesterday);
-    
-    // Wait a moment before showing the config modal
-    setTimeout(() => {
-      setShowConfigModal(true);
-    }, 100);
-  };
+  // Calculate and update the date ranges when needed
+  useEffect(() => {
+    updateDateRanges();
+  }, [lastBatchEndDate, consecutiveDaysCount]);
 
-  // Handle simulation for a single day - SIMPLIFIED VERSION
-  const handleSingleDaySimulation = async (config: StretchConfig, simulationDate?: Date): Promise<void> => {
-    const simulationStartTime = Date.now();
-    logWithTimestamp('Starting SIMPLIFIED handleSingleDaySimulation');
-    logWithTimestamp(`Config: ${JSON.stringify(config)}`);
+  // Function to update date ranges for display in buttons
+  const updateDateRanges = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    // Use either the passed date or the selected date from state
-    // If neither is available, use yesterday
-    let dateToSimulate = simulationDate || selectedDate;
-    if (!dateToSimulate) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-      dateToSimulate = yesterday;
-      logWithTimestamp(`No date selected, using yesterday: ${dateToSimulate.toLocaleDateString()}`);
+    let start7Day: Date;
+    let end7Day: Date;
+    let start3Day: Date;
+    let end3Day: Date;
+    
+    // Calculate dates for 7-day simulation
+    if (lastBatchEndDate && consecutiveDaysCount > 0) {
+      end7Day = new Date(lastBatchEndDate);
+      end7Day.setDate(end7Day.getDate() - 1);
+      
+      start7Day = new Date(end7Day);
+      start7Day.setDate(start7Day.getDate() - 6);
+    } else {
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      start7Day = sevenDaysAgo;
+      end7Day = new Date(today);
+      end7Day.setDate(end7Day.getDate() - 1);
     }
     
-    logWithTimestamp(`Date to simulate: ${dateToSimulate.toLocaleDateString()}`);
+    // Calculate dates for 3-day simulation
+    if (lastBatchEndDate && consecutiveDaysCount > 0) {
+      end3Day = new Date(lastBatchEndDate);
+      end3Day.setDate(end3Day.getDate() - 1);
+      
+      start3Day = new Date(end3Day);
+      start3Day.setDate(start3Day.getDate() - 2);
+    } else {
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      
+      start3Day = threeDaysAgo;
+      end3Day = new Date(today);
+      end3Day.setDate(end3Day.getDate() - 1);
+    }
     
-    // Emergency abort timeout
-    const safetyTimeoutId = setTimeout(() => {
-      logWithTimestamp('SAFETY TIMEOUT: Simulation taking too long, forcing cleanup');
-      restoreOriginalDate();
-      setIsLoading(false);
-      Alert.alert('Simulation Error', 'The simulation was taking too long and was automatically cancelled.');
-    }, 20000);
+    setSimulate7DaysDateRange(`${start7Day.toLocaleDateString()} - ${end7Day.toLocaleDateString()}`);
+    setSimulate3DaysDateRange(`${start3Day.toLocaleDateString()} - ${end3Day.toLocaleDateString()}`);
+  };
+
+  // Handle simulation actions
+  const onSimulate7Days = () => {
+    // Calculate the date range for simulation
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let startDate: Date;
+    let endDate: Date;
+    
+    // Calculate dates based on consecutive days and last batch end date
+    if (lastBatchEndDate && consecutiveDaysCount > 0) {
+      // Step 1: Set the end date to the day before the last end date
+      endDate = new Date(lastBatchEndDate);
+      endDate.setDate(endDate.getDate() - 1);
+      
+      // Step 2: Calculate start date by going back 6 more days (for 7 total)
+      startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 6);
+    } else {
+      // First time batch simulation - use 7 days before today
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      startDate = sevenDaysAgo;
+      endDate = new Date(today);
+      endDate.setDate(endDate.getDate() - 1); // End at yesterday
+    }
+    
+    const dateRange = `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
+    setBatchSimulationDateRange(dateRange);
+    setSelectedScenario('7day');
+    setShowBatchConfigModal(true);
+  };
+
+  const onSimulate3Days = () => {
+    // Calculate the date range for simulation
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let startDate: Date;
+    let endDate: Date;
+    
+    // Calculate dates based on consecutive days and last batch end date
+    if (lastBatchEndDate && consecutiveDaysCount > 0) {
+      // Step 1: Set the end date to the day before the last end date
+      endDate = new Date(lastBatchEndDate);
+      endDate.setDate(endDate.getDate() - 1);
+      
+      // Step 2: Calculate start date by going back 2 more days (for 3 total)
+      startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 2);
+    } else {
+      // First time simulation - use 3 days before today
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      
+      startDate = threeDaysAgo;
+      endDate = new Date(today);
+      endDate.setDate(endDate.getDate() - 1); // End at yesterday
+    }
+    
+    const dateRange = `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
+    setBatchSimulationDateRange(dateRange);
+    setSelectedScenario('3day');
+    setShowBatchConfigModal(true);
+  };
+  
+  // Handle batch simulation for 7 consecutive days
+  const handleBatchSimulation = async (config: StretchConfig): Promise<void> => {
+    const batchStartTime = Date.now();
+    setIsLoading(true);
+    
+    // Log that we're starting batch simulation
+    logWithTimestamp('Starting batch simulation');
+    logWithTimestamp(`Config: ${JSON.stringify(config)}`);
     
     try {
-      // Simplified approach
-      logWithTimestamp('Starting simplified simulation approach');
-      
-      // First get initial progress for comparison
+      // First get user progress for comparison
       logWithTimestamp('Getting initial user progress');
       let initialProgress;
       try {
@@ -581,504 +659,203 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         initialProgress = { totalXP: 0, statistics: { currentStreak: 0 } };
       }
       
-      // Patch date for simulation - using a shorter patch method similar to batch
-      logWithTimestamp('Patching date for simulation');
-      try {
-        // Simple patch approach
-        const originalDate = Date;
+      // Set up batch simulation
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Calculate the date range to simulate
+      let startDate: Date;
+      let endDate: Date;
+      
+      // Calculate dates based on consecutive days and last batch end date
+      if (lastBatchEndDate && consecutiveDaysCount > 0) {
+        logWithTimestamp(`Continuing from previous batch. Last end date: ${lastBatchEndDate.toLocaleDateString()}, consecutive days: ${consecutiveDaysCount}`);
         
-        // @ts-ignore
-        global.OriginalDate = originalDate;
+        // Step 1: Set the end date to the day before the last end date
+        endDate = new Date(lastBatchEndDate);
+        endDate.setDate(endDate.getDate() - 1);
         
-        // @ts-ignore
-        global.Date = class extends originalDate {
-          constructor() {
-            if (arguments.length === 0) {
-              super(dateToSimulate.getTime());
-            } else {
-              // @ts-ignore
-              super(...arguments);
-            }
-          }
-        };
+        // Step 2: Calculate start date by going back 6 more days (for 7 total)
+        startDate = new Date(endDate);
+        startDate.setDate(startDate.getDate() - 6);
         
-        // @ts-ignore
-        global.Date.now = () => dateToSimulate.getTime();
+        logWithTimestamp(`Continuing batch simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+      } else {
+        // First time batch simulation - use 7 days before today
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
-        logWithTimestamp('Date patched successfully using simplified approach');
-      } catch (error) {
-        logWithTimestamp(`Error in simplified date patching: ${error}`);
-        throw new Error('Failed to patch date for simulation');
+        startDate = sevenDaysAgo;
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() - 1); // End at yesterday
+        
+        logWithTimestamp(`First batch simulation, date range: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
       }
       
-      // Create basic routine object
+      // Count days in the batch
+      const daysToSimulate = Math.round((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+      logWithTimestamp(`Days to simulate: ${daysToSimulate}`);
+      
+      // Array to hold dates we simulated
+      const simulatedDateStrings: string[] = [];
+      
+      // Setup progress tracking
+      let totalXpGained = 0;
+      let finalLevel = 1;
+      let finalXp = 0;
+      let finalPercentToNextLevel = 0;
+      let finalStreak = 0;
+      let completedChallenges: Array<{title: string, xp: number}> = [];
+      let achievements: Array<{title: string}> = [];
+      
+      // Simulate each day
+      for (let i = 0; i < daysToSimulate; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(currentDate.getDate() + i);
+        
+        logWithTimestamp(`Simulating day ${i+1}/${daysToSimulate}: ${currentDate.toLocaleDateString()}`);
+        
+        // Patch date
+        try {
+          const originalDate = Date;
+          
+          // @ts-ignore
+          global.OriginalDate = originalDate;
+          
+          // @ts-ignore
+          global.Date = class extends originalDate {
+            constructor() {
+              if (arguments.length === 0) {
+                super(currentDate.getTime());
+              } else {
+                // @ts-ignore
+                super(...arguments);
+              }
+            }
+          };
+          
+          // @ts-ignore
+          global.Date.now = () => currentDate.getTime();
+          
+        } catch (error) {
+          logWithTimestamp(`Error patching date: ${error}`);
+          continue; // Skip this day but try to continue batch
+        }
+        
+        // Process routine for this day
+        try {
+          // Create basic routine object
       const routine = {
-        id: `simplified-stretch-${Date.now()}`,
+            id: `batch-stretch-${Date.now()}-${i}`,
         date: new Date().toISOString(),
         duration: config.duration.toString() as any,
         area: config.bodyArea as any,
         difficulty: config.difficulty as any,
-        stretches: ["Simplified Simulation Stretch"],
+            stretches: ["Batch Simulation Stretch"],
         status: "completed"
       } as any;
       
-      // Process the routine with short timeout
-      logWithTimestamp('Processing routine with limited processing');
-      try {
-        const result = await Promise.race([
-          gamificationManager.processCompletedRoutine(routine),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Routine processing timeout')), 5000))
-        ]) as any;
+          // Process with limited timeout
+          const result = await Promise.race([
+            gamificationManager.processCompletedRoutine(routine),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Processing timeout')), 1500))
+          ]) as any;
+          
+          // Add to simulated dates
+          const dateStr = currentDate.toISOString().split('T')[0];
+          simulatedDateStrings.push(dateStr);
+          
+          logWithTimestamp(`Day ${i+1} simulation successful`);
+        } catch (error) {
+          logWithTimestamp(`Error processing day ${i+1}: ${error}`);
+          // Continue batch despite errors
+        } finally {
+          // Restore date after each day to prevent memory leaks
+          try {
+            // @ts-ignore
+            if (global.OriginalDate) {
+              // @ts-ignore
+              global.Date = global.OriginalDate;
+              // @ts-ignore
+              global.OriginalDate = undefined;
+            }
+          } catch (dateRestoreError) {
+            logWithTimestamp(`Error restoring date: ${dateRestoreError}`);
+          }
+        }
         
-        logWithTimestamp('Routine processed successfully');
-      } catch (error) {
-        logWithTimestamp(`Error processing routine: ${error}`);
-        // Continue despite error
+        // Brief pause between days to let system process
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
       
-      // Add the simulation date
-      const dateStr = dateToSimulate.toISOString();
-      logWithTimestamp(`Adding date to simulated dates: ${dateStr}`);
-      setSimulatedDates(prev => [...prev, dateStr]);
-      
-      // Store for quick simulation
-      logWithTimestamp('Storing config for quick simulation');
-      setLastConfig(config);
-      setLastSimulatedDate(dateToSimulate);
-      
       // Get final progress
-      logWithTimestamp('Getting final progress');
+      logWithTimestamp('Getting final progress after batch');
       let finalProgress;
       try {
         finalProgress = await Promise.race([
           storageService.getUserProgress(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Final progress timeout')), 3000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
         ]) as any;
+        
+        totalXpGained = (finalProgress.totalXP || 0) - (initialProgress.totalXP || 0);
+        finalLevel = finalProgress.level || 1;
+        finalXp = finalProgress.totalXP || 0;
+        finalPercentToNextLevel = finalProgress.percentToNextLevel || 0;
+        finalStreak = finalProgress.statistics?.currentStreak || 0;
+        
+        logWithTimestamp(`Total XP gained in batch: ${totalXpGained}`);
+        logWithTimestamp(`Final level: ${finalLevel}, Streak: ${finalStreak}`);
       } catch (error) {
         logWithTimestamp(`Error getting final progress: ${error}`);
-        finalProgress = initialProgress;
+        totalXpGained = 0;
+        finalLevel = 1;
+        finalXp = 0;
+        finalPercentToNextLevel = 0;
+        finalStreak = 0;
       }
       
-      // Calculate XP gained
-      const xpGained = (finalProgress.totalXP || 0) - (initialProgress.totalXP || 0);
-      logWithTimestamp(`XP gained: ${xpGained}`);
+      // Update state for next batch
+      setLastBatchEndDate(startDate);
+      setConsecutiveDaysCount(consecutiveDaysCount + daysToSimulate);
       
-      // Refresh stats (non-blocking)
-      logWithTimestamp('Refreshing stats (non-blocking)');
+      // Add simulated dates to state
+      setSimulatedDates(prev => [...prev, ...simulatedDateStrings]);
+      
+      // Create simulation result
+      const batchResult: SimulationResult = {
+        date: `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`,
+        bodyArea: config.bodyArea,
+        difficulty: config.difficulty,
+        duration: config.duration,
+        xpEarned: totalXpGained,
+        totalXp: finalXp,
+        level: finalLevel,
+        percentToNextLevel: finalPercentToNextLevel,
+        streakDays: finalStreak,
+        completedChallenges: completedChallenges,
+        achievements: achievements,
+        isBatchMode: true,
+        daysSimulated: daysToSimulate
+      };
+      
+      // Show confirmation
+      setSimulationResult(batchResult);
+      setShowConfirmationModal(true);
+      
+      // Refresh stats in background
       refreshBobStats().catch(error => {
         logWithTimestamp(`Error refreshing stats: ${error}`);
       });
       
-      // Create simplified simulation result
-      const simulationResult: SimulationResult = {
-        date: dateStr,
-        bodyArea: config.bodyArea,
-        difficulty: config.difficulty,
-        duration: config.duration,
-        xpEarned: xpGained,
-        totalXp: finalProgress.totalXP || 0,
-        level: finalProgress.level || 1,
-        percentToNextLevel: 0,
-        streakDays: finalProgress.statistics?.currentStreak || 0,
-        completedChallenges: [],
-        achievements: []
-      };
-      
-      // Show confirmation
-      logWithTimestamp('Showing simulation result');
-      setSimulationResult(simulationResult);
-      setShowConfirmationModal(true);
-      
-      // Reset selected date
-      setSelectedDate(null);
-      
-      logWithTimestamp(`Simplified simulation completed in ${Date.now() - simulationStartTime}ms`);
+      logWithTimestamp(`Batch simulation completed in ${Date.now() - batchStartTime}ms`);
       return Promise.resolve();
       
-    } catch (error) {
-      logWithTimestamp(`Error in simplified simulation: ${error}`);
-      console.error('Error in simplified simulation:', error);
-      Alert.alert('Simulation Error', 'An error occurred during simulation. Please try again.');
-      return Promise.reject(error);
-    } finally {
-      // Always clean up
-      clearTimeout(safetyTimeoutId);
-      
-      // Restore original date
-      try {
-        // @ts-ignore
-        if (global.OriginalDate) {
-          // @ts-ignore
-          global.Date = global.OriginalDate;
-          // @ts-ignore
-          global.OriginalDate = undefined;
-          logWithTimestamp('Original Date restored');
-        }
-      } catch (error) {
-        logWithTimestamp(`Error restoring Date: ${error}`);
-      }
-      
-      setIsLoading(false);
-      logWithTimestamp('Simulation cleanup completed');
-    }
-  };
-  
-  // Handle quick simulation of the previous day
-  const handleQuickSimulation = () => {
-    logWithTimestamp('Quick simulation button pressed');
-    
-    if (!lastSimulatedDate || !lastConfig) {
-      logWithTimestamp('No previous simulation data available for quick simulation');
-      Alert.alert('Error', 'No previous simulation data available');
-      return;
-    }
-    
-    // Safety check - don't allow starting if already loading
-    if (isLoading) {
-      logWithTimestamp('Already loading, ignoring quick simulation request');
-      return;
-    }
-    
-    // Immediately show loading state
-    logWithTimestamp('Setting loading state for quick simulation');
-    setIsLoading(true);
-    
-    // Calculate the previous day
-    const previousDay = new Date(lastSimulatedDate);
-    previousDay.setDate(previousDay.getDate() - 1);
-    logWithTimestamp(`Quick simulation target date: ${previousDay.toLocaleDateString()}`);
-    
-    // Add a small delay to let the UI update before starting the heavy computation
-    logWithTimestamp('Adding delay before starting quick simulation');
-    setTimeout(() => {
-      logWithTimestamp('Starting quick simulation after delay');
-      // Directly pass the date to the simulation function
-      handleSingleDaySimulation(lastConfig, previousDay)
-        .catch((error) => {
-          logWithTimestamp(`Error in quick simulation: ${error}`);
-          console.error('Error in quick simulation:', error);
-          Alert.alert('Simulation Error', 'The quick simulation failed. Please try a different approach.');
-          setIsLoading(false);
-          restoreOriginalDate();
-        });
-    }, 100);
-  };
-  
-  // Handle batch simulation for 7 consecutive days
-  const handleBatchSimulation = async (config: StretchConfig): Promise<void> => {
-    const batchStartTime = Date.now();
-    logWithTimestamp('Starting handleBatchSimulation');
-    logWithTimestamp(`Batch config: ${JSON.stringify(config)}`);
-    
-    // Note: We're not setting isLoading=true here anymore, because it should be set by the caller
-    // This allows the UI to update before the heavy processing starts
-    
-    try {
-      // Calculate date range based on lastBatchEndDate
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      
-      let endDate: Date;
-      let startDate: Date;
-      
-      if (!lastBatchEndDate) {
-        // First batch: use yesterday as end date
-        endDate = yesterday;
-        logWithTimestamp(`First batch simulation, end date: ${yesterday.toLocaleDateString()}`);
-      } else {
-        // Subsequent batches: use 7 days before the last end date
-        endDate = new Date(lastBatchEndDate);
-        endDate.setDate(endDate.getDate() - 1);
-        logWithTimestamp(`Subsequent batch, end date: ${endDate.toLocaleDateString()}`);
-      }
-      
-      // Start date is always 7 days before end date
-      startDate = new Date(endDate);
-      startDate.setDate(startDate.getDate() - 6);
-      
-      logWithTimestamp(`Batch simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
-      
-      // Keep track of total XP earned
-      let totalXpEarned = 0;
-      let allCompletedChallenges: any[] = [];
-      let allCompletedAchievements: any[] = [];
-      
-      // Get initial state for comparison - with timeout protection
-      logWithTimestamp('Getting initial user progress for batch simulation');
-      const initialProgressStartTime = Date.now();
-      
-      // Initial progress promise with 5 second timeout
-      const initialProgress = await Promise.race([
-        storageService.getUserProgress(),
-        new Promise((_, reject) => 
-          setTimeout(() => {
-            const errorMsg = 'Timed out getting initial progress for batch';
-            logWithTimestamp(errorMsg);
-            reject(new Error(errorMsg));
-          }, 5000)
-        )
-      ]) as any;
-      
-      const initialXP = initialProgress.totalXP || 0;
-      logWithTimestamp(`Initial XP before batch: ${initialXP}`);
-      
-      // Simulate each day in the range
-      const batchDates: string[] = [];
-      
-      // Simulate from start date to end date (inclusive)
-      let currentDate = new Date(startDate);
-      let dayCount = 0;
-      const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-      
-      while (currentDate <= endDate) {
-        dayCount++;
-        logWithTimestamp(`Processing day ${dayCount} of ${totalDays}: ${currentDate.toLocaleDateString()}`);
-        
-        // Make sure we restore the original date between iterations
-        logWithTimestamp('Restoring original Date before patching for next day');
-        restoreOriginalDate();
-        
-        try {
-          // Patch date for simulation
-          patchDateForSimulation(currentDate);
-          
-          // Create routine for this day
-          logWithTimestamp('Creating batch routine object');
-          const routine = {
-            id: `batch-stretch-${Date.now()}-${currentDate.getTime()}`,
-            date: new Date().toISOString(),
-            duration: config.duration.toString() as any,
-            area: config.bodyArea as any,
-            difficulty: config.difficulty as any,
-            stretches: ["Batch Simulation Stretch"],
-            status: "completed"
-          } as any;
-        
-          // Process the routine with shorter timeout (10 seconds)
-          logWithTimestamp(`Processing batch routine for ${currentDate.toLocaleDateString()}`);
-          const routineProcessStartTime = Date.now();
-          
-          const result = await Promise.race([
-            gamificationManager.processCompletedRoutine(routine),
-            new Promise((_, reject) => 
-              setTimeout(() => {
-                const errorMsg = `Timed out processing routine for ${currentDate.toLocaleDateString()}`;
-                logWithTimestamp(errorMsg);
-                reject(new Error(errorMsg));
-              }, 10000)
-            )
-          ]) as any;
-          
-          logWithTimestamp(`Completed batch routine processing in ${Date.now() - routineProcessStartTime}ms`);
-          
-          // Claim any completed challenges (if there are any)
-          if (result.completedChallenges && result.completedChallenges.length > 0) {
-            logWithTimestamp(`Found ${result.completedChallenges.length} completed challenges for batch day ${dayCount}`);
-            for (const challenge of result.completedChallenges) {
-              try {
-                // Claim challenge with timeout protection (5 seconds)
-                logWithTimestamp(`Claiming batch challenge: ${challenge.id} - ${challenge.title}`);
-                await Promise.race([
-                  gamificationManager.claimChallenge(challenge.id),
-                  new Promise((_, reject) =>
-                    setTimeout(() => {
-                      const errorMsg = `Timed out claiming challenge ${challenge.id}`;
-                      logWithTimestamp(errorMsg);
-                      reject(new Error(errorMsg));
-                    }, 5000)
-                  )
-                ]);
-                
-                allCompletedChallenges.push(challenge);
-                logWithTimestamp(`Successfully claimed batch challenge: ${challenge.id}`);
-              } catch (error) {
-                logWithTimestamp(`Error claiming batch challenge ${challenge.id}: ${error}`);
-                // Continue with next challenge even if this one fails
-              }
-            }
-          }
-          
-          // Add date to batch
-          batchDates.push(currentDate.toISOString());
-          
-          // Less frequent checking for additional challenges to reduce processing load
-          // Only check on days 1, 4, and 7 of the batch
-          if (dayCount === 1 || dayCount === 4 || dayCount === totalDays) {
-            logWithTimestamp(`Checking for additional batch challenges on day ${dayCount}`);
-            const additionalChallengeStartTime = Date.now();
-            
-            // Get progress with 5 second timeout
-            const progress = await Promise.race([
-              storageService.getUserProgress(),
-              new Promise((_, reject) =>
-                setTimeout(() => {
-                  const errorMsg = 'Timed out getting user progress for challenge check';
-                  logWithTimestamp(errorMsg);
-                  reject(new Error(errorMsg));
-                }, 5000)
-              )
-            ]) as any;
-            
-            // Update challenges with 5 second timeout
-            const additionalChallenges = await Promise.race([
-              challengeManager.updateUserChallenges(progress),
-              new Promise((_, reject) =>
-                setTimeout(() => {
-                  const errorMsg = 'Timed out updating user challenges';
-                  logWithTimestamp(errorMsg);
-                  reject(new Error(errorMsg));
-                }, 5000)
-              )
-            ]) as any[];
-            
-            logWithTimestamp(`Found ${additionalChallenges.length} additional batch challenges in ${Date.now() - additionalChallengeStartTime}ms`);
-            
-            if (additionalChallenges.length > 0) {
-              logWithTimestamp(`Claiming ${additionalChallenges.length} additional batch challenges`);
-              for (const challenge of additionalChallenges) {
-                try {
-                  // Claim challenge with timeout protection (5 seconds)
-                  logWithTimestamp(`Claiming additional batch challenge: ${challenge.id} - ${challenge.title}`);
-                  await Promise.race([
-                    gamificationManager.claimChallenge(challenge.id),
-                    new Promise((_, reject) =>
-                      setTimeout(() => {
-                        const errorMsg = `Timed out claiming additional challenge ${challenge.id}`;
-                        logWithTimestamp(errorMsg);
-                        reject(new Error(errorMsg));
-                      }, 5000)
-                    )
-                  ]);
-                  
-                  allCompletedChallenges.push(challenge);
-                  logWithTimestamp(`Successfully claimed additional batch challenge: ${challenge.id}`);
-                } catch (error) {
-                  logWithTimestamp(`Error claiming additional batch challenge ${challenge.id}: ${error}`);
-                  // Continue with next challenge even if this one fails
-                }
-              }
-            }
-          } else {
-            logWithTimestamp(`Skipping additional challenge check on day ${dayCount} to improve performance`);
-          }
-          
-        } catch (error) {
-          // Log the error but CONTINUE processing next days
-          logWithTimestamp(`Error processing day ${dayCount} (${currentDate.toLocaleDateString()}): ${error}`);
-          addLog(`⚠️ Error on day ${dayCount}: ${currentDate.toLocaleDateString()}`);
-        } finally {
-          // Always restore date before moving to next day
-          logWithTimestamp(`Finished processing day ${dayCount}, restoring Date before next day`);
-          restoreOriginalDate();
-          
-          // Move to next day
-          currentDate = new Date(currentDate);
-          currentDate.setDate(currentDate.getDate() + 1);
-          
-          // Add a small delay between days to let the JS engine breathe
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }
-      
-      // Make sure we restore the original Date
-      logWithTimestamp('All batch days processed, final Date restoration');
-      restoreOriginalDate();
-      
-      // Store the last batch end date for subsequent simulations
-      logWithTimestamp(`Setting last batch end date to ${startDate.toLocaleDateString()}`);
-      setLastBatchEndDate(startDate);
-      
-      // Update simulated dates
-      logWithTimestamp(`Adding ${batchDates.length} dates to simulated dates`);
-      setSimulatedDates(prev => [...prev, ...batchDates]);
-      
-      // Get final state after all simulations with timeout protection
-      logWithTimestamp('Refreshing final batch stats');
-      const refreshStartTime = Date.now();
-      
-      // Refresh stats with 10 second timeout
-      await Promise.race([
-        refreshBobStats(),
-        new Promise((_, reject) =>
-          setTimeout(() => {
-            const errorMsg = 'Timed out refreshing bob stats';
-            logWithTimestamp(errorMsg);
-            reject(new Error(errorMsg));
-          }, 10000)
-        )
-      ]);
-      
-      logWithTimestamp(`Refreshed batch stats in ${Date.now() - refreshStartTime}ms`);
-      
-      // Get final progress with 5 second timeout
-      const finalProgress = await Promise.race([
-        storageService.getUserProgress(),
-        new Promise((_, reject) =>
-          setTimeout(() => {
-            const errorMsg = 'Timed out getting final progress';
-            logWithTimestamp(errorMsg);
-            reject(new Error(errorMsg));
-          }, 5000)
-        )
-      ]) as any;
-      
-      // Calculate total XP earned
-      totalXpEarned = finalProgress.totalXP - initialXP;
-      logWithTimestamp(`Batch XP gained: ${totalXpEarned} (from ${initialXP} to ${finalProgress.totalXP})`);
-      
-      // Simplified achievement check to improve performance
-      logWithTimestamp('Checking for newly completed achievements from batch');
-      const achievements = Object.values(finalProgress.achievements || {});
-      allCompletedAchievements = achievements.filter((a: any) => 
-        a.completed && batchDates.some(dateStr => {
-          const batchDate = new Date(dateStr).toISOString().split('T')[0];
-          return a.dateCompleted === batchDate;
-        })
-      );
-      logWithTimestamp(`Found ${allCompletedAchievements.length} achievements completed during batch`);
-      
-      // Prepare simulation result for confirmation modal
-      logWithTimestamp('Preparing batch simulation result for confirmation modal');
-      const simulationResult: SimulationResult = {
-        date: batchDates[0], // Use first date for reference
-        bodyArea: config.bodyArea,
-        difficulty: config.difficulty,
-        duration: config.duration,
-        xpEarned: totalXpEarned,
-        totalXp: finalProgress.totalXP,
-        level: finalProgress.level,
-        percentToNextLevel: stats.percentToNextLevel,
-        streakDays: finalProgress.statistics?.currentStreak || 0,
-        completedChallenges: allCompletedChallenges.map(c => ({
-          title: c.title,
-          xp: c.xp
-        })),
-        achievements: allCompletedAchievements.map(a => ({
-          title: a.title
-        })),
-        isBatchMode: true,
-        daysSimulated: batchDates.length
-      };
-      
-      // Show the confirmation modal
-      logWithTimestamp('Showing batch confirmation modal');
-      setSimulationResult(simulationResult);
-      setShowConfirmationModal(true);
-      logWithTimestamp(`Batch simulation completed successfully in ${Date.now() - batchStartTime}ms`);
-      return Promise.resolve();
     } catch (error) {
       logWithTimestamp(`Error in batch simulation: ${error}`);
       console.error('Error in batch simulation:', error);
-      Alert.alert('Batch Simulation Error', 'An error occurred during batch simulation. Some days may have been processed successfully.');
-      
-      // Ensure we restore the original Date object
-      logWithTimestamp('Restoring Date object in batch error handler');
-      restoreOriginalDate();
+      Alert.alert('Simulation Error', 'An error occurred during batch simulation.');
       return Promise.reject(error);
     } finally {
-      logWithTimestamp('Setting isLoading to false in batch finally');
       setIsLoading(false);
     }
   };
@@ -1086,178 +863,229 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   // Handle 3-day simulation
   const handle3DaySimulation = async (config: StretchConfig): Promise<void> => {
     const batchStartTime = Date.now();
-    logWithTimestamp('Starting handle3DaySimulation');
-    logWithTimestamp(`3-day config: ${JSON.stringify(config)}`);
+    setIsLoading(true);
+    
+    // Log that we're starting 3-day simulation
+    logWithTimestamp('Starting 3-day simulation');
+    logWithTimestamp(`Config: ${JSON.stringify(config)}`);
     
     try {
-      // Calculate date range - 3 days before today
+      // First get user progress for comparison
+      logWithTimestamp('Getting initial user progress');
+      let initialProgress;
+      try {
+        initialProgress = await Promise.race([
+          storageService.getUserProgress(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+        ]) as any;
+        
+        logWithTimestamp(`Initial XP: ${initialProgress.totalXP || 0}`);
+      } catch (error) {
+        logWithTimestamp(`Error getting initial progress: ${error}`);
+        initialProgress = { totalXP: 0, statistics: { currentStreak: 0 } };
+      }
+      
+      // Set up batch simulation
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const endDate = new Date(today);
-      endDate.setDate(endDate.getDate() - 1); // yesterday
+      // Calculate the date range to simulate
+      let startDate: Date;
+      let endDate: Date;
       
-      // Start date is 3 days before end date
-      const startDate = new Date(endDate);
-      startDate.setDate(startDate.getDate() - 2);
-      
-      logWithTimestamp(`3-day simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
-      
-      // Get initial state for comparison
-      logWithTimestamp('Getting initial user progress for 3-day simulation');
-      const initialProgress = await Promise.race([
-        storageService.getUserProgress(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timed out getting initial progress')), 5000)
-        )
-      ]) as any;
-      
-      const initialXP = initialProgress.totalXP || 0;
-      logWithTimestamp(`Initial XP before 3-day batch: ${initialXP}`);
-      
-      let totalXpEarned = 0;
-      let allCompletedChallenges: any[] = [];
-      let allCompletedAchievements: any[] = [];
-      const batchDates: string[] = [];
-      
-      // Simulate each day in the range
-      let currentDate = new Date(startDate);
-      let dayCount = 0;
-      const totalDays = 3;
-      
-      while (currentDate <= endDate) {
-        dayCount++;
-        logWithTimestamp(`Processing day ${dayCount} of ${totalDays}: ${currentDate.toLocaleDateString()}`);
+      // Calculate dates based on consecutive days and last batch end date
+      if (lastBatchEndDate && consecutiveDaysCount > 0) {
+        logWithTimestamp(`Continuing from previous batch. Last end date: ${lastBatchEndDate.toLocaleDateString()}, consecutive days: ${consecutiveDaysCount}`);
         
-        // Restore the original date between iterations
-        restoreOriginalDate();
+        // Step 1: Set the end date to the day before the last end date
+        endDate = new Date(lastBatchEndDate);
+        endDate.setDate(endDate.getDate() - 1);
+      
+        // Step 2: Calculate start date by going back 2 more days (for 3 total)
+      startDate = new Date(endDate);
+        startDate.setDate(startDate.getDate() - 2);
         
-        try {
-          // Patch date for simulation
-          patchDateForSimulation(currentDate);
-          
-          // Create routine for this day
-          const routine = {
-            id: `3day-stretch-${Date.now()}-${currentDate.getTime()}`,
-            date: new Date().toISOString(),
-            duration: config.duration.toString() as any,
-            area: config.bodyArea as any,
-            difficulty: config.difficulty as any,
-            stretches: ["3-Day Simulation Stretch"],
-            status: "completed"
-          } as any;
+        logWithTimestamp(`Continuing 3-day simulation from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+      } else {
+        // First time simulation - use 3 days before today
+        const threeDaysAgo = new Date(today);
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
         
-          // Process the routine
-          logWithTimestamp(`Processing 3-day routine for ${currentDate.toLocaleDateString()}`);
-          const result = await Promise.race([
-            gamificationManager.processCompletedRoutine(routine),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Routine processing timeout')), 10000)
-            )
-          ]) as any;
-          
-          // Claim any completed challenges
-          if (result.completedChallenges && result.completedChallenges.length > 0) {
-            for (const challenge of result.completedChallenges) {
-              try {
-                await Promise.race([
-                  gamificationManager.claimChallenge(challenge.id),
-                  new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Challenge claim timeout')), 5000)
-                  )
-                ]);
-                
-                allCompletedChallenges.push(challenge);
-              } catch (error) {
-                logWithTimestamp(`Error claiming challenge: ${error}`);
-              }
-            }
-          }
-          
-          // Add date to batch
-          batchDates.push(currentDate.toISOString());
-          
-        } catch (error) {
-          logWithTimestamp(`Error processing day ${dayCount}: ${error}`);
-          addLog(`⚠️ Error on day ${dayCount}: ${currentDate.toLocaleDateString()}`);
-        } finally {
-          // Always restore date before moving to next day
-          restoreOriginalDate();
-          
-          // Move to next day
-          currentDate = new Date(currentDate);
-          currentDate.setDate(currentDate.getDate() + 1);
-          
-          // Add a small delay between days
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
+        startDate = threeDaysAgo;
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() - 1); // End at yesterday
+        
+        logWithTimestamp(`First 3-day simulation, date range: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
       }
       
-      // Restore the original Date
-      restoreOriginalDate();
+      // Count days in the batch
+      const daysToSimulate = Math.round((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+      logWithTimestamp(`Days to simulate: ${daysToSimulate}`);
       
-      // Update simulated dates
-      setSimulatedDates(prev => [...prev, ...batchDates]);
+      // Array to hold dates we simulated
+      const simulatedDateStrings: string[] = [];
       
-      // Refresh stats
-      await Promise.race([
-        refreshBobStats(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Stats refresh timeout')), 10000)
-        )
-      ]);
+      // Setup progress tracking
+      let totalXpGained = 0;
+      let finalLevel = 1;
+      let finalXp = 0;
+      let finalPercentToNextLevel = 0;
+      let finalStreak = 0;
+      let completedChallenges: Array<{title: string, xp: number}> = [];
+      let achievements: Array<{title: string}> = [];
+      
+      // Simulate each day
+      for (let i = 0; i < daysToSimulate; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(currentDate.getDate() + i);
+        
+        logWithTimestamp(`Simulating day ${i+1}/${daysToSimulate}: ${currentDate.toLocaleDateString()}`);
+        
+        // Patch date
+        try {
+          const originalDate = Date;
+          
+          // @ts-ignore
+          global.OriginalDate = originalDate;
+          
+          // @ts-ignore
+          global.Date = class extends originalDate {
+            constructor() {
+              if (arguments.length === 0) {
+                super(currentDate.getTime());
+              } else {
+                // @ts-ignore
+                super(...arguments);
+              }
+            }
+          };
+          
+          // @ts-ignore
+          global.Date.now = () => currentDate.getTime();
+          
+        } catch (error) {
+          logWithTimestamp(`Error patching date: ${error}`);
+          continue; // Skip this day but try to continue batch
+        }
+        
+        // Process routine for this day
+        try {
+          // Create basic routine object
+      const routine = {
+            id: `3day-stretch-${Date.now()}-${i}`,
+        date: new Date().toISOString(),
+          duration: config.duration.toString() as any,
+          area: config.bodyArea as any,
+          difficulty: config.difficulty as any,
+            stretches: ["3-Day Simulation Stretch"],
+        status: "completed"
+        } as any;
+      
+          // Process with limited timeout
+          const result = await Promise.race([
+            gamificationManager.processCompletedRoutine(routine),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Processing timeout')), 1500))
+          ]) as any;
+          
+          // Add to simulated dates
+          const dateStr = currentDate.toISOString().split('T')[0];
+          simulatedDateStrings.push(dateStr);
+          
+          logWithTimestamp(`Day ${i+1} simulation successful`);
+        } catch (error) {
+          logWithTimestamp(`Error processing day ${i+1}: ${error}`);
+          // Continue batch despite errors
+        } finally {
+          // Restore date after each day to prevent memory leaks
+          try {
+            // @ts-ignore
+            if (global.OriginalDate) {
+              // @ts-ignore
+              global.Date = global.OriginalDate;
+              // @ts-ignore
+              global.OriginalDate = undefined;
+            }
+          } catch (dateRestoreError) {
+            logWithTimestamp(`Error restoring date: ${dateRestoreError}`);
+          }
+        }
+        
+        // Brief pause between days to let system process
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
       
       // Get final progress
-      const finalProgress = await Promise.race([
-        storageService.getUserProgress(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Final progress timeout')), 5000)
-        )
-      ]) as any;
+      logWithTimestamp('Getting final progress after batch');
+      let finalProgress;
+      try {
+        finalProgress = await Promise.race([
+          storageService.getUserProgress(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+        ]) as any;
+        
+        totalXpGained = (finalProgress.totalXP || 0) - (initialProgress.totalXP || 0);
+        finalLevel = finalProgress.level || 1;
+        finalXp = finalProgress.totalXP || 0;
+        finalPercentToNextLevel = finalProgress.percentToNextLevel || 0;
+        finalStreak = finalProgress.statistics?.currentStreak || 0;
+        
+        logWithTimestamp(`Total XP gained in batch: ${totalXpGained}`);
+        logWithTimestamp(`Final level: ${finalLevel}, Streak: ${finalStreak}`);
+      } catch (error) {
+        logWithTimestamp(`Error getting final progress: ${error}`);
+        totalXpGained = 0;
+        finalLevel = 1;
+        finalXp = 0;
+        finalPercentToNextLevel = 0;
+        finalStreak = 0;
+      }
       
-      // Calculate total XP earned
-      totalXpEarned = finalProgress.totalXP - initialXP;
+      // Update state for next batch
+      setLastBatchEndDate(startDate);
+      setConsecutiveDaysCount(consecutiveDaysCount + daysToSimulate);
       
-      // Prepare simulation result
-      const simulationResult: SimulationResult = {
-        date: batchDates[0], // Use first date for reference
+      // Add simulated dates to state
+      setSimulatedDates(prev => [...prev, ...simulatedDateStrings]);
+      
+      // Create simulation result
+      const batchResult: SimulationResult = {
+        date: `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`,
         bodyArea: config.bodyArea,
         difficulty: config.difficulty,
         duration: config.duration,
-        xpEarned: totalXpEarned,
-        totalXp: finalProgress.totalXP,
-        level: finalProgress.level,
-        percentToNextLevel: stats.percentToNextLevel,
-        streakDays: finalProgress.statistics?.currentStreak || 0,
-        completedChallenges: allCompletedChallenges.map(c => ({
-          title: c.title,
-          xp: c.xp
-        })),
-        achievements: allCompletedAchievements.map(a => ({
-          title: a.title
-        })),
+        xpEarned: totalXpGained,
+        totalXp: finalXp,
+        level: finalLevel,
+        percentToNextLevel: finalPercentToNextLevel,
+        streakDays: finalStreak,
+        completedChallenges: completedChallenges,
+        achievements: achievements,
         isBatchMode: true,
-        daysSimulated: batchDates.length
+        daysSimulated: daysToSimulate
       };
       
-      // Show the confirmation modal
-      setSimulationResult(simulationResult);
+      // Show confirmation
+      setSimulationResult(batchResult);
       setShowConfirmationModal(true);
-      logWithTimestamp(`3-day simulation completed successfully in ${Date.now() - batchStartTime}ms`);
+      
+      // Refresh stats in background
+      refreshBobStats().catch(error => {
+        logWithTimestamp(`Error refreshing stats: ${error}`);
+      });
+      
+      logWithTimestamp(`3-day simulation completed in ${Date.now() - batchStartTime}ms`);
       return Promise.resolve();
+      
     } catch (error) {
       logWithTimestamp(`Error in 3-day simulation: ${error}`);
       console.error('Error in 3-day simulation:', error);
-      Alert.alert('3-Day Simulation Error', 'An error occurred during simulation. Some days may have been processed successfully.');
-      
-      // Ensure we restore the original Date object
-      restoreOriginalDate();
+      Alert.alert('Simulation Error', 'An error occurred during simulation.');
       return Promise.reject(error);
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   // Handle streak freeze tests
   const handleStreakFreezeTest = async (testId: string): Promise<void> => {
     logWithTimestamp(`Starting streak freeze test ${testId}`);
@@ -1344,7 +1172,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
           // Add date to batch
           batchDates.push(currentDate.toISOString());
           
-        } catch (error) {
+    } catch (error) {
           logWithTimestamp(`Error processing streak day ${dayCount}: ${error}`);
           addLog(`⚠️ Error on streak day ${dayCount}: ${currentDate.toLocaleDateString()}`);
         } finally {
@@ -1432,19 +1260,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     );
   };
   
-  // Render the level progress bar
-  const renderLevelProgress = () => {
-    return (
-      <View style={styles.progressBarContainer}>
-        <View 
-          style={[
-            styles.progressBarFill, 
-            { width: `${Math.min(100, Math.max(0, stats.percentToNextLevel))}%`, backgroundColor: theme.accent }
-          ]} 
-        />
-      </View>
-    );
-  };
+ 
   
   
   // Also update the renderBobStats function to include additional stats
@@ -1560,23 +1376,13 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
               {renderBobStats()}
               
               <SimulationActions
-                onShowSingleDaySimulation={handleShowSingleDaySimulation}
-                onQuickSimulation={handleQuickSimulation}
-                onSimulate7Days={() => {
-                  setSelectedScenario('7day');
-                  setShowBatchConfigModal(true);
-                }}
-                onSimulate3Days={() => {
-                  setSelectedScenario('3day');
-                  setShowBatchConfigModal(true);
-                }}
+                onSimulate7Days={onSimulate7Days}
+                onSimulate3Days={onSimulate3Days}
                 onStreakFreezeTest={handleStreakFreezeTest}
                 onReset={handleReset}
-                lastConfig={lastConfig}
-                lastSimulatedDate={lastSimulatedDate}
-                lastBatchEndDate={lastBatchEndDate}
-                consecutiveDaysCount={consecutiveDaysCount}
                 scenarioId={scenarioInstructions?.id}
+                simulate7DaysDateRange={simulate7DaysDateRange}
+                simulate3DaysDateRange={simulate3DaysDateRange}
               />
               
               {simulatedDates.length > 0 && (
@@ -1584,7 +1390,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
               )}
             </>
           )}
-        </ScrollView>
+      </ScrollView>
       ) : null}
       
       {/* Authentication Modal */}
@@ -1615,7 +1421,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
           logWithTimestamp('Adding delay before showing config modal');
           setTimeout(() => {
             logWithTimestamp('Showing config modal after delay');
-            setShowConfigModal(true);
+          setShowConfigModal(true);
           }, 100);
         }}
         simulatedDates={simulatedDates}
@@ -1639,19 +1445,6 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
           setShowConfigModal(false);
           setIsLoading(true);
           
-          // Add a small delay to let the UI update before starting the heavy computation
-          logWithTimestamp('Adding delay before starting simulation');
-          setTimeout(() => {
-            logWithTimestamp('Starting simulation after delay');
-            handleSingleDaySimulation(config, selectedDate)
-              .catch((error) => {
-                logWithTimestamp(`Error in simulation after delay: ${error}`);
-                console.error('Error in simulation:', error);
-                Alert.alert('Simulation Error', 'The simulation process failed. Please try again with different settings.');
-                setIsLoading(false);
-                restoreOriginalDate();
-              });
-          }, 100);
         }}
         title="Configure Stretch Routine"
       />
@@ -1698,7 +1491,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
             setSelectedScenario(null);
           }, 100);
         }}
-        title={selectedScenario === '3day' ? "Configure 3-Day Simulation" : "Configure 7-Day Simulation"}
+        title={selectedScenario === '3day' 
+          ? `Configure 3-Day Simulation (${batchSimulationDateRange})` 
+          : `Configure 7-Day Simulation (${batchSimulationDateRange})`}
         isBatchMode={true}
       />
       

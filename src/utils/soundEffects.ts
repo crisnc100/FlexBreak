@@ -58,7 +58,7 @@ const soundUris: Record<SoundEffect, any> = {
   levelUp: require('../../assets/sounds/levelUP.mp3'),
   click: require('../../assets/sounds/normalClick.mp3'),
   timerTick: require('../../assets/sounds/normalClick.mp3'),
-  streakFreeze: require('../../assets/sounds/streakFreeze.mp3'),
+  streakFreeze: require('../../assets/sounds/freeze_xboost.mp3'),
   xpBoost: require('../../assets/sounds/freeze_xboost.mp3'),
   intro: require('../../assets/sounds/intro2.mp3'),
   premiumUnlocked: require('../../assets/sounds/unlockedPremium.mp3'),

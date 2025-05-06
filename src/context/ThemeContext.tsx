@@ -125,7 +125,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       // Get user progress to check level and rewards
       const userProgress = await storageService.getUserProgress();
-      console.log(`Saved user progress: Level ${userProgress.level}, XP: ${userProgress.totalXP}`);
       
       // Default to false
       let hasAccess = false;
@@ -142,12 +141,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log(`Dark theme reward unlocked? ${userProgress.rewards.dark_theme.unlocked}`);
       }
       
-      console.log('Dark theme access check:', hasAccess ? 'GRANTED' : 'DENIED');
       setCanUseDarkTheme(hasAccess);
       
       // If user can't use dark theme but currently has it set, revert to light
       if (!hasAccess && themeType === 'dark') {
-        console.log('User lost dark theme access, reverting to light theme');
         await saveThemePreference('light');
         setThemeType('light');
       }
@@ -176,7 +173,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const now = Date.now();
       // Only check if it's been at least 1 second since the last check
       if (now - lastThemeCheck > 1000) {
-        console.log('Periodic theme permission check...');
         await checkDarkThemeAccess();
       }
     };
