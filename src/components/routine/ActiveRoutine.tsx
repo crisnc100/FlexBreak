@@ -19,6 +19,7 @@ import { generateRoutine } from '../../utils/generators/routineGenerator';
 import { useTheme } from '../../context/ThemeContext';
 import { enhanceRoutineWithPremiumInfo } from '../../utils/generators/premiumUtils';
 import * as soundEffects from '../../utils/soundEffects';
+import * as Haptics from 'expo-haptics';
 import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Audio } from 'expo-av';
@@ -52,6 +53,11 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string })[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDone, setIsDone] = useState(false);
+  
+  // Countdown state
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [countdownNumber, setCountdownNumber] = useState(3);
+  const countdownAnimation = useRef(new Animated.Value(1)).current;
   
   // Video and audio state
   const [isPlayingDemo, setIsPlayingDemo] = useState(false);
@@ -525,15 +531,21 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 console.log(`Setting routine with ${enhancedRoutine.length} stretches`);
                 setRoutine(enhancedRoutine);
                 
-                // Start the timer with the first stretch duration
-                console.log(`Starting timer with duration: ${enhancedRoutine[0].duration} (${typeof enhancedRoutine[0].duration})`);
-                
-                // Start the timer and ensure it's running (not paused)
-                startTimer(enhancedRoutine[0].duration);
-                
-                // Ensure the timer is not paused initially
-                if (isPaused) {
-                  resumeTimer();
+                // Initialize timer with duration but don't start it yet if countdown is showing
+                if (showCountdown) {
+                  console.log(`Initializing timer with duration: ${enhancedRoutine[0].duration} but not starting it yet (waiting for countdown)`);
+                  resetTimer(enhancedRoutine[0].duration);
+                  // Ensure timer is paused during countdown
+                  pauseTimer();
+                } else {
+                  // Start the timer and ensure it's running (not paused) if no countdown
+                  console.log(`Starting timer with duration: ${enhancedRoutine[0].duration}`);
+                  startTimer(enhancedRoutine[0].duration);
+                  
+                  // Ensure the timer is not paused initially if no countdown
+                  if (isPaused) {
+                    resumeTimer();
+                  }
                 }
               } else {
                 throw new Error('No stretches in enhanced routine');
@@ -547,11 +559,20 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 console.log(`Setting routine with ${validCustomStretches.length} stretches directly`);
                 setRoutine(validCustomStretches);
                 
-                startTimer(validCustomStretches[0].duration);
-                
-                // Ensure the timer is not paused initially
-                if (isPaused) {
-                  resumeTimer();
+                // Initialize timer with duration but don't start it yet if countdown is showing
+                if (showCountdown) {
+                  console.log(`Initializing timer with duration: ${validCustomStretches[0].duration} but not starting it yet (waiting for countdown)`);
+                  resetTimer(validCustomStretches[0].duration);
+                  // Ensure timer is paused during countdown
+                  pauseTimer();
+                } else {
+                  // Start the timer normally if no countdown
+                  startTimer(validCustomStretches[0].duration);
+                  
+                  // Ensure the timer is not paused initially if no countdown
+                  if (isPaused) {
+                    resumeTimer();
+                  }
                 }
               } else {
                 throw new Error('No valid custom stretches to show');
@@ -569,12 +590,21 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               setRoutine(enhancedRoutine);
               
               if (enhancedRoutine.length > 0) {
-                // Start the timer with the first stretch duration
-                startTimer(enhancedRoutine[0].duration);
-                
-                // Ensure the timer is not paused initially
-                if (isPaused) {
-                  resumeTimer();
+                // Initialize timer with duration but don't start it yet if countdown is showing
+                if (showCountdown) {
+                  console.log(`Initializing timer with duration: ${enhancedRoutine[0].duration} but not starting it yet (waiting for countdown)`);
+                  resetTimer(enhancedRoutine[0].duration);
+                  // Ensure timer is paused during countdown
+                  pauseTimer();
+                } else {
+                  // Start the timer normally if no countdown
+                  console.log(`Starting timer with duration: ${enhancedRoutine[0].duration}`);
+                  startTimer(enhancedRoutine[0].duration);
+                  
+                  // Ensure the timer is not paused initially if no countdown
+                  if (isPaused) {
+                    resumeTimer();
+                  }
                 }
               } else {
                 throw new Error('No stretches in enhanced routine');
@@ -584,11 +614,20 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
               // Fallback to the generated routine directly
               setRoutine(generatedRoutine);
               if (generatedRoutine.length > 0) {
-                startTimer(generatedRoutine[0].duration);
-                
-                // Ensure the timer is not paused initially
-                if (isPaused) {
-                  resumeTimer();
+                // Initialize timer with duration but don't start it yet if countdown is showing
+                if (showCountdown) {
+                  console.log(`Initializing timer with duration: ${generatedRoutine[0].duration} but not starting it yet (waiting for countdown)`);
+                  resetTimer(generatedRoutine[0].duration);
+                  // Ensure timer is paused during countdown
+                  pauseTimer();
+                } else {
+                  // Start the timer normally if no countdown
+                  startTimer(generatedRoutine[0].duration);
+                  
+                  // Ensure the timer is not paused initially if no countdown
+                  if (isPaused) {
+                    resumeTimer();
+                  }
                 }
               } else {
                 throw new Error('No stretches in generated routine');
@@ -614,7 +653,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     };
     
     initRoutine();
-  }, []); // Empty dependency array to run only once on mount
+  }, []);
   
   // Log all props on component mount
   useEffect(() => {
@@ -725,7 +764,6 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       
       isHandlingTimerStateChangeRef.current = true;
       
-      soundEffects.playClickSound();
       togglePause();
       
       // Reset the flag after a short delay
@@ -788,6 +826,101 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     );
   };
   
+  // Countdown effect
+  useEffect(() => {
+    if (showCountdown) {
+      // Pause the timer while counting down
+      pauseTimer();
+      
+      // Play initial haptic feedback and sound
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      soundEffects.playTimerTheme2Sound();
+      
+      // Start the countdown animation
+      Animated.sequence([
+        // Animate in
+        Animated.timing(countdownAnimation, {
+          toValue: 1.5,
+          duration: 200,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease)
+        }),
+        // Hold for a moment
+        Animated.timing(countdownAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease)
+        }),
+        // Animate out
+        Animated.timing(countdownAnimation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease)
+        })
+      ]).start(async () => {
+        // When animation finishes, decrement the counter or finish countdown
+        if (countdownNumber > 1) {
+          // Provide haptic feedback for each count
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          // Remove click sound
+          
+          // Reset scale and continue countdown
+          countdownAnimation.setValue(1);
+          setCountdownNumber(prev => prev - 1);
+        } else {
+          // Countdown finished
+          // Final haptic feedback - stronger to indicate start
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          // Hide countdown and resume timer
+          setShowCountdown(false);
+          resumeTimer();
+        }
+      });
+    }
+  }, [countdownNumber, showCountdown]);
+  
+  // Initialize the countdown and pause everything when component mounts
+  useEffect(() => {
+    // Make sure everything is paused on initial mount when countdown is active
+    if (showCountdown) {
+      // Forcefully pause timer
+      pauseTimer();
+      
+      // Reset the timer to prevent it from running in the background
+      if (currentStretch) {
+        resetTimer(currentStretch.duration);
+      }
+      
+      // Set isPaused state to ensure UI shows paused state
+      setIsPaused(true);
+    }
+  }, []);
+  
+  // Add useEffect to play timer tick sound for the last 3 seconds
+  useEffect(() => {
+    // Don't play tick sound during countdown or if timer is paused
+    if (showCountdown || isPaused) return;
+    
+    // Play tick sound for the last 3 seconds (3, 2, 1)
+    if (timeRemaining <= 3 && timeRemaining > 0) {
+      // Round to nearest second to avoid playing multiple times
+      const currentSecond = Math.ceil(timeRemaining);
+      
+      // Use a ref to track the last second we played a sound for
+      if (currentSecond <= 3 && currentSecond !== lastSecondPlayedRef.current) {
+        console.log(`Playing timer tick sound at ${currentSecond} seconds remaining`);
+        soundEffects.playTimerTickSound();
+        lastSecondPlayedRef.current = currentSecond;
+      }
+    } else {
+      // Reset last second played ref when not in the last 3 seconds
+      lastSecondPlayedRef.current = -1;
+    }
+  }, [timeRemaining, isPaused, showCountdown]);
+  
   // If routine is not loaded yet, show loading
   if (!routine || routine.length === 0 || !currentStretch) {
     return (
@@ -797,77 +930,132 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     );
   }
   
+  // Render countdown component
+  const renderCountdown = () => {
+    if (!showCountdown) return null;
+    
+    // Determine breathing instruction based on countdown number
+    let breathInstruction = "";
+    if (countdownNumber === 3) {
+      breathInstruction = "Take a deep breath";
+    } else if (countdownNumber === 2) {
+      breathInstruction = "Exhale slowly";
+    } else {
+      breathInstruction = "Ready";
+    }
+    
+    return (
+      <View style={styles.countdownContainer}>
+        <View style={styles.countdownInnerContainer}>
+          <Animated.View
+            style={[
+              styles.countNumberContainer,
+              {
+                backgroundColor: isDark ? theme.accent : '#4CAF50',
+                transform: [
+                  { scale: countdownAnimation },
+                  { translateY: countdownAnimation.interpolate({
+                    inputRange: [0, 1, 1.5],
+                    outputRange: [50, 0, -20]
+                  }) }
+                ],
+                opacity: countdownAnimation
+              }
+            ]}
+          >
+            <Text style={styles.countNumber}>{countdownNumber}</Text>
+          </Animated.View>
+          <Text style={[styles.getReadyText, { color: '#FFF' }]}>
+            Get Ready to Stretch!
+          </Text>
+          <Text style={styles.breathText}>
+            {breathInstruction}
+          </Text>
+          
+          {/* Skip button removed */}
+        </View>
+      </View>
+    );
+  };
+  
   return (
     <View style={{ 
       flex: 1, 
       backgroundColor: isDark ? theme.background : '#FFF'
     }}>
-      {/* Header with stretch count */}
-      <View style={[styles.header, { 
-        backgroundColor: isDark ? theme.cardBackground : '#FFF',
-        borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
-      }]}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => {
-            // Play click sound
-            soundEffects.playClickSound();
+      {!showCountdown && (
+        <>
+          {/* Header with stretch count */}
+          <View style={[styles.header, { 
+            backgroundColor: isDark ? theme.cardBackground : '#FFF',
+            borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
+          }]}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => {
+                // Play click sound
+                soundEffects.playClickSound();
+                
+                Alert.alert(
+                  '🧘‍♀️ Exit Workout?',
+                  'Are you sure you want to exit? Your progress will not be saved.',
+                  [
+                    { text: 'Keep Stretching', style: 'cancel' },
+                    { text: 'Exit Anyway', style: 'destructive', onPress: handleSaveAndExit }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="arrow-back" size={24} color={isDark ? theme.text : "#333"} />
+            </TouchableOpacity>
             
-            Alert.alert(
-              '🧘‍♀️ Exit Workout?',
-              'Are you sure you want to exit? Your progress will not be saved.',
-              [
-                { text: 'Keep Stretching', style: 'cancel' },
-                { text: 'Exit Anyway', style: 'destructive', onPress: handleSaveAndExit }
-              ]
-            );
-          }}
-        >
-          <Ionicons name="arrow-back" size={24} color={isDark ? theme.text : "#333"} />
-        </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer}>
-          <Text style={[styles.headerTitle, { color: isDark ? theme.text : '#333' }]}>
-            Current Routine
-          </Text>
-        </View>
-        
-        <Text style={[styles.progressText, { color: isDark ? theme.textSecondary : '#666' }]}>
-          {currentIndex + 1}/{routine.length}
-        </Text>
-      </View>
+            <View style={styles.headerTitleContainer}>
+              <Text style={[styles.headerTitle, { color: isDark ? theme.text : '#333' }]}>
+                Current Routine
+              </Text>
+            </View>
+            
+            <Text style={[styles.progressText, { color: isDark ? theme.textSecondary : '#666' }]}>
+              {currentIndex + 1}/{routine.length}
+            </Text>
+          </View>
+          
+          {/* Main content */}
+          <ScrollView 
+            style={{
+              flex: 1, 
+              backgroundColor: isDark ? theme.background : '#FFF'
+            }}
+            contentContainerStyle={{
+              flexGrow: 1
+            }}
+          >
+            {renderCurrentItem()}
+          </ScrollView>
+          
+          {/* Overall progress */}
+          <View style={[styles.overallProgressContainer, { 
+            backgroundColor: isDark ? theme.cardBackground : '#FFF'
+          }]}>
+            <View style={[styles.overallProgressTrack, { 
+              backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'
+            }]}>
+              <Animated.View 
+                style={[
+                  styles.overallProgressFill, 
+                  { 
+                    width: `${calculateOverallProgress() * 100}%`,
+                    backgroundColor: '#FF9800' // Keep this color for visibility in both modes
+                  }
+                ]} 
+              />
+            </View>
+          </View>
+        </>
+      )}
       
-      {/* Main content */}
-      <ScrollView 
-        style={{
-          flex: 1, 
-          backgroundColor: isDark ? theme.background : '#FFF'
-        }}
-        contentContainerStyle={{
-          flexGrow: 1
-        }}
-      >
-        {renderCurrentItem()}
-      </ScrollView>
-      
-      {/* Overall progress */}
-      <View style={[styles.overallProgressContainer, { 
-        backgroundColor: isDark ? theme.cardBackground : '#FFF'
-      }]}>
-        <View style={[styles.overallProgressTrack, { 
-          backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'
-        }]}>
-          <Animated.View 
-            style={[
-              styles.overallProgressFill, 
-              { 
-                width: `${calculateOverallProgress() * 100}%`,
-                backgroundColor: '#FF9800' // Keep this color for visibility in both modes
-              }
-            ]} 
-          />
-        </View>
-      </View>
+      {/* Countdown overlay */}
+      {renderCountdown()}
     </View>
   );
 };
@@ -1328,6 +1516,75 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 40,
     padding: 10,
+  },
+  countdownContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    zIndex: 1000,
+  },
+  countdownInnerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  countNumberContainer: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 10,
+    borderWidth: 5,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  countNumber: {
+    fontSize: 100,
+    fontWeight: 'bold',
+    color: '#FFF',
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  getReadyText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginTop: 20,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  breathText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 10,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  skipButton: {
+    padding: 10,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    alignItems: 'center',
+    marginTop: 30,
+  },
+  skipButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFF',
   },
 });
 

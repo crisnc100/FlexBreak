@@ -120,7 +120,7 @@ const stretches: Stretch[] = [
     name: "Standing Hamstring Stretch",
     description: "Stand with feet hip-width apart, bend forward, and reach towards your toes to stretch the hamstrings. Hold for 30 seconds.",
     duration: 30,
-    bilateral: false,
+    bilateral: true,
     premium: false,
     tags: ["Hips & Legs"],
     level: "intermediate",

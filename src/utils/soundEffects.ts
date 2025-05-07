@@ -2,7 +2,7 @@ import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types
-type SoundEffect = 'success' | 'failure' | 'start' | 'complete' | 'levelUp' | 'click' | 'timerTick' | 'streakFreeze' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge';
+type SoundEffect = 'success' | 'failure' | 'start' | 'complete' | 'levelUp' | 'click' | 'timerTick' | 'streakFreeze' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1';
 
 // Define the cache to store loaded sounds
 const soundCache: Record<SoundEffect, Audio.Sound | null> = {
@@ -17,7 +17,9 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   xpBoost: null,
   intro: null,
   premiumUnlocked: null,
-  redeemingChallenge: null
+  redeemingChallenge: null,
+  timerTheme2: null,
+  timerTheme1: null
 };
 
 // Add debounce tracking for sounds that are frequently played
@@ -33,7 +35,9 @@ const soundDebounceMap: Record<SoundEffect, number> = {
   xpBoost: 0,
   intro: 0,
   premiumUnlocked: 0,
-  redeemingChallenge: 0
+  redeemingChallenge: 0,
+  timerTheme2: 0,
+  timerTheme1: 0
 };
 
 // Minimum time between playing the same sound (in milliseconds)
@@ -62,7 +66,9 @@ const soundUris: Record<SoundEffect, any> = {
   xpBoost: require('../../assets/sounds/freeze_xboost.mp3'),
   intro: require('../../assets/sounds/intro2.mp3'),
   premiumUnlocked: require('../../assets/sounds/unlockedPremium.mp3'),
-  redeemingChallenge: require('../../assets/sounds/redeemingChallenge.mp3')
+  redeemingChallenge: require('../../assets/sounds/redeemingChallenge.mp3'),
+  timerTheme2: require('../../assets/sounds/timerTheme2.mp3'),
+  timerTheme1: require('../../assets/sounds/timerTheme1.mp3')
 };
 
 /**
@@ -244,9 +250,19 @@ export const playLevelUpSound = async (): Promise<void> => {
  * Play timer tick sound - for countdown timers
  */
 export const playTimerTickSound = async (): Promise<void> => {
-  await playSound('timerTick', 0.3);
+  await playSound('timerTheme1', 0.3);
 };
 
+/**
+ * Play timer theme 2 sound
+ */
+export const playTimerTheme2Sound = async (): Promise<void> => {
+  await playSound('timerTheme2', 0.3);
+};
+
+/**
+ * Play timer theme 1 sound
+ */
 /**
  * Play streak freeze sound
  */

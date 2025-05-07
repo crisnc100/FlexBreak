@@ -29,6 +29,7 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
 }) => {
   const { theme, isDark } = useTheme();
 
+  // Normal button press handler with sound
   const handlePress = (callback: () => void) => {
     try {
       soundEffects.playClickSound();
@@ -37,6 +38,16 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
       console.error('Error on button press:', error);
       // Still attempt to call the callback even if sound failed
       callback();
+    }
+  };
+  
+  // Pause button handler without sound
+  const handlePauseToggle = () => {
+    try {
+      // Call toggle pause directly without sound
+      onTogglePause();
+    } catch (error) {
+      console.error('Error toggling pause:', error);
     }
   };
 
@@ -79,10 +90,10 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
         </View>
       </TouchableOpacity>
       
-      {/* Pause/Resume Button */}
+      {/* Pause/Resume Button - No sound when clicking */}
       <TouchableOpacity 
         style={styles.centerButton} 
-        onPress={() => handlePress(onTogglePause)}
+        onPress={handlePauseToggle}
         activeOpacity={0.7}
       >
         <View style={[styles.centerButtonInner, { 

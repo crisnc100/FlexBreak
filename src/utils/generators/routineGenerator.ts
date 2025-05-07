@@ -221,10 +221,12 @@ export const generateRoutine = async (
       ...stretch,
       duration: stretchTime, // Set total duration (doubled for bilateral)
       description: stretch.bilateral 
-        ? `${stretch.description.split('Hold')[0].trim()} Hold for ${stretch.duration} seconds per side.` 
+        ? (stretch.description.startsWith('Hold') 
+            ? stretch.description  // Keep original if starts with 'Hold'
+            : `${stretch.description.split('Hold')[0].trim()} Hold for ${stretch.duration} seconds per side.`)
         : stretch.description // Keep original description for non-bilateral
     };
-    
+
     routine.push(stretchEntry);
     totalDuration += stretchTime;
   }

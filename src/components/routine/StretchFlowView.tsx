@@ -9,17 +9,21 @@ import {
   Animated,
   Platform,
   ImageSourcePropType,
-  ActivityIndicator
+  ActivityIndicator,
+  Easing
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import DemoVideoPlayer from './DemoVideoPlayer';
 import * as soundEffects from '../../utils/soundEffects';
+import * as Haptics from 'expo-haptics';
 import { Stretch, RestPeriod } from '../../types';
 import { NavigationButtons } from './utils';
 import { Video, ResizeMode as VideoResizeMode } from 'expo-av';
+import Svg, { Circle } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export interface StretchFlowViewProps {
   stretch: Stretch | RestPeriod;
@@ -191,7 +195,9 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       if (isPaused) {
         // Small delay to allow animation to complete
         setTimeout(() => {
-          onTogglePause(); // Resume timer
+          handleTogglePause(); // Resume timer
+          // Add subtle haptic feedback when resuming
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }, 400);
       }
       
@@ -214,7 +220,9 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       
       // Always pause timer when watching demo
       if (!isPaused) {
-        onTogglePause(); // Pause the timer
+        handleTogglePause(); // Pause the timer
+        // Add subtle haptic feedback when pausing
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       
       // Animate transition to demo view
@@ -302,6 +310,20 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       console.log(`Source for ${stretchObj.name}: ${typeof stretchObj.image} | isVideo: ${isVideoSource()}`);
     }
   }, [currentStretchId, isRest, isVideoSource, stretchObj]);
+  
+  // Calculate total duration based on whether the stretch is bilateral
+  const calculateTotalDuration = (stretchObj: Stretch) => {
+    if (!stretchObj) return 0;
+    // No doubling here as it's handled elsewhere
+    return stretchObj.duration;
+  };
+  
+  // Calculate per-side duration for bilateral stretches
+  const calculatePerSideDuration = (stretchObj: Stretch) => {
+    if (!stretchObj || !stretchObj.bilateral) return stretchObj?.duration || 0;
+    // For bilateral stretches, the duration is the total, so divide by 2 for per side
+    return Math.floor(stretchObj.duration / 2);
+  };
   
   // Render the appropriate image or video
   const renderStretchImage = () => {
@@ -424,51 +446,146 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     );
   };
   
-  // Render rest period
-  const renderRestPeriod = () => {
+  // Circular Timer Component
+  const CircularTimer: React.FC<{
+    progress: Animated.Value;
+    timeRemaining: number;
+    diameter?: number;
+    strokeWidth?: number;
+    color?: string;
+    backgroundColor?: string;
+    textColor?: string;
+    isDark?: boolean;
+  }> = ({
+    progress,
+    timeRemaining,
+    diameter = 100,
+    strokeWidth = 8,
+    color = '#4CAF50',
+    backgroundColor = '#E0E0E0',
+    textColor = '#333',
+    isDark = false
+  }) => {
+    const radius = (diameter - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    
+    // Animated value for seconds text
+    const [prevTime, setPrevTime] = useState(timeRemaining);
+    const textOpacity = useRef(new Animated.Value(1)).current;
+    const textScale = useRef(new Animated.Value(1)).current;
+    
+    // Format time as minutes and seconds
+    const formatTime = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      
+      if (mins > 0) {
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+      } else {
+        return `${secs}`;
+      }
+    };
+    
+    // Animate the seconds text when it changes
+    useEffect(() => {
+      if (prevTime !== timeRemaining) {
+        // Time has changed, animate the transition
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(textOpacity, {
+              toValue: 0.3,
+              duration: 100,
+              useNativeDriver: true,
+              easing: Easing.out(Easing.ease)
+            }),
+            Animated.timing(textScale, {
+              toValue: 0.85,
+              duration: 100,
+              useNativeDriver: true,
+              easing: Easing.out(Easing.ease)
+            })
+          ]),
+          Animated.parallel([
+            Animated.timing(textOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+              easing: Easing.in(Easing.ease)
+            }),
+            Animated.timing(textScale, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+              easing: Easing.in(Easing.bounce)
+            })
+          ])
+        ]).start();
+        
+        setPrevTime(timeRemaining);
+      }
+    }, [timeRemaining, prevTime, textOpacity, textScale]);
+    
+    // Determine color based on progress
+    const progressInterpolatedColor = progress.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [color, color, color] // Currently using a single color, but could transition
+    });
+    
+    // Calculate stroke dash offset based on progress with safeguards
+    const strokeDashoffset = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [circumference, 0],
+      extrapolate: 'clamp' // Prevent values outside the range
+    });
+    
     return (
-      <View style={[styles.restContainer, { backgroundColor: isDark ? theme.cardBackground : '#f5f5f5' }]}>
-        <View style={styles.restIconContainer}>
-          <Ionicons name="time-outline" size={70} color={isDark ? theme.accent : '#4CAF50'} />
-        </View>
-        <Text style={[styles.restTitle, { color: isDark ? theme.text : '#333' }]}>
-          {stretch.name || 'Rest Period'}
-        </Text>
-        <Text style={[styles.restDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
-          {stretch.description || 'Take a short break before continuing'}
-        </Text>
-        <View style={styles.timerContainer}>
-          <View style={styles.timerBarContainer}>
-            <Animated.View 
-              style={[
-                styles.progressTrack, 
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0' }
-              ]}
-            >
-              <Animated.View 
-                style={[
-                  styles.progressFill, 
-                  { 
-                    backgroundColor: isDark ? theme.accent : '#4CAF50',
-                    width: progressAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0%', '100%']
-                    })
-                  }
-                ]} 
-              />
-            </Animated.View>
-            <Text 
-              style={[styles.secondsText, { color: isDark ? theme.textSecondary : '#666' }]}
-            >
-              {formatTimeSeconds(displayedTime)}
-            </Text>
-          </View>
+      <View style={[styles.circularTimerContainer, { width: diameter, height: diameter }]}>
+        <Svg width={diameter} height={diameter}>
+          {/* Background Circle */}
+          <Circle
+            cx={diameter / 2}
+            cy={diameter / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            stroke={isDark ? 'rgba(255,255,255,0.15)' : backgroundColor}
+            fill="transparent"
+          />
+          {/* Progress Circle */}
+          <AnimatedCircle
+            cx={diameter / 2}
+            cy={diameter / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            stroke={progressInterpolatedColor}
+            fill="transparent"
+            strokeLinecap="round"
+            strokeDasharray={`${circumference}`}
+            strokeDashoffset={strokeDashoffset}
+            rotation="-90"
+            origin={`${diameter/2}, ${diameter/2}`}
+          />
+        </Svg>
+        <View style={styles.circularTimerTextContainer}>
+          <Animated.Text 
+            style={[
+              styles.circularTimerText, 
+              { 
+                color: isDark ? 'white' : textColor,
+                opacity: textOpacity,
+                transform: [{ scale: textScale }]
+              }
+            ]}
+          >
+            {formatTime(timeRemaining)}
+          </Animated.Text>
+          <Text style={[styles.circularTimerLabel, { color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }]}>
+            sec
+          </Text>
         </View>
       </View>
     );
   };
-  
+
   // Render stretch demo view
   const renderDemoView = () => {
     if (isRest || !hasDemo) return null;
@@ -500,8 +617,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           </View>
         </View>
         
-        {/* Video player section */}
-        <View style={styles.demoVideoContainer}>
+        {/* Video player section - Now takes more vertical space */}
+        <View style={styles.demoVideoWrapper}>
           {'demoVideo' in stretchObj && stretchObj.demoVideo && (
             <DemoVideoPlayer
               videoSource={stretchObj.demoVideo}
@@ -514,7 +631,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           )}
         </View>
         
-        {/* Enhanced Instructions Panel */}
+        {/* Enhanced Instructions Panel with Ready button at bottom */}
         <View style={[
           styles.demoInstructionsPanel, 
           { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }
@@ -528,9 +645,11 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           
           {/* Stretch description with formatted steps */}
           <View style={styles.instructionsContent}>
-            <Text style={[styles.instructionsText, { color: isDark ? theme.text : '#333' }]}>
-              {stretchObj.description || 'Follow along with the demonstration video.'}
-            </Text>
+            <StructuredInstructions 
+              description={stretchObj.description || 'Follow along with the demonstration video.'} 
+              isDark={isDark}
+              theme={theme}
+            />
             
             {/* Display tips if available */}
             {hasTips && (
@@ -549,26 +668,18 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               </View>
             )}
             
-            {/* Duration indication */}
-            <View style={styles.durationIndicator}>
-              <Ionicons name="time-outline" size={18} color={isDark ? theme.textSecondary : '#666'} />
-              <Text style={[styles.durationText, { color: isDark ? theme.textSecondary : '#666' }]}>
-                Hold for {stretchObj.duration} seconds
-                {stretchObj.bilateral ? ' per side' : ''}
-              </Text>
+       
+            {/* Ready to Stretch button now inside the instructions panel */}
+            <View style={styles.inlineDemoFooter}>
+              <TouchableOpacity
+                style={[styles.readyButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
+                onPress={handleReadyToStretch}
+              >
+                <Text style={styles.readyButtonText}>Ready to Stretch</Text>
+                <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
             </View>
           </View>
-        </View>
-        
-        {/* Footer with ready button */}
-        <View style={styles.demoFooter}>
-          <TouchableOpacity
-            style={[styles.readyButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
-            onPress={handleReadyToStretch}
-          >
-            <Text style={styles.readyButtonText}>Ready to Stretch</Text>
-            <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -586,67 +697,64 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         styles.stretchContainer,
         { opacity: fadeAnim }
       ]}>
-        {/* Header with title and timer */}
+        {/* Header with title and badges */}
         <View style={styles.stretchHeader}>
           <Text style={[styles.stretchName, { color: isDark ? theme.text : '#333' }]}>
             {stretchObj.name || 'Stretch'}
           </Text>
           
-          <View style={styles.timerContainer}>
-            <View style={styles.timerBarContainer}>
-              <Animated.View 
+          <View style={styles.badgeContainer}>
+            {stretchObj.bilateral && (
+              <View style={[styles.badgeItem, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+                <Ionicons name="swap-horizontal" size={16} color="#FFF" />
+                <Text style={styles.badgeText}>Both Sides</Text>
+              </View>
+            )}
+            
+            {isPremium && (
+              <View style={[styles.badgeItem, { backgroundColor: (stretch as any).vipBadgeColor || '#FFD700' }]}>
+                <Ionicons name="star" size={16} color="#FFF" />
+                <Text style={styles.badgeText}>VIP</Text>
+              </View>
+            )}
+            
+            {hasDemo && (
+              <TouchableOpacity 
                 style={[
-                  styles.progressTrack, 
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0' }
+                  styles.badgeItem, 
+                  { 
+                    backgroundColor: !hasDemoBeenWatched ? '#FF5722' : '#FF5722',
+                    padding: !hasDemoBeenWatched ? 10 : undefined,
+                    borderWidth: !hasDemoBeenWatched ? 2 : 0,
+                    borderColor: !hasDemoBeenWatched ? '#FFF' : undefined
+                  }
                 ]}
+                onPress={handleWatchDemo}
               >
-                <Animated.View 
-                  style={[
-                    styles.progressFill, 
-                    { 
-                      backgroundColor: isDark ? theme.accent : '#4CAF50',
-                      width: progressAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%']
-                      })
-                    }
-                  ]} 
-                />
-              </Animated.View>
-              <Text 
-                style={[styles.secondsText, { color: isDark ? theme.textSecondary : '#666' }]}
-              >
-                {formatTimeSeconds(displayedTime)}
-              </Text>
-            </View>
+                <Ionicons name="videocam" size={!hasDemoBeenWatched ? 18 : 16} color="#FFF" />
+                <Text style={[
+                  styles.badgeText, 
+                  !hasDemoBeenWatched ? styles.emphasizedBadgeText : null
+                ]}>
+                  {!hasDemoBeenWatched ? 'Watch Demo (Instructions)' : 'Watch Demo'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         
-        {/* Badges */}
-        <View style={styles.badgeContainer}>
-          {stretchObj.bilateral && (
-            <View style={[styles.badgeItem, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
-              <Ionicons name="swap-horizontal" size={16} color="#FFF" />
-              <Text style={styles.badgeText}>Both Sides</Text>
-            </View>
-          )}
-          
-          {isPremium && (
-            <View style={[styles.badgeItem, { backgroundColor: (stretch as any).vipBadgeColor || '#FFD700' }]}>
-              <Ionicons name="star" size={16} color="#FFF" />
-              <Text style={styles.badgeText}>VIP</Text>
-            </View>
-          )}
-          
-          {hasDemo && (
-            <TouchableOpacity 
-              style={[styles.badgeItem, { backgroundColor: '#FF5722' }]}
-              onPress={handleWatchDemo}
-            >
-              <Ionicons name="videocam" size={16} color="#FFF" />
-              <Text style={styles.badgeText}>Watch Demo</Text>
-            </TouchableOpacity>
-          )}
+        {/* Timer back to original position and size */}
+        <View style={styles.timerContainer}>
+          <CircularTimer
+            progress={progressAnim}
+            timeRemaining={displayedTime}
+            diameter={125}
+            strokeWidth={8}
+            color={isDark ? theme.accent : '#4CAF50'}
+            backgroundColor={isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'}
+            textColor={isDark ? theme.text : '#333'}
+            isDark={isDark}
+          />
         </View>
         
         {/* Image section */}
@@ -654,31 +762,29 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           styles.imageContainer,
           { 
             backgroundColor: isDark ? theme.cardBackground : '#FFF',
-            borderColor: isPremium ? ((stretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD')
+            borderColor: isPremium ? ((stretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD'),
+            height: hasTips ? height * 0.25 : height * 0.3 // Make smaller when tips are present
           }
         ]}>
           {renderStretchImage()}
         </View>
         
-        {/* Description */}
-        <Text style={[styles.stretchDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
-          {stretchObj.description || 'No description available'}
-        </Text>
+        {/* No description - only shown in demo view */}
         
-        {/* Tips section */}
+        {/* Tips section - always show tips as they're important reminders */}
         {hasTips && (
           <View style={[
-            styles.tipsContainer,
+            styles.tipsContainerCompact,
             { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }
           ]}>
             <View style={styles.tipsHeader}>
-              <Ionicons name="bulb" size={20} color={isDark ? theme.accent : '#4CAF50'} />
+              <Ionicons name="bulb" size={18} color={isDark ? theme.accent : '#4CAF50'} />
               <Text style={[styles.tipsTitle, { color: isDark ? theme.accent : '#4CAF50' }]}>
-                Stretching Tips:
+                Tips:
               </Text>
             </View>
             {tips.map((tip: string, index: number) => (
-              <Text key={index} style={[styles.tipText, { color: isDark ? theme.text : '#333' }]}>
+              <Text key={index} style={[styles.tipTextCompact, { color: isDark ? theme.text : '#333' }]}>
                 • {tip}
               </Text>
             ))}
@@ -686,6 +792,218 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         )}
       </Animated.View>
     );
+  };
+
+  // Render rest period
+  const renderRestPeriod = () => {
+    return (
+      <View style={[styles.restContainer, { backgroundColor: isDark ? theme.cardBackground : '#f5f5f5' }]}>
+        <View style={styles.restIconContainer}>
+          <Ionicons name="time-outline" size={70} color={isDark ? theme.accent : '#4CAF50'} />
+        </View>
+        <Text style={[styles.restTitle, { color: isDark ? theme.text : '#333' }]}>
+          {stretch.name || 'Rest Period'}
+        </Text>
+        <Text style={[styles.restDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
+          {stretch.description || 'Take a short break before continuing'}
+        </Text>
+        <View style={styles.timerContainer}>
+          <CircularTimer
+            progress={progressAnim}
+            timeRemaining={displayedTime}
+            diameter={110}
+            strokeWidth={8}
+            color={isDark ? theme.accent : '#4CAF50'}
+            backgroundColor={isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'}
+            textColor={isDark ? theme.text : '#333'}
+            isDark={isDark}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // Add this function to parse description text into structured steps
+  const parseStretchInstructions = (description: string) => {
+    if (!description) return { type: 'simple', instructions: ['No description available'] };
+    
+    // Split by periods, clean up, and filter empty items
+    const sentences = description
+      .split('.')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    
+    // If it's just 1-2 sentences, use a simple format
+    if (sentences.length <= 2) {
+      return {
+        type: 'simple',
+        instructions: sentences
+      };
+    }
+    
+    // Keywords that might indicate form cues/tips
+    const cueKeywords = ['keep', 'ensure', 'maintain', 'remember', 'avoid', 'don\'t', 'make sure', 'focus'];
+    
+    // Keywords that might indicate setup steps
+    const setupKeywords = ['start', 'begin', 'position', 'place', 'stand', 'sit', 'lie'];
+    
+    // Categorize each sentence
+    const setup: string[] = [];
+    const execution: string[] = [];
+    const cues: string[] = [];
+    
+    sentences.forEach(sentence => {
+      const lowerSentence = sentence.toLowerCase();
+      
+      // Check if it's a setup instruction
+      if (setup.length < 2 && setupKeywords.some(keyword => lowerSentence.includes(keyword))) {
+        setup.push(sentence);
+      }
+      // Check if it's a form cue
+      else if (cueKeywords.some(keyword => lowerSentence.includes(keyword))) {
+        cues.push(sentence);
+      }
+      // Otherwise it's an execution step
+      else {
+        execution.push(sentence);
+      }
+    });
+    
+    // If nothing was categorized as setup, take the first sentence as setup
+    if (setup.length === 0 && execution.length > 1) {
+      setup.push(execution.shift()!);
+    }
+    
+    return {
+      type: 'structured',
+      setup,
+      execution,
+      cues
+    };
+  };
+
+  // Add this new component for formatted instructions
+  const StructuredInstructions: React.FC<{
+    description: string;
+    isDark: boolean;
+    theme: any;
+  }> = ({ description, isDark, theme }) => {
+    const parsedInstructions = parseStretchInstructions(description);
+    
+    if (parsedInstructions.type === 'simple') {
+      return (
+        <View style={styles.simpleInstructionsContainer}>
+          <View style={styles.instructionHeader}>
+            <Ionicons name="information-circle-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
+              Instructions
+            </Text>
+          </View>
+          {parsedInstructions.instructions.map((instruction, index) => (
+            <View key={index} style={styles.simpleInstructionItem}>
+              <View style={[styles.instructionDot, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
+              <Text style={[styles.simpleInstructionText, { color: isDark ? theme.text : '#333' }]}>
+                {instruction}
+              </Text>
+            </View>
+          ))}
+        </View>
+      );
+    }
+    
+    return (
+      <View style={styles.structuredInstructionsContainer}>
+        {/* Setup section */}
+        {parsedInstructions.setup.length > 0 && (
+          <View style={styles.instructionSection}>
+            <View style={styles.instructionHeader}>
+              <Ionicons name="body-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
+              <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
+                Starting Position
+              </Text>
+            </View>
+            
+            {parsedInstructions.setup.map((step, index) => (
+              <View key={`setup-${index}`} style={styles.instructionStep}>
+                <View style={[styles.stepNumberCircle, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+                  <Text style={styles.stepNumberText}>{index + 1}</Text>
+                </View>
+                <Text style={[styles.stepText, { color: isDark ? theme.text : '#333' }]}>
+                  {step}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+        
+        {/* Execution section */}
+        <View style={styles.instructionSection}>
+          <View style={styles.instructionHeader}>
+            <Ionicons name="fitness-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
+              {parsedInstructions.setup.length > 0 ? 'Movement' : 'Instructions'}
+            </Text>
+          </View>
+          
+          {parsedInstructions.execution.map((step, index) => (
+            <View key={`exec-${index}`} style={styles.instructionStep}>
+              <View style={[styles.stepNumberCircle, { 
+                backgroundColor: isDark ? 
+                  (parsedInstructions.setup.length > 0 ? 'rgba(255,255,255,0.2)' : theme.accent) : 
+                  (parsedInstructions.setup.length > 0 ? '#E0E0E0' : '#4CAF50') 
+              }]}>
+                <Text style={[
+                  styles.stepNumberText,
+                  parsedInstructions.setup.length > 0 && { color: isDark ? 'white' : '#666' }
+                ]}>
+                  {parsedInstructions.setup.length + index + 1}
+                </Text>
+              </View>
+              <Text style={[styles.stepText, { color: isDark ? theme.text : '#333' }]}>
+                {step}
+              </Text>
+            </View>
+          ))}
+        </View>
+        
+        {/* Form cues section */}
+        {parsedInstructions.cues.length > 0 && (
+          <View style={[styles.cuesContainer, { 
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(76, 175, 80, 0.05)'
+          }]}>
+            <View style={styles.instructionHeader}>
+              <Ionicons name="alert-circle-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
+              <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
+                Form Tips
+              </Text>
+            </View>
+            
+            {parsedInstructions.cues.map((cue, index) => (
+              <View key={`cue-${index}`} style={styles.cueBulletPoint}>
+                <View style={[styles.cueBullet, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
+                <Text style={[styles.cueText, { color: isDark ? theme.textSecondary : '#555' }]}>
+                  {cue}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // Wrap onTogglePause to add haptic feedback
+  const handleTogglePause = () => {
+    try {
+      // Add haptic feedback based on what the new state will be (opposite of current isPaused)
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Call the original onTogglePause function
+      onTogglePause();
+    } catch (error) {
+      console.error('Error with haptic feedback:', error);
+      // Still call the original function even if haptics fail
+      onTogglePause();
+    }
   };
 
   return (
@@ -702,16 +1020,18 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         {viewMode === 'demo' ? renderDemoView() : renderStretchInstructionsView()}
       </Animated.View>
       
-      {/* Use NavigationButtons at the bottom only for stretch view */}
+      {/* Navigation buttons in a floating container when in stretch view */}
       {viewMode === 'stretch' && (
-        <NavigationButtons
-          onPrevious={onPrevious}
-          onNext={onNext}
-          onTogglePause={onTogglePause}
-          isPaused={isPaused}
-          isPreviousDisabled={currentIndex === 0}
-          isLastStretch={currentIndex === totalCount - 1}
-        />
+        <View style={styles.navigationButtonsContainer}>
+          <NavigationButtons
+            onPrevious={onPrevious}
+            onNext={onNext}
+            onTogglePause={handleTogglePause}
+            isPaused={isPaused}
+            isPreviousDisabled={currentIndex === 0}
+            isLastStretch={currentIndex === totalCount - 1}
+          />
+        </View>
       )}
     </View>
   );
@@ -748,9 +1068,22 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: 'transparent',
   },
+  demoVideoWrapper: {
+    width: '100%',
+    height: Platform.OS === 'ios' ? height * 0.4 : height * 0.35, // Allocate more space for the video
+    backgroundColor: 'transparent',
+  },
   demoFooter: {
     padding: 16,
     alignItems: 'center',
+  },
+  readyButtonContainer: {
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: 8,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   readyButton: {
     flexDirection: 'row',
@@ -759,7 +1092,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 30,
-    width: '80%',
+    width: '90%',
     maxWidth: 300,
   },
   readyButtonText: {
@@ -771,49 +1104,29 @@ const styles = StyleSheet.create({
   stretchContainer: {
     flex: 1,
     padding: 16,
+    paddingBottom: 80, // Add space for floating navigation buttons
   },
   stretchHeader: {
-    marginBottom: 8,
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 15,
   },
   stretchName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
   },
   timerContainer: {
-    width: '100%',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  timerBarContainer: {
-    width: '80%',
-    position: 'relative',
-  },
-  progressTrack: {
-    height: 4,
-    width: '100%',
-    backgroundColor: '#E0E0E0',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4CAF50',
-  },
-  secondsText: {
-    fontSize: 14,
-    alignSelf: 'flex-end',
-    marginTop: 2,
-    fontWeight: '600',
+    justifyContent: 'center',
+    marginVertical: 15,
   },
   badgeContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16,
     flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 10,
   },
   badgeItem: {
     flexDirection: 'row',
@@ -943,8 +1256,10 @@ const styles = StyleSheet.create({
   },
   // Enhanced instructions panel styles
   demoInstructionsPanel: {
-    margin: 16,
+    flex: 1, // Take up remaining space
+    margin: 12,
     marginTop: 8,
+    marginBottom: 12,
     borderRadius: 12,
     padding: 16,
     elevation: 1,
@@ -952,6 +1267,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+  },
+  instructionsScrollContainer: {
+    flex: 1,
   },
   instructionsHeader: {
     flexDirection: 'row',
@@ -965,10 +1283,6 @@ const styles = StyleSheet.create({
   },
   instructionsContent: {
     paddingLeft: 4,
-  },
-  instructionsText: {
-    fontSize: 16,
-    lineHeight: 22,
   },
   tipsList: {
     marginTop: 8,
@@ -1007,6 +1321,171 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 8,
     fontWeight: '500',
+  },
+  durationIndicatorStretch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderRadius: 12,
+    borderColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
+  durationTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  durationTextStretch: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  durationSubText: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  circularTimerContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circularTimerTextContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circularTimerText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  circularTimerLabel: {
+    fontSize: 12,
+    marginTop: -3,
+    textAlign: 'center',
+    opacity: 0.7,
+  },
+  structuredInstructionsContainer: {
+    marginBottom: 16,
+  },
+  simpleInstructionsContainer: {
+    marginBottom: 16,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  instructionSection: {
+    marginBottom: 16,
+  },
+  instructionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  instructionHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  simpleInstructionItem: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    alignItems: 'flex-start',
+    paddingHorizontal: 4,
+  },
+  instructionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 7,
+    marginRight: 10,
+  },
+  simpleInstructionText: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  instructionStep: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'flex-start',
+    paddingHorizontal: 4,
+  },
+  stepNumberCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    marginTop: 2,
+  },
+  stepNumberText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  cuesContainer: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  cueBulletPoint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  cueBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 8,
+    marginRight: 8,
+  },
+  cueText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  inlineDemoFooter: {
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: 8,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  emphasizedBadgeText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  navigationButtonsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+    zIndex: 100,
+  },
+  tipsContainerCompact: {
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  tipTextCompact: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+    paddingLeft: 6,
   },
 });
 

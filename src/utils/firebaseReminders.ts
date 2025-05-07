@@ -990,7 +990,6 @@ export const startLocalMotivationalMessages = (testMode: boolean = false): (() =
 
   if (testMode) {
     // Schedule test notifications if in test mode
-    scheduleRecurringTestNotifications();
   } else {
     // For production mode, schedule 2 messages per day using smart algorithm
     scheduleProductionMotivationalMessages();
@@ -1142,95 +1141,3 @@ const scheduleProductionMotivationalMessages = async () => {
   }
 };
 
-/**
- * Schedule recurring test motivational messages every 5 minutes
- * Uses proper scheduled notifications that will work when app is closed
- */
-const scheduleRecurringTestNotifications = async () => {
-  try {
-    // First clear any existing scheduled motivational messages
-    // Get all scheduled notifications
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    
-    // Find and cancel all test motivational messages
-    for (const notification of scheduled) {
-      if (notification.content.data?.type === 'test_motivational_message') {
-        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-        console.log(`Cancelled existing test notification: ${notification.identifier}`);
-      }
-    }
-    
-    // Schedule 10 notifications, one every 5 minutes
-    // This ensures notifications continue for about an hour even when app is closed
-    console.log('Scheduling recurring test motivational messages (every 5 minutes)');
-    
-    for (let i = 0; i < 10; i++) {
-      const delayMinutes = (i + 1) * 5; // 5, 10, 15, 20, etc. minutes
-      const triggerDate = new Date(Date.now() + delayMinutes * 60 * 1000);
-      
-      // Get a random message
-      const MOTIVATIONAL_MESSAGES = [
-        {
-          title: "Time for a quick stretch!",
-          body: "Take a 5-minute break to reset your focus and energy."
-        },
-        {
-          title: "Movement break!",
-          body: "Stand up and stretch your arms above your head for better circulation."
-        },
-        {
-          title: "Posture check!",
-          body: "Take a moment to relax your shoulders and sit up straight."
-        },
-        {
-          title: "Break reminder",
-          body: "A 2-minute stretch now can prevent hours of discomfort later."
-        },
-        {
-          title: "Wellness check",
-          body: "Remember to stay hydrated and take short breaks throughout your day."
-        },
-        {
-          title: "Quick break time",
-          body: "Roll your shoulders and stretch your neck to relieve tension."
-        },
-        {
-          title: "Movement matters",
-          body: "Regular movement breaks help improve productivity and focus."
-        },
-        {
-          title: "FlexBreak reminder",
-          body: "Take a moment to breathe deeply and stretch your body."
-        }
-      ];
-      
-      // Pick a random message
-      const randomIndex = Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length);
-      const message = MOTIVATIONAL_MESSAGES[randomIndex];
-      
-      // Schedule with the DATE trigger type which works better when app is closed
-      const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `${message.title} (Test ${i+1}/10)`,
-          body: `${message.body} (Scheduled for ${triggerDate.toLocaleTimeString()})`,
-          data: { 
-            type: 'test_motivational_message', 
-            index: i,
-            scheduledTime: triggerDate.toISOString()
-          },
-          sound: true,
-        },
-        trigger: { 
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: triggerDate 
-        },
-      });
-      
-      console.log(`Scheduled test notification #${i+1} with ID ${notificationId} for ${triggerDate.toLocaleTimeString()} (in ${delayMinutes} minutes)`);
-    }
-    
-    console.log('All test notifications scheduled successfully');
-  } catch (error) {
-    console.error('Error scheduling test notifications:', error);
-  }
-}; 
