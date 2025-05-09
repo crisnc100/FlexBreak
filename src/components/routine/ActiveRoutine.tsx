@@ -11,7 +11,8 @@ import {
   Dimensions,
   Platform,
   Easing,
-  Modal
+  Modal,
+  ToastAndroid
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../../types';
@@ -53,6 +54,9 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string })[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDone, setIsDone] = useState(false);
+  
+  // Add state for tracking if next button should be enabled
+  const [canSkipToNext, setCanSkipToNext] = useState(false);
   
   // Countdown state
   const [showCountdown, setShowCountdown] = useState(true);
@@ -117,9 +121,55 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // Get the next stretch for preloading
   const nextStretch = routine[currentIndex + 1];
   
+  // Add useEffect to handle the next button timeout
+  useEffect(() => {
+    // Reset canSkipToNext whenever the stretch changes
+    setCanSkipToNext(false);
+    
+    // Set a timeout to enable the next button after 5 seconds
+    const timer = setTimeout(() => {
+      setCanSkipToNext(true);
+      
+      // Show notification to the user that they can advance
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Ready to advance to the next stretch!', ToastAndroid.SHORT);
+      } else {
+        // For iOS, we could use a custom Toast component or an alert,
+        // but let's keep it simple and just rely on the button visual change
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          // Remove sound effect for the countdown completion
+        } catch (error) {
+          console.error('Error providing feedback:', error);
+        }
+      }
+    }, 5000);
+    
+    // Clean up timer on unmount or when stretch changes
+    return () => clearTimeout(timer);
+  }, [currentIndex]);
+  
   // Create the actual handleNext function
   const handleNext = useCallback(() => {
     console.log('handleNext called');
+    
+    // Check if user can skip to next
+    if (!canSkipToNext) {
+      // Play an error sound or feedback
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch (error) {
+        console.error('Error providing haptic feedback:', error);
+      }
+      
+      // Optionally show a brief notification or alert
+      Alert.alert(
+        "Please Wait",
+        "You need to stretch for at least 5 seconds before advancing."
+      );
+      
+      return;
+    }
     
     // Play sound effect
     try {
@@ -160,7 +210,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       console.log('Reached the end of the routine, completing...');
       handleComplete();
     }
-  }, [currentIndex, routine.length, isPaused, resumeTimer, fadeAnim]);
+  }, [currentIndex, routine.length, isPaused, resumeTimer, fadeAnim, canSkipToNext]);
   
   // Update the ref when handleNext changes
   useEffect(() => {
@@ -822,6 +872,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         startTimer={startTimer}
         currentStretch={'isRest' in currentStretch ? null : currentStretch as Stretch}
         isPlaying={!isPaused}
+        canSkipToNext={canSkipToNext}
       />
     );
   };

@@ -38,6 +38,7 @@ export interface StretchFlowViewProps {
   startTimer: (duration: number) => void;
   currentStretch: Stretch | null;
   isPlaying: boolean;
+  canSkipToNext?: boolean;
 }
 
 export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
@@ -52,7 +53,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   totalCount,
   startTimer,
   currentStretch,
-  isPlaying
+  isPlaying,
+  canSkipToNext = true
 }) => {
   const { theme, isDark } = useTheme();
   
@@ -1030,6 +1032,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             isPaused={isPaused}
             isPreviousDisabled={currentIndex === 0}
             isLastStretch={currentIndex === totalCount - 1}
+            canSkipToNext={canSkipToNext}
           />
         </View>
       )}

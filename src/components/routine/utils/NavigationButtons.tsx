@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ interface NavigationButtonsProps {
   isPaused: boolean;
   isPreviousDisabled?: boolean;
   isLastStretch?: boolean;
+  canSkipToNext?: boolean;
 }
 
 const NavigationButtons: React.FC<NavigationButtonsProps> = ({
@@ -25,9 +26,47 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
   onTogglePause,
   isPaused,
   isPreviousDisabled = false,
-  isLastStretch = false
+  isLastStretch = false,
+  canSkipToNext = true
 }) => {
   const { theme, isDark } = useTheme();
+  
+  // Add state to track countdown time
+  const [countdown, setCountdown] = useState(5);
+  
+  // Effect to handle countdown when button is disabled
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    // Only run countdown when not paused and button is disabled
+    if (!canSkipToNext && !isPaused) {
+      // Don't reset countdown if we're just resuming from pause
+      if (countdown === 5 || countdown === 0) {
+        setCountdown(5);
+      }
+      
+      timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [canSkipToNext, isPaused, countdown]);
+  
+  // Reset countdown when canSkipToNext changes to true
+  useEffect(() => {
+    if (canSkipToNext) {
+      setCountdown(5);
+    }
+  }, [canSkipToNext]);
 
   // Normal button press handler with sound
   const handlePress = (callback: () => void) => {
@@ -117,27 +156,48 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
           styles.controlButton, 
           styles.sideButton,
           isLastStretch && styles.finishButton,
+          !canSkipToNext && styles.disabledButton,
           { 
             backgroundColor: isLastStretch 
               ? (isDark ? theme.accent : '#4CAF50') 
               : (isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5'),
+            opacity: !canSkipToNext ? 0.7 : 1
           }
         ]} 
-        onPress={() => handlePress(onNext)}
-        activeOpacity={0.7}
+        onPress={() => canSkipToNext && handlePress(onNext)}
+        disabled={!canSkipToNext}
+        activeOpacity={!canSkipToNext ? 0.5 : 0.7}
       >
         <View style={styles.buttonContentWrapper}>
-          <Ionicons 
-            name={isLastStretch ? "checkmark-circle" : "chevron-forward"} 
-            size={28} 
-            color={isLastStretch ? "#FFF" : (isDark ? theme.text : "#333")} 
-          />
+          {!canSkipToNext ? (
+            <View style={styles.countdownIndicator}>
+              <Text style={[
+                styles.countdownText,
+                { color: isDark ? "rgba(255,255,255,0.5)" : "#999" }
+              ]}>
+                {countdown}s
+              </Text>
+            </View>
+          ) : (
+            <Ionicons 
+              name={isLastStretch ? "checkmark-circle" : "chevron-forward"} 
+              size={28} 
+              color={!canSkipToNext 
+                ? (isDark ? "rgba(255,255,255,0.3)" : "#CCC")
+                : (isLastStretch ? "#FFF" : (isDark ? theme.text : "#333"))} 
+            />
+          )}
           <Text style={[
             styles.controlText,
             isLastStretch && styles.finishText,
-            { color: isLastStretch ? "#FFF" : (isDark ? theme.text : "#333") }
+            !canSkipToNext && styles.disabledText,
+            { 
+              color: !canSkipToNext 
+                ? (isDark ? "rgba(255,255,255,0.3)" : "#AAA")
+                : (isLastStretch ? "#FFF" : (isDark ? theme.text : "#333")) 
+            }
           ]}>
-            {isLastStretch ? "Finish" : "Next"}
+            {!canSkipToNext ? "Wait" : (isLastStretch ? "Finish" : "Next")}
           </Text>
         </View>
       </TouchableOpacity>
@@ -217,6 +277,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginTop: 8,
+  },
+  countdownIndicator: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countdownText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#999',
   },
 });
 
