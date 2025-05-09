@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 3.13.3"
+    "version": ">= 3.13.3",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -22,8 +23,13 @@
       }
     },
     "testflight": {
+      "extends": "production",
       "distribution": "store",
       "autoIncrement": true,
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_SKIP_SPLASH_SCREEN_GENERATION": "1"
+      },
       "ios": {
         "resourceClass": "m-medium"
       }
@@ -34,9 +40,9 @@
     "testflight": {
       "ios": {
         "appleId": "crisnc100@gmail.com",
-        "ascAppId": "6743581671",
+        "ascAppId": "6728844881",
         "appleTeamId": "7LHNAAUJQ6"
       }
     }
   }
-} 
+}

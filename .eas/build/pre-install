@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Fix for Pod installation issues in EAS Build
+echo "Running pre-install script to fix CocoaPods setup"
+
+# Disable splash screen storyboard generation
+echo "Disabling splash screen storyboard generation"
+export EXPO_SKIP_SPLASH_SCREEN_GENERATION=1
+
+# Navigate to the iOS directory
+cd ios
+
+# Clean up any existing pods
+if [ -d "Pods" ]; then
+  echo "Removing existing Pods directory"
+  rm -rf Pods
+fi
+
+if [ -f "Podfile.lock" ]; then
+  echo "Removing Podfile.lock"
+  rm Podfile.lock
+fi
+
+# Install pods
+echo "Installing Pods"
+pod install
+
+echo "Pod installation completed"
+
+# Make sure permission issues don't occur with scripts
+echo "Setting proper permissions for Pod scripts"
+find Pods -name "*.sh" -exec chmod +x {} \;
+
+echo "Pre-install script completed" 

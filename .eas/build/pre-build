@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Fix for JavaScript bundling issues in EAS Build
+echo "Running pre-build script to fix JavaScript bundling issues"
+
+# Install exact versions of critical dependencies
+echo "Installing exact versions of critical dependencies"
+npm install --no-save --legacy-peer-deps metro@0.80.9 metro-resolver@0.80.9
+
+# Clear npm, yarn and metro caches
+echo "Clearing npm and metro caches"
+npm cache clean --force
+rm -rf $HOME/.yarn/cache
+watchman watch-del-all || true
+rm -rf node_modules/.cache/metro
+
+# We now use a custom .easignore file in the root directory
+# instead of creating one here
+
+echo "Pre-build script completed" 

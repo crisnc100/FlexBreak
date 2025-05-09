@@ -12,10 +12,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cristianortega.flexbreak",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"]
+      },
+      "splash": {
+        "xib": "./ios/FlexBreak/SplashScreen.storyboard"
       }
     },
     "android": {
@@ -48,6 +51,7 @@
     "updates": {
       "url": "https://u.expo.dev/e2f2f0ca-229d-4469-9de8-9f69b7f7a724"
     },
-    "scheme": "flexbreak-app"
+    "scheme": "flexbreak-app",
+    "jsEngine": "hermes"
   }
 }

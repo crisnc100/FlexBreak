@@ -19,19 +19,26 @@ android/
 ios/
 
 # videos & other large binaries
-assets/**/*.mp4
-assets/**/*.MP4
-assets/**/*.mov
+# assets/**/*.mp4  # Commented out to include mp4 files
+# assets/**/*.MP4  # Commented out to include MP4 files
+# assets/**/*.mov  # Commented out to include mov files
+# assets/**/*.MOV  # Commented out to include MOV files
 assets/**/*.mkv
 assets/**/*.avi
 assets/**/*.webm
 assets/**/*.flac
 assets/**/*.wav
-assets/**/*.mp3
+# assets/**/*.mp3  # Commented out to include mp3 files
 assets/**/*.gif
 assets/**/*.GIF
-assets/sounds/
-assets/stretchData/
+# assets/sounds/  # Commented out to include sound files
+# assets/stretchData/  # Commented out to include all stretch data
+
+# Explicitly include the stretch video files
+!assets/stretchData/**/image.mp4
+!assets/stretchData/**/image.mov
+!assets/stretchData/**/image.MOV
+
 *.aab
 *.apk
 *.ipa
@@ -81,3 +88,30 @@ tests/
 !.env.example
 .vscode/
 .idea/
+
+# EAS Build ignore file
+
+# Build artifacts
+ios/build/
+android/build/
+android/app/build/
+ios/Pods/
+
+# Node modules that aren't needed for iOS builds
+node_modules/react-native/ReactAndroid
+node_modules/react-native/android
+node_modules/**/android/build/
+node_modules/**/*.android.js
+node_modules/**/*.android.ts
+node_modules/**/*.android.tsx
+
+# Large directories in node_modules that aren't needed for iOS builds
+node_modules/hermes-engine/android/
+node_modules/@react-native/gradle-plugin/
+node_modules/metro-hermes-compiler/
+
+# Debug and test files
+__tests__
+*.test.js
+*.test.ts
+*.test.tsx
