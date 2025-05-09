@@ -20,9 +20,23 @@
       "ios": {
         "resourceClass": "m-medium"
       }
+    },
+    "testflight": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "m-medium"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "testflight": {
+      "ios": {
+        "appleId": "crisnc100@gmail.com",
+        "ascAppId": "6743581671",
+        "appleTeamId": "7LHNAAUJQ6"
+      }
+    }
   }
 } 
