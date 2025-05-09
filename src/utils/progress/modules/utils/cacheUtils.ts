@@ -49,7 +49,6 @@ export const getCachedRoutines = async (forceRefresh: boolean = false): Promise<
       routineCache.data && 
       routineCache.timestamp > 0 && 
       now - routineCache.timestamp < routineCache.ttl) {
-    console.log('Using cached routines data');
     return routineCache.data;
   }
   
@@ -80,7 +79,6 @@ export const getCachedChallenges = (category: string, forceRefresh: boolean = fa
       cache.data && 
       cache.timestamp > 0 && 
       now - cache.timestamp < cache.ttl) {
-    console.log(`Using cached ${category} challenges data`);
     return cache.data;
   }
   

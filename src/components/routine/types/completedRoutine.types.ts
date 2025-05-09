@@ -36,6 +36,7 @@ export type CompletedRoutineProps = {
   xpBreakdown?: XpBreakdownItem[];
   levelUp?: LevelUpData;
   isXpBoosted?: boolean;
+  savedStretches?: any[];
   onShowDashboard: () => void;
   onNavigateHome: () => void;
   onOpenSubscription: () => void;

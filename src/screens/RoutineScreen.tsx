@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView, StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import SubscriptionModal from '../components/SubscriptionModal';
 import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
@@ -27,6 +26,9 @@ import * as storageService from '../services/storageService';
 
 // Import smart pick generator
 import { generateSmartPick, RoutineRecommendation } from '../utils/generators/smartPickGenerator';
+
+// Import premium promotion context
+import { usePremiumPromotion } from '../context/PremiumPromotionContext';
 
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
@@ -91,11 +93,13 @@ export default function RoutineScreen() {
   // Get theme context for refreshing access to dark theme
   const { refreshThemeAccess, themeType, setThemeType } = useTheme();
 
+  // Get premium promotion context
+  const { showPromotion } = usePremiumPromotion();
+
   // Single screen state to track what we're showing
   const [screenState, setScreenState] = useState<RoutineScreenState>('LOADING');
 
   // Modal visibility state
-  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [smartPickModalVisible, setSmartPickModalVisible] = useState(false);
 
   // Add state for XP earned
@@ -103,6 +107,9 @@ export default function RoutineScreen() {
 
   // Add state for storing XP breakdown
   const [xpBreakdown, setXpBreakdown] = useState<Array<{ source: string; amount: number; description: string }>>([]);
+
+  // State to store the actual stretches used in the completed routine
+  const [completedStretches, setCompletedStretches] = useState<any[]>([]);
 
   // Add state for level-up data
   const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
@@ -158,7 +165,7 @@ export default function RoutineScreen() {
     try {
       // Don't play any sound yet - we'll decide which sound to play based on level up status
       
-      // Save to recent routines
+      // Save to recent routines (through game engine) and keep copy of stretches
       const entry = {
         area: routineArea,
         duration: routineDuration,
@@ -167,6 +174,9 @@ export default function RoutineScreen() {
         level: level || 'beginner', // Include the level when saving the routine
         savedStretches: currentStretches // Save the actual stretches used
       };
+
+      // Keep stretches in state for later favorite saving
+      setCompletedStretches(currentStretches || []);
 
       // REMOVED: Direct call to saveRoutineProgress - removed to avoid duplicate entries
       // The routine is saved inside processCompletedRoutine already
@@ -621,6 +631,12 @@ export default function RoutineScreen() {
     }
   };
 
+  // Update onOpenSubscription to use premium promotion context instead
+  const handleOpenSubscription = () => {
+    // Use premium promotion to handle subscription modal
+    showPromotion('subscription_needed');
+  };
+
   // Handle smart pick modal
   const handleSmartPickTap = async () => {
     console.log('Smart Pick tapped, isPremium:', isPremium);
@@ -639,9 +655,8 @@ export default function RoutineScreen() {
         setSmartPickModalVisible(true);
       }
     } else {
-      // Non-premium users see the upgrade modal
-      setSmartPickRecommendation(null);
-      setSmartPickModalVisible(true);
+      // Non-premium users see the upgrade modal via promotion system
+      handleOpenSubscription();
     }
   };
 
@@ -830,15 +845,10 @@ export default function RoutineScreen() {
           onDeleteRoutine={handleHideRoutine}
         />
 
-        <SubscriptionModal
-          visible={subscriptionModalVisible}
-          onClose={() => setSubscriptionModalVisible(false)}
-        />
-
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => setSubscriptionModalVisible(true)}
+          onUpgrade={handleOpenSubscription}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}
@@ -862,20 +872,16 @@ export default function RoutineScreen() {
           xpBreakdown={xpBreakdown}
           levelUp={levelUpData}
           isXpBoosted={isXpBoosted}
+          savedStretches={completedStretches}
           onShowDashboard={showDashboard}
           onNavigateHome={handleCreateNewRoutine}
-          onOpenSubscription={() => setSubscriptionModalVisible(true)}
-        />
-
-        <SubscriptionModal
-          visible={subscriptionModalVisible}
-          onClose={() => setSubscriptionModalVisible(false)}
+          onOpenSubscription={handleOpenSubscription}
         />
 
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => setSubscriptionModalVisible(true)}
+          onUpgrade={handleOpenSubscription}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}
@@ -902,15 +908,10 @@ export default function RoutineScreen() {
           }}
         />
 
-        <SubscriptionModal
-          visible={subscriptionModalVisible}
-          onClose={() => setSubscriptionModalVisible(false)}
-        />
-
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => setSubscriptionModalVisible(true)}
+          onUpgrade={handleOpenSubscription}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}

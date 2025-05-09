@@ -1056,8 +1056,8 @@ const scheduleProductionMotivationalMessages = async () => {
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
 
-    // Schedule for 7 days forward including today
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    // Schedule for 10 days forward including today
+    for (let dayOffset = 0; dayOffset < 10; dayOffset++) {
       const targetDay = new Date(dayStart);
       targetDay.setDate(targetDay.getDate() + dayOffset);
       
@@ -1135,7 +1135,7 @@ const scheduleProductionMotivationalMessages = async () => {
       }
     }
     
-    console.log('Scheduled motivational messages for the next 7 days');
+    console.log('Scheduled motivational messages for the next 10 days');
   } catch (error) {
     console.error('Error scheduling production motivational messages:', error);
   }

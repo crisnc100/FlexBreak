@@ -316,28 +316,13 @@ export const getAllRoutines = async (): Promise<ProgressEntry[]> => {
  * @param entry Progress entry to save
  * @returns Success boolean
  */
-export const saveRoutineProgress = async (entry: { 
-  area: BodyArea; 
-  duration: Duration; 
-  date: string;
-  stretchCount?: number;
-  level?: StretchLevel;
-}): Promise<boolean> => {
+export const saveRoutineProgress = async (entry: ProgressEntry): Promise<boolean> => {
   try {
     // Get existing routines
     const existingRoutines = await getRecentRoutines();
     
-    // Create new entry
-    const newEntry: ProgressEntry = {
-      area: entry.area,
-      duration: entry.duration,
-      date: entry.date,
-      stretchCount: entry.stretchCount || 0,
-      level: entry.level || 'beginner'
-    };
-    
     // Add to beginning of array
-    const updatedRoutines = [newEntry, ...existingRoutines];
+    const updatedRoutines = [entry, ...existingRoutines];
     
     // Limit to 20 most recent routines to prevent excessive growth
     const limitedRoutines = updatedRoutines.slice(0, 20);
@@ -347,7 +332,7 @@ export const saveRoutineProgress = async (entry: {
     
     // Also save to progress key for statistics
     const allRoutines = await getAllRoutines();
-    allRoutines.push(newEntry);
+    allRoutines.push(entry);
     const saveAllResult = await setData(KEYS.PROGRESS.PROGRESS_ENTRIES, allRoutines);
     
     return saveRecentResult && saveAllResult;
@@ -377,7 +362,8 @@ export const saveCompletedRoutine = async (
       duration: routine.duration,
       date: formattedDate,
       stretchCount: stretchCount,
-      level: routine.level
+      level: routine.level,
+      savedStretches: routine.customStretches || []
     };
     
     return await saveRoutineProgress(entry);
@@ -480,7 +466,9 @@ export const removeFavorite = async (stretchId: number): Promise<boolean> => {
 export const saveFavoriteRoutine = async (routine: { 
   name?: string; 
   area: BodyArea; 
-  duration: Duration 
+  duration: Duration,
+  level?: StretchLevel,
+  savedStretches?: any[]
 }): Promise<{success: boolean, limitReached?: boolean, message?: string}> => {
   try {
     // Get existing favorites
@@ -759,6 +747,14 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
       '@challenges'
     );
     
+    // Add premium promotion keys to ensure they get cleared
+    knownKeys.push(
+      'last_premium_promotion_shown',
+      'premium_promotion_hide_count',
+      'premium_promotion_daily_count',
+      'premium_promotion_daily_reset'
+    );
+    
     // Define testing-related keys to preserve
     const testingKeys = [
       '@flexbreak:testing_phase',
@@ -995,6 +991,12 @@ export const resetSimulationData = async (): Promise<boolean> => {
     await AsyncStorage.removeItem('@flexbreak:custom_reminder_message');
     await AsyncStorage.removeItem('reminder_message');
     await AsyncStorage.removeItem('firebase_reminder_message');
+    
+    // Also clear premium promotion data to reset timings and counts
+    await AsyncStorage.removeItem('last_premium_promotion_shown');
+    await AsyncStorage.removeItem('premium_promotion_hide_count');
+    await AsyncStorage.removeItem('premium_promotion_daily_count');
+    await AsyncStorage.removeItem('premium_promotion_daily_reset');
     
     console.log('Simulation data reset and custom reminder messages cleared');
     

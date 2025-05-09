@@ -275,7 +275,6 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       const now = Date.now();
       if (streakStatusCache.current.data && 
           now - streakStatusCache.current.lastChecked < streakStatusCache.current.ttl) {
-        console.log('Using cached streak status');
         const cachedStatus = streakStatusCache.current.data;
         setIsStreakBroken(cachedStatus.streakBroken);
         setCanSaveStreak(cachedStatus.canSaveYesterdayStreak);
@@ -319,16 +318,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       // If there's no activity for yesterday AND no activity for two days ago, it's a multi-day gap
       const hasMultiDayGap = !hasYesterdayActivity && !hasTwoDaysAgoActivity;
       
-      console.log('[STREAK DEBUG] Gap check:', {
-        hasTodayActivity,
-        hasYesterdayActivity,
-        hasTwoDaysAgoActivity,
-        hasMultiDayGap,
-        today: todayStr,
-        yesterday: yesterdayStr,
-        twoDaysAgo: twoDaysAgoStr,
-        recentDates: routineDates.slice(0, 5)
-      });
+     
       
       // Cache the result
       streakStatusCache.current = {
@@ -344,17 +334,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       const todayActivity = newStatus.maintainedToday;
       setHasTodayActivity(todayActivity);
       
-      // Log extensive streak details to debug
-      console.log('STREAK DEBUG - Current state:', {
-        currentStreak: newStatus.currentStreak,
-        streakBroken: status.streakBroken,
-        canSaveYesterdayStreak: status.canSaveYesterdayStreak,
-        freezesAvailable: status.freezesAvailable,
-        hasTodayActivity: todayActivity,
-        isTrulyBroken,
-        maintainedToday: newStatus.maintainedToday,
-        hasMultiDayGap
-      });
+    
       
       // Current logic - prevents showing apply button if user did activity today
       const originalCanSave = status.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity;
@@ -362,12 +342,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       // New logic - would allow applying freeze even if there's activity today
       const newLogicCanSave = status.canSaveYesterdayStreak && !isTrulyBroken;
       
-      console.log('STREAK DEBUG - Applying logic:', {
-        currentLogic: originalCanSave,
-        newPotentialLogic: newLogicCanSave,
-        todayActivityBlockingApply: (newLogicCanSave && !originalCanSave),
-        hasMultiDayGap
-      });
+
       
       // Only allow saving if:
       // 1. It's technically savable based on legacy status (missed only 1 day)

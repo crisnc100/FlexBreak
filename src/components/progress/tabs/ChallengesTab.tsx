@@ -237,14 +237,12 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
     if (activeTab === 'claimable') {
       const cachedClaimable = cacheUtils.getCachedChallenges('claimable');
       if (cachedClaimable !== null) {
-        console.log('Using cached claimable challenges');
         setLocalClaimable(cachedClaimable);
         skipRefresh = true;
       }
     } else {
       const cachedChallenges = cacheUtils.getCachedChallenges(activeTab);
       if (cachedChallenges !== null) {
-        console.log(`Using cached ${activeTab} challenges`);
         // Only update the active tab data to avoid UI jumps in other tabs
         setLocalChallenges(prev => ({
           ...prev,

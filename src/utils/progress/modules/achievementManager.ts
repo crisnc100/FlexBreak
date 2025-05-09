@@ -163,12 +163,7 @@ export const getAchievementsSummary = (userProgress: UserProgress) => {
     summary.byCategory[category].push(achievement);
   });
   
-  console.log('Achievement summary:', {
-    total: Object.keys(userProgress.achievements).length,
-    completed: summary.completed.length,
-    inProgress: summary.inProgress.length,
-    categories: Object.keys(summary.byCategory).length
-  });
+
   
   return summary;
 };

@@ -273,14 +273,11 @@ export function useProgressData() {
       
       // Use cached data if valid and not forcing refresh
       if (cacheValid) {
-        console.log(`[STATS DEBUG] Using cached progress data (age: ${now - dataCache.lastUpdated}ms)`);
         setUserProgress(dataCache.userProgress);
       } else {
         // Load fresh data from storage
-        console.log('[STATS DEBUG] Loading fresh progress data from storage');
         const progress = await storageService.getUserProgress();
         
-        console.log(`[STATS DEBUG] Loaded user progress: Level ${progress.level}, XP: ${progress.totalXP}, Current streak: ${progress.statistics.currentStreak}`);
         
         // Update cache
         dataCache.userProgress = progress;
@@ -294,7 +291,6 @@ export function useProgressData() {
                               (now - dataCache.freezeLastUpdated < dataCache.cooldownPeriod);
       
       if (freezeCacheValid) {
-        console.log(`[STATS DEBUG] Using cached freeze count: ${dataCache.freezeCount}`);
         setFreezeCount(dataCache.freezeCount);
       } else {
         // Check if user is premium before getting freeze count

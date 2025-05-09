@@ -18,6 +18,7 @@ interface FavoriteRoutine {
   duration: Duration;
   name?: string;
   timestamp: string;
+  savedStretches?: any[];
 }
 
 export default function FavoritesScreen() {
@@ -82,11 +83,21 @@ export default function FavoritesScreen() {
   };
 
   const handleStartRoutine = (routine: FavoriteRoutine) => {
-    navigation.navigate('Routine', {
-      area: routine.area,
-      duration: routine.duration,
-      level: 'beginner'
-    });
+    // If we have saved stretches, pass them as customStretches
+    if (routine.savedStretches && routine.savedStretches.length > 0) {
+      navigation.navigate('Routine', {
+        area: routine.area,
+        duration: routine.duration,
+        level: 'beginner',
+        customStretches: routine.savedStretches
+      });
+    } else {
+      navigation.navigate('Routine', {
+        area: routine.area,
+        duration: routine.duration,
+        level: 'beginner'
+      });
+    }
   };
 
   const renderFavoriteRoutine = ({ item }: { item: FavoriteRoutine }) => {

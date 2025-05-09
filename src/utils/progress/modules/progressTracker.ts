@@ -267,7 +267,6 @@ export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: 
   // Check if we have activity yesterday
   const hasYesterdayActivity = uniqueDates.includes(yesterday);
   
-  console.log(`[STREAK DEBUG] Calculating streak with freezes. Activity today: ${hasTodayActivity}, yesterday: ${hasYesterdayActivity}`);
   
   // Check if the most recent activity is too old (more than 2 days ago)
   const mostRecentDate = uniqueDates[0];
@@ -277,7 +276,6 @@ export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: 
   
   // If we haven't had activity in more than 2 days, streak is broken
   if (daysSinceLastActivity > 1 && !hasTodayActivity && !hasYesterdayActivity) {
-    console.log(`[STREAK DEBUG] Streak broken - last activity was ${daysSinceLastActivity} days ago (${mostRecentDate})`);
     return 0;
   }
   
@@ -300,6 +298,5 @@ export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: 
     }
   }
   
-  console.log(`[STREAK DEBUG] Calculated streak: ${streakCount}`);
   return streakCount;
 }; 

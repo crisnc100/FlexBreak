@@ -18,6 +18,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
 import { useRefresh } from '../../context/RefreshContext';
 import { Toast } from 'react-native-toast-notifications';
+import { usePremiumPromotion } from '../../context/PremiumPromotionContext';
 
 
 // Import subcomponents from tabs
@@ -54,6 +55,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   xpBreakdown = [],
   levelUp,
   isXpBoosted,
+  savedStretches = [],
   onShowDashboard,
   onNavigateHome,
   onOpenSubscription
@@ -61,10 +63,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   const navigation = useNavigation<AppNavigationProp>();
   const { theme, isDark } = useTheme();
   const { triggerRefresh } = useRefresh();
+  const { showPromotion, canShowPromotion, showPromotionWithDelay } = usePremiumPromotion();
   const styles = themedStyles(theme);
   
   // State to store resolved routine data
   const [routineLength, setRoutineLength] = useState(0);
+  const [hasShownPromotion, setHasShownPromotion] = useState(false);
   
   // Get unlocked achievements using the custom hook
   const { unlockedAchievements } = useAchievements(levelUp);
@@ -194,6 +198,16 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   const favoriteAnimOpacity = useRef(new Animated.Value(0)).current;
   const [isSaving, setIsSaving] = useState(false);
   
+  // Show premium promotion after a delay when the component mounts (after routine completion)
+  useEffect(() => {
+    if (!isPremium && canShowPromotion && !hasShownPromotion) {
+      // Only show promotion after routine completion with a delay
+      // to ensure user sees their results first
+      showPromotionWithDelay('routine_completed', 3000); // 3 seconds delay
+      setHasShownPromotion(true);
+    }
+  }, [isPremium, canShowPromotion, hasShownPromotion]);
+  
   // Function to navigate properly with params
   const navigateToScreen = (screenName: string, params?: any) => {
     // Reset navigation state and navigate to the specific screen with params
@@ -239,7 +253,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   const saveToFavorites = async () => {
     if (!isPremium) {
-      onOpenSubscription();
+      // Show premium promotion before opening subscription
+      if (canShowPromotion) {
+        showPromotion('save_favorite');
+      } else {
+        onOpenSubscription();
+      }
       return;
     }
     
@@ -270,10 +289,13 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
       ]).start();
       
       triggerRefresh();
-      const routineParams: RoutineParams = {
+      // Prepare data to save including the exact stretches used
+      const routineParams: any = {
+        name: `${area} ${duration} min routine`,
         area: area,
         duration: duration,
-        level: 'beginner'
+        level: 'beginner',
+        savedStretches: savedStretches
       };
       
       const result = await saveFavoriteRoutine(routineParams);
@@ -320,7 +342,12 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   
   const startSmartPick = () => {
     if (!isPremium) {
-      onOpenSubscription();
+      // Show premium promotion before opening subscription
+      if (canShowPromotion) {
+        showPromotion('smart_pick');
+      } else {
+        onOpenSubscription();
+      }
       return;
     }
     

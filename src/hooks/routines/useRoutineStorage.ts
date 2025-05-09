@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ProgressEntry, BodyArea, Duration } from '../../types';
+import { ProgressEntry, BodyArea, Duration, StretchLevel } from '../../types';
 import * as storageService from '../../services/storageService';
 
 interface UseRoutineStorageReturn {
   recentRoutines: ProgressEntry[];
   isLoading: boolean;
   hasSynchronized: boolean;
-  saveRoutineProgress: (entry: { area: BodyArea; duration: Duration; date: string }) => Promise<void>;
+  saveRoutineProgress: (entry: { area: BodyArea; duration: Duration; date: string; stretchCount?: number; level?: StretchLevel; savedStretches?: any[] }) => Promise<void>;
   getRecentRoutines: () => Promise<ProgressEntry[]>;
   getAllRoutines: () => Promise<ProgressEntry[]>;
   hideRoutine: (routineDate: string) => Promise<void>;
   deleteRoutine: (routineDate: string) => Promise<void>;
-  saveFavoriteRoutine: (routine: { name: string; area: BodyArea; duration: Duration }) => Promise<void>;
+  saveFavoriteRoutine: (routine: { name?: string; area: BodyArea; duration: Duration; level?: StretchLevel; savedStretches?: any[] }) => Promise<void>;
   setDashboardFlag: (value: boolean) => Promise<void>;
   getDashboardFlag: () => Promise<boolean>;
   clearAllFlags: () => Promise<void>;
@@ -26,7 +26,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Log routines when they change
   useEffect(() => {
     if (recentRoutines.length > 0) {
-      console.log('[HOOK DEBUG] Recent routines updated in state:', recentRoutines.length);
       
       // Log dates for all routines
       const sortedDates = recentRoutines
@@ -34,7 +33,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
         .filter(Boolean)
         .sort();
       
-      console.log('[HOOK DEBUG] Recent routine dates in state:', JSON.stringify(sortedDates));
       
       // Log dates for routines in the current month
       const today = new Date();
@@ -84,13 +82,11 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Synchronize data between storage locations
   const synchronizeProgressData = useCallback(async () => {
     try {
-      console.log('[HOOK DEBUG] Synchronizing progress data...');
       
       // Use the centralized function from storageService
       const success = await storageService.synchronizeProgressData();
       
       if (success) {
-        console.log('[HOOK DEBUG] Synchronization successful, refreshing recent routines...');
         // Refresh recent routines after synchronization
         const updatedRoutines = await storageService.getRecentRoutines();
         setRecentRoutines(updatedRoutines);
@@ -114,16 +110,13 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   }, []);
 
   // Save routine progress
-  const saveRoutineProgress = useCallback(async (entry: { area: BodyArea; duration: Duration; date: string }) => {
+  const saveRoutineProgress = useCallback(async (entry: { area: BodyArea; duration: Duration; date: string; stretchCount?: number; level?: StretchLevel; savedStretches?: any[] }) => {
     try {
-      console.log('[HOOK DEBUG] Saving routine progress:', JSON.stringify(entry));
-      console.log(`[HOOK DEBUG] Routine date: ${entry.date.split('T')[0]}`);
       
       // Use storageService instead of direct AsyncStorage calls
       const success = await storageService.saveRoutineProgress(entry);
       
       if (success) {
-        console.log('[HOOK DEBUG] Routine saved successfully, refreshing data...');
         // Update local state
         const updatedRoutines = await storageService.getRecentRoutines();
         setRecentRoutines(updatedRoutines);
@@ -208,7 +201,7 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   }, [hideRoutine]);
 
   // Save a favorite routine
-  const saveFavoriteRoutine = useCallback(async (routine: { name: string; area: BodyArea; duration: Duration }) => {
+  const saveFavoriteRoutine = useCallback(async (routine: { name?: string; area: BodyArea; duration: Duration; level?: StretchLevel; savedStretches?: any[] }) => {
     try {
       // Use storageService instead of direct AsyncStorage calls
       await storageService.saveFavoriteRoutine(routine);

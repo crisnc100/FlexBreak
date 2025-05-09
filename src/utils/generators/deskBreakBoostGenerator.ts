@@ -3,7 +3,7 @@ import stretches from '../../data/stretches';
 
 // The IDs for the desk break boost stretches as specified in the requirements
 const DESK_BREAK_BOOST_STRETCH_IDS = [
-  42, 46, 54, 56, 62, 65, 66, 81, 83, 91, 100, 115, 92, 114, 53, 34, 15, 74
+  42, 46, 54, 56, 62, 65, 66, 81, 83, 91, 100, 113, 92, 114, 53, 34, 15, 74
 ];
 
 // Group stretches by area for balanced selection
@@ -11,7 +11,7 @@ const STRETCH_CATEGORIES = {
   upperBody: [42, 46, 54, 56, 62, 53], // Upper back, chest, shoulders
   arms: [65, 66], // Wrists, arms
   neck: [81, 83, 91, 92], // Neck stretches
-  fullBody: [100, 115, 114] // Full body, stand/chair stretches
+  fullBody: [100, 113, 114] // Full body, stand/chair stretches
 };
 
 /**

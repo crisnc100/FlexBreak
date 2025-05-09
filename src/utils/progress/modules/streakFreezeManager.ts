@@ -16,12 +16,10 @@ const MAX_FREEZES = 2;
  */
 export const isFreezeAvailable = async (): Promise<boolean> => {
   try {
-    console.log('[FREEZE DEBUG] Checking if streak freeze is available');
     
     // First, check if user has access to streak freezes feature
     const hasAccess = await featureAccessUtils.canAccessFeature('streak_freezes');
     if (!hasAccess) {
-      console.log('[FREEZE DEBUG] User does not have access to streak freezes feature');
       return false;
     }
     
@@ -29,23 +27,18 @@ export const isFreezeAvailable = async (): Promise<boolean> => {
     const streakStatus = await simpleStreakManager.getStreakStatus();
     const isAvailable = streakStatus.canFreeze && streakStatus.freezesAvailable > 0;
     
-    console.log(`[FREEZE DEBUG] Freeze availability check: canFreeze=${streakStatus.canFreeze}, freezesAvailable=${streakStatus.freezesAvailable}, isAvailable=${isAvailable}`);
     
     // Additional logging to debug today activity issue
     const today = dateUtils.today();
     const todayActivity = await simpleStreakManager.hasRoutineToday();
-    console.log(`[FREEZE DEBUG] Today (${today}) activity check: ${todayActivity}`);
     
     // Get detailed streak status
     const legacyStatus = await simpleStreakManager.getLegacyStreakStatus();
-    console.log(`[FREEZE DEBUG] Legacy streak status: canSaveYesterdayStreak=${legacyStatus.canSaveYesterdayStreak}, streakBroken=${legacyStatus.streakBroken}, hasTodayActivity=${legacyStatus.hasTodayActivity}`);
     
     const isTrulyBroken = await simpleStreakManager.isStreakBroken();
-    console.log(`[FREEZE DEBUG] Is streak truly broken (3+ days missed): ${isTrulyBroken}`);
     
     return isAvailable;
   } catch (error) {
-    console.error('[FREEZE ERROR] Error checking streak freeze availability:', error);
     return false;
   }
 };
@@ -54,7 +47,6 @@ export const isFreezeAvailable = async (): Promise<boolean> => {
  * Check if a streak freeze was applied for a specific date
  */
 export const wasStreakFreezeAppliedForDate = async (dateStr: string): Promise<boolean> => {
-  console.log(`[FREEZE DEBUG] Checking if freeze was applied for date: ${dateStr}`);
   
   // Make sure streak manager is initialized
   if (!simpleStreakManager.streakCache.initialized) {
@@ -76,7 +68,6 @@ export const wasStreakFreezeAppliedForDate = async (dateStr: string): Promise<bo
       return true;
     }
     
-    console.log(`[FREEZE DEBUG] No freeze found for date ${dateStr}`);
     return false;
   }
   
@@ -106,7 +97,6 @@ export const wasStreakFreezeAppliedRecently = async (): Promise<boolean> => {
     const appliedYesterday = await wasStreakFreezeAppliedForDate(yesterdayStr);
     
     const result = appliedToday || appliedYesterday;
-    console.log(`[FREEZE DEBUG] Recent freeze check: today=${appliedToday}, yesterday=${appliedYesterday}, result=${result}`);
     
     return result;
   } catch (error) {
@@ -120,7 +110,6 @@ export const wasStreakFreezeAppliedRecently = async (): Promise<boolean> => {
  */
 export const getFreezesAvailable = async (): Promise<number> => {
   try {
-    console.log('[FREEZE DEBUG] Getting available freezes count');
     
     // Always get the count directly from UserProgress for accuracy
     const userProgress = await storageService.getUserProgress();
@@ -131,7 +120,6 @@ export const getFreezesAvailable = async (): Promise<number> => {
       
       // Update the streak manager cache to match
       if (simpleStreakManager.streakCache.freezesAvailable !== storedCount) {
-        console.log(`[FREEZE DEBUG] Updating streak manager cache freeze count from ${simpleStreakManager.streakCache.freezesAvailable} to ${storedCount}`);
         simpleStreakManager.streakCache.freezesAvailable = storedCount;
       }
       
@@ -182,7 +170,6 @@ export const applyFreeze = async (): Promise<{
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = dateUtils.formatDateYYYYMMDD(yesterday);
       
-      console.log(`[FREEZE DEBUG] Successfully applied freeze for ${yesterdayStr}, remaining freezes: ${result.remainingFreezes}`);
       
       // Log detailed streak info after applying
       const afterStatus = await simpleStreakManager.getLegacyStreakStatus();
@@ -228,7 +215,6 @@ export const applyFreeze = async (): Promise<{
  */
 export const refillFreezes = async (): Promise<boolean> => {
   try {
-    console.log('[FREEZE DEBUG] Checking if freezes need to be refilled');
     
     // Check if user has access to streak freezes feature
     const hasAccess = await featureAccessUtils.canAccessFeature('streak_freezes');

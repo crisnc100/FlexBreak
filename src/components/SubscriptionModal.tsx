@@ -23,6 +23,7 @@ import { useFeatureAccess, PREMIUM_STATUS_CHANGED } from '../hooks/progress/useF
 import { useGamification } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
 import { gamificationEvents } from '../hooks/progress/useGamification';
+import { usePremiumPromotion } from '../context/PremiumPromotionContext';
 
 /* --- helpers (benefits + reward init) --- */
 const BENEFITS = ['Track your progress','Custom routines','Dark mode',
@@ -39,6 +40,7 @@ export default function SubscriptionModal({ visible, onClose }){
   const {refreshAccess}=useFeatureAccess();
   const {refreshData}=useGamification();
   const {refreshTheme}=useTheme();
+  const { source, setSource } = usePremiumPromotion();
 
   const [products,setProducts]=useState<any[]|null>(null);
   const [busy,setBusy]=useState(false);
@@ -193,6 +195,12 @@ export default function SubscriptionModal({ visible, onClose }){
       {isCurrent(item.productId)&&<Text style={styles.cardCurrent}>Current plan</Text>}
     </TouchableOpacity>
   );
+
+  // Track subscription source for analytics
+  useEffect(() => {
+    // This helps track where the user came from when they subscribed
+    console.log(`[SubscriptionModal] Opened from source: ${source || 'direct'}`);
+  }, [source]);
 
   return(
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
