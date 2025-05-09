@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView, StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import SubscriptionModal from '../components/SubscriptionModal';
 import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
@@ -26,9 +27,6 @@ import * as storageService from '../services/storageService';
 
 // Import smart pick generator
 import { generateSmartPick, RoutineRecommendation } from '../utils/generators/smartPickGenerator';
-
-// Import premium promotion context
-import { usePremiumPromotion } from '../context/PremiumPromotionContext';
 
 // Define the possible screens in the routine flow
 type RoutineScreenState = 'DASHBOARD' | 'ACTIVE' | 'COMPLETED' | 'LOADING';
@@ -93,13 +91,11 @@ export default function RoutineScreen() {
   // Get theme context for refreshing access to dark theme
   const { refreshThemeAccess, themeType, setThemeType } = useTheme();
 
-  // Get premium promotion context
-  const { showPromotion } = usePremiumPromotion();
-
   // Single screen state to track what we're showing
   const [screenState, setScreenState] = useState<RoutineScreenState>('LOADING');
 
   // Modal visibility state
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [smartPickModalVisible, setSmartPickModalVisible] = useState(false);
 
   // Add state for XP earned
@@ -631,12 +627,6 @@ export default function RoutineScreen() {
     }
   };
 
-  // Update onOpenSubscription to use premium promotion context instead
-  const handleOpenSubscription = () => {
-    // Use premium promotion to handle subscription modal
-    showPromotion('subscription_needed');
-  };
-
   // Handle smart pick modal
   const handleSmartPickTap = async () => {
     console.log('Smart Pick tapped, isPremium:', isPremium);
@@ -655,8 +645,9 @@ export default function RoutineScreen() {
         setSmartPickModalVisible(true);
       }
     } else {
-      // Non-premium users see the upgrade modal via promotion system
-      handleOpenSubscription();
+      // Non-premium users see the upgrade modal
+      setSmartPickRecommendation(null);
+      setSmartPickModalVisible(true);
     }
   };
 
@@ -845,10 +836,15 @@ export default function RoutineScreen() {
           onDeleteRoutine={handleHideRoutine}
         />
 
+        <SubscriptionModal
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
+
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={handleOpenSubscription}
+          onUpgrade={() => setSubscriptionModalVisible(true)}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}
@@ -875,13 +871,18 @@ export default function RoutineScreen() {
           savedStretches={completedStretches}
           onShowDashboard={showDashboard}
           onNavigateHome={handleCreateNewRoutine}
-          onOpenSubscription={handleOpenSubscription}
+          onOpenSubscription={() => setSubscriptionModalVisible(true)}
+        />
+
+        <SubscriptionModal
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
         />
 
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={handleOpenSubscription}
+          onUpgrade={() => setSubscriptionModalVisible(true)}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}
@@ -908,10 +909,15 @@ export default function RoutineScreen() {
           }}
         />
 
+        <SubscriptionModal
+          visible={subscriptionModalVisible}
+          onClose={() => setSubscriptionModalVisible(false)}
+        />
+
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={handleOpenSubscription}
+          onUpgrade={() => setSubscriptionModalVisible(true)}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}

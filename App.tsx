@@ -34,9 +34,6 @@ import * as performance from './src/utils/performance/performance';
 import * as storageService from './src/services/storageService';
 import * as notifications from './src/utils/notifications';
 import * as firebaseReminders from './src/utils/firebaseReminders';
-import { PremiumPromotionProvider, usePremiumPromotion } from './src/context/PremiumPromotionContext';
-import PremiumPromotionModal from './src/components/PremiumPromotionModal';
-import SubscriptionModal from './src/components/SubscriptionModal';
 
 // Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
@@ -152,16 +149,14 @@ export default function App() {
       <SafeAreaProvider>
         <ThemeProvider>
           <PremiumProvider>
-            <PremiumPromotionProvider>
-              <RefreshProvider>
-                <StatusBar 
-                  barStyle="dark-content" 
-                  backgroundColor="transparent" 
-                  translucent={true} 
-                />
-                <MainApp />
-              </RefreshProvider>
-            </PremiumPromotionProvider>
+            <RefreshProvider>
+              <StatusBar 
+                barStyle="dark-content" 
+                backgroundColor="transparent" 
+                translucent={true} 
+              />
+              <MainApp />
+            </RefreshProvider>
           </PremiumProvider>
         </ThemeProvider>
       </SafeAreaProvider>
@@ -340,10 +335,6 @@ function MainApp() {
   const { theme, isDark } = useTheme();
   const [showIntro, setShowIntro] = useState(true);
   const fadeInAnim = useRef(new Animated.Value(0)).current;
-  const { showPromotionModal, hidePromotion, showPromotion, showPromotionWithDelay, getPromotionCount } = usePremiumPromotion();
-  const { isPremium } = usePremium();
-  const [hasShownAppStartPromotion, setHasShownAppStartPromotion] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   
   // Mark component render for performance tracking
   useEffect(() => {
@@ -461,37 +452,6 @@ function MainApp() {
     }
   }, [showIntro]);
   
-  // Show premium promotion on app start after delay (if not premium)
-  useEffect(() => {
-    if (!showIntro && !isPremium && !hasShownAppStartPromotion) {
-      // Check if user has completed at least one routine before showing promotion
-      const checkUserProgress = async () => {
-        try {
-          const progress = await storageService.getUserProgress();
-          const hasCompletedRoutines = progress?.statistics?.totalRoutines > 0;
-          
-          // Only show promotion if user has completed at least one routine
-          // This ensures we're not showing it to brand new users
-          if (hasCompletedRoutines) {
-            // Check if we've already shown promotions today
-            const dailyCount = await getPromotionCount();
-            
-            // If we haven't shown any promotions today, show one after a short delay
-            if (dailyCount === 0) {
-              // Show promotion with a delay to let the app load fully first
-              showPromotionWithDelay('app_start', 5000); // 5 seconds delay
-              setHasShownAppStartPromotion(true);
-            }
-          }
-        } catch (error) {
-          console.error('Error checking user progress:', error);
-        }
-      };
-      
-      checkUserProgress();
-    }
-  }, [showIntro, isPremium, hasShownAppStartPromotion]);
-  
   const navigationTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
     colors: {
@@ -506,15 +466,6 @@ function MainApp() {
   // Handle intro complete
   const handleIntroComplete = () => {
     setShowIntro(false);
-  };
-  
-  // Handle subscription modal open
-  const handleOpenSubscriptionModal = () => {
-    // First hide the promotion modal
-    hidePromotion();
-    
-    // Then show the subscription modal immediately
-    setShowSubscriptionModal(true);
   };
   
   // If showing intro, render the IntroManager
@@ -539,19 +490,6 @@ function MainApp() {
       
       {/* Streak Freeze Prompt */}
       <StreakFreezePrompt />
-      
-      {/* Premium Promotion Modal */}
-      <PremiumPromotionModal
-        visible={showPromotionModal}
-        onClose={hidePromotion}
-        onSubscribe={handleOpenSubscriptionModal}
-      />
-      
-      {/* Subscription Modal */}
-      <SubscriptionModal
-        visible={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
-      />
     </Animated.View>
   );
 } 

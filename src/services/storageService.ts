@@ -747,14 +747,6 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
       '@challenges'
     );
     
-    // Add premium promotion keys to ensure they get cleared
-    knownKeys.push(
-      'last_premium_promotion_shown',
-      'premium_promotion_hide_count',
-      'premium_promotion_daily_count',
-      'premium_promotion_daily_reset'
-    );
-    
     // Define testing-related keys to preserve
     const testingKeys = [
       '@flexbreak:testing_phase',
@@ -991,12 +983,6 @@ export const resetSimulationData = async (): Promise<boolean> => {
     await AsyncStorage.removeItem('@flexbreak:custom_reminder_message');
     await AsyncStorage.removeItem('reminder_message');
     await AsyncStorage.removeItem('firebase_reminder_message');
-    
-    // Also clear premium promotion data to reset timings and counts
-    await AsyncStorage.removeItem('last_premium_promotion_shown');
-    await AsyncStorage.removeItem('premium_promotion_hide_count');
-    await AsyncStorage.removeItem('premium_promotion_daily_count');
-    await AsyncStorage.removeItem('premium_promotion_daily_reset');
     
     console.log('Simulation data reset and custom reminder messages cleared');
     
