@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, Image, Animated, TouchableWithoutFeedback } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { usePremium } from '../../context/PremiumContext';
+import * as Haptics from 'expo-haptics';
 
 interface HomeHeaderProps {
   title?: string;
@@ -18,16 +19,64 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 }) => {
   const { theme, isDark } = useTheme();
   const { isPremium } = usePremium();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [animationInProgress, setAnimationInProgress] = useState(false);
+  
+  const handleLogoPress = () => {
+    if (animationInProgress) return;
+    
+    // Provide subtle haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    setAnimationInProgress(true);
+    
+    // Simple, elegant animation sequence
+    Animated.sequence([
+      // Scale down slightly
+      Animated.timing(scaleAnim, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      
+      // Bounce back slightly larger
+      Animated.spring(scaleAnim, {
+        toValue: 1.05,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      
+      // Settle back to normal size
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 30,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      setAnimationInProgress(false);
+    });
+  };
   
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
-        <View style={styles.logoContainer}>
-          <Image 
-            source={require('../../../assets/images/potentialLogo3.png')} 
-            style={styles.logoImage}
-          />
-        </View>
+        <TouchableWithoutFeedback onPress={handleLogoPress}>
+          <Animated.View 
+            style={[
+              styles.logoContainer,
+              {
+                transform: [{ scale: scaleAnim }]
+              }
+            ]}
+          >
+            <Image 
+              source={require('../../../assets/images/potentialLogo2.png')} 
+              style={styles.logoImage}
+            />
+          </Animated.View>
+        </TouchableWithoutFeedback>
         
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: theme.text }]}>
@@ -54,17 +103,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
-    width: 60,
-    height: 60,
+    width: 72,
+    height: 72,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    overflow: 'visible'
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   logoImage: {
-    width: 110,
-    height: 110,
+    width: 80,
+    height: 80,
     resizeMode: 'contain',
+    borderRadius: 12,
     backgroundColor: 'transparent'
   },
   textContainer: {

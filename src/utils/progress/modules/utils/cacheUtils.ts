@@ -97,7 +97,6 @@ export const setCachedChallenges = (category: string, challenges: Challenge[]): 
     };
   }
   
-  console.log(`Caching ${challenges.length} ${category} challenges`);
   
   challengeCache[category].data = challenges;
   challengeCache[category].timestamp = Date.now();

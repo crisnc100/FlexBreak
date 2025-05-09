@@ -49,8 +49,7 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
         .map(r => r.date?.split('T')[0])
         .sort();
       
-      console.log(`[HOOK DEBUG] Routines this month (${currentMonth + 1}/${currentYear}):`, 
-                 thisMonthDates.length, JSON.stringify(thisMonthDates));
+  
     }
   }, [recentRoutines]);
 
@@ -58,14 +57,11 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   useEffect(() => {
     const loadRoutines = async () => {
       try {
-        console.log('[HOOK DEBUG] Loading routines from storage...');
         const routines = await getRecentRoutines();
         setRecentRoutines(routines);
-        console.log('[HOOK DEBUG] Loaded routines:', routines.length);
         
         // Synchronize data between storage locations (only once)
         if (!hasSynchronized) {
-          console.log('[HOOK DEBUG] Starting initial data synchronization...');
           await synchronizeProgressData();
           setHasSynchronized(true);
         }
@@ -97,11 +93,7 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
           .filter(Boolean)
           .sort();
         
-        console.log('[HOOK DEBUG] Synced routine dates:', JSON.stringify(syncedDates));
-      } else {
-        console.log('[HOOK DEBUG] Synchronization failed or no changes made');
       }
-      
       return success;
     } catch (error) {
       console.error('[HOOK ERROR] Error calling synchronizeProgressData:', error);
@@ -127,9 +119,7 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
           .filter(Boolean)
           .sort();
         
-        console.log('[HOOK DEBUG] Updated routine dates after save:', JSON.stringify(updatedDates));
       } else {
-        console.log('[HOOK DEBUG] Failed to save routine progress');
       }
     } catch (error) {
       console.error('[HOOK ERROR] Error saving routine progress:', error);
@@ -140,7 +130,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Get recent routines (only visible ones)
   const getRecentRoutines = useCallback(async (): Promise<ProgressEntry[]> => {
     try {
-      console.log('[HOOK DEBUG] Fetching recent routines from storage...');
       
       // Use storageService instead of direct AsyncStorage calls
       const freshRoutines = await storageService.getRecentRoutines();
@@ -151,7 +140,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
         .filter(Boolean)
         .sort();
       
-      console.log('[HOOK DEBUG] Retrieved routine dates:', JSON.stringify(retrievedDates));
       
       // Check for today and yesterday dates
       const today = new Date();
@@ -164,8 +152,7 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
       const hasToday = retrievedDates.includes(todayStr);
       const hasYesterday = retrievedDates.includes(yesterdayStr);
       
-      console.log(`[HOOK DEBUG] Has routine for today (${todayStr}): ${hasToday}`);
-      console.log(`[HOOK DEBUG] Has routine for yesterday (${yesterdayStr}): ${hasYesterday}`);
+
       
       // Update local state with fresh data
       setRecentRoutines(freshRoutines);
@@ -248,7 +235,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   // Get all routines (both visible and hidden) for statistics
   const getAllRoutines = useCallback(async (): Promise<ProgressEntry[]> => {
     try {
-      console.log('[HOOK DEBUG] Fetching all routines from storage...');
       
       // Use storageService instead of direct AsyncStorage calls
       const allRoutines = await storageService.getAllRoutines();
@@ -259,7 +245,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
         .filter(Boolean)
         .sort();
       
-      console.log('[HOOK DEBUG] All routine dates:', JSON.stringify(allDates));
       
       // Count routines by month for the current year
       const today = new Date();
@@ -276,7 +261,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
         }
       });
       
-      console.log(`[HOOK DEBUG] Routines by month for ${currentYear}:`, JSON.stringify(routinesByMonth));
       
       return allRoutines;
     } catch (error) {
