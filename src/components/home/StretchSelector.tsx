@@ -106,9 +106,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
         stretch.tags.includes(selectedArea)
       ) && 
       // Match the level filter if specified
-      (filters.level === 'all' || stretch.level === filters.level) &&
-      // Only include stretches with demo
-      stretch.hasDemo === true
+      (filters.level === 'all' || stretch.level === filters.level)
     );
     
     setAvailableStretches(filtered);
@@ -244,10 +242,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
         stretch.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         stretch.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      // Only include stretches with demo
-      const hasDemo = stretch.hasDemo === true;
-      
-      return matchesAreas && matchesSearch && hasDemo;
+      return matchesAreas && matchesSearch;
     });
     
     // Use the premiumUtils function to filter by level and premium access

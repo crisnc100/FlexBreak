@@ -44,6 +44,7 @@
     "@react-native-community/cli": "^18.0.0",
     "@types/react": "~18.3.12",
     "@types/react-native": "^0.72.8",
+    "react-native-clean-project": "^4.0.3",
     "typescript": "^5.8.3"
   },
   "private": true
