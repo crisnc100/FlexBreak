@@ -8,6 +8,7 @@
 import * as storageService from '../../../services/storageService';
 import * as streakManager from './streakManager';
 import { calculateStreakWithFreezes } from './progressTracker';
+import * as dateUtils from './utils/dateUtils';
 
 /**
  * Validates and corrects streak calculations across all parts of the app
@@ -28,6 +29,11 @@ export const validateAndCorrectStreak = async (): Promise<{
   corrections: string[];
 }> => {
   try {
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Current date/time: ${new Date().toISOString()}`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Today string: ${dateUtils.todayStringLocal()}`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Yesterday string: ${dateUtils.yesterdayStringLocal()}`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Local timezone offset: ${new Date().getTimezoneOffset() / -60}h`);
+    
     console.log('[VALIDATOR DEBUG] Starting streak validation and correction');
     const corrections: string[] = [];
     
@@ -50,12 +56,20 @@ export const validateAndCorrectStreak = async (): Promise<{
     const routines = await storageService.getAllRoutines();
     const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
     
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Routine count: ${routines.length}`);
+    if (routines.length > 0) {
+      console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - First routine date: ${routines[0].date}`);
+      console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - First routine parsed: ${new Date(routines[0].date).toISOString()}`);
+    }
+    
     // Extract routine dates
     const routineDates = routines
       .filter(r => r.date)
-      .map(r => r.date.split('T')[0]);
+      .map(r => dateUtils.toDateString(r.date));
     
-    console.log(`[VALIDATOR DEBUG] Found ${routineDates.length} routine dates and ${freezeDates.length} freeze dates for calculation`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Found ${routineDates.length} routine dates and ${freezeDates.length} freeze dates for calculation`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - First few routine dates: ${routineDates.slice(0, 3).join(', ')}`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Freeze dates: ${freezeDates.join(', ')}`);
     
     // Calculate with freezes
     const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);

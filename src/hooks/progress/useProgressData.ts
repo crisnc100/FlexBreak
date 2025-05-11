@@ -95,7 +95,7 @@ export function useProgressData() {
     // Extract routine dates for streak calculation
     const routineDates = data
       .filter(r => r.date)
-      .map(r => r.date!.split('T')[0]);
+      .map(r => dateUtils.toDateString(r.date));
     
     // Check today and yesterday
     const today = new Date();

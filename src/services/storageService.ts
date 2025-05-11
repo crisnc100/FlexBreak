@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { ProgressEntry, RoutineParams, BodyArea, Duration, StretchLevel } from '../types';
 import { UserProgress } from '../utils/progress/types';
 import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
-
+import { streakEvents, STREAK_UPDATED_EVENT } from '../utils/progress/modules/streakManager';
 // ========== STORAGE KEYS ==========
 export const KEYS = {
   USER: {
@@ -281,18 +281,40 @@ const migrateUserProgress = (progress: UserProgress): UserProgress => {
 
 // ========== ROUTINE METHODS ==========
 
+// Debug helper function for timezone logging
+const logTimezone = (functionName: string, message: string) => {
+  console.log(`[STORAGE TIMEZONE DEBUG] ${functionName} - ${message}`);
+};
+
 /**
  * Get recent routines
  * @returns Array of recent routines
  */
 export const getRecentRoutines = async (): Promise<ProgressEntry[]> => {
   try {
+    logTimezone('getRecentRoutines', `Current date/time: ${new Date().toISOString()}`);
+    logTimezone('getRecentRoutines', `Local time components: Y=${new Date().getFullYear()} M=${new Date().getMonth()+1} D=${new Date().getDate()}`);
+    logTimezone('getRecentRoutines', `Timezone offset: ${new Date().getTimezoneOffset() / -60}h`);
+    
     const routines = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_HISTORY, []);
+    logTimezone('getRecentRoutines', `Found ${routines.length} total routines`);
+    
+    if (routines.length > 0) {
+      logTimezone('getRecentRoutines', `First routine date: ${routines[0].date}`);
+      
+      // Check date parsing
+      const firstDate = new Date(routines[0].date);
+      logTimezone('getRecentRoutines', `First routine parsed ISO: ${firstDate.toISOString()}`);
+      logTimezone('getRecentRoutines', `First routine local components: Y=${firstDate.getFullYear()} M=${firstDate.getMonth()+1} D=${firstDate.getDate()}`);
+    }
+    
     // Filter out hidden routines
     const visibleRoutines = routines.filter(routine => !routine.hidden);
+    logTimezone('getRecentRoutines', `Returning ${visibleRoutines.length} visible routines`);
     
     return visibleRoutines;
   } catch (error) {
+    logTimezone('getRecentRoutines', `Error: ${error}`);
     return [];
   }
 };
@@ -303,10 +325,30 @@ export const getRecentRoutines = async (): Promise<ProgressEntry[]> => {
  */
 export const getAllRoutines = async (): Promise<ProgressEntry[]> => {
   try {
+    logTimezone('getAllRoutines', `Current date/time: ${new Date().toISOString()}`);
+    
     const allRoutines = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
+    logTimezone('getAllRoutines', `Found ${allRoutines.length} total routines`);
+    
+    if (allRoutines.length > 0) {
+      // Log sorted dates to help debug streak calculation issues
+      const sortedDates = [...allRoutines]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .map(r => r.date);
+      
+      logTimezone('getAllRoutines', `First few sorted dates: ${sortedDates.slice(0, 5).join(', ')}`);
+      
+      // Check date parsing for the most recent routine
+      if (sortedDates.length > 0) {
+        const mostRecentDate = new Date(sortedDates[0]);
+        logTimezone('getAllRoutines', `Most recent date parsed: ${mostRecentDate.toISOString()}`);
+        logTimezone('getAllRoutines', `Most recent local components: Y=${mostRecentDate.getFullYear()} M=${mostRecentDate.getMonth()+1} D=${mostRecentDate.getDate()}`);
+      }
+    }
     
     return allRoutines;
   } catch (error) {
+    logTimezone('getAllRoutines', `Error: ${error}`);
     return [];
   }
 };
@@ -318,6 +360,14 @@ export const getAllRoutines = async (): Promise<ProgressEntry[]> => {
  */
 export const saveRoutineProgress = async (entry: ProgressEntry): Promise<boolean> => {
   try {
+    logTimezone('saveRoutineProgress', `Current date/time: ${new Date().toISOString()}`);
+    logTimezone('saveRoutineProgress', `Entry date: ${entry.date}`);
+    
+    // Parse and log entry date for debugging
+    const entryDate = new Date(entry.date);
+    logTimezone('saveRoutineProgress', `Entry date parsed: ${entryDate.toISOString()}`);
+    logTimezone('saveRoutineProgress', `Entry local components: Y=${entryDate.getFullYear()} M=${entryDate.getMonth()+1} D=${entryDate.getDate()}`);
+    
     // Get existing routines
     const existingRoutines = await getRecentRoutines();
     
@@ -335,8 +385,10 @@ export const saveRoutineProgress = async (entry: ProgressEntry): Promise<boolean
     allRoutines.push(entry);
     const saveAllResult = await setData(KEYS.PROGRESS.PROGRESS_ENTRIES, allRoutines);
     
+    streakEvents.emit(STREAK_UPDATED_EVENT);    
     return saveRecentResult && saveAllResult;
   } catch (error) {
+    logTimezone('saveRoutineProgress', `Error: ${error}`);
     return false;
   }
 };
@@ -352,10 +404,16 @@ export const saveCompletedRoutine = async (
   stretchCount: number = 0
 ): Promise<boolean> => {
   try {
+    logTimezone('saveCompletedRoutine', `Current date/time: ${new Date().toISOString()}`);
+    
     // Create progress entry
     const now = new Date();
     const formattedDate = now.toISOString();
     const cleanDate = formattedDate.split('T')[0];
+    
+    logTimezone('saveCompletedRoutine', `Formatted date: ${formattedDate}`);
+    logTimezone('saveCompletedRoutine', `Clean date: ${cleanDate}`);
+    logTimezone('saveCompletedRoutine', `Local components: Y=${now.getFullYear()} M=${now.getMonth()+1} D=${now.getDate()}`);
     
     const entry: ProgressEntry = {
       area: routine.area,
@@ -368,6 +426,7 @@ export const saveCompletedRoutine = async (
     
     return await saveRoutineProgress(entry);
   } catch (error) {
+    logTimezone('saveCompletedRoutine', `Error: ${error}`);
     return false;
   }
 };

@@ -338,13 +338,11 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       setHasTodayActivity(todayActivity);
       
       // More detailed logs to debug today's activity issue
-      const today = dateUtils.today();
-      const yesterday = dateUtils.yesterdayString();
+      const today = dateUtils.todayStringLocal();
+      const yesterday = dateUtils.yesterdayStringLocal();
       
-      // Get direct activity checks
+      // Check if the user has already completed a routine today
       const hasRoutineToday = await streakManager.hasRoutineToday();
-      const hasRoutineYesterday = await streakManager.hasRoutineYesterday();
-      const hasYesterdayFreeze = await streakManager.hasFreezeYesterday();
       
       // Determine if user had a meaningful streak (3+) or recent activity
       const hadMeaningfulStreak = status.currentStreak >= 3 || freshUserProgress?.statistics?.bestStreak >= 3;

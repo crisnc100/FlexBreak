@@ -16,6 +16,8 @@ export const calculateStreak = (routines: ProgressEntry[]): number => {
     return 0;
   }
   
+  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - Processing ${routines.length} routines`);
+  
   // Get unique dates from routines, using local dates instead of UTC
   const uniqueDates = Array.from(
     new Set(
@@ -24,6 +26,9 @@ export const calculateStreak = (routines: ProgressEntry[]): number => {
         .map(r => dateUtils.toDateString(r.date!)) // Use dateUtils.toDateString instead of convertToLocalDateStr
     )
   ).sort().reverse(); // Sort in descending order (newest first)
+  
+  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - Found ${uniqueDates.length} unique dates`);
+  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - First few dates: ${uniqueDates.slice(0, 5).join(', ')}`);
   
   // If no dates, return 0
   if (uniqueDates.length === 0) {
@@ -34,20 +39,28 @@ export const calculateStreak = (routines: ProgressEntry[]): number => {
   let streakCount = 1;  // Start with 1 for the most recent date
   let currentDate = new Date(uniqueDates[0]);
   
+  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - Starting with date: ${uniqueDates[0]}, parsed as: ${currentDate.toISOString()}`);
+  
   // Start from the second date in our unique dates list
   for (let i = 1; i < uniqueDates.length; i++) {
     const prevDate = new Date(uniqueDates[i]);
     const dayDiff = dateUtils.daysBetween(prevDate, currentDate);
     
+    console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - Comparing ${uniqueDates[i]} with ${uniqueDates[i-1]}, diff: ${dayDiff} days`);
+    
     // Check if dates are consecutive
     if (dayDiff === 1) {
       streakCount++;
       currentDate = prevDate;
+      console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - Consecutive day found, streak now: ${streakCount}`);
     } else {
       // Streak is broken by a gap (2+ days)
+      console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - Streak broken at ${uniqueDates[i]}, gap: ${dayDiff} days`);
       break;
     }
   }
+  
+  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreak - Final streak count: ${streakCount}`);
   
   return streakCount;
 };
@@ -237,66 +250,112 @@ export const getMostActiveDay = (dayOfWeekBreakdown: number[], dayNames: string[
  * Calculates the streak with freeze dates included
  * This addresses inconsistencies between streakManager and the main stats system
  *
- * @param routineDates Array of routine dates (YYYY-MM-DD)
- * @param freezeDates Array of freeze dates (YYYY-MM-DD)
+ * @param routineDates Array of routine dates (YYYY-MM-DD, local tz)
+ * @param freezeDates  Array of freeze dates  (YYYY-MM-DD, local tz)
  * @returns The current streak based on consecutive days
  */
-export const calculateStreakWithFreezes = (routineDates: string[], freezeDates: string[]): number => {
-  // Check for empty arrays
-  if ((!routineDates || routineDates.length === 0) && (!freezeDates || freezeDates.length === 0)) {
+export const calculateStreakWithFreezes = (
+  routineDates: string[],
+  freezeDates:  string[]
+): number => {
+  // ────────────────  early-out for empty data  ────────────────
+  if ((!routineDates?.length) && (!freezeDates?.length)) return 0;
+
+  console.log(
+    `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Inputs: ` +
+    `${routineDates.length} routine dates, ${freezeDates.length} freeze dates`
+  );
+
+  /* ------------------------------------------------------------------
+   * 1️⃣  make absolutely sure every entry is a *local* YYYY-MM-DD string
+   *     (avoids the implicit UTC parse bug)
+   * ------------------------------------------------------------------ */
+  const normalisedDates = [
+    ...routineDates.map(d => dateUtils.toDateString(d)),
+    ...freezeDates .map(d => dateUtils.toDateString(d))
+  ];
+
+  const uniqueDates = Array.from(new Set(normalisedDates)).sort().reverse();
+
+  console.log(
+    `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Combined ` +
+    `${uniqueDates.length} unique dates`
+  );
+  console.log(
+    `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - First few dates: ` +
+    uniqueDates.slice(0, 5).join(', ')
+  );
+
+  if (!uniqueDates.length) return 0;                // paranoia guard
+
+  // -------------------------------------------------------------------
+  const today      = dateUtils.todayStringLocal();
+  const yesterday  = dateUtils.yesterdayStringLocal();
+
+  console.log(
+    `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Today: ${today}, ` +
+    `Yesterday: ${yesterday}`
+  );
+
+  const hasToday      = uniqueDates.includes(today);
+  const hasYesterday  = uniqueDates.includes(yesterday);
+
+  console.log(
+    `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Has today: ${hasToday}, ` +
+    `Has yesterday: ${hasYesterday}`
+  );
+
+  /* helper: parse "YYYY-MM-DD" as a *local* midnight date object */
+  const toLocalDate = (s: string): Date => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);                  // month is zero-based
+  };
+
+  // how many days since the most-recent activity?
+  const mostRecent   = uniqueDates[0];
+  const daysSince    = dateUtils.daysBetween(toLocalDate(mostRecent), toLocalDate(today));
+
+  console.log(
+    `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Most recent date: ` +
+    `${mostRecent}, Days since: ${daysSince}`
+  );
+
+  // missing two *full* days (and nothing today/yesterday) ⇒ streak broken
+  if (daysSince > 1 && !hasToday && !hasYesterday) {
+    console.log('[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Streak broken, no recent activity');
     return 0;
   }
-  
-  // Combine unique dates from routines and freezes
-  const uniqueDates = Array.from(
-    new Set([...routineDates, ...freezeDates])
-  ).sort().reverse(); // Sort in descending order (newest first)
-  
-  // If no dates, return 0
-  if (uniqueDates.length === 0) {
-    return 0;
-  }
-  
-  // Today and yesterday check
-  const today = dateUtils.today();
-  const yesterday = dateUtils.yesterdayString();
-  
-  // Check if we have activity today
-  const hasTodayActivity = uniqueDates.includes(today);
-  
-  // Check if we have activity yesterday
-  const hasYesterdayActivity = uniqueDates.includes(yesterday);
-  
-  
-  // Check if the most recent activity is too old (more than 2 days ago)
-  const mostRecentDate = uniqueDates[0];
-  const mostRecentDateObj = new Date(mostRecentDate);
-  const todayObj = new Date(today);
-  const daysSinceLastActivity = dateUtils.daysBetween(mostRecentDateObj, todayObj);
-  
-  // If we haven't had activity in more than 2 days, streak is broken
-  if (daysSinceLastActivity > 1 && !hasTodayActivity && !hasYesterdayActivity) {
-    return 0;
-  }
-  
-  // Count consecutive days starting from most recent date
-  let streakCount = 1; // Start with 1 for the most recent date
-  let currentDate = new Date(uniqueDates[0]);
-  
-  // Start from the second date in our unique dates list
+
+  /* ------------------------------------------------------------------
+   * 2️⃣  walk the list from newest → oldest, counting consecutive days
+   * ------------------------------------------------------------------ */
+  let streak    = 1;                               // the most-recent day counts
+  let cursor    = toLocalDate(mostRecent);
+
   for (let i = 1; i < uniqueDates.length; i++) {
-    const prevDate = new Date(uniqueDates[i]);
-    const dayDiff = dateUtils.daysBetween(prevDate, currentDate);
-    
-    // Check if dates are consecutive
-    if (dayDiff === 1) {
-      streakCount++;
-      currentDate = prevDate;
+    const nextDate = toLocalDate(uniqueDates[i]);
+    const diff     = dateUtils.daysBetween(nextDate, cursor);
+
+    console.log(
+      `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Comparing ` +
+      `${uniqueDates[i]} with ${uniqueDates[i - 1]}, diff: ${diff} days`
+    );
+
+    if (diff === 1) {
+      streak++;
+      cursor = nextDate;                           // move the window back by one
+      console.log(
+        `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Consecutive day found, streak now: ${streak}`
+      );
     } else {
-      // Streak is broken by a gap (2+ days)
-      break;
+      console.log(
+        `[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Streak broken at ` +
+        `${uniqueDates[i]}, gap: ${diff} days`
+      );
+      break;                                       // gap ==> streak ends here
     }
   }
-  
-  return streakCount;
-}; 
+
+  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Final streak count: ${streak}`);
+  return streak;
+};

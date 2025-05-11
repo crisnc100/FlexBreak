@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import * as streakManager from '../../utils/progress/modules/streakManager';
+import { useStreak } from '../../hooks/progress/useStreak';
 import * as featureAccessUtils from '../../utils/featureAccessUtils';
 import * as storageService from '../../services/storageService';
+
 
 interface StatsOverviewProps {
   totalMinutes: number;
@@ -35,13 +37,23 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   // Track if streak can be saved with a freeze
   const [streakAtRisk, setStreakAtRisk] = useState(false);
   const [isStreakBroken, setIsStreakBroken] = useState(false);
-  const [validatedStreak, setValidatedStreak] = useState(currentStreak);
   
   // Get required level for streak freezes from feature access utils
   const requiredLevel = featureAccessUtils.getRequiredLevel('streak_freezes');
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const meetsLevelRequirement = userLevel >= requiredLevel;
   const canUseStreakFreeze = meetsLevelRequirement && isPremiumUser;
+  
+  // Add error handling for the streak hook
+  let liveStreak = 0;
+  try {
+    liveStreak = useStreak({ forceRefresh: false }) || 0;
+  } catch (error) {
+    console.error('Error using streak hook:', error);
+    liveStreak = currentStreak; // Fall back to the prop value
+  }
+
+  const [validatedStreak, setValidatedStreak] = useState(liveStreak);
   
   // Animation values for the streak number glow effect
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
@@ -63,54 +75,25 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
 
   // Validate streak and listen for streak updates
   useEffect(() => {
-    const validateStreak = async () => {
+    let cancelled = false;
+  
+    /** ask the manager if the current streak is broken */
+    const checkBroken = async () => {
       try {
-        // Initialize streak manager if needed
-        if (!streakManager.streakCache.initialized) {
-          await streakManager.initializeStreak();
+        const broken = await streakManager.isStreakBroken();
+        const firstTime = streakManager.streakCache.routineDates.length === 0;
+        if (!cancelled) {
+          setIsStreakBroken(broken && !firstTime);
+          setValidatedStreak(broken ? 0 : liveStreak);   // <-- NEW
         }
-        
-        // Check if streak is broken
-        const isBroken = await streakManager.isStreakBroken();
-        setIsStreakBroken(isBroken);
-        
-        // Get validated streak
-        const streakStatus = await streakManager.getStreakStatus();
-        // Only update to 0 if it's broken, otherwise use the passed value
-        // This prevents flickering during transitions
-        if (isBroken) {
-          setValidatedStreak(0);
-        } else {
-          setValidatedStreak(currentStreak);
-        }
-        
-        console.log('StatsOverview: Validated streak status', {
-          isBroken,
-          originalStreak: currentStreak,
-          validatedStreak: isBroken ? 0 : currentStreak
-        });
-      } catch (error) {
-        console.error('Error validating streak:', error);
-        setValidatedStreak(currentStreak);
+      } catch (e) {
+        console.warn('StatsOverview: isStreakBroken()', e);
+        if (!cancelled) setIsStreakBroken(false);
       }
     };
-    
-    validateStreak();
-    
-    // Listen for streak updates
-    const handleStreakUpdate = () => {
-      console.log('StatsOverview: Streak updated event received');
-      validateStreak();
-    };
-    
-    // Add event listener
-    streakManager.streakEvents.on('streak_updated', handleStreakUpdate);
-    
-    // Clean up
-    return () => {
-      streakManager.streakEvents.off('streak_updated', handleStreakUpdate);
-    };
-  }, [currentStreak]);
+  
+    checkBroken();                 // run once
+  }, [liveStreak]);                // …and every time the li
   
   // Start pulse animation when streak is at risk
   useEffect(() => {

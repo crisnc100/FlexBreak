@@ -1,6 +1,7 @@
 import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../../types';
 import * as rewardManager from '../progress/modules/rewardManager';
 import stretches from '../../data/stretches';
+import * as dateUtils from '../progress/modules/utils/dateUtils';
 
 // Type for routine recommendation
 export interface RoutineRecommendation {
@@ -88,12 +89,10 @@ function getAreaRoutineCount(routines: ProgressEntry[], area: BodyArea): number 
 
 // Get routine count for today
 function getTodayRoutineCount(routines: ProgressEntry[]): number {
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = dateUtils.todayStringLocal();
   
   return routines.filter(routine => {
-    const routineDate = new Date(routine.date);
-    const routineDateStr = routineDate.toISOString().split('T')[0];
+    const routineDateStr = dateUtils.toDateString(routine.date);
     return routineDateStr === todayStr;
   }).length;
 }

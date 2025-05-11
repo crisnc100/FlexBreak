@@ -17,6 +17,7 @@ import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as storageService from '../../services/storageService';
 import * as featureAccessUtils from '../../utils/featureAccessUtils';
 import * as Haptics from 'expo-haptics';
+import { useStreak } from '../../hooks/progress/useStreak';
 
 // Helper function for consistent haptic feedback
 const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error') => {
@@ -203,69 +204,60 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
   };
   
   // Load streak data from streakManager instead of directly from storage
-  useEffect(() => {
-    const loadStreakData = async () => {
-      try {
-        setLoading(true);
-        
-        // Initialize streak manager if needed
-        if (!streakManager.streakCache.initialized) {
-          await streakManager.initializeStreak();
-        }
-        
-        // Get streak status from streak manager
-        const streakStatus = await streakManager.getStreakStatus();
-        
-        // Check if streak is broken (more than 2 days missed)
-        const isBroken = await streakManager.isStreakBroken();
-        
-        // Check if this is the first time user is using the app
-        const isFirstTime = streakManager.streakCache.routineDates.length === 0;
-        
-        setIsStreakBroken(isBroken && !isFirstTime);
-        
-        // Only show the user's previous streak value if the streak isn't broken
-        // Otherwise show the corrected value (which is 0)
-        setStreak(isBroken ? 0 : streakStatus.currentStreak);
-        
-        // Get user's level for streak freeze access
-        const userProgress = await storageService.getUserProgress();
-        const level = userProgress.level || 1;
-        setUserLevel(level);
-        
-        // Check if user meets level requirement for streak freezes
-        const requiredLevel = featureAccessUtils.getRequiredLevel('streak_freezes');
-        const meetsLevelRequirement = level >= requiredLevel;
-        setCanUseStreakFreeze(meetsLevelRequirement);
-        
-        // Get freeze count directly from streak manager
-        if (isPremium && meetsLevelRequirement) {
-          setFreezeCount(streakStatus.freezesAvailable);
-        }
-      } catch (error) {
-        console.error('Error loading streak data:', error);
-        // Fall back to prop value
-        setStreak(currentStreak);
-      } finally {
-        setLoading(false);
+/* 1️⃣  live streak – automatically up-to-date */
+const liveStreak = useStreak();
+
+/* 2️⃣  map it into the local state that drives animations */
+useEffect(() => {
+  setStreak(liveStreak);
+}, [liveStreak]);
+
+/* 3️⃣  lightweight loader for everything **other** than the number itself */
+useEffect(() => {
+  let cancelled = false;
+
+  const loadExtras = async () => {
+    try {
+      setLoading(true);
+
+      // We still ask the manager for status, but ONLY for side-data
+      const status   = await streakManager.getStreakStatus();
+      const broken   = await streakManager.isStreakBroken();
+      const progress = await storageService.getUserProgress();
+
+      if (cancelled) return;
+
+      const firstTime   = streakManager.streakCache.routineDates.length === 0;
+      const level       = progress.level || 1;
+      const reqLevel    = featureAccessUtils.getRequiredLevel('streak_freezes');
+      const meetsLevel  = level >= reqLevel;
+
+      setIsStreakBroken(broken && !firstTime);
+      setStreak(broken ? 0 : liveStreak);   // keep displayed number current
+      setUserLevel(level);
+      setCanUseStreakFreeze(meetsLevel);
+      if (isPremium && meetsLevel) {
+        setFreezeCount(status.freezesAvailable);
       }
-    };
-    
-    loadStreakData();
-    
-    // Set up streakEvents listener to update when streak changes
-    const handleStreakChange = () => {
-      loadStreakData();
-    };
-    
-    // Add event listener
-    streakManager.streakEvents.on('streak_updated', handleStreakChange);
-    
-    // Clean up
-    return () => {
-      streakManager.streakEvents.off('streak_updated', handleStreakChange);
-    };
-  }, [isPremium, currentStreak]);
+    } catch (err) {
+      console.error('StreakDisplay loadExtras:', err);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  };
+
+  loadExtras();
+
+  // refresh extras whenever the streak system fires its event
+  const onUpdate = () => loadExtras();
+  streakManager.streakEvents.on('streak_updated', onUpdate);
+
+  return () => {
+    cancelled = true;
+    streakManager.streakEvents.off('streak_updated', onUpdate);
+  };
+}, [isPremium]);
+
   
   // Show loading indicator while data is loading
   if (loading) {

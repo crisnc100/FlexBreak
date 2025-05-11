@@ -15,7 +15,6 @@ import { getMostActiveDay, getOrderedDayNames } from '../utils/progress/modules/
 import * as storageService from '../services/storageService';
 import { useProgressTabManagement } from '../hooks/progress/useProgressTabManagement';
 import { useProgressData } from '../hooks/progress/useProgressData';
-import { useStreakChecker } from '../hooks/progress/useStreakChecker';
 import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
 import { useGamification } from '../hooks/progress/useGamification';
 import XpNotificationManager from '../components/notifications/XpNotificationManager';
@@ -77,7 +76,6 @@ export default function ProgressScreen({ navigation }) {
   const hasUpdated = useRef(false);
 
   // Use streak checker hook (already updated to use centralized system)
-  useStreakChecker();
   
   // Memoize derived data
   const orderedDayNames = useMemo(() => getOrderedDayNames(DAY_NAMES), []);

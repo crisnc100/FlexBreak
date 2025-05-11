@@ -16,6 +16,7 @@ import { usePremium } from '../../context/PremiumContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as Haptics from 'expo-haptics';
 import * as featureAccessUtils from '../../utils/featureAccessUtils';
+import * as dateUtils from '../../utils/progress/modules/utils/dateUtils'
 
 // Snowflake component for animation
 const Snowflake = ({ x, y, size, duration, delay, rotation }) => {
@@ -299,9 +300,9 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       
       // CHECK FOR SPECIFIC MULTI-DAY GAP ISSUE
       // Get dates to check recent activity
-      const todayStr = new Date().toISOString().split('T')[0];
-      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      const twoDaysAgoStr = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+      const todayStr = dateUtils.todayStringLocal();
+      const yesterdayStr = dateUtils.yesterdayStringLocal()
+      const twoDaysAgoStr = dateUtils.getDaysAgoString(2);
       
       // Get the sorted routine dates to check for gaps
       const routineDates = [...streakManager.streakCache.routineDates].sort().reverse();

@@ -29,7 +29,7 @@ export const isFreezeAvailable = async (): Promise<boolean> => {
     
     
     // Additional logging to debug today activity issue
-    const today = dateUtils.today();
+    const today = dateUtils.todayStringLocal();
     const todayActivity = await simpleStreakManager.hasRoutineToday();
     
     // Get detailed streak status

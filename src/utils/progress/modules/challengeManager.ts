@@ -561,7 +561,7 @@ export const ensureChallengeCount = async (
   challengeData: Record<string, any[]>
 ): Promise<number> => {
   const now = new Date();
-  const today = dateUtils.today();
+  const today = dateUtils.todayStringLocal();
   let addedCount = 0;
   
   // Get the last check date to determine if cycles have ended
@@ -697,7 +697,7 @@ export const ensureChallengeCount = async (
  */
 export const refreshChallenges = async (userProgress: UserProgress): Promise<void> => {
   const now = new Date();
-  const today = dateUtils.today();
+  const today = dateUtils.todayStringLocal();
   const lastCheck = userProgress.lastDailyChallengeCheck || '1970-01-01';
   const lastCheckDate = lastCheck.split('T')[0];
   

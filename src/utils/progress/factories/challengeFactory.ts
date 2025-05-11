@@ -14,7 +14,7 @@ export const ChallengeFactory = {
     } = {}
   ): Challenge {
     const now = new Date();
-    const uniqueId = `${template.id}_${dateUtils.today()}_${options.uniqueIdSuffix || Math.floor(Math.random() * 10000)}`;
+    const uniqueId = `${template.id}_${dateUtils.todayStringLocal()}_${options.uniqueIdSuffix || Math.floor(Math.random() * 10000)}`;
     
     return {
       ...template,

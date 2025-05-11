@@ -49,7 +49,6 @@ The following hooks are being phased out in favor of `useGamification`:
 
 - **`useProgressSystem`** - Legacy system, now just wraps useGamification
 - **`useProgressData`** - Use `gamificationSummary` from useGamification instead
-- **`useStreakChecker`** - Use `handleStreakReset()` from useGamification
 - **`useChallengeUpdater`** - Use `refreshData()` from useGamification
 - **`useChallengeSystem`** - Use challenge functions from useGamification
 
@@ -117,28 +116,11 @@ Streak management has been centralized in the `useGamification` hook. The system
 
 #### Before (Old Approach):
 ```tsx
-import { useStreakChecker } from '../hooks/progress';
 
-function ProgressScreen() {
-  // Complex setup with multiple parameters
-  useStreakChecker(
-    stats.currentStreak,
-    progressData.length,
-    refreshProgress,
-    refreshChallenges
-  );
-}
-```
 
 #### Now (New Approach):
 ```tsx
 // Use directly for streak checking
-import { useStreakChecker } from '../hooks/progress';
-
-function ProgressScreen() {
-  // Simple usage - all logic is handled internally
-  useStreakChecker();
-}
 
 // Or use the underlying functionality directly
 import { useGamification } from '../hooks/progress';

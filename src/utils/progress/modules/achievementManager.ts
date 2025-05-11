@@ -3,7 +3,7 @@ import { CORE_ACHIEVEMENTS } from '../constants';
 import * as storageService from '../../../services/storageService';
 import * as streakManager from './streakManager';
 import { calculateStreakWithFreezes } from './progressTracker';
-
+import * as dateUtils from './utils/dateUtils';
 /**
  * Initialize achievements for a user progress object
  * @param userProgress The user progress object to initialize achievements in
@@ -62,7 +62,7 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
           // Extract routine dates
           const routineDates = routines
             .filter(r => r.date)
-            .map(r => r.date.split('T')[0]);
+            .map(r => dateUtils.toDateString(r.date));
           
           // Calculate streak with freezes
           const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);

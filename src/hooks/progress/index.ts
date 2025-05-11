@@ -12,6 +12,9 @@ export { useLevelProgress } from './useLevelProgress';
 /** @deprecated - Use useGamification().gamificationSummary instead */
 export { useProgressData } from './useProgressData';
 export { useProgressTabManagement } from './useProgressTabManagement';
-/** @deprecated - Use useGamification().refreshData() instead */
-export { useStreakChecker } from './useStreakChecker';
+
+
+// Streak tracking hooks - export both named and default export
+export { useStreak } from './useStreak';
+export { default as useStreakDefault } from './useStreak';
 
