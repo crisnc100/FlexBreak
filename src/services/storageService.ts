@@ -283,7 +283,6 @@ const migrateUserProgress = (progress: UserProgress): UserProgress => {
 
 // Debug helper function for timezone logging
 const logTimezone = (functionName: string, message: string) => {
-  console.log(`[STORAGE TIMEZONE DEBUG] ${functionName} - ${message}`);
 };
 
 /**

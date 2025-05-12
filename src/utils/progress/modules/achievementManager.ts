@@ -41,64 +41,70 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
   
   // Process all achievements sequentially
   for (const achievement of Object.values(userProgress.achievements)) {
-    if (!achievement.completed) {
-      const stats = userProgress.statistics;
-      const oldProgress = achievement.progress || 0; // Ensure progress is initialized
-      
-      // Update progress based on achievement type
-      switch (achievement.type) {
-        case 'routine_count': 
-          achievement.progress = stats.totalRoutines || 0; 
-          break;
-        case 'streak': 
-          // Get streak from streak manager for consistency
-          const streakStatus = await streakManager.getStreakStatus();
-          achievement.progress = streakStatus.currentStreak;
-          
-          // Double check with calculateStreakWithFreezes
-          const routines = await storageService.getAllRoutines();
-          const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
-          
-          // Extract routine dates
-          const routineDates = routines
-            .filter(r => r.date)
-            .map(r => dateUtils.toDateString(r.date));
-          
-          // Calculate streak with freezes
-          const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
-          
-          if (calculatedStreak !== achievement.progress) {
-            console.log(`Streak discrepancy in achievement: ${achievement.progress} vs ${calculatedStreak}. Using calculated value.`);
-            achievement.progress = calculatedStreak;
-            
-            // Update streak in the streak manager to keep everything in sync
-            await streakManager.updateStoredStreak(calculatedStreak);
-          }
-          break;
-        case 'area_variety': 
-          achievement.progress = stats.uniqueAreas?.length || 0; 
-          break;
-        case 'specific_area': 
-          achievement.progress = Math.max(...Object.values(stats.routinesByArea || {}).map(count => count || 0), 0); 
-          break;
-        case 'total_minutes': 
-          achievement.progress = stats.totalMinutes || 0; 
-          break;
+    if (achievement.completed) {
+      // Guard: If something elsewhere set progress < requirement, restore it
+      if (achievement.type === 'streak' && (achievement.progress ?? 0) < achievement.requirement) {
+        achievement.progress = achievement.requirement;
       }
-      
-      // Check for completion and award XP
-      if (achievement.progress >= achievement.requirement) {
-        achievement.completed = true;
-        achievement.dateCompleted = new Date().toISOString();
-        userProgress.totalXP += achievement.xp;
-        console.log(`Achievement completed: ${achievement.title} (+${achievement.xp} XP)`);
-      }
-      
-      // Count if progress changed
-      if (oldProgress !== achievement.progress) {
-        updatedCount++;
-        console.log(`Achievement "${achievement.title}" progress updated: ${oldProgress} → ${achievement.progress}`);
-      }
+      continue;                                    // skip normal processing
+    }
+    
+    const stats = userProgress.statistics;
+    const oldProgress = achievement.progress || 0; // Ensure progress is initialized
+    
+    // Update progress based on achievement type
+    switch (achievement.type) {
+      case 'routine_count': 
+        achievement.progress = stats.totalRoutines || 0; 
+        break;
+      case 'streak': 
+        // Get streak from streak manager for consistency
+        const streakStatus = await streakManager.getStreakStatus();
+        achievement.progress = streakStatus.currentStreak;
+        
+        // Double check with calculateStreakWithFreezes
+        const routines = await storageService.getAllRoutines();
+        const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+        
+        // Extract routine dates
+        const routineDates = routines
+          .filter(r => r.date)
+          .map(r => dateUtils.toDateString(r.date));
+        
+        // Calculate streak with freezes
+        const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
+        
+        if (calculatedStreak !== achievement.progress) {
+          console.log(`Streak discrepancy in achievement: ${achievement.progress} vs ${calculatedStreak}. Using calculated value.`);
+          achievement.progress = calculatedStreak;
+          
+          // Update streak in the streak manager to keep everything in sync
+          await streakManager.updateStoredStreak(calculatedStreak);
+        }
+        break;
+      case 'area_variety': 
+        achievement.progress = stats.uniqueAreas?.length || 0; 
+        break;
+      case 'specific_area': 
+        achievement.progress = Math.max(...Object.values(stats.routinesByArea || {}).map(count => count || 0), 0); 
+        break;
+      case 'total_minutes': 
+        achievement.progress = stats.totalMinutes || 0; 
+        break;
+    }
+    
+    // Check for completion and award XP
+    if (achievement.progress >= achievement.requirement) {
+      achievement.completed = true;
+      achievement.dateCompleted = new Date().toISOString();
+      userProgress.totalXP += achievement.xp;
+      console.log(`Achievement completed: ${achievement.title} (+${achievement.xp} XP)`);
+    }
+    
+    // Count if progress changed
+    if (oldProgress !== achievement.progress) {
+      updatedCount++;
+      console.log(`Achievement "${achievement.title}" progress updated: ${oldProgress} → ${achievement.progress}`);
     }
   }
   

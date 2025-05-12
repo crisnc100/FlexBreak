@@ -152,8 +152,10 @@ export const processCompletedRoutine = async (routine: ProgressEntry): Promise<{
   
   // Also directly use streakManager to ensure events are triggered
   if (routine.date) {
-    const routineDate = routine.date.split('T')[0];
-    await streakManager.completeRoutine(routineDate);
+    // Convert the timestamp to a *local-midnight* YYYY-MM-DD so we don't
+    // accidentally advance the date when it's past 8–9 pm local (midnight UTC)
+    const routineDateLocal = dateUtils.toDateString(routine.date);
+    await streakManager.completeRoutine(routineDateLocal);
   }
   
   // Update challenges and capture newly completed ones

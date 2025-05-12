@@ -704,6 +704,49 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               <Text style={[styles.testDescription, {color: theme.textSecondary}]}>
                 Complete guided testing for core app features and provide structured feedback.
               </Text>
+              <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleClearPremiumStatus}
+            >
+              <View style={styles.settingContent}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FEEBEF'}]}>
+                  <Ionicons name="star-outline" size={22} color="#F4A261" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[styles.settingTitle, {color: theme.text}]}>Clear Premium Status</Text>
+                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Remove premium subscription (for testing)</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.settingItem, styles.lastItem]}
+              onPress={handleResetSimulationData}
+            >
+              <View style={styles.settingContent}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                  <Ionicons name="trash-outline" size={22} color="#F44336" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset Simulation Data</Text>
+                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all simulation data only (for testers)</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleResetData}
+            >
+              <View style={styles.settingContent}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                  <Ionicons name="trash-outline" size={22} color="#F44336" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
+                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
             </View>
           )}
         </View>

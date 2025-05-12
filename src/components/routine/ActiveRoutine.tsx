@@ -143,7 +143,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           console.error('Error providing feedback:', error);
         }
       }
-    }, 5000);
+    }, 6000);
     
     // Clean up timer on unmount or when stretch changes
     return () => clearTimeout(timer);
@@ -165,7 +165,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       // Optionally show a brief notification or alert
       Alert.alert(
         "Please Wait",
-        "You need to stretch for at least 5 seconds before advancing."
+        "You need to stretch for at least 6 seconds before advancing."
       );
       
       return;
@@ -187,7 +187,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 500,
+        duration: 600,
         useNativeDriver: true,
       }).start();
       

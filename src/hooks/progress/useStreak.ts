@@ -40,11 +40,20 @@ export const useStreak = (opts: { forceRefresh?: boolean } = {}): number => {
       streakManager.STREAK_UPDATED_EVENT,
       handler
     );
+    // Also refresh when a streak freeze is applied and saved
+    streakManager.streakEvents.on(
+      streakManager.STREAK_SAVED_EVENT,
+      handler
+    );
     
     return () => {
       isMounted = false;
       streakManager.streakEvents.off(
         streakManager.STREAK_UPDATED_EVENT,
+        handler
+      );
+      streakManager.streakEvents.off(
+        streakManager.STREAK_SAVED_EVENT,
         handler
       );
     };

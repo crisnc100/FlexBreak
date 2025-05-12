@@ -14,14 +14,25 @@ export const MS_PER_DAY = 86_400_000;
 //  BASIC FORMATS
 ////////////////////
 
-/** Cast Date|string ➜ local YYYY-MM-DD */
-export function toDateString(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+/** Local “YYYY-MM-DD” for arbitrary Date */
+export const formatDateYYYYMMDD = (d: Date): string => {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');   // 0-based
+  const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
+};
+
+/** Cast Date|string ➜ local YYYY-MM-DD */
+export const toDateString = (input: string | Date): string => {
+  // already safe → just return
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return input;
+  }
+  const d = new Date(input);                        // ISO or Date
+  // rebuild *local-midnight* date so TZ never bites us
+  const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return formatDateYYYYMMDD(localMidnight);
+};
 
 /** Today (local) as YYYY-MM-DD */
 export function todayStringLocal(): string {
@@ -35,10 +46,7 @@ export function yesterdayStringLocal(): string {
   return toDateString(y);
 }
 
-/** Local “YYYY-MM-DD” for arbitrary Date */
-export function formatDateYYYYMMDD(date: Date): string {
-  return toDateString(date);
-}
+
 
 ////////////////////
 //  COMPARISONS

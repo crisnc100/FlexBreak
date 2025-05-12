@@ -134,33 +134,30 @@ export default function ProgressScreen({ navigation }) {
     handleRefresh();
   }, [handleRefresh]);
   
-  // Force data refresh on mount - simplified to reduce duplicate refreshes
+  // Refresh data the *first* time the screen is shown. Subsequent visits rely on
+  // pull-to-refresh to avoid the jerky auto-refresh animation.
   useFocusEffect(
     React.useCallback(() => {
       const loadData = async () => {
         try {
-          console.log('ProgressScreen: Screen focused, refreshing all data');
-          
-          // Update hasUpdated ref before the refresh to prevent multiple refreshes
-          hasUpdated.current = true;
-          
-          // Refresh all data - this will update both progress stats and gamification data
-          await handleRefresh();
-          
-          // Check streak freeze status
+          // Skip expensive refreshes after the first focus
+          if (!hasUpdated.current) {
+            console.log('ProgressScreen: First focus – refreshing all data');
+            await handleRefresh();
+            hasUpdated.current = true;
+          }
+
+          // Still keep streak-freeze status up-to-date
           await checkStreakFreezeStatus();
-          
-          console.log('ProgressScreen: Data refresh completed');
         } catch (error) {
           console.error('Error loading data in ProgressScreen:', error);
         }
       };
-      
-      // Always refresh data when screen comes into focus
+
       loadData();
-      
+
       return () => {
-        console.log('Progress screen lost focus');
+        // nothing to clean up
       };
     }, [handleRefresh])
   );
@@ -327,7 +324,7 @@ export default function ProgressScreen({ navigation }) {
           <RefreshableScrollView 
             onRefresh={handleRefresh}
             refreshing={isRefreshing || isGamificationLoading}
-            showRefreshingFeedback={true}
+            showRefreshingFeedback={false}
             minimumRefreshTime={800}
           >
             {/* Render the active tab */}
@@ -394,8 +391,10 @@ export default function ProgressScreen({ navigation }) {
       {/* Subscription Modal - always available */}
       <SubscriptionModal
         visible={subscriptionModalVisible}
-        onClose={() => setSubscriptionModalVisible(false)}
-        onSubscribe={handleSubscriptionComplete}
+        onClose={() => {
+          setSubscriptionModalVisible(false);
+          handleSubscriptionComplete(); // ensure data refresh after sub
+        }}
       />
     </View>
   );

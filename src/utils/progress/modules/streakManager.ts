@@ -31,10 +31,7 @@ export let streakCache = {
  */
 export const initializeStreak = async (): Promise<void> => {
   try {
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Current date/time: ${new Date().toISOString()}`);
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Today string: ${dateUtils.todayStringLocal()}`);
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Yesterday string: ${dateUtils.yesterdayStringLocal()}`);
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Local timezone offset: ${new Date().getTimezoneOffset() / -60}h`);
+
     
     // Get fresh routines from storage
     const routines = await storageService.getAllRoutines();
@@ -42,8 +39,7 @@ export const initializeStreak = async (): Promise<void> => {
       .filter(r => r.date)
       .map(r => dateUtils.toDateString(r.date));
       
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Found ${routines.length} routines, ${routineDates.length} unique dates`);
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - First few routine dates: ${routineDates.slice(0, 3).join(', ')}`);
+
       
     // Get streak freezes from storage
     const userProgress = await storageService.getUserProgress();
@@ -51,8 +47,7 @@ export const initializeStreak = async (): Promise<void> => {
       dateUtils.toDateString(d)
     ) || [];
     
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Found ${freezeDates.length} freeze dates`);
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Freeze dates: ${freezeDates.join(', ')}`);
+
     
     // Read freeze count from storage
     let freezesAvailable = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.uses || 0;
@@ -101,7 +96,6 @@ export const initializeStreak = async (): Promise<void> => {
       freezeDates
     );
     
-    console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Calculated streak: ${calculatedStreak}`);
     
     // Update streak cache
     streakCache = {
@@ -240,13 +234,11 @@ export const getStreakStatus = async (forceRefresh = false): Promise<{
   const today = dateUtils.todayStringLocal();
   const yesterdayStr = dateUtils.yesterdayStringLocal();
   
-  console.log(`[STREAK TIMEZONE DEBUG] getStreakStatus - Today: ${today}, Yesterday: ${yesterdayStr}`);
   
   const hasToday = streakCache.routineDates.includes(today);
   const hasYesterday = streakCache.routineDates.includes(yesterdayStr) || 
                       streakCache.freezeDates.includes(yesterdayStr);
   
-  console.log(`[STREAK TIMEZONE DEBUG] getStreakStatus - Has today: ${hasToday}, Has yesterday: ${hasYesterday}`);
   
   // Check if streak is maintained today
   const maintainedToday = hasToday || hasYesterday;

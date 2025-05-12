@@ -233,7 +233,7 @@ useEffect(() => {
       const meetsLevel  = level >= reqLevel;
 
       setIsStreakBroken(broken && !firstTime);
-      setStreak(broken ? 0 : liveStreak);   // keep displayed number current
+      // Keep streak value from useStreak hook; avoid double-count or TZ drift
       setUserLevel(level);
       setCanUseStreakFreeze(meetsLevel);
       if (isPremium && meetsLevel) {
@@ -251,10 +251,12 @@ useEffect(() => {
   // refresh extras whenever the streak system fires its event
   const onUpdate = () => loadExtras();
   streakManager.streakEvents.on('streak_updated', onUpdate);
+  streakManager.streakEvents.on(streakManager.STREAK_SAVED_EVENT, onUpdate);
 
   return () => {
     cancelled = true;
     streakManager.streakEvents.off('streak_updated', onUpdate);
+    streakManager.streakEvents.off(streakManager.STREAK_SAVED_EVENT, onUpdate);
   };
 }, [isPremium]);
 
