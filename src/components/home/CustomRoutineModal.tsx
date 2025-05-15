@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { BodyArea, Duration, RoutineParams, Stretch, StretchLevel, CustomRestPeriod } from '../../types';
+import { BodyArea, Duration, RoutineParams, Stretch, CustomRestPeriod } from '../../types';
 import { 
   saveFavoriteRoutine, 
   saveCustomRoutine as saveCustomRoutineToStorage, 
@@ -62,7 +62,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
 }) => {
   const { theme, isDark } = useTheme();
   const { isPremium, refreshPremiumStatus } = usePremium();
-  const { canAccessFeature, getRequiredLevel, refreshAccess } = useFeatureAccess();
+  const { canAccessFeature, getRequiredLevel, getUserLevel, refreshAccess } = useFeatureAccess();
   
   // State variables
   const [customRoutines, setCustomRoutines] = useState<CustomRoutine[]>([]);
@@ -76,6 +76,8 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'routines' | 'create'>('routines');
   const [isSaving, setIsSaving] = useState(false);
+  const [userLevel, setUserLevel] = useState<number>(1);
+  const [requiredLevel, setRequiredLevel] = useState<number>(5);
   
   // Rest period options
   const restPeriods: CustomRestPeriod[] = [
@@ -133,9 +135,17 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     await refreshPremiumStatus();
     // Then refresh feature access
     await refreshAccess();
+    
+    // Get user's current level and required level for feature
+    const level = await getUserLevel();
+    const required = getRequiredLevel('custom_routines');
+    setUserLevel(level);
+    setRequiredLevel(required);
+    
     // Update access state
     const access = isPremium && canAccessFeature('custom_routines');
     console.log('Current premium status:', isPremium);
+    console.log('User level:', level, 'Required level:', required);
     console.log('Can access custom routines:', canAccessFeature('custom_routines'));
     console.log('Feature access result:', access);
     setHasAccess(access);
@@ -253,7 +263,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     let params: RoutineParams = {
       area: routine.area,
       duration: routine.duration,
-      level: 'intermediate' // Default level
+      position: 'All' // Default level
     };
     
     // Add custom stretches if available
@@ -536,7 +546,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
               : [smartRoutineInput?.area || selectedArea],
             
             // Ensure level exists
-            level: stretch.level || 'intermediate',
+            position: stretch.position || 'All',
             
             // Ensure image exists
             image: stretch.image || { 
@@ -564,7 +574,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       const routineParams: RoutineParams = {
         area: smartRoutineInput?.area || selectedArea,
         duration: smartRoutineInput?.duration || selectedDuration as Duration,
-        level: 'intermediate' as StretchLevel,
+        position: 'All',
         customStretches: validatedStretches
       };
       
@@ -639,41 +649,6 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     return name;
   };
 
-  // Render create form content based on mode
-  const renderCreateFormContent = () => {
-    if (!isCustomMode) {
-      return (
-        <View style={styles.smartModeContainer}>
-          <SmartRoutineGenerator onRoutineGenerated={handleSmartRoutineGenerated} />
-        </View>
-      );
-    }
-
-    return (
-      <CustomForm
-        theme={theme}
-        isDark={isDark}
-        routineName={routineName}
-        setRoutineName={setRoutineName}
-        selectedArea={selectedArea}
-        setSelectedArea={setSelectedArea}
-        selectedDuration={selectedDuration}
-        setSelectedDuration={setSelectedDuration}
-        selectedStretches={selectedStretches}
-        setSelectedStretches={setSelectedStretches}
-        openStretchSelector={openStretchSelector}
-        addRestPeriod={addRestPeriod}
-        removeItem={removeItem}
-        moveItem={moveItem}
-        saveCustomRoutine={saveCustomRoutine}
-        restPeriods={restPeriods}
-        formatCustomStretchesInfo={formatCustomStretchesInfo}
-        meetsMinimumRequirement={meetsMinimumRequirement}
-        isCustomMode={isCustomMode}
-      />
-    );
-  };
-
   // If hasAccess is null, we're still loading
   if (hasAccess === null) {
     return (
@@ -696,171 +671,6 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       </Modal>
     );
   }
-
-  const requiredLevel = getRequiredLevel('custom_routines');
-  
-  // Modal content
-  const modalContent = () => {
-    if (!hasAccess) {
-      return (
-        <PremiumTeaser
-          theme={theme}
-          isDark={isDark}
-          requiredLevel={requiredLevel}
-          refreshFeatureAccess={refreshFeatureAccess}
-          onClose={onClose}
-        />
-      );
-    }
-    
-    return (
-      <>
-        {/* Mode toggle for smart/custom selection */}
-        <View style={styles.modeToggleContainer}>
-          <Text style={[styles.modeToggleLabel, { color: theme.text }]}>
-            Creation Mode:
-          </Text>
-          <View style={styles.segmentedControl}>
-            <TouchableOpacity
-              style={[
-                styles.segmentButton,
-                !isCustomMode && styles.segmentButtonActive,
-                { backgroundColor: !isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
-              ]}
-              onPress={() => setIsCustomMode(false)}
-            >
-              <Text style={[
-                styles.segmentButtonText,
-                { color: !isCustomMode ? '#fff' : theme.text }
-              ]}>
-                Smart
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.segmentButton,
-                isCustomMode && styles.segmentButtonActive,
-                { backgroundColor: isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
-              ]}
-              onPress={() => setIsCustomMode(true)}
-            >
-              <Text style={[
-                styles.segmentButtonText,
-                { color: isCustomMode ? '#fff' : theme.text }
-              ]}>
-                Manual
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Tab navigation */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'routines' && { borderBottomColor: theme.accent, borderBottomWidth: 2 }
-            ]}
-            onPress={() => setActiveTab('routines')}
-          >
-            <Text 
-              style={[
-                styles.tabText, 
-                { color: activeTab === 'routines' ? theme.accent : theme.textSecondary }
-              ]}
-            >
-              My Routines
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'create' && { borderBottomColor: theme.accent, borderBottomWidth: 2 }
-            ]}
-            onPress={() => setActiveTab('create')}
-          >
-            <Text 
-              style={[
-                styles.tabText, 
-                { color: activeTab === 'create' ? theme.accent : theme.textSecondary }
-              ]}
-            >
-              Create New
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tab content */}
-        {activeTab === 'routines' && (
-          <ScrollView 
-            style={styles.tabContent}
-            showsVerticalScrollIndicator={true}
-            bounces={true}
-          >
-            {customRoutines.length > 0 ? (
-              <RoutineList
-                customRoutines={customRoutines}
-                startCustomRoutine={startCustomRoutine}
-                deleteCustomRoutine={deleteCustomRoutine}
-                theme={theme}
-                isDark={isDark}
-                MAX_CUSTOM_ROUTINES={MAX_CUSTOM_ROUTINES}
-              />
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <Ionicons 
-                  name="fitness-outline" 
-                  size={70} 
-                  color={isDark ? theme.textSecondary : '#ccc'} 
-                />
-                <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
-                  No Custom Routines Yet
-                </Text>
-                <Text style={[styles.emptyStateDescription, { color: theme.textSecondary }]}>
-                  Create your first custom routine or use the AI powered generator to get started.
-                </Text>
-                <TouchableOpacity
-                  style={[styles.createEmptyButton, { backgroundColor: theme.accent }]}
-                  onPress={() => setActiveTab('create')}
-                >
-                  <Text style={styles.createEmptyButtonText}>Create New Routine</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-        )}
-
-        {activeTab === 'create' && (
-          <ScrollView 
-            style={styles.tabContent}
-            showsVerticalScrollIndicator={true}
-            bounces={true}
-          >
-            <View style={[
-              styles.createForm,
-              { backgroundColor: isDark ? theme.cardBackground : '#fff' }
-            ]}>
-              <Text style={[
-                styles.formTitle,
-                { color: theme.text }
-              ]}>
-                {isCustomMode ? 'Create Custom Routine' : 'Smart Routine Generator (Beta)'}
-              </Text>
-              
-              <Text style={[styles.formDescription, { color: theme.textSecondary }]}>
-                {isCustomMode 
-                  ? 'Select your own stretches and create a personalized routine.' 
-                  : 'Describe your needs in natural language, and I\'ll create a personalized routine for you.'}
-              </Text>
-              
-              {renderCreateFormContent()}
-            </View>
-          </ScrollView>
-        )}
-      </>
-    );
-  };
   
   return (
     <Modal
@@ -883,7 +693,191 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
           <Text style={[styles.headerTitle, { color: theme.text }]}>Custom Routines</Text>
         </View>
         
-        {modalContent()}
+        {!hasAccess ? (
+          // Show premium teaser if user doesn't have access
+          <PremiumTeaser
+            theme={theme}
+            isDark={isDark}
+            requiredLevel={requiredLevel}
+            refreshFeatureAccess={refreshFeatureAccess}
+            onClose={onClose}
+            userLevel={userLevel}
+            isPremium={isPremium}
+          />
+        ) : (
+          // Show regular content if user has access
+          <>
+            {/* Mode toggle for smart/custom selection */}
+            <View style={styles.modeToggleContainer}>
+              <Text style={[styles.modeToggleLabel, { color: theme.text }]}>
+                Creation Mode:
+              </Text>
+              <View style={styles.segmentedControl}>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    !isCustomMode && styles.segmentButtonActive,
+                    { backgroundColor: !isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
+                  ]}
+                  onPress={() => setIsCustomMode(false)}
+                >
+                  <Text style={[
+                    styles.segmentButtonText,
+                    { color: !isCustomMode ? '#fff' : theme.text }
+                  ]}>
+                    Smart
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    isCustomMode && styles.segmentButtonActive,
+                    { backgroundColor: isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
+                  ]}
+                  onPress={() => setIsCustomMode(true)}
+                >
+                  <Text style={[
+                    styles.segmentButtonText,
+                    { color: isCustomMode ? '#fff' : theme.text }
+                  ]}>
+                    Manual
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Tab navigation */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.tabButton,
+                  activeTab === 'routines' && { borderBottomColor: theme.accent, borderBottomWidth: 2 }
+                ]}
+                onPress={() => setActiveTab('routines')}
+              >
+                <Text 
+                  style={[
+                    styles.tabText, 
+                    { color: activeTab === 'routines' ? theme.accent : theme.textSecondary }
+                  ]}
+                >
+                  My Routines
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.tabButton,
+                  activeTab === 'create' && { borderBottomColor: theme.accent, borderBottomWidth: 2 }
+                ]}
+                onPress={() => setActiveTab('create')}
+              >
+                <Text 
+                  style={[
+                    styles.tabText, 
+                    { color: activeTab === 'create' ? theme.accent : theme.textSecondary }
+                  ]}
+                >
+                  Create New
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Tab content */}
+            {activeTab === 'routines' && (
+              <ScrollView 
+                style={styles.tabContent}
+                showsVerticalScrollIndicator={true}
+                bounces={true}
+              >
+                {customRoutines.length > 0 ? (
+                  <RoutineList
+                    customRoutines={customRoutines}
+                    startCustomRoutine={startCustomRoutine}
+                    deleteCustomRoutine={deleteCustomRoutine}
+                    theme={theme}
+                    isDark={isDark}
+                    MAX_CUSTOM_ROUTINES={MAX_CUSTOM_ROUTINES}
+                  />
+                ) : (
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons 
+                      name="fitness-outline" 
+                      size={70} 
+                      color={isDark ? theme.textSecondary : '#ccc'} 
+                    />
+                    <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
+                      No Custom Routines Yet
+                    </Text>
+                    <Text style={[styles.emptyStateDescription, { color: theme.textSecondary }]}>
+                      Create your first custom routine or use the AI powered generator to get started.
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.createEmptyButton, { backgroundColor: theme.accent }]}
+                      onPress={() => setActiveTab('create')}
+                    >
+                      <Text style={styles.createEmptyButtonText}>Create New Routine</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </ScrollView>
+            )}
+
+            {activeTab === 'create' && (
+              <ScrollView 
+                style={styles.tabContent}
+                showsVerticalScrollIndicator={true}
+                bounces={true}
+              >
+                <View style={[
+                  styles.createForm,
+                  { backgroundColor: isDark ? theme.cardBackground : '#fff' }
+                ]}>
+                  <Text style={[
+                    styles.formTitle,
+                    { color: theme.text }
+                  ]}>
+                    {isCustomMode ? 'Create Custom Routine' : 'Smart Routine Generator (Beta)'}
+                  </Text>
+                  
+                  <Text style={[styles.formDescription, { color: theme.textSecondary }]}>
+                    {isCustomMode 
+                      ? 'Select your own stretches and create a personalized routine.' 
+                      : 'Describe your needs in natural language, and I\'ll create a personalized routine for you.'}
+                  </Text>
+                  
+                  {isCustomMode ? (
+                    <CustomForm
+                      theme={theme}
+                      isDark={isDark}
+                      routineName={routineName}
+                      setRoutineName={setRoutineName}
+                      selectedArea={selectedArea}
+                      setSelectedArea={setSelectedArea}
+                      selectedDuration={selectedDuration}
+                      setSelectedDuration={setSelectedDuration}
+                      selectedStretches={selectedStretches}
+                      setSelectedStretches={setSelectedStretches}
+                      openStretchSelector={openStretchSelector}
+                      addRestPeriod={addRestPeriod}
+                      removeItem={removeItem}
+                      moveItem={moveItem}
+                      saveCustomRoutine={saveCustomRoutine}
+                      restPeriods={restPeriods}
+                      formatCustomStretchesInfo={formatCustomStretchesInfo}
+                      meetsMinimumRequirement={meetsMinimumRequirement}
+                      isCustomMode={isCustomMode}
+                    />
+                  ) : (
+                    <View style={styles.smartModeContainer}>
+                      <SmartRoutineGenerator onRoutineGenerated={handleSmartRoutineGenerated} />
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+            )}
+          </>
+        )}
         
         {/* Stretch Selector Modal */}
         <Modal

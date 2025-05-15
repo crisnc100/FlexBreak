@@ -15,7 +15,14 @@ import {
   ToastAndroid
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod } from '../../types';
+import { 
+  BodyArea, 
+  Duration, 
+  Stretch, 
+  Position, 
+  RestPeriod, 
+  TransitionPeriod 
+} from '../../types';
 import { generateRoutine } from '../../utils/generators/routineGenerator';
 import { useTheme } from '../../context/ThemeContext';
 import { enhanceRoutineWithPremiumInfo } from '../../utils/generators/premiumUtils';
@@ -26,15 +33,17 @@ import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Audio } from 'expo-av';
 import StretchFlowView from './StretchFlowView';
 import stretches from '../../data/stretches';
+import * as storageService from '../../services/storageService';
 
 const { width, height } = Dimensions.get('window');
 
 export interface ActiveRoutineProps {
   area: BodyArea;
   duration: Duration;
-  level: StretchLevel;
-  customStretches?: (Stretch | RestPeriod)[];
+  position: Position;
+  customStretches?: (Stretch | RestPeriod | TransitionPeriod)[];
   includePremiumStretches?: boolean;
+  transitionDuration?: number;
   onComplete: (routineArea: BodyArea, routineDuration: Duration, stretchCount?: number, hasAdvancedStretch?: boolean, currentStretches?: any[]) => Promise<void>;
   onNavigateHome: () => void;
 }
@@ -42,16 +51,17 @@ export interface ActiveRoutineProps {
 const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   area,
   duration,
-  level,
+  position,
   customStretches,
   includePremiumStretches,
+  transitionDuration,
   onComplete,
   onNavigateHome
 }) => {
   const { theme, isDark } = useTheme();
   
   // State
-  const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string })[]>([]);
+  const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string; } | TransitionPeriod)[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isDone, setIsDone] = useState(false);
   
@@ -80,6 +90,8 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   
   // Track last second where we played a sound to avoid multiple plays
   const lastSecondPlayedRef = useRef<number>(-1);
+  // Flag to skip the tick sound right after a transition completes
+  const skipNextTickRef = useRef<boolean>(false);
   const initialRenderRef = useRef(true);
   
   // Add state for paused status
@@ -116,10 +128,10 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   }, [isTimerPaused]);
   
   // Get the current stretch
-  const currentStretch = routine[currentIndex];
+  const currentStretch = routine[currentIndex] as (Stretch | RestPeriod | TransitionPeriod);
   
   // Get the next stretch for preloading
-  const nextStretch = routine[currentIndex + 1];
+  const nextStretch = routine[currentIndex + 1] as (Stretch | RestPeriod | TransitionPeriod);
   
   // Add useEffect to handle the next button timeout
   useEffect(() => {
@@ -143,7 +155,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           console.error('Error providing feedback:', error);
         }
       }
-    }, 6000);
+    }, 5000);
     
     // Clean up timer on unmount or when stretch changes
     return () => clearTimeout(timer);
@@ -153,29 +165,35 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const handleNext = useCallback(() => {
     console.log('handleNext called');
     
-    // Check if user can skip to next
-    if (!canSkipToNext) {
-      // Play an error sound or feedback
+    const isCurrentTransition = 'isTransition' in currentStretch;
+    // Check if user can skip to next (bypass for transition periods)
+    if (!isCurrentTransition && !canSkipToNext) {
+      // Provide haptic feedback to indicate action not allowed yet
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } catch (error) {
         console.error('Error providing haptic feedback:', error);
       }
-      
+
       // Optionally show a brief notification or alert
       Alert.alert(
         "Please Wait",
-        "You need to stretch for at least 6 seconds before advancing."
+        "You need to stretch for at least 5 seconds before advancing."
       );
       
       return;
     }
     
-    // Play sound effect
-    try {
-      soundEffects.playClickSound();
-    } catch (error) {
-      console.error('Error playing click sound:', error);
+    // Play sound only if current item is NOT a transition period
+    if (!isCurrentTransition) {
+      try {
+        soundEffects.playClickSound();
+      } catch (error) {
+        console.error('Error playing click sound:', error);
+      }
+    } else {
+      // We are leaving a transition; suppress the first potential tick of the next stretch
+      skipNextTickRef.current = true;
     }
     
     // Reset the last second played reference
@@ -236,13 +254,20 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
       
       // For bilateral stretches, double the duration - BUT ONLY for custom routines
       // Standard generated routines already have their durations calculated correctly in routineGenerator.ts
-      if (customStretches && customStretches.length > 0) {
-        // Only if it's a stretch (not a rest) and has bilateral property set to true
-        if (currentStretchItem && 
-            !('isRest' in currentStretchItem) && 
-            (currentStretchItem as Stretch).bilateral === true) {
-          console.log(`Custom routine: Stretch ${currentIndex} is bilateral, doubling duration from ${currentDuration} to ${currentDuration * 2}`);
+      if (
+        customStretches && 
+        customStretches.length > 0 &&
+        currentStretchItem && 
+        !('isRest' in currentStretchItem) && 
+        (currentStretchItem as Stretch).bilateral === true
+      ) {
+        // Avoid re-doubling if this stretch was already stored with the full bilateral duration
+        // Heuristic: base unilateral stretches are typically <= 45 s, so anything larger is assumed to be already doubled.
+        if (currentDuration <= 45) {
+          console.log(`[ActiveRoutine] Bilateral custom stretch detected (undoubled). Doubling duration from ${currentDuration}s to ${currentDuration * 2}s`);
           currentDuration = currentDuration * 2;
+        } else {
+          console.log(`[ActiveRoutine] Bilateral custom stretch already doubled (${currentDuration}s). Skipping additional doubling.`);
         }
       } else {
         // For generated routines, the bilateral timing is already factored in by routineGenerator
@@ -438,7 +463,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         hasUri: typeof stretch.image === 'object' && 'uri' in stretch.image,
         source: typeof stretch.image === 'number' ? 
                 `[Asset #${stretch.image}]` : 
-                JSON.stringify(stretch.image).substring(0, 100)
+                (stretch.image ? JSON.stringify(stretch.image).substring(0, 100) : 'no-image')
       });
     }
   }, [currentStretch]);
@@ -464,10 +489,10 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   useEffect(() => {
     const initRoutine = async () => {
       try {
-        console.log(`[ActiveRoutine] Initializing routine: ${area}, ${duration}, ${level}, custom stretches: ${customStretches?.length || 0}`);
+        console.log(`[ActiveRoutine] Initializing routine: ${area}, ${duration}, ${position}, custom stretches: ${customStretches?.length || 0}`);
         
         if (area && duration) {
-          console.log(`Generating routine: area=${area}, duration=${duration}, level=${level}, customStretches=${customStretches?.length || 0}`);
+          console.log(`Generating routine: area=${area}, duration=${duration}, position=${position}, customStretches=${customStretches?.length || 0}`);
           
           // If we have custom stretches, log them for debugging
           if (customStretches && customStretches.length > 0) {
@@ -631,7 +656,18 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           } else {
             // Generate a routine normally if no custom stretches
             console.log('Generating routine without custom stretches');
-            const generatedRoutine = await generateRoutine(area, duration, level, undefined);
+            // Determine effective transition duration (prop overrides setting)
+            let effectiveTransition = transitionDuration;
+            if (effectiveTransition === undefined || effectiveTransition === null) {
+              try {
+                effectiveTransition = await storageService.getTransitionDuration();
+                console.log(`[ActiveRoutine] Loaded transition duration setting: ${effectiveTransition}s`);
+              } catch (e) {
+                console.warn('Could not load transition duration setting, defaulting to 0');
+                effectiveTransition = 0;
+              }
+            }
+            const generatedRoutine = await generateRoutine(area, duration, position || 'All', undefined, effectiveTransition);
             
             // Enhance the routine with premium information
             try {
@@ -710,9 +746,10 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     console.log('[ActiveRoutine] Props received:', {
       area,
       duration,
-      level,
+      position,
       customStretchesCount: customStretches?.length || 0,
-      includePremiumStretches
+      includePremiumStretches,
+      transitionDuration
     });
     
     // Log detailed info about custom stretches if they exist
@@ -797,7 +834,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     
     // Check if routine includes advanced stretches
     const hasAdvancedStretch = routine.some(
-      item => !('isRest' in item) && (item as Stretch).level === 'advanced'
+      item => !('isRest' in item)
     );
     
     // Call onComplete callback with the routine
@@ -873,6 +910,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         currentStretch={'isRest' in currentStretch ? null : currentStretch as Stretch}
         isPlaying={!isPaused}
         canSkipToNext={canSkipToNext}
+        nextStretch={ (routine[currentIndex+1] && !('isRest' in routine[currentIndex+1]) && !('isTransition' in routine[currentIndex+1]) ) ? routine[currentIndex+1] as Stretch : null }
       />
     );
   };
@@ -951,26 +989,58 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   }, []);
   
   // Add useEffect to play timer tick sound for the last 3 seconds
+  const previousTimeRef = useRef<number>(timeRemaining);
+
+  // Track when the current stretch started to delay tick sounds briefly
+  const stretchStartTimeRef = useRef<number>(Date.now());
+
   useEffect(() => {
-    // Don't play tick sound during countdown or if timer is paused
-    if (showCountdown || isPaused) return;
-    
+    // Don't play tick sound during countdown, if timer is paused, or during transitions
+    if (showCountdown || isPaused || ('isTransition' in currentStretch)) {
+      previousTimeRef.current = timeRemaining;
+      return;
+    }
+
+    // Suppress tick once if flag set (right after a transition)
+    if (skipNextTickRef.current) {
+      skipNextTickRef.current = false;
+      previousTimeRef.current = timeRemaining;
+      lastSecondPlayedRef.current = -1;
+      return;
+    }
+
+    // Prevent tick/theme sounds for the first few seconds of a new stretch
+    const elapsedSinceStretchStart = (Date.now() - stretchStartTimeRef.current) / 1000;
+    if (elapsedSinceStretchStart < 4) {
+      return;
+    }
+
+    // Only proceed if the timer is actually counting down (timeRemaining decreased)
+    const isCountingDown = timeRemaining < previousTimeRef.current;
+    previousTimeRef.current = timeRemaining;
+
+    if (!isCountingDown) return; // Skip if timer just reset / increased
+
     // Play tick sound for the last 3 seconds (3, 2, 1)
     if (timeRemaining <= 3 && timeRemaining > 0) {
-      // Round to nearest second to avoid playing multiple times
+      // Round to nearest second to avoid multiple plays per second
       const currentSecond = Math.ceil(timeRemaining);
-      
-      // Use a ref to track the last second we played a sound for
-      if (currentSecond <= 3 && currentSecond !== lastSecondPlayedRef.current) {
+
+      if (currentSecond !== lastSecondPlayedRef.current) {
         console.log(`Playing timer tick sound at ${currentSecond} seconds remaining`);
         soundEffects.playTimerTickSound();
         lastSecondPlayedRef.current = currentSecond;
       }
     } else {
-      // Reset last second played ref when not in the last 3 seconds
+      // Reset last second played ref when outside the last 3-second window
       lastSecondPlayedRef.current = -1;
     }
-  }, [timeRemaining, isPaused, showCountdown]);
+  }, [timeRemaining, isPaused, showCountdown, currentStretch]);
+  
+  // Update start time whenever the current stretch changes (index changes)
+  useEffect(() => {
+    stretchStartTimeRef.current = Date.now();
+  }, [currentIndex]);
   
   // If routine is not loaded yet, show loading
   if (!routine || routine.length === 0 || !currentStretch) {

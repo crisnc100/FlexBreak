@@ -88,14 +88,14 @@ export default function FavoritesScreen() {
       navigation.navigate('Routine', {
         area: routine.area,
         duration: routine.duration,
-        level: 'beginner',
+        position: 'All',
         customStretches: routine.savedStretches
       });
     } else {
       navigation.navigate('Routine', {
         area: routine.area,
         duration: routine.duration,
-        level: 'beginner'
+        position: 'All'
       });
     }
   };

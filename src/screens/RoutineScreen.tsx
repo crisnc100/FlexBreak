@@ -5,7 +5,7 @@ import SubscriptionModal from '../components/SubscriptionModal';
 import SmartPickModal from '../components/SmartPickModal';
 import { usePremium } from '../context/PremiumContext';
 import { useRefresh } from '../context/RefreshContext';
-import { BodyArea, Duration, ProgressEntry, StretchLevel, Stretch } from '../types';
+import { BodyArea, Duration, ProgressEntry, Position, Stretch } from '../types';
 import * as soundEffects from '../utils/soundEffects';
 
 // Import our components
@@ -55,7 +55,7 @@ export default function RoutineScreen() {
   const { 
     area, 
     duration, 
-    level, 
+    position, 
     customStretches, 
     includePremiumStretches,
     hasParams, 
@@ -120,7 +120,7 @@ export default function RoutineScreen() {
   useEffect(() => {
     // If we have params, we should show the active routine
     if (hasParams && screenState !== 'COMPLETED') {
-      console.log('We have params, showing active routine:', area, duration, level);
+      console.log('We have params, showing active routine:', area, duration, position);
       setScreenState('ACTIVE');
     }
     // If we don't have params and we're not on the completion screen, show dashboard
@@ -128,7 +128,7 @@ export default function RoutineScreen() {
       console.log('No params, showing dashboard');
       setScreenState('DASHBOARD');
     }
-  }, [hasParams, area, duration, level]);
+  }, [hasParams, area, duration, position]);
 
   // Handle focus changes from tab navigation
   useFocusEffect(
@@ -167,7 +167,7 @@ export default function RoutineScreen() {
         duration: routineDuration,
         date: new Date().toISOString(),
         stretchCount: stretchCount,
-        level: level || 'beginner', // Include the level when saving the routine
+        position: position || 'All', // Include the position when saving the routine
         savedStretches: currentStretches // Save the actual stretches used
       };
 
@@ -666,7 +666,7 @@ export default function RoutineScreen() {
       navigateToRoutine({
         area: recommendation.area,
         duration: recommendation.duration,
-        level: recommendation.level,
+        position: recommendation.position,
         // Add a flag to indicate if premium stretches should be included
         includePremiumStretches: recommendation.isPremiumEnabled
       });
@@ -685,7 +685,7 @@ export default function RoutineScreen() {
 
     // Navigate to the routine screen with new params
     setTimeout(() => {
-      console.log('Navigating to routine with params:', routine.area, routine.duration, routine.level || 'beginner');
+      console.log('Navigating to routine with params:', routine.area, routine.duration, routine.position || 'All');
       
       // Check if this routine has saved stretches
       if (routine.savedStretches && routine.savedStretches.length > 0) {
@@ -695,7 +695,7 @@ export default function RoutineScreen() {
         navigateToRoutine({
           area: routine.area,
           duration: routine.duration,
-          level: routine.level || 'beginner',
+          position: routine.position || 'All',
           customStretches: routine.savedStretches // Use the saved stretches
         });
       } else {
@@ -703,7 +703,7 @@ export default function RoutineScreen() {
         navigateToRoutine({
           area: routine.area,
           duration: routine.duration,
-          level: routine.level || 'beginner'
+          position: routine.position || 'All'
         });
       }
     }, 100);
@@ -729,7 +729,7 @@ export default function RoutineScreen() {
         navigateToRoutine({
           area: suggestion.area,
           duration: suggestion.duration,
-          level: 'beginner' // Default to beginner for suggestions
+          position: 'All' // Default to beginner for suggestions
         });
       }, 100);
     }
@@ -765,6 +765,49 @@ export default function RoutineScreen() {
       console.log('Routine hidden successfully');
     } catch (error) {
       console.error('Error hiding routine:', error);
+    }
+  };
+
+  // Handle favoriting/unfavoriting a routine
+  const handleFavoriteRoutine = async (routineDate: string) => {
+    try {
+      // Find the routine in recent routines by date
+      const routine = recentRoutines.find(r => r.date === routineDate);
+      if (!routine) return;
+
+      // Get current favorites list
+      const favorites = await storageService.getFavoriteRoutines();
+
+      // Helper to compare a favorite entry to a progress entry
+      const isSameRoutine = (fav: any, entry: typeof routine) => {
+        return (
+          fav.area === entry.area &&
+          fav.duration === entry.duration &&
+          JSON.stringify(fav.savedStretches || []) === JSON.stringify(entry.savedStretches || [])
+        );
+      };
+
+      const existingFavorite = favorites.find(fav => isSameRoutine(fav, routine));
+
+      if (existingFavorite) {
+        // Already favorited -> unfavorite
+        await storageService.deleteFavoriteRoutine(existingFavorite.id);
+      } else {
+        // Not favorited -> save
+        const favParams = {
+          name: `${routine.area} ${routine.duration} min routine`,
+          area: routine.area,
+          duration: routine.duration,
+          position: routine.position || 'All',
+          savedStretches: routine.savedStretches,
+        } as any;
+        await storageService.saveFavoriteRoutine(favParams);
+      }
+
+      // Refresh routines to update UI
+      await refreshRoutine();
+    } catch (error) {
+      console.error('Error toggling favorite routine:', error);
     }
   };
 
@@ -834,6 +877,7 @@ export default function RoutineScreen() {
           onSmartPick={handleSmartPickTap}
           onCreateNew={handleCreateNewRoutine}
           onDeleteRoutine={handleHideRoutine}
+          onFavoriteRoutine={handleFavoriteRoutine}
         />
 
         <SubscriptionModal
@@ -899,7 +943,7 @@ export default function RoutineScreen() {
         <ActiveRoutine
           area={area}
           duration={duration}
-          level={level || 'intermediate'}
+          position={position || 'All'}
           customStretches={customStretches}
           includePremiumStretches={includePremiumStretches}
           onComplete={handleRoutineComplete}

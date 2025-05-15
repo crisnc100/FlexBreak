@@ -55,7 +55,8 @@ export function useRoutineSuggestions() {
           'Upper Back & Chest': 0,
           'Shoulders & Arms': 0,
           'Neck': 0,
-          'Full Body': 0
+          'Full Body': 0,
+          "Dynamic Flow": 0
         };
         
         // Count frequency of each area

@@ -10,23 +10,28 @@ import {
   Platform,
   ImageSourcePropType,
   ActivityIndicator,
-  Easing
+  Easing,
+  ScrollView,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import DemoVideoPlayer from './DemoVideoPlayer';
 import * as soundEffects from '../../utils/soundEffects';
 import * as Haptics from 'expo-haptics';
-import { Stretch, RestPeriod } from '../../types';
+import { Stretch, RestPeriod, TransitionPeriod } from '../../types';
 import { NavigationButtons } from './utils';
 import { Video, ResizeMode as VideoResizeMode } from 'expo-av';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, G } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import CircularTimer from './CircularTimer';
+import StructuredInstructions from './StructuredInstructions';
 
 const { width, height } = Dimensions.get('window');
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export interface StretchFlowViewProps {
-  stretch: Stretch | RestPeriod;
+  stretch: Stretch | RestPeriod | TransitionPeriod;
   timeRemaining: number;
   progressAnim: Animated.Value;
   isPaused: boolean;
@@ -39,6 +44,7 @@ export interface StretchFlowViewProps {
   currentStretch: Stretch | null;
   isPlaying: boolean;
   canSkipToNext?: boolean;
+  nextStretch?: Stretch | null;
 }
 
 export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
@@ -54,12 +60,13 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   startTimer,
   currentStretch,
   isPlaying,
-  canSkipToNext = true
+  canSkipToNext = true,
+  nextStretch = null
 }) => {
   const { theme, isDark } = useTheme();
   
   // App states
-  const [viewMode, setViewMode] = useState<'demo' | 'stretch' | 'rest'>('stretch');
+  const [viewMode, setViewMode] = useState<'demo' | 'stretch' | 'rest' | 'transition'>('stretch');
   const [hasDemoBeenWatched, setHasDemoBeenWatched] = useState(false);
   const [previousStretch, setPreviousStretch] = useState<Stretch | null>(null);
   const [timerForceUpdate, setTimerForceUpdate] = useState(Date.now());
@@ -68,23 +75,31 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   const [displayedTime, setDisplayedTime] = useState(timeRemaining);
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
+  const [transitionVideoOpacity, setTransitionVideoOpacity] = useState(0.6);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const imageOpacity = useRef(new Animated.Value(0)).current;
   
+  // Video ref for transition preview
+  const transitionVideoRef = useRef<Video>(null);
+  
+  // Ref to track logged stretches to avoid infinite logging
+  const loggedStretchesRef = useRef<Set<string>>(new Set());
+  
   // Update displayed time whenever timeRemaining changes
   useEffect(() => {
     setDisplayedTime(timeRemaining);
   }, [timeRemaining]);
   
-  // Is this a rest or a stretch?
+  // Is this a rest, transition, or a stretch?
   const isRest = 'isRest' in stretch;
-  const isPremium = !isRest && (stretch as any).isPremium;
-  const hasDemo = !isRest && 'hasDemo' in stretch && (stretch as Stretch).hasDemo;
+  const isTransition = 'isTransition' in stretch;
+  const isPremium = !isRest && !isTransition && (stretch as any).isPremium;
+  const hasDemo = !isRest && !isTransition && 'hasDemo' in stretch && (stretch as Stretch).hasDemo;
   // Define stretchObj here for scope access in all functions
-  const stretchObj = isRest ? null : (stretch as Stretch);
+  const stretchObj = isRest || isTransition ? null : (stretch as Stretch);
   
   // Track current stretch ID for detecting changes
   const currentStretchId = stretch.id;
@@ -109,13 +124,51 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   }, [currentStretchId]);
   
   // Determine if this stretch has tips
-  const hasTips = !isRest && 'tips' in stretch && (stretch as any).tips && (stretch as any).tips.length > 0;
+  const hasTips = !isRest && !isTransition && 'tips' in stretch && (stretch as any).tips && (stretch as any).tips.length > 0;
   
   // When stretch changes or on first load, show demo first if available
   useEffect(() => {
     if (isRest) {
       // Rest periods don't have demos, go straight to stretch view
-      animateViewTransition('stretch', false);
+      animateViewTransition('rest', false);
+    } else if (isTransition) {
+      // Transition periods don't have demos, go straight to transition view
+      animateViewTransition('transition', false);
+      
+      // Play a random transition sound after a short delay
+      try {
+        console.log('Setting up transition sound with 1 second delay...');
+        
+        // Add a 1-second delay before playing the sound
+        setTimeout(() => {
+          // Use await to ensure the sound plays
+          const playSound = async () => {
+            if (Math.random() < 0.5) {
+              console.log('Playing transition sound 1');
+              await soundEffects.playTransition1Sound();
+            } else {
+              console.log('Playing transition sound 2');
+              await soundEffects.playTransition2Sound();
+            }
+            
+            // Add subtle haptic feedback for transition after sound starts
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          };
+          
+          // Execute the sound playing function
+          playSound();
+        }, 500); // 1000ms = 0.5 second delay
+        
+      } catch (error) {
+        console.error('Error playing transition sound:', error);
+        
+        // Try fallback sound if there was an error
+        try {
+          soundEffects.playClickSound();
+        } catch (secondError) {
+          console.error('Even fallback sound failed:', secondError);
+        }
+      }
     } else {
       // Default to showing stretch view (not demo)
       animateViewTransition('stretch', false);
@@ -137,13 +190,13 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   }, [demoVideoStatus, isPlaying]);
   
   // Handle smooth transition between views
-  const animateViewTransition = (newView: 'demo' | 'stretch', animate = true) => {
+  const animateViewTransition = (newView: 'demo' | 'stretch' | 'rest' | 'transition', animate = true) => {
     if (viewMode === newView || isTransitioning) return;
     
     setIsTransitioning(true);
     
     // Determine the direction of slide animation
-    const slideDirection = newView === 'demo' ? -1 : 1;
+    const slideDirection = newView === 'demo' ? -1 : newView === 'rest' ? -2 : newView === 'transition' ? -3 : 1;
     
     if (animate) {
       // Fade out current view
@@ -247,52 +300,52 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     }
   };
   
-  // Enhanced detection for video sources
-  const isVideoSource = useCallback(() => {
-    if (isRest || !stretchObj || !stretchObj.image) {
+  // Function to check if stretch has a video source - updated to work with any stretch
+  const isVideoSource = useCallback((stretchToCheck: Stretch | null) => {
+    if (!stretchToCheck || !stretchToCheck.image) {
       return false;
     }
 
     // Case 1: Check for the __video flag
-    if (typeof stretchObj.image === 'object' && 
-        stretchObj.image !== null && 
-        (stretchObj.image as any).__video === true) {
+    if (typeof stretchToCheck.image === 'object' && 
+        stretchToCheck.image !== null && 
+        (stretchToCheck.image as any).__video === true) {
       return true;
     }
     
     // Case 2: Check for .mp4 extension in uri
-    if (typeof stretchObj.image === 'object' && 
-        stretchObj.image !== null && 
-        'uri' in stretchObj.image && 
-        typeof stretchObj.image.uri === 'string' && 
-        stretchObj.image.uri.toLowerCase().endsWith('.mp4')) {
+    if (typeof stretchToCheck.image === 'object' && 
+        stretchToCheck.image !== null && 
+        'uri' in stretchToCheck.image && 
+        typeof stretchToCheck.image.uri === 'string' && 
+        (stretchToCheck.image.uri.toLowerCase().endsWith('.mp4') || 
+         stretchToCheck.image.uri.toLowerCase().endsWith('.mov'))) {
       return true;
     }
 
     // Case 3: Check for require asset with MP4 reference
-    if (typeof stretchObj.image === 'object' && 
-        (stretchObj.image as any).__asset) {
+    if (typeof stretchToCheck.image === 'object' && 
+        (stretchToCheck.image as any).__asset) {
       return true;
     }
 
     // Case 4: Last resort - try to detect MP4 from number asset
-    if (typeof stretchObj.image === 'number') {
+    if (typeof stretchToCheck.image === 'number') {
       // Convert to string and check for MP4 in the debug description
-      const assetStr = stretchObj.image.toString();
+      const assetStr = stretchToCheck.image.toString();
       
       // Try to detect MP4 from the asset reference
-      const isMp4 = assetStr.includes('mp4') || assetStr.includes('video');
-      if (isMp4) {
+      if (assetStr.includes('mp4') || assetStr.includes('mov') || assetStr.includes('video')) {
         return true;
       }
     }
     
     return false;
-  }, [isRest, stretchObj]);
+  }, []);
   
   // Use effect to log debugging info only when stretch changes
   useEffect(() => {
-    if (!isRest && stretchObj) {
+    if (!isRest && !isTransition && stretchObj) {
       console.log(`Source type for ${stretchObj.name}:`, {
         type: typeof stretchObj.image,
         isObject: typeof stretchObj.image === 'object',
@@ -303,15 +356,15 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
                   JSON.stringify(stretchObj.image).substring(0, 100),
       });
       
-      if (isVideoSource()) {
+      if (isVideoSource(stretchObj)) {
         console.log(`✅ Video detected for ${stretchObj.name}`);
       } else {
         console.log(`❌ Not detected as video for ${stretchObj.name}`);
       }
       
-      console.log(`Source for ${stretchObj.name}: ${typeof stretchObj.image} | isVideo: ${isVideoSource()}`);
+      console.log(`Source for ${stretchObj.name}: ${typeof stretchObj.image} | isVideo: ${isVideoSource(stretchObj)}`);
     }
-  }, [currentStretchId, isRest, isVideoSource, stretchObj]);
+  }, [currentStretchId, isRest, isTransition, isVideoSource, stretchObj]);
   
   // Calculate total duration based on whether the stretch is bilateral
   const calculateTotalDuration = (stretchObj: Stretch) => {
@@ -342,7 +395,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
 
     if (!stretchObj) return null;
     
-    const shouldRenderVideo = isVideoSource();
+    const shouldRenderVideo = isVideoSource(stretchObj);
     
     if (shouldRenderVideo) {
       let videoSource = stretchObj.image;
@@ -448,146 +501,6 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     );
   };
   
-  // Circular Timer Component
-  const CircularTimer: React.FC<{
-    progress: Animated.Value;
-    timeRemaining: number;
-    diameter?: number;
-    strokeWidth?: number;
-    color?: string;
-    backgroundColor?: string;
-    textColor?: string;
-    isDark?: boolean;
-  }> = ({
-    progress,
-    timeRemaining,
-    diameter = 100,
-    strokeWidth = 8,
-    color = '#4CAF50',
-    backgroundColor = '#E0E0E0',
-    textColor = '#333',
-    isDark = false
-  }) => {
-    const radius = (diameter - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    
-    // Animated value for seconds text
-    const [prevTime, setPrevTime] = useState(timeRemaining);
-    const textOpacity = useRef(new Animated.Value(1)).current;
-    const textScale = useRef(new Animated.Value(1)).current;
-    
-    // Format time as minutes and seconds
-    const formatTime = (seconds: number) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      
-      if (mins > 0) {
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-      } else {
-        return `${secs}`;
-      }
-    };
-    
-    // Animate the seconds text when it changes
-    useEffect(() => {
-      if (prevTime !== timeRemaining) {
-        // Time has changed, animate the transition
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(textOpacity, {
-              toValue: 0.3,
-              duration: 100,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.ease)
-            }),
-            Animated.timing(textScale, {
-              toValue: 0.85,
-              duration: 100,
-              useNativeDriver: true,
-              easing: Easing.out(Easing.ease)
-            })
-          ]),
-          Animated.parallel([
-            Animated.timing(textOpacity, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-              easing: Easing.in(Easing.ease)
-            }),
-            Animated.timing(textScale, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-              easing: Easing.in(Easing.bounce)
-            })
-          ])
-        ]).start();
-        
-        setPrevTime(timeRemaining);
-      }
-    }, [timeRemaining, prevTime, textOpacity, textScale]);
-    
-    // Determine color based on progress
-    const progressInterpolatedColor = progress.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [color, color, color] // Currently using a single color, but could transition
-    });
-    
-    // Calculate stroke dash offset based on progress with safeguards
-    const strokeDashoffset = progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [circumference, 0],
-      extrapolate: 'clamp' // Prevent values outside the range
-    });
-    
-    return (
-      <View style={[styles.circularTimerContainer, { width: diameter, height: diameter }]}>
-        <Svg width={diameter} height={diameter}>
-          {/* Background Circle */}
-          <Circle
-            cx={diameter / 2}
-            cy={diameter / 2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            stroke={isDark ? 'rgba(255,255,255,0.15)' : backgroundColor}
-            fill="transparent"
-          />
-          {/* Progress Circle */}
-          <AnimatedCircle
-            cx={diameter / 2}
-            cy={diameter / 2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            stroke={progressInterpolatedColor}
-            fill="transparent"
-            strokeLinecap="round"
-            strokeDasharray={`${circumference}`}
-            strokeDashoffset={strokeDashoffset}
-            rotation="-90"
-            origin={`${diameter/2}, ${diameter/2}`}
-          />
-        </Svg>
-        <View style={styles.circularTimerTextContainer}>
-          <Animated.Text 
-            style={[
-              styles.circularTimerText, 
-              { 
-                color: isDark ? 'white' : textColor,
-                opacity: textOpacity,
-                transform: [{ scale: textScale }]
-              }
-            ]}
-          >
-            {formatTime(timeRemaining)}
-          </Animated.Text>
-          <Text style={[styles.circularTimerLabel, { color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }]}>
-            sec
-          </Text>
-        </View>
-      </View>
-    );
-  };
-
   // Render stretch demo view
   const renderDemoView = () => {
     if (isRest || !hasDemo) return null;
@@ -748,13 +661,14 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         {/* Timer back to original position and size */}
         <View style={styles.timerContainer}>
           <CircularTimer
+            key={timerForceUpdate}
             progress={progressAnim}
             timeRemaining={displayedTime}
             diameter={125}
             strokeWidth={8}
             color={isDark ? theme.accent : '#4CAF50'}
             backgroundColor={isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'}
-            textColor={isDark ? theme.text : '#333'}
+            textColor="#000"
             isDark={isDark}
           />
         </View>
@@ -796,200 +710,75 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     );
   };
 
-  // Render rest period
+  // Render a rest period
   const renderRestPeriod = () => {
     return (
-      <View style={[styles.restContainer, { backgroundColor: isDark ? theme.cardBackground : '#f5f5f5' }]}>
-        <View style={styles.restIconContainer}>
-          <Ionicons name="time-outline" size={70} color={isDark ? theme.accent : '#4CAF50'} />
-        </View>
-        <Text style={[styles.restTitle, { color: isDark ? theme.text : '#333' }]}>
-          {stretch.name || 'Rest Period'}
-        </Text>
-        <Text style={[styles.restDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
-          {stretch.description || 'Take a short break before continuing'}
-        </Text>
-        <View style={styles.timerContainer}>
-          <CircularTimer
-            progress={progressAnim}
-            timeRemaining={displayedTime}
-            diameter={110}
-            strokeWidth={8}
-            color={isDark ? theme.accent : '#4CAF50'}
-            backgroundColor={isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'}
-            textColor={isDark ? theme.text : '#333'}
-            isDark={isDark}
-          />
-        </View>
-      </View>
-    );
-  };
-
-  // Add this function to parse description text into structured steps
-  const parseStretchInstructions = (description: string) => {
-    if (!description) return { type: 'simple', instructions: ['No description available'] };
-    
-    // Split by periods, clean up, and filter empty items
-    const sentences = description
-      .split('.')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-    
-    // If it's just 1-2 sentences, use a simple format
-    if (sentences.length <= 2) {
-      return {
-        type: 'simple',
-        instructions: sentences
-      };
-    }
-    
-    // Keywords that might indicate form cues/tips
-    const cueKeywords = ['keep', 'ensure', 'maintain', 'remember', 'avoid', 'don\'t', 'make sure', 'focus'];
-    
-    // Keywords that might indicate setup steps
-    const setupKeywords = ['start', 'begin', 'position', 'place', 'stand', 'sit', 'lie'];
-    
-    // Categorize each sentence
-    const setup: string[] = [];
-    const execution: string[] = [];
-    const cues: string[] = [];
-    
-    sentences.forEach(sentence => {
-      const lowerSentence = sentence.toLowerCase();
-      
-      // Check if it's a setup instruction
-      if (setup.length < 2 && setupKeywords.some(keyword => lowerSentence.includes(keyword))) {
-        setup.push(sentence);
-      }
-      // Check if it's a form cue
-      else if (cueKeywords.some(keyword => lowerSentence.includes(keyword))) {
-        cues.push(sentence);
-      }
-      // Otherwise it's an execution step
-      else {
-        execution.push(sentence);
-      }
-    });
-    
-    // If nothing was categorized as setup, take the first sentence as setup
-    if (setup.length === 0 && execution.length > 1) {
-      setup.push(execution.shift()!);
-    }
-    
-    return {
-      type: 'structured',
-      setup,
-      execution,
-      cues
-    };
-  };
-
-  // Add this new component for formatted instructions
-  const StructuredInstructions: React.FC<{
-    description: string;
-    isDark: boolean;
-    theme: any;
-  }> = ({ description, isDark, theme }) => {
-    const parsedInstructions = parseStretchInstructions(description);
-    
-    if (parsedInstructions.type === 'simple') {
-      return (
-        <View style={styles.simpleInstructionsContainer}>
-          <View style={styles.instructionHeader}>
-            <Ionicons name="information-circle-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-            <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
-              Instructions
+      <View style={styles.restContainer}>
+        <LinearGradient
+          colors={isDark ? ['#1a1a1a', '#2a2a2a'] : ['#f5f5f5', '#e0e0e0']}
+          style={styles.restGradient}
+        >
+          <View style={styles.restContent}>
+            <Ionicons 
+              name="time-outline" 
+              size={50} 
+              color={isDark ? theme.accent : '#4CAF50'} 
+              style={styles.restIcon} 
+            />
+            
+            <Text style={[styles.restTitle, { color: isDark ? theme.text : '#333' }]}>
+              Rest Period
             </Text>
-          </View>
-          {parsedInstructions.instructions.map((instruction, index) => (
-            <View key={index} style={styles.simpleInstructionItem}>
-              <View style={[styles.instructionDot, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
-              <Text style={[styles.simpleInstructionText, { color: isDark ? theme.text : '#333' }]}>
-                {instruction}
-              </Text>
-            </View>
-          ))}
-        </View>
-      );
-    }
-    
-    return (
-      <View style={styles.structuredInstructionsContainer}>
-        {/* Setup section */}
-        {parsedInstructions.setup.length > 0 && (
-          <View style={styles.instructionSection}>
-            <View style={styles.instructionHeader}>
-              <Ionicons name="body-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-              <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
-                Starting Position
-              </Text>
+            
+            <Text style={[styles.restDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
+              {stretch.description}
+            </Text>
+            
+            <View style={styles.restTimerContainer}>
+              <CircularTimer
+                key={timeRemaining}
+                progress={progressAnim}
+                timeRemaining={timeRemaining}
+                diameter={120}
+                strokeWidth={8}
+                color={isDark ? theme.accent : '#4CAF50'}
+                backgroundColor={isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0'}
+                textColor="#000"
+                isDark={isDark}
+              />
             </View>
             
-            {parsedInstructions.setup.map((step, index) => (
-              <View key={`setup-${index}`} style={styles.instructionStep}>
-                <View style={[styles.stepNumberCircle, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
-                  <Text style={styles.stepNumberText}>{index + 1}</Text>
-                </View>
-                <Text style={[styles.stepText, { color: isDark ? theme.text : '#333' }]}>
-                  {step}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-        
-        {/* Execution section */}
-        <View style={styles.instructionSection}>
-          <View style={styles.instructionHeader}>
-            <Ionicons name="fitness-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-            <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
-              {parsedInstructions.setup.length > 0 ? 'Movement' : 'Instructions'}
-            </Text>
-          </View>
-          
-          {parsedInstructions.execution.map((step, index) => (
-            <View key={`exec-${index}`} style={styles.instructionStep}>
-              <View style={[styles.stepNumberCircle, { 
-                backgroundColor: isDark ? 
-                  (parsedInstructions.setup.length > 0 ? 'rgba(255,255,255,0.2)' : theme.accent) : 
-                  (parsedInstructions.setup.length > 0 ? '#E0E0E0' : '#4CAF50') 
-              }]}>
-                <Text style={[
-                  styles.stepNumberText,
-                  parsedInstructions.setup.length > 0 && { color: isDark ? 'white' : '#666' }
-                ]}>
-                  {parsedInstructions.setup.length + index + 1}
-                </Text>
-              </View>
-              <Text style={[styles.stepText, { color: isDark ? theme.text : '#333' }]}>
-                {step}
-              </Text>
+            <View style={styles.restButtonsContainer}>
+              {currentIndex > 0 && (
+                <TouchableOpacity
+                  style={[styles.restButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}
+                  onPress={onPrevious}
+                >
+                  <Ionicons name="chevron-back" size={24} color={isDark ? theme.text : '#333'} />
+                  <Text style={[styles.restButtonText, { color: isDark ? theme.text : '#333' }]}>Previous</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity
+                style={[styles.restButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
+                onPress={onTogglePause}
+              >
+                <Ionicons name={isPaused ? "play" : "pause"} size={24} color="#FFF" />
+                <Text style={styles.restButtonText}>{isPaused ? "Resume" : "Pause"}</Text>
+              </TouchableOpacity>
+              
+              {canSkipToNext && (
+                <TouchableOpacity
+                  style={[styles.restButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}
+                  onPress={onNext}
+                >
+                  <Text style={[styles.restButtonText, { color: isDark ? theme.text : '#333' }]}>Skip</Text>
+                  <Ionicons name="chevron-forward" size={24} color={isDark ? theme.text : '#333'} />
+                </TouchableOpacity>
+              )}
             </View>
-          ))}
-        </View>
-        
-        {/* Form cues section */}
-        {parsedInstructions.cues.length > 0 && (
-          <View style={[styles.cuesContainer, { 
-            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(76, 175, 80, 0.05)'
-          }]}>
-            <View style={styles.instructionHeader}>
-              <Ionicons name="alert-circle-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-              <Text style={[styles.instructionHeaderText, { color: isDark ? theme.accent : '#4CAF50' }]}>
-                Form Tips
-              </Text>
-            </View>
-            
-            {parsedInstructions.cues.map((cue, index) => (
-              <View key={`cue-${index}`} style={styles.cueBulletPoint}>
-                <View style={[styles.cueBullet, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
-                <Text style={[styles.cueText, { color: isDark ? theme.textSecondary : '#555' }]}>
-                  {cue}
-                </Text>
-              </View>
-            ))}
           </View>
-        )}
+        </LinearGradient>
       </View>
     );
   };
@@ -1008,18 +797,332 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     }
   };
 
+  // Function to check if next stretch has a video source - moved outside renderTransitionPeriod
+  const nextStretchHasVideo = useCallback(() => {
+    if (!nextStretch || ('isRest' in nextStretch) || ('isTransition' in nextStretch)) {
+      return false;
+    }
+
+    // Case 1: Check for the __video flag
+    if (typeof nextStretch.image === 'object' && 
+        nextStretch.image !== null && 
+        (nextStretch.image as any).__video === true) {
+      return true;
+    }
+    
+    // Case 2: Check for .mp4 extension in uri
+    if (typeof nextStretch.image === 'object' && 
+        nextStretch.image !== null && 
+        'uri' in nextStretch.image && 
+        typeof nextStretch.image.uri === 'string' && 
+        (nextStretch.image.uri.toLowerCase().endsWith('.mp4') || 
+         nextStretch.image.uri.toLowerCase().endsWith('.mov'))) {
+      return true;
+    }
+
+    // Case 3: Check for require asset with MP4 reference
+    if (typeof nextStretch.image === 'object' && 
+        (nextStretch.image as any).__asset) {
+      return true;
+    }
+
+    // Case 4: Last resort - try to detect MP4 from number asset
+    if (typeof nextStretch.image === 'number') {
+      // Convert to string and check for MP4 in the debug description
+      const assetStr = nextStretch.image.toString();
+      
+      // Try to detect MP4/MOV from the asset reference
+      if (assetStr.includes('mp4') || assetStr.includes('mov') || assetStr.includes('video')) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, [nextStretch]);
+  
+  // Effect to seek to end of video when component mounts or nextStretch changes
+  useEffect(() => {
+    if (nextStretch && nextStretchHasVideo() && transitionVideoRef.current && viewMode === 'transition') {
+      // Small timeout to ensure video is loaded
+      const timer = setTimeout(() => {
+        try {
+          // Try to seek to near the end of the video - use a longer timeout to ensure video is loaded
+          transitionVideoRef.current?.playAsync().then(() => {
+            // Wait a bit to let the video start playing
+            setTimeout(() => {
+              // Seek to 80% of the video duration to show a good representative frame
+              transitionVideoRef.current?.getStatusAsync().then((status) => {
+                if (status.isLoaded && status.durationMillis) {
+                  // Seek to 80% of the duration
+                  const seekPosition = status.durationMillis * 0.8;
+                  transitionVideoRef.current?.setPositionAsync(seekPosition).then(() => {
+                    // Pause the video after seeking
+                    transitionVideoRef.current?.pauseAsync();
+                  });
+                }
+              });
+            }, 300);
+          });
+        } catch (error) {
+          console.log('Error seeking video:', error);
+        }
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [nextStretch, nextStretchHasVideo, viewMode]);
+
+  // Render a transition period (with preview of next stretch)
+  const renderTransitionPeriod = () => {
+    // More detailed logging about the next stretch for debugging - only log once per stretch
+    if (nextStretch && !('isRest' in nextStretch) && !('isTransition' in nextStretch)) {
+      const stretchKey = `${nextStretch.id}-${nextStretch.name}`;
+      
+      if (!loggedStretchesRef.current.has(stretchKey)) {
+        console.log(`Transition preview - Next stretch: ${nextStretch.name}`);
+        console.log(`Next stretch image details:`, JSON.stringify({
+          exists: !!nextStretch.image,
+          type: typeof nextStretch.image,
+          isVideoByFunction: isVideoSource(nextStretch),
+          imageValue: nextStretch.image && typeof nextStretch.image === 'object' ? 
+            JSON.stringify(nextStretch.image).substring(0, 100) : 'non-object',
+          hasVideoFlag: nextStretch.image && typeof nextStretch.image === 'object' && 
+            (nextStretch.image as any).__video === true,
+          hasAsset: nextStretch.image && typeof nextStretch.image === 'object' && 
+            (nextStretch.image as any).__asset !== undefined
+        }));
+        
+        // Mark this stretch as logged
+        loggedStretchesRef.current.add(stretchKey);
+      }
+    }
+
+    return (
+      <View style={[styles.transitionContainer, { backgroundColor: isDark ? theme.background : '#F9F9F9' }]}>
+        {/* Preview of next stretch if available */}
+        {nextStretch && !('isRest' in nextStretch) && !('isTransition' in nextStretch) && (
+          <View style={[
+            styles.nextStretchPreviewContainer, 
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)' }
+          ]}>
+            <Text style={[styles.nextStretchPreviewLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+              Up Next:
+            </Text>
+            <Text style={[styles.nextStretchPreviewName, { color: isDark ? theme.text : '#333' }]}>
+              {nextStretch.name}
+            </Text>
+            
+            {/* Premium badge if applicable */}
+            {(nextStretch as any).isPremium && (
+              <View style={[
+                styles.nextStretchPremiumBadge, 
+                { backgroundColor: (nextStretch as any).vipBadgeColor || '#FFD700' }
+              ]}>
+                <Ionicons name="star" size={14} color="#FFF" />
+                <Text style={styles.nextStretchPremiumText}>Premium</Text>
+              </View>
+            )}
+            
+            {/* Larger image container */}
+            <View style={[
+              styles.nextStretchImageContainer, 
+              { 
+                backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)',
+                borderColor: (nextStretch as any).isPremium ? 
+                  ((nextStretch as any).vipBadgeColor || '#FFD700') : 
+                  (isDark ? theme.border : '#DDD')
+              }
+            ]}>
+              {nextStretch.image ? (
+                isVideoSource(nextStretch) ? (
+                  // Video source - display with a frame from the video
+                  <View style={styles.previewContentContainer}>
+                    <Text style={styles.previewLoadingText}>
+                      Video Preview Loading...
+                    </Text>
+                    <ActivityIndicator size="large" color={isDark ? theme.accent : '#4CAF50'} />
+                    <Video 
+                      ref={transitionVideoRef}
+                      source={
+                        (nextStretch.image as any).__asset ? 
+                        (nextStretch.image as any).__asset : 
+                        nextStretch.image
+                      }
+                      style={[styles.previewMedia, { opacity: transitionVideoOpacity }]}
+                      resizeMode={VideoResizeMode.CONTAIN}
+                      shouldPlay={false} // Don't auto-play - we'll control this in the effect
+                      isLooping={false} // No looping needed for a static frame
+                      isMuted={true}
+                      volume={0}
+                      useNativeControls={false}
+                      onLoadStart={() => {
+                        console.log(`Transition video loading started for: ${nextStretch.name}`);
+                      }}
+                      onLoad={(status) => {
+                        console.log(`Transition video loaded for: ${nextStretch.name}`, status);
+                        // Fade in the video using state
+                        setTransitionVideoOpacity(1);
+                      }}
+                      onError={(error) => {
+                        console.error(`Error loading transition video for: ${nextStretch.name}`, error);
+                      }}
+                    />
+                  </View>
+                ) : (
+                  // Regular image source
+                  <View style={styles.previewContentContainer}>
+                    <Text style={styles.previewLoadingText}>
+                      Image Preview Loading...
+                    </Text>
+                    <ActivityIndicator size="small" color={isDark ? theme.accent : '#4CAF50'} />
+                    <Image 
+                      source={nextStretch.image}
+                      style={styles.previewMedia}
+                      resizeMode="contain"
+                      onLoad={() => {
+                        console.log(`Transition image loaded for: ${nextStretch.name}`);
+                      }}
+                      onError={(e) => {
+                        console.error(`Error loading transition image for: ${nextStretch.name}`, e.nativeEvent.error);
+                      }}
+                    />
+                  </View>
+                )
+              ) : (
+                // Fallback when no image is available
+                <View style={styles.fallbackImageContainer}>
+                  <Ionicons name="image-outline" size={50} color={isDark ? "#666" : "#999"} />
+                  <Text style={[styles.fallbackImageText, { color: isDark ? theme.textSecondary : '#666' }]}>
+                    {nextStretch.name || 'Next Stretch'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Show bilateral badge if applicable */}
+            {nextStretch.bilateral && (
+              <View style={[styles.nextStretchBilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+                <Ionicons name="swap-horizontal" size={14} color="#FFF" />
+                <Text style={styles.nextStretchBadgeText}>Both Sides</Text>
+              </View>
+            )}
+          </View>
+        )}
+        
+        {/* Smaller, more compact "Get Ready" card */}
+        <View style={[styles.transitionContent, { 
+          backgroundColor: isDark ? theme.cardBackground : '#FFFFFF',
+          padding: 16,
+          marginTop: 8,
+          flexDirection: 'row',
+          alignItems: 'center'
+        }]}>
+          <View style={styles.transitionTimerContainer}>
+            <CircularTimer
+              key={timeRemaining}
+              progress={progressAnim}
+              timeRemaining={timeRemaining}
+              diameter={70}
+              strokeWidth={6}
+              color={isDark ? theme.accent : '#4CAF50'}
+              backgroundColor={isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0'}
+              textColor="#000"
+              isDark={isDark}
+            />
+          </View>
+          
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Ionicons
+                name="sync-outline" 
+                size={18} 
+                color={isDark ? theme.accent : '#4CAF50'} 
+              />
+              <Text style={[styles.transitionTitle, { 
+                color: isDark ? theme.text : '#333',
+                fontSize: 18,
+                marginTop: 0,
+                marginLeft: 6
+              }]}>
+                Get Ready
+              </Text>
+            </View>
+            
+            <Text style={[styles.transitionSubtitle, { 
+              color: isDark ? theme.textSecondary : '#666',
+              fontSize: 14,
+              marginBottom: 8,
+              textAlign: 'left'
+            }]}>
+              {stretch.description}
+            </Text>
+            
+            {/* Navigation buttons in a row */}
+            <View style={[styles.transitionButtonsContainer, { 
+              marginTop: 8, 
+              justifyContent: 'flex-start' 
+            }]}>
+              {currentIndex > 0 && (
+                <TouchableOpacity
+                  style={[styles.transitionButton, { 
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
+                    marginRight: 8,
+                    paddingVertical: 8,
+                    paddingHorizontal: 12
+                  }]}
+                  onPress={onPrevious}
+                >
+                  <Ionicons name="chevron-back" size={18} color={isDark ? theme.text : '#333'} />
+                  <Text style={[styles.transitionButtonText, { 
+                    color: isDark ? theme.text : '#333',
+                    fontSize: 14
+                  }]}>
+                    Previous
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              {canSkipToNext && (
+                <TouchableOpacity
+                  style={[styles.transitionButton, { 
+                    backgroundColor: isDark ? theme.accent : '#4CAF50',
+                    marginLeft: currentIndex > 0 ? 8 : 0,
+                    paddingVertical: 8,
+                    paddingHorizontal: 12
+                  }]}
+                  onPress={onNext}
+                >
+                  <Text style={[styles.transitionButtonText, {
+                    fontSize: 14
+                  }]}>
+                    I'm Ready
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color="#FFF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Main render function
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
+    <View style={styles.container}>
       <Animated.View
         style={[
           styles.contentContainer,
           {
             opacity: fadeAnim,
-            transform: [{ translateX: slideAnim }]
+            transform: [{ translateY: slideAnim }]
           }
         ]}
       >
-        {viewMode === 'demo' ? renderDemoView() : renderStretchInstructionsView()}
+        {viewMode === 'demo' && renderDemoView()}
+        {viewMode === 'stretch' && !isRest && !isTransition && renderStretchInstructionsView()}
+        {viewMode === 'rest' && isRest && renderRestPeriod()}
+        {viewMode === 'transition' && isTransition && renderTransitionPeriod()}
       </Animated.View>
       
       {/* Navigation buttons in a floating container when in stretch view */}
@@ -1197,11 +1300,8 @@ const styles = StyleSheet.create({
   // Rest period styles
   restContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
     borderRadius: 16,
-    margin: 16,
+    overflow: 'hidden',
   },
   restIconContainer: {
     width: 100,
@@ -1213,16 +1313,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   restTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
+    marginBottom: 10,
   },
   restDescription: {
-    fontSize: 18,
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 26,
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   fallbackImageContainer: {
     flex: 1,
@@ -1489,6 +1588,165 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 4,
     paddingLeft: 6,
+  },
+  restGradient: {
+    flex: 1,
+    borderRadius: 16,
+  },
+  restContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restIcon: {
+    marginBottom: 20,
+  },
+  restTimerContainer: {
+    marginBottom: 20,
+  },
+  restButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  restButton: {
+    padding: 12,
+    borderRadius: 20,
+  },
+  restButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  transitionContainer: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  transitionContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    marginTop: 20, // Add margin to separate from the preview
+  },
+  transitionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 12,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  transitionSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  transitionTimerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transitionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  transitionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  transitionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+    marginHorizontal: 8,
+  },
+  nextStretchPreviewContainer: {
+    width: '100%',
+    maxWidth: 400,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  nextStretchPreviewLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  nextStretchPreviewName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  nextStretchImageContainer: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    marginVertical: 16,
+  },
+  nextStretchImage: {
+    width: '100%',
+    height: '100%',
+  },
+  nextStretchPremiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  nextStretchPremiumText: {
+    color: '#FFF',
+    fontSize: 13,
+    marginLeft: 5,
+    fontWeight: '600',
+  },
+  nextStretchBilateralBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  nextStretchBadgeText: {
+    color: '#FFF',
+    fontSize: 13,
+    marginLeft: 5,
+    fontWeight: '600',
+  },
+  // New styles for preview content
+  previewContentContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewLoadingText: {
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  previewMedia: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    opacity: 0.6,
   },
 });
 

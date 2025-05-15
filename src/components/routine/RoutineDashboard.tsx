@@ -7,6 +7,7 @@ import RoutineItem from './RoutineItem';
 import { RefreshableScrollView } from '../common';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
+import { getFavoriteRoutines } from '../../services/storageService';
 
 interface RoutineDashboardProps {
   recentRoutines: ProgressEntry[];
@@ -19,6 +20,7 @@ interface RoutineDashboardProps {
   onSmartPick: () => void;
   onCreateNew: () => void;
   onDeleteRoutine: (routineDate: string) => void;
+  onFavoriteRoutine?: (routineDate: string) => void;
 }
 
 interface WeeklyRoutines {
@@ -39,7 +41,8 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   onRandomSuggestion,
   onSmartPick,
   onCreateNew,
-  onDeleteRoutine
+  onDeleteRoutine,
+  onFavoriteRoutine
 }) => {
   const { theme, isDark } = useTheme();
   // Move hooks to the top level of the component
@@ -47,6 +50,40 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   const [activeTimePeriod, setActiveTimePeriod] = useState<TimePeriod>('This Week');
   const [organizedRoutines, setOrganizedRoutines] = useState<WeeklyRoutines>({});
   const [availableTimePeriods, setAvailableTimePeriods] = useState<TimePeriod[]>([]);
+  
+  // State to store favorite routines list
+  const [favoriteRoutines, setFavoriteRoutines] = useState<any[]>([]);
+
+  const loadFavoriteRoutines = async () => {
+    try {
+      const favs = await getFavoriteRoutines();
+      setFavoriteRoutines(favs);
+    } catch (e) {
+      console.error('Error loading favorite routines:', e);
+    }
+  };
+
+  // Load favorites whenever recent routines change
+  useEffect(() => {
+    loadFavoriteRoutines();
+  }, [recentRoutines]);
+
+  // Helper to check if a routine is favorite
+  const isFavoriteRoutine = (item: ProgressEntry) => {
+    return favoriteRoutines.some(fav =>
+      fav.area === item.area &&
+      fav.duration === item.duration &&
+      JSON.stringify(fav.savedStretches || []) === JSON.stringify(item.savedStretches || [])
+    );
+  };
+
+  // Wrap onFavoriteRoutine to refresh favorites after toggle
+  const handleFavorite = async (routineDate: string) => {
+    if (onFavoriteRoutine) {
+      await onFavoriteRoutine(routineDate);
+      await loadFavoriteRoutines();
+    }
+  };
   
   // Check if user has completed routines before
   useEffect(() => {
@@ -313,9 +350,11 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 item={item}
                 onPress={() => onStartRecent(item)}
                 onDelete={() => onDeleteRoutine(item.date)}
+                onFavorite={onFavoriteRoutine ? () => handleFavorite(item.date) : undefined}
                 hideLabel="Hide"
                 theme={theme}
                 isDark={isDark}
+                favorite={isFavoriteRoutine(item)}
                 isCustom={!!item.customStretches && item.customStretches.length > 0}
               />
             ))}
@@ -368,9 +407,11 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 item={item}
                 onPress={() => onStartRecent(item)}
                 onDelete={() => onDeleteRoutine(item.date)}
+                onFavorite={onFavoriteRoutine ? () => handleFavorite(item.date) : undefined}
                 hideLabel="Hide"
                 theme={theme}
                 isDark={isDark}
+                favorite={isFavoriteRoutine(item)}
                 isCustom={!!item.customStretches && item.customStretches.length > 0}
               />
             ))}

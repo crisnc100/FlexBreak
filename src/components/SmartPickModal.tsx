@@ -23,6 +23,47 @@ export default function SmartPickModal({
 }: SmartPickModalProps) {
   const { theme, isDark } = useTheme();
 
+  // Helper to render the routine mode badge
+  const renderModeBadge = () => {
+    if (!recommendation) return null;
+    
+    // Check if it's a Dynamic Flow routine
+    const isDynamicFlow = recommendation.area === 'Dynamic Flow';
+    
+    if (isDynamicFlow) {
+      return (
+        <View style={[styles.modeBadge, { backgroundColor: 'rgba(138, 43, 226, 0.15)' }]}>
+          <Ionicons name="fitness" size={14} color="blueviolet" />
+          <Text style={[styles.modeBadgeText, { color: 'blueviolet' }]}>
+            Dynamic Flow
+          </Text>
+        </View>
+      );
+    }
+    
+    // Office Friendly badge
+    if (recommendation.isOfficeFriendly) {
+      return (
+        <View style={[styles.modeBadge, { backgroundColor: 'rgba(25, 118, 210, 0.15)' }]}>
+          <Ionicons name="briefcase" size={14} color="#1976D2" />
+          <Text style={[styles.modeBadgeText, { color: '#1976D2' }]}>
+            Office Friendly
+          </Text>
+        </View>
+      );
+    }
+    
+    // All positions badge
+    return (
+      <View style={[styles.modeBadge, { backgroundColor: 'rgba(46, 125, 50, 0.15)' }]}>
+        <Ionicons name="expand" size={14} color="#2E7D32" />
+        <Text style={[styles.modeBadgeText, { color: '#2E7D32' }]}>
+          All Positions
+        </Text>
+      </View>
+    );
+  };
+
   // For premium users with a recommendation
   if (isPremium && recommendation) {
     return (
@@ -53,8 +94,10 @@ export default function SmartPickModal({
                 styles.recommendationTitle,
                 { color: isDark ? theme.text : '#333' }
               ]}>
-                {recommendation.area} - {recommendation.duration} min ({recommendation.level})
+                {recommendation.area} - {recommendation.duration} min
               </Text>
+              
+              {renderModeBadge()}
               
               <Text style={[
                 styles.recommendationReason,
@@ -251,6 +294,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginVertical: 16,
+    alignItems: 'center',
   },
   recommendationTitle: {
     fontSize: 18,
@@ -262,6 +306,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+    marginTop: 12,
   },
   startButton: {
     backgroundColor: '#4CAF50',
@@ -290,6 +335,18 @@ const styles = StyleSheet.create({
   premiumBadgeText: {
     fontSize: 12,
     fontWeight: '600',
+    marginLeft: 4,
+  },
+  modeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 6,
+    borderRadius: 16,
+    marginVertical: 8,
+  },
+  modeBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
     marginLeft: 4,
   },
 }); 

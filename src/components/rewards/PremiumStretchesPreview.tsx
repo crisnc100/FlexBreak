@@ -23,7 +23,7 @@ interface PremiumStretchesPreviewProps {
 }
 
 const { width } = Dimensions.get('window');
-const PREVIEW_COUNT = 15; // Show 15 premium stretches
+const PREVIEW_COUNT = 14; // Show 14 premium stretches
 
 const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({ 
   onClose,
@@ -332,8 +332,8 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
 
       <Text style={[styles.subtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
         {isModal ? 
-          "You've unlocked 15 premium VIP stretches! These are available in all your routines." : 
-          "Unlock these 15 premium stretches when you reach Level 7!"}
+          "You've unlocked 14 premium VIP stretches! These are available in all your routines." : 
+          "Unlock these 14 premium stretches when you reach Level 7!"}
       </Text>
 
       {loading ? (

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { ProgressEntry, RoutineParams, BodyArea, Duration, StretchLevel } from '../types';
+import { ProgressEntry, RoutineParams, BodyArea, Duration, Position } from '../types';
 import { UserProgress } from '../utils/progress/types';
 import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
 import { streakEvents, STREAK_UPDATED_EVENT } from '../utils/progress/modules/streakManager';
@@ -27,6 +27,7 @@ export const KEYS = {
     REMINDER_ENABLED: 'reminderEnabled',
     REMINDER_TIME: 'reminderTime',
     SHOW_DASHBOARD: '@shouldShowDashboard',
+    TRANSITION_DURATION: '@transitionDuration',
   },
   UI: {
     COMPLETED_CHALLENGES: '@completedChallenges',
@@ -419,7 +420,7 @@ export const saveCompletedRoutine = async (
       duration: routine.duration,
       date: formattedDate,
       stretchCount: stretchCount,
-      level: routine.level,
+      position: routine.position,
       savedStretches: routine.customStretches || []
     };
     
@@ -525,7 +526,7 @@ export const saveFavoriteRoutine = async (routine: {
   name?: string; 
   area: BodyArea; 
   duration: Duration,
-  level?: StretchLevel,
+  position?: Position,
   savedStretches?: any[]
 }): Promise<{success: boolean, limitReached?: boolean, message?: string}> => {
   try {
@@ -661,6 +662,23 @@ export const setDashboardFlag = async (value: boolean): Promise<boolean> => {
  */
 export const getDashboardFlag = async (): Promise<boolean> => {
   return getData<boolean>(KEYS.SETTINGS.SHOW_DASHBOARD, false);
+};
+
+/**
+ * Save transition duration setting
+ * @param duration Duration in seconds (0-10)
+ * @returns Success boolean
+ */
+export const saveTransitionDuration = async (duration: number): Promise<boolean> => {
+  return setData(KEYS.SETTINGS.TRANSITION_DURATION, duration);
+};
+
+/**
+ * Get transition duration setting
+ * @returns Duration in seconds, defaults to 5
+ */
+export const getTransitionDuration = async (): Promise<number> => {
+  return getData(KEYS.SETTINGS.TRANSITION_DURATION, 5);
 };
 
 // ========== DATA MANAGEMENT METHODS ==========

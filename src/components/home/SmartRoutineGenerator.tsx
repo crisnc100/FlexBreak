@@ -12,10 +12,11 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import * as Permissions from 'expo-permissions';
 import { Ionicons } from '@expo/vector-icons';
 import { parseUserInput, generateRoutineConfig, selectStretches } from '../../utils/generators/routineGenerator';
-import { SmartRoutineInput, IssueType, Duration, Stretch, StretchLevel, RestPeriod, BodyArea } from '../../types';
+import { SmartRoutineInput, IssueType, Duration, Stretch, Position, RestPeriod, BodyArea } from '../../types';
 import allStretches from '../../data/stretches';
 import { useTheme } from '../../context/ThemeContext';
 import * as rewardManager from '../../utils/progress/modules/rewardManager';
@@ -28,6 +29,7 @@ interface SmartRoutineGeneratorProps {
       issueType: string; 
       duration: Duration;
       area?: BodyArea;
+      transitionDuration?: number;
     }
   ) => void;
 }
@@ -38,7 +40,9 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [parsedInput, setParsedInput] = useState<SmartRoutineInput | null>(null);
   const [selectedIssueType, setSelectedIssueType] = useState<IssueType | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<Position>('Standing');
   const [selectedDuration, setSelectedDuration] = useState<Duration>('5');
+  const [transitionDuration, setTransitionDuration] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
@@ -70,6 +74,13 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
     }
   }, [isRecording]);
 
+  useEffect(() => {
+    // When parsed input changes, update selected position based on parsed input
+    if (parsedInput?.parsedPosition) {
+      setSelectedPosition(parsedInput.parsedPosition);
+    }
+  }, [parsedInput]);
+
   const checkPermissions = async () => {
     // We'll just set this to true to keep the UI clean
     setHasPermission(true);
@@ -98,8 +109,12 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
       const config = generateRoutineConfig(
         parsedInput,
         selectedIssueType,
-        selectedDuration
+        selectedDuration,
+        transitionDuration
       );
+      
+      // Override the position if the user selected one in the UI
+      config.position = selectedPosition;
 
       console.log("Generating routine with config:", JSON.stringify(config));
       const selectedRoutine = await selectStretches(config, allStretches);
@@ -127,7 +142,8 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
         issueType: selectedIssueType || 'stiffness',
         duration: selectedDuration,
         area: parsedInput?.parsedArea && parsedInput.parsedArea.length > 0 ? 
-          parsedInput.parsedArea[0] : 'Full Body'
+          parsedInput.parsedArea[0] : 'Full Body',
+        transitionDuration: transitionDuration
       });
       
       setShowFollowUp(false);
@@ -137,7 +153,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
     } finally {
       setIsGenerating(false);
     }
-  }, [parsedInput, selectedIssueType, selectedDuration, onRoutineGenerated, allStretches, userInput]);
+  }, [parsedInput, selectedIssueType, selectedPosition, selectedDuration, transitionDuration, onRoutineGenerated, allStretches, userInput]);
 
   const handleInputSubmit = useCallback(() => {
     if (!userInput.trim()) return;
@@ -150,6 +166,10 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
     
     if (parsedData.parsedIssue) {
       setSelectedIssueType(parsedData.parsedIssue);
+    }
+    
+    if (parsedData.parsedPosition) {
+      setSelectedPosition(parsedData.parsedPosition);
     }
   }, [userInput]);
 
@@ -382,6 +402,76 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
               </View>
             </ScrollView>
 
+            <View style={styles.questionContainer}>
+              <View style={styles.questionNumberBadge}>
+                <Text style={styles.questionNumberText}>3</Text>
+              </View>
+              <Text style={[styles.label, { color: theme.text }]}>What position would you prefer?</Text>
+            </View>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.positionContainer}>
+                {['Standing', 'Sitting', 'Lying', 'All'].map((position) => (
+                  <TouchableOpacity
+                    key={position}
+                    style={[
+                      styles.positionButton,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      selectedPosition === position && [styles.selectedPosition, { backgroundColor: theme.accent }],
+                    ]}
+                    onPress={() => setSelectedPosition(position as Position)}
+                  >
+                    <Ionicons 
+                      name={
+                        position === 'Standing' ? 'body-outline' : 
+                        position === 'Sitting' ? 'business-outline' : 
+                        position === 'Lying' ? 'bed-outline' :
+                        'apps-outline' // Icon for "All"
+                      } 
+                      size={24} 
+                      color={selectedPosition === position ? '#fff' : theme.textSecondary} 
+                      style={styles.positionIcon}
+                    />
+                    <Text style={[
+                      styles.positionText,
+                      { color: theme.text },
+                      selectedPosition === position && styles.selectedPositionText,
+                    ]}>
+                      {position}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <View style={styles.questionContainer}>
+              <View style={styles.questionNumberBadge}>
+                <Text style={styles.questionNumberText}>4</Text>
+              </View>
+              <Text style={[styles.label, { color: theme.text }]}>Transition time between stretches</Text>
+            </View>
+            
+            <View style={styles.transitionContainer}>
+              <Text style={[styles.transitionValue, { color: theme.text }]}>
+                {transitionDuration} seconds
+              </Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={10}
+                step={1}
+                value={transitionDuration}
+                onValueChange={setTransitionDuration}
+                minimumTrackTintColor={theme.accent}
+                maximumTrackTintColor={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
+                thumbTintColor={theme.accent}
+              />
+              <View style={styles.sliderLabelsContainer}>
+                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>None</Text>
+                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>10s</Text>
+              </View>
+            </View>
+
             <TouchableOpacity
               style={[
                 styles.generateButton, 
@@ -456,6 +546,12 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                       {parsedInput?.parsedActivity ? 
                         `${parsedInput.parsedActivity} recovery` : 
                         'Desk-friendly stretches'}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Transitions:</Text>
+                    <Text style={[styles.summaryValue, { color: theme.text }]}>
+                      {transitionDuration > 0 ? `${transitionDuration} seconds between stretches` : 'None'}
                     </Text>
                   </View>
                 </View>
@@ -719,6 +815,57 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 14,
     flex: 1,
+  },
+  positionContainer: {
+    flexDirection: 'row',
+    marginBottom: 24,
+  },
+  positionButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  positionIcon: {
+    marginRight: 6,
+  },
+  positionText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  selectedPosition: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  selectedPositionText: {
+    color: '#fff',
+  },
+  transitionContainer: {
+    marginBottom: 24,
+    paddingHorizontal: 10,
+  },
+  transitionValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderLabelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: -5,
+  },
+  sliderLabel: {
+    fontSize: 12,
   },
 });
 

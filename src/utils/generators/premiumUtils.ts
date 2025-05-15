@@ -1,4 +1,4 @@
-import { Stretch, RestPeriod } from '../../types';
+import { Stretch, RestPeriod, TransitionPeriod } from '../../types';
 import * as rewardManager from '../progress/modules/rewardManager';
 import { markAsVideo } from './routineGenerator';
 
@@ -37,8 +37,8 @@ export const enhanceStretchWithPremiumInfo = (
  * @returns The enhanced routine with premium information
  */
 export const enhanceRoutineWithPremiumInfo = async (
-  routine: (Stretch | RestPeriod)[]
-): Promise<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string })[]> => {
+  routine: (Stretch | RestPeriod | TransitionPeriod)[]
+): Promise<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string } | TransitionPeriod)[]> => {
   try {
     console.log(`Enhancing routine with ${routine.length} items`);
     
@@ -46,6 +46,11 @@ export const enhanceRoutineWithPremiumInfo = async (
     const enhancedRoutine = routine.map(item => {
       // Skip rest periods with minimal copy
       if ('isRest' in item) {
+        return { ...item };
+      }
+      
+      // Skip transition periods with minimal copy
+      if ('isTransition' in item) {
         return { ...item };
       }
       
@@ -136,13 +141,8 @@ export const enhanceRoutineWithPremiumInfo = async (
       
       // For premium stretches, add VIP badge
       if (copy.premium) {
-        // Create a level-based badge color
+        // Create a default badge color
         let vipBadgeColor = '#FFD700'; // Default gold
-        if (copy.level === 'advanced') {
-          vipBadgeColor = '#FF5722'; // Deep orange for advanced
-        } else if (copy.level === 'intermediate') {
-          vipBadgeColor = '#FF9800'; // Orange for intermediate
-        }
         
         return {
           ...copy,
@@ -192,8 +192,7 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
       const enhancedStretch = {
         ...stretch,
         isPremium: true,
-        vipBadgeColor: stretch.level === 'advanced' ? '#FF5722' : 
-                      stretch.level === 'intermediate' ? '#FF9800' : '#FFD700',
+        vipBadgeColor: '#FFD700', // Default gold color
       };
       
       // Make sure there is an image
@@ -260,9 +259,8 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
     if (enhancedStretches.length < count && enhancedStretches.length > 0) {
       console.log(`Not enough premium stretches (only ${enhancedStretches.length}, needed ${count}), generating more`);
       
-      // Define body areas and levels for variety
+      // Define body areas for variety
       const bodyAreas = ['Full Body', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'] as const;
-      const levels = ['beginner', 'intermediate', 'advanced'] as const;
       
       while (enhancedStretches.length < count) {
         // Get a base stretch to modify
@@ -270,7 +268,6 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
         const original = premiumStretches[originalIndex];
         
         // Modify to create a new unique stretch
-        const newLevel = levels[Math.floor(Math.random() * levels.length)];
         const newArea = bodyAreas[Math.floor(Math.random() * bodyAreas.length)];
         const suffixes = [
           'Deep Stretch', 'Extension', 'Dynamic Hold', 'Release', 'Mobility',
@@ -283,11 +280,9 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
           ...original,
           id: `${original.id}-premium-${enhancedStretches.length}`,
           name: `${newArea} ${newSuffix}`,
-          level: newLevel,
           tags: [newArea], // Keep only valid BodyArea tags
           isPremium: true,
-          vipBadgeColor: newLevel === 'advanced' ? '#FF5722' : 
-                        newLevel === 'intermediate' ? '#FF9800' : '#FFD700',
+          vipBadgeColor: '#FFD700', // Default gold color
         };
         
         // For generated stretches, just use static image fallbacks for simplicity
@@ -341,27 +336,17 @@ export const filterPremiumStretches = async (
 };
 
 /**
- * Filter stretches based on level and premium access
+ * Filter stretches based on premium access
  * @param stretches Array of stretches to filter
- * @param level Level to filter by ('beginner', 'intermediate', 'advanced', or 'all')
  * @param includeLockedPremium Whether to include premium stretches even if the user doesn't have access
  * @returns Filtered array of stretches
  */
 export const filterStretchesByLevel = async (
   stretches: Stretch[],
-  level: string = 'all',
   includeLockedPremium: boolean = false
 ): Promise<Stretch[]> => {
-  // First filter by premium status
-  const premiumFiltered = await filterPremiumStretches(stretches, includeLockedPremium);
-  
-  // If level is 'all', return all stretches that passed the premium filter
-  if (level === 'all') {
-    return premiumFiltered;
-  }
-  
-  // Otherwise, filter by the specified level
-  return premiumFiltered.filter(stretch => stretch.level === level);
+  // Filter by premium status only
+  return await filterPremiumStretches(stretches, includeLockedPremium);
 };
 
 /**

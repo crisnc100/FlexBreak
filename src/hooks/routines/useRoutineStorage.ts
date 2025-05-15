@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ProgressEntry, BodyArea, Duration, StretchLevel } from '../../types';
+import { ProgressEntry, BodyArea, Duration, Position } from '../../types';
 import * as storageService from '../../services/storageService';
 
 interface UseRoutineStorageReturn {
   recentRoutines: ProgressEntry[];
   isLoading: boolean;
   hasSynchronized: boolean;
-  saveRoutineProgress: (entry: { area: BodyArea; duration: Duration; date: string; stretchCount?: number; level?: StretchLevel; savedStretches?: any[] }) => Promise<void>;
+  saveRoutineProgress: (entry: { area: BodyArea; duration: Duration; date: string; stretchCount?: number; position?: Position; savedStretches?: any[] }) => Promise<void>;
   getRecentRoutines: () => Promise<ProgressEntry[]>;
   getAllRoutines: () => Promise<ProgressEntry[]>;
   hideRoutine: (routineDate: string) => Promise<void>;
   deleteRoutine: (routineDate: string) => Promise<void>;
-  saveFavoriteRoutine: (routine: { name?: string; area: BodyArea; duration: Duration; level?: StretchLevel; savedStretches?: any[] }) => Promise<void>;
+  saveFavoriteRoutine: (routine: { name?: string; area: BodyArea; duration: Duration; position?: Position; savedStretches?: any[] }) => Promise<void>;
   setDashboardFlag: (value: boolean) => Promise<void>;
   getDashboardFlag: () => Promise<boolean>;
   clearAllFlags: () => Promise<void>;
@@ -102,7 +102,7 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   }, []);
 
   // Save routine progress
-  const saveRoutineProgress = useCallback(async (entry: { area: BodyArea; duration: Duration; date: string; stretchCount?: number; level?: StretchLevel; savedStretches?: any[] }) => {
+  const saveRoutineProgress = useCallback(async (entry: { area: BodyArea; duration: Duration; date: string; stretchCount?: number; position?: Position; savedStretches?: any[] }) => {
     try {
       
       // Use storageService instead of direct AsyncStorage calls
@@ -188,7 +188,7 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
   }, [hideRoutine]);
 
   // Save a favorite routine
-  const saveFavoriteRoutine = useCallback(async (routine: { name?: string; area: BodyArea; duration: Duration; level?: StretchLevel; savedStretches?: any[] }) => {
+  const saveFavoriteRoutine = useCallback(async (routine: { name?: string; area: BodyArea; duration: Duration; position?: Position; savedStretches?: any[] }) => {
     try {
       // Use storageService instead of direct AsyncStorage calls
       await storageService.saveFavoriteRoutine(routine);

@@ -64,7 +64,7 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
   // Reset countdown when canSkipToNext changes to true
   useEffect(() => {
     if (canSkipToNext) {
-      setCountdown(6);
+      setCountdown(5);
     }
   }, [canSkipToNext]);
 

@@ -13,10 +13,22 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { BodyArea, Stretch, StretchLevel, CustomRestPeriod } from '../../types';
+import { BodyArea, Stretch, Position, CustomRestPeriod } from '../../types';
 import stretches from '../../data/stretches';
 import * as rewardManager from '../../utils/progress/modules/rewardManager';
 import { isPremiumStretch, filterStretchesByLevel } from '../../utils/generators/premiumUtils';
+
+// Define a section structure for the SectionList
+type StretchSectionData = {
+  title: 'filters' | 'stretches';
+  data: Stretch[] | { id: string }[];
+  renderItem?: () => React.ReactElement;
+};
+
+// Define a helper type for the filter section item
+interface FilterSectionItem {
+  id: string;
+}
 
 interface StretchSelectorProps {
   area: BodyArea;
@@ -28,7 +40,7 @@ interface StretchSelectorProps {
 
 // Available body areas for multi-selection
 const BODY_AREAS: BodyArea[] = [
-  'Full Body', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'
+  'Dynamic Flow', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'
 ];
 
 const StretchSelector: React.FC<StretchSelectorProps> = ({
@@ -42,9 +54,9 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
   const [availableStretches, setAvailableStretches] = useState<Stretch[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<BodyArea[]>([area]);
   const [filters, setFilters] = useState<{
-    level: StretchLevel | 'all';
+    position: Position | 'All';
   }>({
-    level: 'all'
+    position: 'All'
   });
   const [activeTab, setActiveTab] = useState<'stretches' | 'areas'>('stretches');
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,9 +116,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
       // Match any of the selected areas
       selectedAreas.some(selectedArea => 
         stretch.tags.includes(selectedArea)
-      ) && 
-      // Match the level filter if specified
-      (filters.level === 'all' || stretch.level === filters.level)
+      )
     );
     
     setAvailableStretches(filtered);
@@ -223,14 +233,14 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // Filter stretches based on area and search query
+  // Filter stretches based on search query and selected areas
   useEffect(() => {
-    filterStretches();
-  }, [area, searchQuery, selectedItems, filters.level, premiumUnlocked, selectedAreas]);
-
-  const filterStretches = async () => {
-    // First filter by the basic criteria - areas and search query
     let filtered = stretches.filter(stretch => {
+      // Only include stretches with hasDemo: true
+      if (!stretch.hasDemo) {
+        return false;
+      }
+      
       // Filter by selected areas
       const matchesAreas = selectedAreas.some(selectedArea => 
         stretch.tags.includes(selectedArea)
@@ -242,17 +252,25 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
         stretch.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         stretch.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      return matchesAreas && matchesSearch;
+      // Filter by position if specified
+      const matchesPosition = filters.position === 'All' || 
+                             String(stretch.position).includes(String(filters.position)) ||
+                             stretch.position === 'All';
+      
+      return matchesAreas && matchesSearch && matchesPosition;
     });
     
-    // Use the premiumUtils function to filter by level and premium access
-    const levelFiltered = await filterStretchesByLevel(
-      filtered, 
-      filters.level,
-      false // Don't include locked premium stretches
-    );
+    // Remove premium stretches if not unlocked
+    if (!premiumUnlocked) {
+      filtered = filtered.filter(stretch => !stretch.premium);
+    }
     
-    setFilteredStretches(levelFiltered);
+    setFilteredStretches(filtered);
+  }, [searchQuery, selectedAreas, filters.position, premiumUnlocked]);
+
+  // Define the filterStretches function for backward compatibility
+  const filterStretches = () => {
+    // The filtering is now handled in the useEffect
   };
 
   // Render a stretch item
@@ -299,16 +317,9 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
               
               <View style={[
                 styles.levelBadge, 
-                { 
-                  backgroundColor: 
-                    item.level === 'beginner' ? '#4CAF50' : 
-                    item.level === 'intermediate' ? '#FF9800' : 
-                    '#F44336' 
-                }
+                
               ]}>
-                <Text style={styles.badgeText}>
-                  {item.level.charAt(0).toUpperCase() + item.level.slice(1)}
-                </Text>
+                
               </View>
             </View>
           </View>
@@ -495,225 +506,209 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
           </View>
         </ScrollView>
       ) : (
-        <SectionList
-          sections={[
-            {
-              title: 'filters',
-              data: [{}],
-              renderItem: () => (
-                <View>
-                  <View style={styles.filters}>
-                    <Text style={[styles.filterLabel, { color: theme.textSecondary }]}>Filter by:</Text>
-                    <View style={styles.levelFilters}>
-                      <TouchableOpacity
-                        style={[
-                          styles.levelFilter,
-                          { 
-                            backgroundColor: filters.level === 'all' 
-                              ? theme.accent 
-                              : isDark ? theme.backgroundLight : '#fff'
-                          }
-                        ]}
-                        onPress={() => setFilters({...filters, level: 'all'})}
-                      >
-                        <Text 
-                          style={[
-                            styles.levelFilterText, 
-                            { color: filters.level === 'all' ? '#fff' : theme.text }
-                          ]}
-                        >
-                          All
-                        </Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[
-                          styles.levelFilter,
-                          { 
-                            backgroundColor: filters.level === 'beginner' 
-                              ? '#4CAF50' 
-                              : isDark ? theme.backgroundLight : '#fff'
-                          }
-                        ]}
-                        onPress={() => setFilters({...filters, level: 'beginner'})}
-                      >
-                        <Text 
-                          style={[
-                            styles.levelFilterText, 
-                            { color: filters.level === 'beginner' ? '#fff' : theme.text }
-                          ]}
-                        >
-                          Beginner
-                        </Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[
-                          styles.levelFilter,
-                          { 
-                            backgroundColor: filters.level === 'intermediate' 
-                              ? '#FF9800' 
-                              : isDark ? theme.backgroundLight : '#fff'
-                          }
-                        ]}
-                        onPress={() => setFilters({...filters, level: 'intermediate'})}
-                      >
-                        <Text 
-                          style={[
-                            styles.levelFilterText, 
-                            { color: filters.level === 'intermediate' ? '#fff' : theme.text }
-                          ]}
-                        >
-                          Intermediate
-                        </Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[
-                          styles.levelFilter,
-                          { 
-                            backgroundColor: filters.level === 'advanced' 
-                              ? '#F44336' 
-                              : isDark ? theme.backgroundLight : '#fff'
-                          }
-                        ]}
-                        onPress={() => setFilters({...filters, level: 'advanced'})}
-                      >
-                        <Text 
-                          style={[
-                            styles.levelFilterText, 
-                            { color: filters.level === 'advanced' ? '#fff' : theme.text }
-                          ]}
-                        >
-                          Advanced
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.timeInfoContainer}>
-                    <View style={[styles.timeInfo, { backgroundColor: isDark ? theme.backgroundLight : '#e3f2fd' }]}>
-                      <View style={styles.timeRow}>
-                        <Text style={[styles.timeLabel, { color: theme.text }]}>
-                          Target Time:
-                        </Text>
-                        <Text style={[styles.timeValue, { color: theme.text }]}>
-                          {formatTime(targetDuration)}
-                        </Text>
-                      </View>
-                      <View style={styles.timeRow}>
-                        <Text style={[styles.timeLabel, { color: theme.text }]}>
-                          Selected Time:
-                        </Text>
-                        <Text style={[
-                          styles.timeValue, 
-                          { 
-                            color: selectedTotalTime > targetDuration ? '#F44336' : 
-                                   selectedTotalTime < minimumTimeRequired ? '#FF9800' : 
-                                   '#4CAF50' 
-                          }
-                        ]}>
-                          {formatTime(selectedTotalTime)}
-                        </Text>
-                      </View>
-                      <View style={styles.timeRow}>
-                        <Text style={[styles.timeLabel, { color: theme.text }]}>
-                          Remaining:
-                        </Text>
-                        <Text style={[
-                          styles.timeValue, 
-                          { 
-                            color: remainingTime < 0 ? '#F44336' : theme.text 
-                          }
-                        ]}>
-                          {formatTime(Math.abs(remainingTime))} {remainingTime < 0 ? '(over)' : ''}
-                        </Text>
-                      </View>
-                      {!meetsMinimumRequirement && (
-                        <Text style={[styles.minTimeWarning, { color: '#FF9800' }]}>
-                          Minimum time required: {formatTime(minimumTimeRequired)}
-                        </Text>
-                      )}
-                      {meetsMinimumRequirement && (
-                        <Text style={[styles.minTimeSuccess, { color: '#4CAF50' }]}>
-                          ✓ Minimum time requirement met
-                        </Text>
-                      )}
-                    </View>
-                    
-                    <View style={styles.timeActionButtons}>
-                      <TouchableOpacity
-                        style={[
-                          styles.clearButton,
-                          { 
-                            backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
-                            borderColor: isDark ? theme.border : '#ddd',
-                          }
-                        ]}
-                        onPress={clearAllStretches}
-                      >
-                        <Text style={[styles.clearButtonText, { color: theme.text }]}>Clear All</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[
-                          styles.autoCompleteButton,
-                          { 
-                            backgroundColor: remainingTime <= 0 ? 
-                              isDark ? '#555' : '#ccc' : 
-                              theme.accent,
-                            opacity: remainingTime <= 0 ? 0.7 : 1
-                          }
-                        ]}
-                        onPress={autoCompleteRoutine}
-                        disabled={remainingTime <= 0}
-                      >
-                        <Text style={styles.autoCompleteText}>Auto Complete</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.selectedCount}>
-                    <Text style={[styles.selectedCountText, { color: theme.text }]}>
-                      {selectedItems.filter(item => !('isRest' in item)).length} stretches selected
-                    </Text>
-                  </View>
-                  
-                  {!premiumUnlocked && (
-                    <View style={[styles.premiumInfo, { backgroundColor: isDark ? theme.backgroundLight : '#FFF9E5' }]}>
-                      <Ionicons name="lock-closed" size={20} color="#FFD700" />
-                      <Text style={[styles.premiumInfoText, { color: isDark ? theme.textSecondary : '#5D4037' }]}>
-                        Premium stretches will be available at level 7
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )
-            },
-            {
-              title: 'stretches',
-              data: filteredStretches
-            }
-          ]}
-          renderItem={({ item, section }) => 
-            section.title === 'stretches' ? renderStretchItem({ item }) : null
-          }
-          keyExtractor={(item, index) => 
-            'id' in item ? item.id.toString() : index.toString()
-          }
-          style={styles.list}
-          contentContainerStyle={styles.listContainer}
-          stickySectionHeadersEnabled={false}
-          showsVerticalScrollIndicator={true}
-          ListEmptyComponent={
+        <ScrollView style={styles.contentContainer}>
+          {/* Filters Section */}
+          <View style={styles.filters}>
+            <Text style={[styles.filterLabel, { color: theme.textSecondary }]}>Filter by:</Text>
+            <View style={styles.levelFilters}>
+              <TouchableOpacity
+                style={[
+                  styles.levelFilter,
+                  { 
+                    backgroundColor: filters.position === 'All' 
+                      ? theme.accent 
+                      : isDark ? theme.backgroundLight : '#fff'
+                  }
+                ]}
+                onPress={() => setFilters({...filters, position: 'All'})}
+              >
+                <Text 
+                  style={[
+                    styles.levelFilterText, 
+                    { color: filters.position === 'All' ? '#fff' : theme.text }
+                  ]}
+                >
+                  All
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.levelFilter,
+                  { 
+                    backgroundColor: filters.position === 'Sitting' 
+                      ? '#4CAF50' 
+                      : isDark ? theme.backgroundLight : '#fff'
+                  }
+                ]}
+                onPress={() => setFilters({...filters, position: 'Sitting'})}
+              >
+                <Text 
+                  style={[
+                    styles.levelFilterText, 
+                    { color: filters.position === 'Sitting' ? '#fff' : theme.text }
+                  ]}
+                >
+                  Sitting
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.levelFilter,
+                  { 
+                    backgroundColor: filters.position === 'Lying' 
+                      ? '#FF9800' 
+                      : isDark ? theme.backgroundLight : '#fff'
+                  }
+                ]}
+                onPress={() => setFilters({...filters, position: 'Lying'})}
+              >
+                <Text 
+                  style={[
+                    styles.levelFilterText, 
+                    { color: filters.position === 'Lying' ? '#fff' : theme.text }
+                  ]}
+                >
+                  Lying
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.levelFilter,
+                  { 
+                    backgroundColor: filters.position === 'Standing' 
+                      ? '#F44336' 
+                      : isDark ? theme.backgroundLight : '#fff'
+                  }
+                ]}
+                onPress={() => setFilters({...filters, position: 'Standing'})}
+              >
+                <Text 
+                  style={[
+                    styles.levelFilterText, 
+                    { color: filters.position === 'Standing' ? '#fff' : theme.text }
+                  ]}
+                >
+                  Standing
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <View style={styles.timeInfoContainer}>
+            <View style={[styles.timeInfo, { backgroundColor: isDark ? theme.backgroundLight : '#e3f2fd' }]}>
+              <View style={styles.timeRow}>
+                <Text style={[styles.timeLabel, { color: theme.text }]}>
+                  Target Time:
+                </Text>
+                <Text style={[styles.timeValue, { color: theme.text }]}>
+                  {formatTime(targetDuration)}
+                </Text>
+              </View>
+              <View style={styles.timeRow}>
+                <Text style={[styles.timeLabel, { color: theme.text }]}>
+                  Selected Time:
+                </Text>
+                <Text style={[
+                  styles.timeValue, 
+                  { 
+                    color: selectedTotalTime > targetDuration ? '#F44336' : 
+                           selectedTotalTime < minimumTimeRequired ? '#FF9800' : 
+                           '#4CAF50' 
+                  }
+                ]}>
+                  {formatTime(selectedTotalTime)}
+                </Text>
+              </View>
+              <View style={styles.timeRow}>
+                <Text style={[styles.timeLabel, { color: theme.text }]}>
+                  Remaining:
+                </Text>
+                <Text style={[
+                  styles.timeValue, 
+                  { 
+                    color: remainingTime < 0 ? '#F44336' : theme.text 
+                  }
+                ]}>
+                  {formatTime(Math.abs(remainingTime))} {remainingTime < 0 ? '(over)' : ''}
+                </Text>
+              </View>
+              {!meetsMinimumRequirement && (
+                <Text style={[styles.minTimeWarning, { color: '#FF9800' }]}>
+                  Minimum time required: {formatTime(minimumTimeRequired)}
+                </Text>
+              )}
+              {meetsMinimumRequirement && (
+                <Text style={[styles.minTimeSuccess, { color: '#4CAF50' }]}>
+                  ✓ Minimum time requirement met
+                </Text>
+              )}
+            </View>
+            
+            <View style={styles.timeActionButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.clearButton,
+                  { 
+                    backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+                    borderColor: isDark ? theme.border : '#ddd',
+                  }
+                ]}
+                onPress={clearAllStretches}
+              >
+                <Text style={[styles.clearButtonText, { color: theme.text }]}>Clear All</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.autoCompleteButton,
+                  { 
+                    backgroundColor: remainingTime <= 0 ? 
+                      isDark ? '#555' : '#ccc' : 
+                      theme.accent,
+                    opacity: remainingTime <= 0 ? 0.7 : 1
+                  }
+                ]}
+                onPress={autoCompleteRoutine}
+                disabled={remainingTime <= 0}
+              >
+                <Text style={styles.autoCompleteText}>Auto Complete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <View style={styles.selectedCount}>
+            <Text style={[styles.selectedCountText, { color: theme.text }]}>
+              {selectedItems.filter(item => !('isRest' in item)).length} stretches selected
+            </Text>
+          </View>
+          
+          {!premiumUnlocked && (
+            <View style={[styles.premiumInfo, { backgroundColor: isDark ? theme.backgroundLight : '#FFF9E5' }]}>
+              <Ionicons name="lock-closed" size={20} color="#FFD700" />
+              <Text style={[styles.premiumInfoText, { color: isDark ? theme.textSecondary : '#5D4037' }]}>
+                Premium stretches will be available at level 7
+              </Text>
+            </View>
+          )}
+          
+          {/* Stretches List */}
+          {filteredStretches.length > 0 ? (
+            filteredStretches.map(item => (
+              <React.Fragment key={item.id.toString()}>
+                {renderStretchItem({ item })}
+              </React.Fragment>
+            ))
+          ) : (
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                 No stretches found for your search criteria.
               </Text>
             </View>
-          }
-          renderSectionHeader={() => null}
-        />
+          )}
+        </ScrollView>
       )}
     </SafeAreaView>
   );

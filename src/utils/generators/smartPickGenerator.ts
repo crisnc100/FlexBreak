@@ -1,4 +1,4 @@
-import { BodyArea, Duration, ProgressEntry, StretchLevel } from '../../types';
+import { BodyArea, Duration, ProgressEntry, Position } from '../../types';
 import * as rewardManager from '../progress/modules/rewardManager';
 import stretches from '../../data/stretches';
 import * as dateUtils from '../progress/modules/utils/dateUtils';
@@ -7,9 +7,10 @@ import * as dateUtils from '../progress/modules/utils/dateUtils';
 export interface RoutineRecommendation {
   area: BodyArea;
   duration: Duration;
-  level: StretchLevel;
+  position: Position;
   reason: string;
   isPremiumEnabled?: boolean;
+  isOfficeFriendly?: boolean;
 }
 
 // Get available body areas (areas that have stretches with demos)
@@ -36,6 +37,16 @@ function getAvailableBodyAreas(): BodyArea[] {
     areasWithDemos.add('Full Body');
   }
   
+  // Check if Dynamic Flow has any demos
+  const hasDynamicFlowDemos = stretches.some(stretch => 
+    stretch.hasDemo === true && 
+    stretch.tags.includes('Dynamic Flow')
+  );
+  
+  if (hasDynamicFlowDemos) {
+    areasWithDemos.add('Dynamic Flow');
+  }
+  
   return Array.from(areasWithDemos);
 }
 
@@ -45,32 +56,44 @@ const DEFAULT_ROUTINE_SEQUENCE: RoutineRecommendation[] = [
   {
     area: 'Neck',
     duration: '5',
-    level: 'beginner',
-    reason: 'Start with an easy neck routine to get familiar with the app'
+    position: 'Sitting,Standing',
+    reason: 'Start with an easy neck routine to get familiar with the app',
+    isOfficeFriendly: true
   },
   {
     area: 'Upper Back & Chest',
     duration: '5',
-    level: 'beginner',
-    reason: 'Relieve tension in your upper back with this beginner-friendly routine'
+    position: 'Sitting,Standing',
+    reason: 'Relieve tension in your upper back with this quick routine',
+    isOfficeFriendly: true
   },
   {
     area: 'Shoulders & Arms',
     duration: '10',
-    level: 'beginner',
-    reason: 'A slightly longer shoulder routine to build your stretching habit'
+    position: 'Sitting,Standing',
+    reason: 'A slightly longer shoulder routine to build your stretching habit',
+    isOfficeFriendly: true
   },
   {
     area: 'Hips & Legs',
     duration: '5',
-    level: 'beginner',
-    reason: 'Give your lower body a break with this quick routine'
+    position: 'Sitting,Standing',
+    reason: 'Give your lower body a break with this office-friendly routine',
+    isOfficeFriendly: true
   },
   {
     area: 'Lower Back',
     duration: '10',
-    level: 'beginner',
-    reason: 'Try a lower back focus to improve your overall flexibility'
+    position: 'All',
+    reason: 'Try a lower back focus to improve your overall flexibility',
+    isOfficeFriendly: false
+  },
+  {
+    area: 'Full Body',
+    duration: '15',
+    position: 'All',
+    reason: 'A comprehensive routine with a mix of positions for your whole body',
+    isOfficeFriendly: false
   }
 ];
 
@@ -159,6 +182,28 @@ function getLeastUsedArea(routines: ProgressEntry[]): BodyArea | null {
   return leastUsedArea;
 }
 
+// Check if user prefers office-friendly routines based on history
+function prefersOfficeFriendly(routines: ProgressEntry[]): boolean {
+  if (routines.length === 0) return true; // Default to office-friendly for new users
+  
+  let officeFriendlyCount = 0;
+  let nonOfficeFriendlyCount = 0;
+  
+  routines.forEach(routine => {
+    // Count routines with only sitting/standing positions as office-friendly
+    if (routine.position === 'Sitting' || 
+        routine.position === 'Standing' || 
+        routine.position === 'Sitting,Standing') {
+      officeFriendlyCount++;
+    } else if (routine.position === 'Lying' || routine.position === 'All') {
+      nonOfficeFriendlyCount++;
+    }
+  });
+  
+  // Return true if user has done more office-friendly routines
+  return officeFriendlyCount >= nonOfficeFriendlyCount;
+}
+
 // Get average routine duration
 function getAverageDuration(routines: ProgressEntry[]): Duration {
   if (routines.length === 0) return '5';
@@ -227,12 +272,15 @@ export async function generateSmartPick(routines: ProgressEntry[]): Promise<Rout
     if (filteredDefaultSequence.length === 0) {
       // If no default routines have demos, create a fallback recommendation
       const fallbackArea = availableAreas.length > 0 ? availableAreas[0] : 'Full Body';
+      
+      // Default to office-friendly for new users
       return {
         area: fallbackArea,
         duration: '5',
-        level: 'beginner',
+        position: 'Sitting,Standing',
         reason: 'Here\'s a routine to get you started',
-        isPremiumEnabled: premiumEnabled
+        isPremiumEnabled: premiumEnabled,
+        isOfficeFriendly: true
       };
     }
     
@@ -249,6 +297,9 @@ export async function generateSmartPick(routines: ProgressEntry[]): Promise<Rout
   // Get today's routine count
   const todayRoutineCount = getTodayRoutineCount(routines);
   
+  // Check user preference for office-friendly routines
+  const preferOfficeFriendly = prefersOfficeFriendly(routines);
+  
   // VARIETY: If user has done multiple routines today, suggest a less-used area
   if (todayRoutineCount >= 1) {
     const leastUsedArea = getLeastUsedArea(routines);
@@ -256,13 +307,19 @@ export async function generateSmartPick(routines: ProgressEntry[]): Promise<Rout
     
     // Fallback to any available area if no least used area
     const fallbackArea = availableAreas.length > 0 ? availableAreas[0] : 'Full Body';
+    const targetArea = leastUsedArea || fallbackArea;
+    
+    // Dynamic Flow isn't compatible with office-friendly
+    const isDynamicFlow = targetArea === 'Dynamic Flow';
+    const shouldBeOfficeFriendly = preferOfficeFriendly && !isDynamicFlow;
     
     return {
-      area: leastUsedArea || fallbackArea,
+      area: targetArea,
       duration: preferredDuration,
-      level: 'beginner',
-      reason: `You've already done ${todayRoutineCount} routine${todayRoutineCount > 1 ? 's' : ''} today! Try this ${leastUsedArea || fallbackArea} routine for more variety.`,
-      isPremiumEnabled: premiumEnabled
+      position: shouldBeOfficeFriendly ? 'Sitting,Standing' : 'All',
+      reason: `You've already done ${todayRoutineCount} routine${todayRoutineCount > 1 ? 's' : ''} today! Try this ${targetArea} routine for more variety.`,
+      isPremiumEnabled: premiumEnabled,
+      isOfficeFriendly: shouldBeOfficeFriendly
     };
   }
   
@@ -275,22 +332,33 @@ export async function generateSmartPick(routines: ProgressEntry[]): Promise<Rout
   const readyForProgression = isReadyForProgression(routines, targetArea);
   const preferredDuration = getAverageDuration(routines);
   
+  // Dynamic Flow isn't compatible with office-friendly
+  const isDynamicFlow = targetArea === 'Dynamic Flow';
+  
   if (readyForProgression) {
+    // For progression, if they've been doing office-friendly routines, suggest a non-office-friendly one
+    // and vice versa, unless it's Dynamic Flow which is always non-office-friendly
+    const switchOfficeFriendly = !isDynamicFlow && preferOfficeFriendly;
+    
     return {
       area: targetArea,
       duration: preferredDuration,
-      level: 'intermediate', // Suggest moving up to intermediate
-      reason: `You've mastered ${targetArea} stretches! Try this intermediate routine to challenge yourself.`,
-      isPremiumEnabled: premiumEnabled
+      position: switchOfficeFriendly ? 'All' : (isDynamicFlow ? 'All' : 'Sitting,Standing'),
+      reason: `You've mastered ${targetArea} stretches! Try this ${switchOfficeFriendly ? 'immersive' : 'office-friendly'} routine to challenge yourself.`,
+      isPremiumEnabled: premiumEnabled,
+      isOfficeFriendly: !switchOfficeFriendly && !isDynamicFlow
     };
   }
   
   // Default recommendation if no other condition is met
+  const shouldBeOfficeFriendly = preferOfficeFriendly && !isDynamicFlow;
+  
   return {
     area: targetArea,
     duration: preferredDuration,
-    level: 'beginner',
+    position: shouldBeOfficeFriendly ? 'Sitting,Standing' : 'All',
     reason: `Based on your history, here's a ${targetArea} routine that's just right for you today.`,
-    isPremiumEnabled: premiumEnabled
+    isPremiumEnabled: premiumEnabled,
+    isOfficeFriendly: shouldBeOfficeFriendly
   };
 } 

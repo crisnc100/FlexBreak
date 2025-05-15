@@ -1,7 +1,7 @@
 import { NavigationProp } from '@react-navigation/native';
 
-export type StretchLevel = 'beginner' | 'intermediate' | 'advanced';
-export type BodyArea = 'Full Body' | 'Lower Back' | 'Upper Back & Chest' | 'Neck' | 'Hips & Legs' | 'Shoulders & Arms';
+export type Position = 'All' | 'Standing' | 'Sitting' | 'Lying' | 'Sitting,Standing';
+export type BodyArea = 'Full Body' | 'Lower Back' | 'Upper Back & Chest' | 'Neck' | 'Hips & Legs' | 'Shoulders & Arms' | 'Dynamic Flow';
 export type Duration = '5' | '10' | '15';
 
 export interface Stretch {
@@ -10,7 +10,7 @@ export interface Stretch {
   description: string;
   duration: number; // seconds
   tags: BodyArea[];
-  level: StretchLevel;
+  position: Position;
   image: number | { uri: string; __video?: boolean } | { __video: true; uri: string }; // Support for images and MP4 videos
   bilateral?: boolean;
   premium?: boolean;
@@ -41,12 +41,21 @@ export interface RestPeriod {
   isRest: true;
 }
 
+export interface TransitionPeriod {
+  id: string;
+  name: string;
+  description: string;
+  duration: number;
+  isTransition: true;
+}
+
 export interface RoutineParams {
   area: BodyArea;
   duration: Duration;
-  level?: StretchLevel;
+  position: Position;
   customStretches?: (Stretch | RestPeriod)[];
   includePremiumStretches?: boolean;
+  transitionDuration?: number; // Duration in seconds (0-10)
 }
 
 export interface ProgressEntry {
@@ -55,8 +64,9 @@ export interface ProgressEntry {
   duration: Duration;
   stretchCount?: number;
   hidden?: boolean;
+  favorite?: boolean;
   customStretches?: { id: number | string; isRest?: boolean }[];
-  level?: StretchLevel;
+  position?: Position;
   savedStretches?: any[]; // Array of stretches saved with the routine
 }
 
@@ -168,15 +178,17 @@ export interface SmartRoutineInput {
   parsedArea?: BodyArea[];
   parsedIssue?: IssueType;
   parsedActivity?: string;
+  parsedPosition?: Position;
 }
 
 export interface SmartRoutineConfig {
   areas: BodyArea[];
   duration: Duration;
-  level: StretchLevel;
+  position: Position;
   issueType: IssueType;
   isDeskFriendly: boolean;
   postActivity?: string;
+  transitionDuration?: number;
 }
 
 export interface Playlist {

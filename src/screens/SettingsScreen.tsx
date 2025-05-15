@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { clearAllData, clearAllPremiumStatus } from '../services/storageService';
+import { clearAllData, clearAllPremiumStatus, saveTransitionDuration, getTransitionDuration } from '../services/storageService';
 import { resetSimulationData } from '../services/storageService';
 
 import DiagnosticsScreen from './DiagnosticsScreen';
@@ -79,6 +79,23 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const [fitnessDisclaimerModalVisible, setFitnessDisclaimerModalVisible] = useState(false);
   const [nonMedicalNoticeModalVisible, setNonMedicalNoticeModalVisible] = useState(false);
   const [testingModalVisible, setTestingModalVisible] = useState(false);
+  const [transitionDuration, setTransitionDuration] = useState(5);
+  
+  // Load transition duration on mount
+  useEffect(() => {
+    const loadTransitionDuration = async () => {
+      const duration = await getTransitionDuration();
+      setTransitionDuration(duration);
+    };
+    loadTransitionDuration();
+  }, []);
+
+  // Handle transition duration change
+  const handleTransitionDurationChange = async (value: number) => {
+    const roundedValue = Math.round(value);
+    setTransitionDuration(roundedValue);
+    await saveTransitionDuration(roundedValue);
+  };
   
   const handleGoBack = () => {
     if (onClose) {
@@ -281,6 +298,39 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     }
   };
   
+  // Add this section in the render part, before the diagnostics section
+  const renderWorkoutSettings = () => {
+    return (
+      <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Workout Settings</Text>
+        
+        <View style={styles.settingRow}>
+          <View style={styles.settingLabelContainer}>
+            <Text style={[styles.settingLabel, { color: theme.text }]}>
+              Transition Duration
+            </Text>
+            <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
+              {transitionDuration === 0 ? 'No transitions' : `${transitionDuration} seconds between stretches`}
+            </Text>
+          </View>
+          <View style={styles.sliderContainer}>
+            {/* <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={10}
+              step={1}
+              value={transitionDuration}
+              onValueChange={handleTransitionDurationChange}
+              minimumTrackTintColor={theme.accent}
+              maximumTrackTintColor={theme.border}
+              thumbTintColor={theme.accent}
+            /> */}
+          </View>
+        </View>
+      </View>
+    );
+  };
+  
   return (
     <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
@@ -423,6 +473,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             </>
           )}
         </View>
+        
+        {/* Workout Settings Section */}
+        {renderWorkoutSettings()}
         
         {/* Premium Subscription Section */}
         <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
@@ -668,9 +721,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 </View>
               </View>
             </TouchableOpacity>
-
-       
-            
           </View>
         )}
         
@@ -1550,6 +1600,29 @@ const styles = StyleSheet.create({
   premiumInfoText: {
     fontSize: 14,
     marginBottom: 8,
+  },
+  settingRow: {
+    flexDirection: 'column',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  settingLabelContainer: {
+    flex: 1,
+    marginBottom: 8,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  sliderContainer: {
+    width: '100%',
+    paddingHorizontal: 8,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
   },
 });
 

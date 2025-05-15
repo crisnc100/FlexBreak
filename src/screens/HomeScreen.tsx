@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { AppNavigationProp, BodyArea, Duration, RoutineParams, StretchLevel, Stretch, RestPeriod } from '../types';
+import { AppNavigationProp, BodyArea, Duration, RoutineParams, Position, Stretch, RestPeriod } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { tw } from '../utils/tw';
@@ -23,6 +23,7 @@ import { useRefresh } from '../context/RefreshContext';
 import { RefreshableScrollView } from '../components/common';
 import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
 import { useTheme } from '../context/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
 import { 
   HomeHeader, 
   DailyTip, 
@@ -51,7 +52,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<AppNavigationProp>();
   const [area, setArea] = useState<BodyArea>('Hips & Legs');
   const [duration, setDuration] = useState<Duration>('5');
-  const [level, setLevel] = useState<StretchLevel>('beginner');
+  const [officeFriendly, setOfficeFriendly] = useState<boolean>(false);
   const { isPremium, refreshPremiumStatus } = usePremium();
   const { isRefreshing, refreshHome } = useRefresh();
   
@@ -294,13 +295,21 @@ export default function HomeScreen() {
 
   // Start stretching routine
   const handleStartStretching = () => {
+    // Set position based on officeFriendly toggle
+    const effectivePosition: Position = officeFriendly ? 'Sitting,Standing' : 'All';
+
     const routineParams: RoutineParams & { customStretches?: Stretch[] } = {
       area,
       duration,
-      level
+      position: effectivePosition
     };
 
     navigation.navigate('Routine', routineParams);
+  };
+
+  // Handle office friendly toggle
+  const handleOfficeFriendlyToggle = (value: boolean) => {
+    setOfficeFriendly(value);
   };
 
   // Toggle reminder
@@ -632,7 +641,7 @@ export default function HomeScreen() {
     console.log('Starting custom routine with params:', {
       area: params.area,
       duration: params.duration,
-      level: params.level,
+      position: params.position,
       stretches: params.customStretches?.length || 0
     });
     
@@ -682,7 +691,7 @@ export default function HomeScreen() {
     navigation.navigate('Routine', {
       area: 'Full Body',
       duration: '5',
-      level: 'beginner',
+      position: 'All',
       customStretches: deskBreakStretches as Stretch[]
     });
   }, [navigation, canAccessFeature, getRequiredLevel, userLevel, getUserLevel, handleStartStretching]);
@@ -691,17 +700,37 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={[tw('flex-1 justify-center items-center'), { backgroundColor: theme.background }]}>
+        <LinearGradient
+          colors={isDark ? 
+            ['rgba(18, 18, 18, 1)', 'rgba(30, 30, 30, 1)'] : 
+            ['rgba(240, 240, 240, 1)', 'rgba(255, 255, 255, 1)']}
+          style={StyleSheet.absoluteFill}
+        />
         <ActivityIndicator size="large" color={theme.accent} />
         <Text style={[tw('mt-3 text-base'), { color: theme.textSecondary }]}>Loading flexbreak...</Text>
       </SafeAreaView>
     );
   }
 
+  // Helper to convert office friendly toggle to generator-friendly position string
+  const getEffectivePosition = (): Position => {
+    return officeFriendly ? 'Sitting,Standing' : 'All';
+  };
+
   return (
     <SafeAreaView style={[tw('flex-1'), { backgroundColor: theme.background }]}>
+      <LinearGradient
+        colors={isDark ? 
+          ['rgba(18, 18, 18, 1)', 'rgba(30, 30, 30, 1)'] : 
+          ['rgba(245, 245, 250, 1)', 'rgba(255, 255, 255, 1)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <RefreshableScrollView
         ref={scrollViewRef}
         style={tw('flex-1 p-4')}
+        contentContainerStyle={styles.scrollContent}
         scrollEnabled={!activeDropdown}
         onScroll={(e) => setScrollPosition(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
@@ -722,13 +751,16 @@ export default function HomeScreen() {
         <RoutinePicker
           area={area}
           duration={duration}
-          level={level}
+          officeFriendly={officeFriendly}
           onAreaPress={() => openDropdown('area')}
           onDurationPress={() => openDropdown('duration')}
-          onLevelPress={() => openDropdown('level')}
+          onOfficeFriendlyToggle={handleOfficeFriendlyToggle}
           onStartStretching={handleStartStretching}
           canAccessCustomRoutines={canAccessFeature('custom_routines')}
           onCustomRoutinesPress={handleCustomRoutinesPress}
+          isPremium={isPremium}
+          requiredLevel={getRequiredLevel('custom_routines')}
+          userLevel={userLevel}
         />
         
         {/* Desk Break Boost */}
@@ -802,58 +834,52 @@ export default function HomeScreen() {
       />
       
       {/* Option Dropdown */}
-      {activeDropdown && (
+      {activeDropdown === 'area' && (
         <OptionDropdown
           visible={!!activeDropdown}
-          title={
-            activeDropdown === 'area' 
-              ? 'Select Body Area' 
-              : activeDropdown === 'duration'
-                ? 'Select Duration'
-                : 'Select Level'
-          }
-          options={
-            activeDropdown === 'area'
-              ? [
-                  { label: 'Hips & Legs', value: 'Hips & Legs', description: 'For sitting-related stiffness' },
-                  { label: 'Lower Back', value: 'Lower Back', description: 'For desk posture relief' },
-                  { label: 'Upper Back & Chest', value: 'Upper Back & Chest', description: 'For hunching & slouching' },
-                  { label: 'Shoulders & Arms', value: 'Shoulders & Arms', description: 'For desk-typing tension' },
-                  { label: 'Neck', value: 'Neck', description: 'For screen-staring strain' },
-                  { label: 'Full Body', value: 'Full Body', description: 'For complete rejuvenation' }
-                ]
-              : activeDropdown === 'duration'
-                ? [
-                    { label: '5 minutes', value: '5', description: 'Quick refresh' },
-                    { label: '10 minutes', value: '10', description: 'Standard session' },
-                    { label: '15 minutes', value: '15', description: 'Deep relief' }
-                  ]
-                : [
-                    { label: 'Beginner', value: 'beginner', description: 'Easy gentle stretches' },
-                    { label: 'Intermediate', value: 'intermediate', description: 'Moderate intensity' },
-                    { label: 'Advanced', value: 'advanced', description: 'Deep stretching' }
-                  ]
-          }
-          selectedValue={
-            activeDropdown === 'area'
-              ? area
-              : activeDropdown === 'duration'
-                ? duration
-                : level
-          }
+          title="Select Body Area"
+          options={[
+            { label: 'Hips & Legs', value: 'Hips & Legs', description: 'For sitting-related stiffness' },
+            { label: 'Lower Back', value: 'Lower Back', description: 'For desk posture relief' },
+            { label: 'Upper Back & Chest', value: 'Upper Back & Chest', description: 'For hunching & slouching' },
+            { label: 'Shoulders & Arms', value: 'Shoulders & Arms', description: 'For desk-typing tension' },
+            { label: 'Neck', value: 'Neck', description: 'For screen-staring strain' },
+            { label: 'Full Body', value: 'Full Body', description: 'For complete rejuvenation' },
+            { label: 'Dynamic Flow', value: 'Dynamic Flow', description: 'Active movement sequence' }
+          ]}
+          selectedValue={area}
           onSelect={(value) => {
-            if (activeDropdown === 'area') {
-              setArea(value as BodyArea);
-            } else if (activeDropdown === 'duration') {
-              setDuration(value as Duration);
-            } else if (activeDropdown === 'level') {
-              setLevel(value as StretchLevel);
+            setArea(value as BodyArea);
+            // Turn off office friendly mode if Dynamic Flow is selected
+            if (value === 'Dynamic Flow' && officeFriendly) {
+              setOfficeFriendly(false);
             }
             closeDropdown();
           }}
           onClose={closeDropdown}
           slideAnim={slideAnim}
           backdropOpacity={backdropOpacity}
+          multiSelect={false}
+        />
+      )}
+      {activeDropdown === 'duration' && (
+        <OptionDropdown
+          visible={!!activeDropdown}
+          title="Select Duration"
+          options={[
+            { label: '5 minutes', value: '5', description: 'Quick refresh' },
+            { label: '10 minutes', value: '10', description: 'Standard session' },
+            { label: '15 minutes', value: '15', description: 'Deep relief' }
+          ]}
+          selectedValue={duration}
+          onSelect={(value) => {
+            setDuration(value as Duration);
+            closeDropdown();
+          }}
+          onClose={closeDropdown}
+          slideAnim={slideAnim}
+          backdropOpacity={backdropOpacity}
+          multiSelect={false}
         />
       )}
 
@@ -883,5 +909,8 @@ const styles = StyleSheet.create({
   testButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  scrollContent: {
+    paddingBottom: 20,
   }
 });

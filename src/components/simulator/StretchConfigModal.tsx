@@ -12,7 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 // Options for configuration
 const BODY_AREAS = ['Neck', 'Lower Back', 'Upper Back & Chest', 'Shoulders & Arms', 'Hips & Legs', 'Full Body'];
-const DIFFICULTY_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+const POSITIONS = ['Standing', 'Sitting', 'Lying', 'All'];
 const DURATIONS = [5, 10, 15];
 
 // Add "Random" option
@@ -27,7 +27,7 @@ const XP_RATES = {
 
 interface StretchConfig {
   bodyArea: string;
-  difficulty: string;
+  position: string;
   duration: number;
 }
 
@@ -54,8 +54,8 @@ const StretchConfigModal = ({
   const [selectedArea, setSelectedArea] = useState<string>(
     initialConfig.bodyArea || BODY_AREAS[0]
   );
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>(
-    initialConfig.difficulty || DIFFICULTY_LEVELS[0]
+  const [selectedPosition, setSelectedPosition] = useState<string>(
+    initialConfig.position || POSITIONS[0]
   );
   const [selectedDuration, setSelectedDuration] = useState<number | string>(
     initialConfig.duration || DURATIONS[1]
@@ -73,9 +73,9 @@ const StretchConfigModal = ({
       ? getRandomItem(BODY_AREAS) 
       : selectedArea;
       
-    const finalDifficulty = selectedDifficulty === RANDOM_OPTION 
-      ? getRandomItem(DIFFICULTY_LEVELS) 
-      : selectedDifficulty;
+    const finalPosition = selectedPosition === RANDOM_OPTION 
+      ? getRandomItem(POSITIONS) 
+      : selectedPosition;
       
     const finalDuration = selectedDuration === RANDOM_OPTION 
       ? getRandomItem(DURATIONS) 
@@ -83,7 +83,7 @@ const StretchConfigModal = ({
     
     onConfirm({
       bodyArea: finalArea,
-      difficulty: finalDifficulty,
+      position: finalPosition,
       duration: finalDuration as number
     });
   };
@@ -188,11 +188,11 @@ const StretchConfigModal = ({
                   styles.difficultyOption,
                   { 
                     backgroundColor: isDark ? '#4A2E85' : '#E1BEE7',
-                    borderColor: selectedDifficulty === RANDOM_OPTION ? theme.accent : 'transparent',
-                    borderWidth: selectedDifficulty === RANDOM_OPTION ? 2 : 0
+                    borderColor: selectedPosition === RANDOM_OPTION ? theme.accent : 'transparent',
+                    borderWidth: selectedPosition === RANDOM_OPTION ? 2 : 0
                   }
-                ]}
-                onPress={() => setSelectedDifficulty(RANDOM_OPTION)}
+                  ]}
+                  onPress={() => setSelectedPosition(RANDOM_OPTION)}
               >
                 <View style={styles.difficultyContent}>
                   <Ionicons 
@@ -209,34 +209,35 @@ const StretchConfigModal = ({
                 </View>
               </TouchableOpacity>
               
-              {DIFFICULTY_LEVELS.map(difficulty => (
+              {POSITIONS.map(position => (
                 <TouchableOpacity
-                  key={difficulty}
+                  key={position}
                   style={[
                     styles.difficultyOption,
                     { 
                       backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5',
-                      borderColor: selectedDifficulty === difficulty ? theme.accent : 'transparent',
-                      borderWidth: selectedDifficulty === difficulty ? 2 : 0
+                      borderColor: selectedPosition === position ? theme.accent : 'transparent',
+                      borderWidth: selectedPosition === position ? 2 : 0
                     }
                   ]}
-                  onPress={() => setSelectedDifficulty(difficulty)}
+                  onPress={() => setSelectedPosition(position)}
                 >
                   <View style={styles.difficultyContent}>
                     <Ionicons 
                       name={
-                        difficulty === 'Beginner' ? 'leaf-outline' :
-                        difficulty === 'Intermediate' ? 'flame-outline' : 'flash-outline'
+                        position === 'Standing' ? 'leaf-outline' :
+                        position === 'Sitting' ? 'flame-outline' :
+                        position === 'Lying' ? 'flash-outline' : 'ellipse-outline'
                       } 
                       size={24} 
-                      color={selectedDifficulty === difficulty ? theme.accent : theme.textSecondary} 
+                      color={selectedPosition === position ? theme.accent : theme.textSecondary} 
                     />
                     <Text style={[
                       styles.difficultyText,
                       { color: theme.text },
-                      selectedDifficulty === difficulty && { color: theme.accent, fontWeight: 'bold' }
+                      selectedPosition === position && { color: theme.accent, fontWeight: 'bold' }
                     ]}>
-                      {difficulty}
+                      {position}
                     </Text>
                   </View>
                 </TouchableOpacity>

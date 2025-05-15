@@ -463,7 +463,6 @@ const Achievements: React.FC<AchievementsProps> = ({
   // Setup local values using either gamification data or props (for backward compatibility)
   useEffect(() => {
     if (gamificationSummary) {
-      console.log('Gamification summary received:', gamificationSummary);
       // Use data from gamification hook 
       const { achievements, statistics, level, totalXP } = gamificationSummary;
       

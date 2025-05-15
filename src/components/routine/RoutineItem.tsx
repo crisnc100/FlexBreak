@@ -9,11 +9,12 @@ interface RoutineItemProps {
   item: ProgressEntry;
   onPress: () => void;
   onDelete: () => void;
-  hideLabel?: string; // Optional prop to customize the action label
-  theme?: any; // Optional theme prop passed from parent
-  isDark?: boolean; // Optional isDark flag passed from parent
-  favorite?: boolean; // Whether the routine is favorited
-  isCustom?: boolean; // Whether this is a custom routine
+  onFavorite?: () => void;
+  hideLabel?: string;
+  theme?: any;
+  isDark?: boolean;
+  favorite?: boolean;
+  isCustom?: boolean;
 }
 
 // Helper function to format dates in a more readable format
@@ -41,14 +42,14 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
   item, 
   onPress, 
   onDelete, 
-  hideLabel = 'Delete', // Default to "Delete" for backward compatibility
+  onFavorite,
+  hideLabel = 'Delete',
   theme: propTheme,
   isDark: propIsDark,
   favorite = false,
   isCustom = false
 }) => {
   // Use theme from props if provided, otherwise use theme context
-  // This allows the component to work both when used standalone and when included in RoutineDashboard
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
@@ -86,6 +87,23 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
     </TouchableOpacity>
   );
 
+  // Render the left swipe actions (favorite)
+  const renderLeftActions = () => (
+    <TouchableOpacity 
+      style={[styles.favoriteActionButton, {
+        backgroundColor: favorite ? '#FFD700' : '#4CAF50'
+      }]}
+      onPress={onFavorite}
+    >
+      <Ionicons 
+        name={favorite ? "star" : "star-outline"} 
+        size={24} 
+        color="#FFF" 
+      />
+      <Text style={styles.actionText}>{favorite ? "Unfavorite" : "Favorite"}</Text>
+    </TouchableOpacity>
+  );
+
   // Get area icon based on the body area
   const getAreaIcon = (area: string) => {
     switch(area.toLowerCase()) {
@@ -102,7 +120,10 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
   };
 
   return (
-    <Swipeable renderRightActions={renderRightActions}>
+    <Swipeable 
+      renderRightActions={renderRightActions}
+      renderLeftActions={onFavorite ? renderLeftActions : undefined}
+    >
       <TouchableOpacity 
         style={[
           styles.routineItem, 
@@ -113,17 +134,21 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
         ]}
         onPress={onPress}
       >
-        <View style={styles.iconContainer}>
-          <View style={[styles.areaIconBackground, {
-            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5'
-          }]}>
-            <Ionicons 
-              name={getAreaIcon(item.area)} 
-              size={24} 
-              color={isDark ? theme.accent : "#4CAF50"} 
-            />
+        <View style={styles.leftContainer}>
+          
+          <View style={styles.iconContainer}>
+            <View style={[styles.areaIconBackground, {
+              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5'
+            }]}>
+              <Ionicons 
+                name={getAreaIcon(item.area)} 
+                size={24} 
+                color={isDark ? theme.accent : "#4CAF50"} 
+              />
+            </View>
           </View>
         </View>
+        
         <View style={styles.routineInfo}>
           <View style={styles.topRow}>
             <Text style={[
@@ -133,14 +158,6 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
               {item.area}
             </Text>
             <View style={styles.indicatorContainer}>
-              {favorite && (
-                <Ionicons 
-                  name="star" 
-                  size={16} 
-                  color="#FFD700" 
-                  style={styles.favoriteIcon}
-                />
-              )}
               {isCustom && (
                 <Ionicons 
                   name="create-outline" 
@@ -215,6 +232,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#EEE',
   },
+  leftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   iconContainer: {
     marginRight: 12,
   },
@@ -272,11 +293,23 @@ const styles = StyleSheet.create({
     width: 80,
     flexDirection: 'column',
   },
+  favoriteActionButton: {
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    flexDirection: 'column',
+  },
   actionText: {
     color: '#FFF',
     fontSize: 12,
     marginTop: 4,
-  }
+  },
+  favoriteButton: {
+    padding: 10,
+    borderRadius: 23,
+    marginRight: 8,
+  },
 });
 
 export default RoutineItem;

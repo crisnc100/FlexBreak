@@ -1,13 +1,14 @@
 import stretches from '../../data/stretches';
-import { BodyArea, Duration, Stretch, StretchLevel, RestPeriod, IssueType, SmartRoutineInput, SmartRoutineConfig } from '../../types';
+import { BodyArea, Duration, Stretch, Position, RestPeriod, TransitionPeriod, IssueType, SmartRoutineInput, SmartRoutineConfig } from '../../types';
 import * as rewardManager from '../progress/modules/rewardManager';
 
 export const generateRoutine = async (
   area: BodyArea,
   duration: Duration,
-  level: StretchLevel,
-  customStretches?: (Stretch | RestPeriod)[]
-): Promise<(Stretch | RestPeriod)[]> => {
+  position: Position,
+  customStretches?: (Stretch | RestPeriod)[],
+  transitionDuration?: number
+): Promise<(Stretch | RestPeriod | TransitionPeriod)[]> => {
   // Check if premium stretches are unlocked
   const premiumUnlocked = await rewardManager.isRewardUnlocked('premium_stretches');
   
@@ -21,10 +22,12 @@ export const generateRoutine = async (
     
     // Calculate total time of custom stretches
     let totalCustomTime = 0;
-    const routineWithCustom: (Stretch | RestPeriod)[] = [];
+    const routineWithCustom: (Stretch | RestPeriod | TransitionPeriod)[] = [];
     
-    // Add all custom stretches first
-    for (const item of customStretches) {
+    // Add all custom stretches first with transitions if specified
+    for (let i = 0; i < customStretches.length; i++) {
+      const item = customStretches[i];
+      
       // Calculate time for the item
       const itemTime = 'isRest' in item ? 
         item.duration : 
@@ -34,6 +37,20 @@ export const generateRoutine = async (
       
       // Add the item to the routine
       routineWithCustom.push(item);
+      
+      // Add transition after each stretch except the last one
+      if (transitionDuration && transitionDuration > 0 && i < customStretches.length - 1) {
+        const transition: TransitionPeriod = {
+          id: `transition-${i}`,
+          name: "Transition",
+          description: "Get ready for the next stretch",
+          duration: transitionDuration,
+          isTransition: true
+        };
+        
+        routineWithCustom.push(transition);
+        totalCustomTime += transitionDuration;
+      }
     }
     
     // If custom stretches don't fill the duration, add complementary stretches
@@ -64,8 +81,25 @@ export const generateRoutine = async (
         // Calculate stretch time (double for bilateral)
         const stretchTime = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
         
+        // Account for transition time if needed
+        const totalTimeNeeded = stretchTime + (transitionDuration && transitionDuration > 0 && routineWithCustom.length > 0 ? transitionDuration : 0);
+        
         // Skip if adding this stretch exceeds total time
-        if (stretchTime > remainingTime) continue;
+        if (totalTimeNeeded > remainingTime) continue;
+        
+        // Add transition before the stretch if needed
+        if (transitionDuration && transitionDuration > 0 && routineWithCustom.length > 0) {
+          const transition: TransitionPeriod = {
+            id: `transition-${routineWithCustom.length}`,
+            name: "Transition",
+            description: "Get ready for the next stretch",
+            duration: transitionDuration,
+            isTransition: true
+          };
+          
+          routineWithCustom.push(transition);
+          remainingTime -= transitionDuration;
+        }
         
         // Create the stretch entry
         routineWithCustom.push(stretch);
@@ -85,161 +119,195 @@ export const generateRoutine = async (
   const durationMinutes = parseInt(duration, 10);
   const totalSeconds = durationMinutes * 60;
 
-  // Define max stretch counts
-  const maxStretches = { 5: 7, 10: 12, 15: 16 }[durationMinutes] || Math.ceil(durationMinutes / 1.7);
+  // For Dynamic Flow, we always want all positions
+  const isDynamicFlow = area === 'Dynamic Flow';
+  
+  // Parse position parameter - Handle 'All' or comma-separated list like 'Sitting,Standing'
+  let requestedPositions: Position[] = [];
+  
+  if (position === 'All' || isDynamicFlow) {
+    // All positions
+    requestedPositions = ['Standing', 'Sitting', 'Lying'];
+  } else if (position === 'Sitting,Standing') {
+    // Office-friendly: only sitting and standing positions
+    requestedPositions = ['Sitting', 'Standing'];
+  } else {
+    // Single position or custom comma-separated positions
+    requestedPositions = position.split(',').map(p => p.trim()) as Position[];
+  }
 
-  // Filter by area, premium status and demo availability
-  let filteredStretches = stretches.filter(stretch => 
-    (stretch.tags.includes(area) || 
-    (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))) &&
-    (!stretch.premium || premiumUnlocked) && // Filter out premium stretches if not unlocked
-    stretch.hasDemo === true // Only include stretches with demo videos
-  );
+  const singlePositionRequested = requestedPositions.length === 1;
+
+  // Rough estimate: aim for ~35-45 s per stretch including transition
+  const avgStretchBlock = 30 + (transitionDuration || 0); // 30 s stretch + transition
+
+  // Stretch count ranges per duration bucket
+  const stretchRangeMap: Record<number, { min: number; max: number }> = {
+    5: { min: 3, max: 4 },
+    10: { min: 6, max: 8 },
+    15: { min: 11, max: 15 }
+  };
+
+  const { min: minStretches, max: maxStretches } = stretchRangeMap[durationMinutes] || { min: 3, max: Math.max(4, Math.ceil(totalSeconds / avgStretchBlock)) };
+
+  console.log(`[DEBUG] Calculated maxStretches=${maxStretches}`);
+
+  // Filter logic for Dynamic Flow vs regular areas
+  let filteredStretches = stretches.filter(stretch => {
+    // Always filter by premium status and demo availability
+    const hasPremiumAccess = !stretch.premium || premiumUnlocked;
+    const hasDemo = stretch.hasDemo === true;
+    
+    // For Dynamic Flow, only include stretches with the Dynamic Flow tag
+    if (isDynamicFlow) {
+      return stretch.tags.includes('Dynamic Flow') && hasPremiumAccess && hasDemo;
+    }
+    
+    // For regular areas
+    return (stretch.tags.includes(area) || 
+           (area === 'Full Body' && stretch.tags.some(tag => tag !== 'Full Body'))) &&
+           hasPremiumAccess && hasDemo;
+  });
 
   // Debug logging
-  console.log(`[DEBUG] Generating routine for area: ${area}, level: ${level}, duration: ${duration}`);
+  console.log(`[DEBUG] Generating routine for area: ${area}, position: ${position}, duration: ${duration}`);
   console.log(`[DEBUG] Total stretches: ${stretches.length}`);
   console.log(`[DEBUG] Filtered by area, premium status, and demo availability: ${filteredStretches.length}`);
   console.log(`[DEBUG] Premium stretches unlocked: ${premiumUnlocked}`);
+  console.log(`[DEBUG] Dynamic Flow: ${isDynamicFlow}`);
+  console.log(`[DEBUG] Transition duration: ${transitionDuration || 0} seconds`);
   
-  const advancedCount = filteredStretches.filter(s => s.level === 'advanced').length;
-  const intermediateCount = filteredStretches.filter(s => s.level === 'intermediate').length;
-  const beginnerCount = filteredStretches.filter(s => s.level === 'beginner').length;
+  const standingCount = filteredStretches.filter(s => s.position === 'Standing').length;
+  const sittingCount = filteredStretches.filter(s => s.position === 'Sitting').length;
+  const lyingCount = filteredStretches.filter(s => s.position === 'Lying').length;
   
-  console.log(`[DEBUG] Available stretches by level - Advanced: ${advancedCount}, Intermediate: ${intermediateCount}, Beginner: ${beginnerCount}`);
+  console.log(`[DEBUG] Available stretches by position - Standing: ${standingCount}, Sitting: ${sittingCount}, Lying: ${lyingCount}`);
 
-  // Filter and mix stretches by level
-  let selectedStretches: Stretch[] = [];
-  
-  if (level === 'beginner') {
-    // Beginners only get beginner stretches
-    selectedStretches = filteredStretches.filter(stretch => stretch.level === 'beginner');
-    console.log(`[DEBUG] Selected ${selectedStretches.length} beginner stretches`);
-  } 
-  else if (level === 'intermediate') {
-    // Intermediates get mostly intermediate stretches with some beginner ones
-    const intermediateStretches = filteredStretches.filter(stretch => stretch.level === 'intermediate');
-    const beginnerStretches = filteredStretches.filter(stretch => stretch.level === 'beginner');
-    
-    // Aim for 70% intermediate, 30% beginner
-    const targetIntermediateCount = Math.ceil(maxStretches * 0.7);
-    const targetBeginnerCount = Math.floor(maxStretches * 0.3);
-    
-    console.log(`[DEBUG] Intermediate - Target: ${targetIntermediateCount}, Available: ${intermediateStretches.length}`);
-    console.log(`[DEBUG] Beginner - Target: ${targetBeginnerCount}, Available: ${beginnerStretches.length}`);
-    
-    // Shuffle and take the appropriate number from each level
-    selectedStretches = [
-      ...shuffleArray(intermediateStretches).slice(0, targetIntermediateCount),
-      ...shuffleArray(beginnerStretches).slice(0, targetBeginnerCount)
-    ];
-    
-    console.log(`[DEBUG] Selected ${selectedStretches.length} stretches for intermediate level`);
-  } 
-  else if (level === 'advanced') {
-    // Advanced users get a mix of all levels, with emphasis on advanced
-    const advancedStretches = filteredStretches.filter(stretch => stretch.level === 'advanced');
-    const intermediateStretches = filteredStretches.filter(stretch => stretch.level === 'intermediate');
-    const beginnerStretches = filteredStretches.filter(stretch => stretch.level === 'beginner');
-    
-    // FIXED: Prioritize advanced stretches - include ALL available advanced stretches first
-    // Then fill the remaining slots with intermediate and beginner
-    const availableAdvancedCount = advancedStretches.length;
-    
-    // Calculate how many more stretches we need after including all advanced
-    const remainingSlots = Math.max(0, maxStretches - availableAdvancedCount);
-    
-    // Distribute remaining slots: 70% intermediate, 30% beginner
-    const targetIntermediateCount = Math.ceil(remainingSlots * 0.7);
-    const targetBeginnerCount = Math.floor(remainingSlots * 0.3);
-    
-    console.log(`[DEBUG] Advanced - Available: ${availableAdvancedCount} (using all)`);
-    console.log(`[DEBUG] Remaining slots: ${remainingSlots}`);
-    console.log(`[DEBUG] Intermediate - Target: ${targetIntermediateCount}, Available: ${intermediateStretches.length}`);
-    console.log(`[DEBUG] Beginner - Target: ${targetBeginnerCount}, Available: ${beginnerStretches.length}`);
-    
-    // Include ALL advanced stretches first
-    const selectedAdvanced = shuffleArray(advancedStretches);
-    const selectedIntermediate = shuffleArray(intermediateStretches).slice(0, targetIntermediateCount);
-    const selectedBeginner = shuffleArray(beginnerStretches).slice(0, targetBeginnerCount);
-    
-    console.log(`[DEBUG] Selected - Advanced: ${selectedAdvanced.length}, Intermediate: ${selectedIntermediate.length}, Beginner: ${selectedBeginner.length}`);
-    
-    selectedStretches = [
-      ...selectedAdvanced,
-      ...selectedIntermediate,
-      ...selectedBeginner
-    ];
-    
-    console.log(`[DEBUG] Selected ${selectedStretches.length} stretches for advanced level`);
-  }
-
-  // Shuffle the selected stretches, but ensure advanced stretches are prioritized if level is advanced
-  if (level === 'advanced') {
-    // For advanced level, keep advanced stretches at the beginning to ensure they're included
-    const advancedStretches = selectedStretches.filter(s => s.level === 'advanced');
-    const otherStretches = selectedStretches.filter(s => s.level !== 'advanced');
-    
-    selectedStretches = [
-      ...shuffleArray(advancedStretches),
-      ...shuffleArray(otherStretches)
-    ];
+  // For Dynamic Flow, don't filter by position
+  let selectedStretches: Stretch[];
+  if (isDynamicFlow) {
+    selectedStretches = filteredStretches;
+    console.log(`[DEBUG] Dynamic Flow selected, using all ${selectedStretches.length} dynamic stretches`);
   } else {
-    selectedStretches = shuffleArray(selectedStretches);
+    // Filter stretches by requested positions for regular routines
+    selectedStretches = filteredStretches.filter(
+      stretch => requestedPositions.includes(stretch.position)
+    );
+    
+    console.log(`[DEBUG] Selected ${selectedStretches.length} stretches for positions: ${requestedPositions.join(', ')}`);
+    
+    // If we have fewer than 3 stretches, add more from other positions as fallback
+    if (selectedStretches.length < 3) {
+      console.log(`[DEBUG] Not enough stretches (${selectedStretches.length}) for the requested positions. Adding complementary stretches.`);
+      const needed = 3 - selectedStretches.length;
+      const otherStretches = shuffleArray(filteredStretches.filter(s => !requestedPositions.includes(s.position)));
+      const extras = otherStretches.slice(0, needed);
+      selectedStretches = [...selectedStretches, ...extras];
+      console.log(`[DEBUG] Added ${extras.length} complementary stretches from other positions to reach minimum count`);
+    }
   }
+
+  // Shuffle the selected stretches
+  selectedStretches = shuffleArray(selectedStretches).slice(0, maxStretches);
   
-  // Limit to max stretches
-  selectedStretches = selectedStretches.slice(0, maxStretches);
-  
-  console.log(`[DEBUG] After shuffle and limit: ${selectedStretches.length} stretches`);
-  console.log(`[DEBUG] Final stretch levels: ${selectedStretches.map(s => s.level).join(', ')}`);
+  console.log(`[DEBUG] After shuffling and limiting: ${selectedStretches.length} stretches`);
 
   // Build routine dynamically
-  let routine = [];
+  let routine: (Stretch | TransitionPeriod)[] = [];
   let totalDuration = 0;
-  
-  // FIXED: Prioritize advanced stretches in the routine
-  // Sort selectedStretches to put advanced ones first if level is advanced
-  if (level === 'advanced') {
-    selectedStretches.sort((a, b) => {
-      if (a.level === 'advanced' && b.level !== 'advanced') return -1;
-      if (a.level !== 'advanced' && b.level === 'advanced') return 1;
-      return 0;
+  let indexPtr = 0;
+
+  // Helper for adding a stretch and (optionally) a *following* transition period
+  const pushStretch = (stretch: Stretch) => {
+    const stretchTime = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
+
+    // Check if we have room for the stretch itself
+    if (totalDuration + stretchTime > totalSeconds) return false;
+
+    // Add the stretch first
+    routine.push({
+      ...stretch,
+      duration: stretchTime,
+      description: stretch.bilateral
+        ? (stretch.description.startsWith('Hold')
+            ? stretch.description
+            : `${stretch.description.split('Hold')[0].trim()} Hold for ${stretch.duration} seconds per side.`)
+        : stretch.description
     });
+    totalDuration += stretchTime;
+
+    // Decide whether to add a transition afterwards
+    if (transitionDuration && transitionDuration > 0) {
+      // Only add if we still have budget for it (leave 3-second buffer)
+      if (totalDuration + transitionDuration < totalSeconds - 3) {
+        routine.push({
+          id: `transition-${routine.length}`,
+          name: 'Transition',
+          description: 'Get ready for the next stretch',
+          duration: transitionDuration,
+          isTransition: true
+        } as TransitionPeriod);
+        totalDuration += transitionDuration;
+      }
+    }
+
+    return true;
+  };
+
+  // Repeat through list until we fill time or iterations exceed safe limit
+  const maxIterations = 50; // safety guard
+  let iterations = 0;
+  while (totalDuration < totalSeconds * 0.95 && iterations < maxIterations) {
+    const stretch = selectedStretches[indexPtr % selectedStretches.length];
+    // prevent immediate duplicate
+    if (routine.length > 0) {
+      const lastStretch = routine[routine.length - 1];
+      if (!('isTransition' in lastStretch) && (lastStretch as Stretch).id === stretch.id) {
+        // skip duplicate by moving pointer
+        indexPtr++;
+        iterations++;
+        continue;
+      }
+    }
+
+    if (!pushStretch(stretch)) break;
+
+    // Stop if we've reached the target stretch count (transitions not counted)
+    const stretchCount = routine.filter(item => !('isTransition' in item)).length;
+    if (stretchCount >= maxStretches) {
+      console.log(`[DEBUG] Reached max stretch count (${stretchCount}/${maxStretches}), stopping fill loop.`);
+      break;
+    }
+
+    indexPtr++;
+    iterations++;
   }
   
-  // First pass: add stretches until we reach the time limit
-  for (const stretch of selectedStretches) {
-    // Calculate stretch time (double for bilateral)
-    const stretchTime = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
-    
-    // Skip if adding this stretch exceeds total time
-    if (totalDuration + stretchTime > totalSeconds) continue;
-    
-    // Create the stretch entry
-    const stretchEntry = {
-      ...stretch,
-      duration: stretchTime, // Set total duration (doubled for bilateral)
-      description: stretch.bilateral 
-        ? (stretch.description.startsWith('Hold') 
-            ? stretch.description  // Keep original if starts with 'Hold'
-            : `${stretch.description.split('Hold')[0].trim()} Hold for ${stretch.duration} seconds per side.`)
-        : stretch.description // Keep original description for non-bilateral
-    };
+  // If we didn't reach the minimum stretch count, duplicate existing stretches (prioritising primary position) until we do.
+  let currentStretchCount = routine.filter(item => !('isTransition' in item)).length;
+  if (currentStretchCount < minStretches && selectedStretches.length > 0) {
+    console.log(`[DEBUG] Only ${currentStretchCount} stretches after fill, need at least ${minStretches}. Adding duplicates to meet minimum.`);
 
-    routine.push(stretchEntry);
-    totalDuration += stretchTime;
+    const primaryPoolDup = shuffleArray(selectedStretches);
+    let dupIndex = 0;
+    while (currentStretchCount < minStretches && dupIndex < primaryPoolDup.length) {
+      const stretch = primaryPoolDup[dupIndex];
+      if (pushStretch(stretch)) {
+        currentStretchCount++;
+      }
+      dupIndex++;
+    }
   }
   
   // If we couldn't add any stretches, add at least one
   if (routine.length === 0 && selectedStretches.length > 0) {
-    // For advanced level, prioritize adding an advanced stretch if available
+    // Prioritize adding a stretch in the requested position if available
     let stretchToAdd = selectedStretches[0];
     
-    if (level === 'advanced') {
-      const advancedStretch = selectedStretches.find(s => s.level === 'advanced');
-      if (advancedStretch) {
-        stretchToAdd = advancedStretch;
+    if (requestedPositions.length === 1) {
+      const preferredPositionStretch = selectedStretches.find(s => s.position === requestedPositions[0]);
+      if (preferredPositionStretch) {
+        stretchToAdd = preferredPositionStretch;
       }
     }
     
@@ -259,8 +327,24 @@ export const generateRoutine = async (
     routine.push(stretchEntry);
   }
   
+  // Remove trailing transition if routine ends with one (no following stretch)
+  if (routine.length > 0 && 'isTransition' in routine[routine.length - 1]) {
+    const lastTransition = routine.pop() as TransitionPeriod;
+    totalDuration -= lastTransition.duration;
+    console.log('[DEBUG] Removed trailing transition at end of routine');
+  }
+  
+  // FINAL SAFETY: strip any stretches whose position somehow slipped outside requestedPositions
+  // Only apply this filter for non-Dynamic Flow routines
+  if (!isDynamicFlow) {
+    routine = routine.filter(item => {
+      if ('isTransition' in item) return true;
+      return requestedPositions.includes((item as Stretch).position);
+    });
+  }
+  
   console.log(`[DEBUG] Final routine: ${routine.length} stretches, total duration: ${totalDuration}s`);
-  console.log(`[DEBUG] Routine levels: ${routine.map(s => s.level).join(', ')}`);
+  console.log(`[DEBUG] Routine positions: ${routine.filter(s => !('isTransition' in s)).map(s => (s as Stretch).position).join(', ')}`);
   console.log(`[DEBUG] Premium stretches in routine: ${routine.filter(s => (s as Stretch).premium).length}`);
 
   return routine;
@@ -338,6 +422,24 @@ const activityKeywords = [
   'gym', 'sports', 'practice',
   'bike', 'cycling', 'ride',
 ];
+
+// Position keywords - added to help parse user intent for position
+const positionKeywords: Record<string, Position> = {
+  'stand': 'Standing',
+  'standing': 'Standing',
+  'upright': 'Standing',
+  'sit': 'Sitting',
+  'sitting': 'Sitting',
+  'chair': 'Sitting',
+  'seated': 'Sitting',
+  'lie': 'Lying',
+  'lying': 'Lying',
+  'floor': 'Lying',
+  'mat': 'Lying',
+  'bed': 'Lying',
+  'ground': 'Lying',
+  'down': 'Lying'
+};
 
 export const parseUserInput = (input: string): SmartRoutineInput => {
   // Define keywords for different body areas with more synonyms and variations
@@ -527,21 +629,25 @@ export const parseUserInput = (input: string): SmartRoutineInput => {
   };
 
   // Specific contexts to help with disambiguating
-  const contextPatterns: { [key: string]: { area?: BodyArea, issue?: IssueType, activity?: string } } = {
+  const contextPatterns: { [key: string]: { area?: BodyArea, issue?: IssueType, activity?: string, position?: Position } } = {
     'hunched over': { area: 'Upper Back & Chest', issue: 'stiffness' },
     'slumped': { area: 'Upper Back & Chest', issue: 'stiffness' },
     'rounded shoulders': { area: 'Upper Back & Chest', issue: 'stiffness' },
     'text neck': { area: 'Neck', issue: 'stiffness' },
     'tech neck': { area: 'Neck', issue: 'stiffness' },
     'poor posture': { area: 'Upper Back & Chest', issue: 'stiffness' },
-    'desk job': { activity: 'desk work' },
-    'office work': { activity: 'desk work' },
+    'desk job': { activity: 'desk work', position: 'Sitting' },
+    'office work': { activity: 'desk work', position: 'Sitting' },
     'woke up': { issue: 'stiffness' },
     'morning': { issue: 'stiffness' },
-    'before bed': { issue: 'tiredness' },
+    'before bed': { issue: 'tiredness', position: 'Lying' },
     'quick stretch': { issue: 'flexibility' },
     'cool down': { issue: 'tiredness' },
     'warm up': { issue: 'flexibility' },
+    'at my desk': { position: 'Sitting' },
+    'on the floor': { position: 'Lying' },
+    'standing up': { position: 'Standing' },
+    'standing desk': { position: 'Standing' },
   };
 
   const lowercaseInput = input.toLowerCase();
@@ -573,6 +679,15 @@ export const parseUserInput = (input: string): SmartRoutineInput => {
       break;
     }
   }
+  
+  // Find preferred position
+  let parsedPosition: Position | null = null;
+  for (const [keyword, position] of Object.entries(positionKeywords)) {
+    if (lowercaseInput.includes(keyword)) {
+      parsedPosition = position;
+      break;
+    }
+  }
 
   // Check for specific context patterns
   for (const [pattern, context] of Object.entries(contextPatterns)) {
@@ -585,6 +700,9 @@ export const parseUserInput = (input: string): SmartRoutineInput => {
       }
       if (context.activity && !parsedActivity) {
         parsedActivity = context.activity;
+      }
+      if (context.position && !parsedPosition) {
+        parsedPosition = context.position;
       }
     }
   }
@@ -610,11 +728,26 @@ export const parseUserInput = (input: string): SmartRoutineInput => {
       parsedIssue = 'stiffness';
     }
   }
+  
+  // Default position based on activity or other clues
+  if (!parsedPosition) {
+    // If they mention desk work or sitting, default to sitting position
+    if (parsedActivity === 'desk work' || lowercaseInput.includes('desk') || 
+        lowercaseInput.includes('sitting') || lowercaseInput.includes('chair')) {
+      parsedPosition = 'Sitting';
+    } else if (parsedActivity === 'yoga' || lowercaseInput.includes('floor') || 
+               lowercaseInput.includes('mat') || lowercaseInput.includes('lying')) {
+      parsedPosition = 'Lying';
+    } else {
+      parsedPosition = 'Standing';
+    }
+  }
 
   console.log('Parsed results:', {
     parsedArea,
     parsedIssue,
-    parsedActivity
+    parsedActivity,
+    parsedPosition
   });
 
   return {
@@ -622,13 +755,15 @@ export const parseUserInput = (input: string): SmartRoutineInput => {
     parsedArea,
     parsedIssue,
     parsedActivity,
+    parsedPosition,
   };
 };
 
 export const generateRoutineConfig = (
   input: SmartRoutineInput,
   selectedIssue: IssueType,
-  selectedDuration: Duration
+  selectedDuration: Duration,
+  transitionDuration?: number
 ): SmartRoutineConfig => {
   // Determine body areas - ensure we're working with valid BodyArea types
   const areas: BodyArea[] = input.parsedArea && input.parsedArea.length > 0 ? 
@@ -636,54 +771,69 @@ export const generateRoutineConfig = (
   
   console.log('Generating routine for areas:', areas);
   
-  // Determine stretch level based on issue
-  let level: StretchLevel;
-  switch (selectedIssue) {
-    case 'pain':
-      level = 'beginner';
-      break;
-    case 'stiffness':
-      level = Math.random() > 0.5 ? 'beginner' : 'intermediate';
-      break;
-    case 'tiredness':
-      level = 'beginner';
-      break;
-    case 'flexibility':
-      level = Math.random() > 0.5 ? 'intermediate' : 'advanced';
-      break;
-    default:
-      level = 'beginner';
+  // Determine stretch position based on issue and input
+  let position: Position;
+  
+  // If the user specified a position in their input, use that
+  if (input.parsedPosition) {
+    position = input.parsedPosition;
+  } else if (selectedIssue === 'pain') {
+    // For pain, prefer sitting or lying positions
+    position = Math.random() > 0.5 ? 'Sitting' : 'Lying';
+  } else if (selectedIssue === 'stiffness') {
+    // For stiffness, prefer standing or sitting
+    position = Math.random() > 0.5 ? 'Standing' : 'Sitting';
+  } else if (selectedIssue === 'tiredness') {
+    // For tiredness, prefer lying positions
+    position = 'Lying';
+  } else {
+    // Default for flexibility or other issues
+    position = 'Standing';
   }
   
   // Determine if routine should be desk-friendly
   const isDeskFriendly = !input.parsedActivity;
   
-  console.log(`Generated config: level=${level}, duration=${selectedDuration}, desk-friendly=${isDeskFriendly}`);
+  console.log(`Generated config: position=${position}, duration=${selectedDuration}, desk-friendly=${isDeskFriendly}, transition=${transitionDuration || 0}s`);
   
   return {
     areas,
     duration: selectedDuration,
-    level,
+    position,
     issueType: selectedIssue,
     isDeskFriendly,
     postActivity: input.parsedActivity,
+    transitionDuration
   };
 };
 
 export const selectStretches = (
   config: SmartRoutineConfig,
   availableStretches: Stretch[],
-): Stretch[] => {
-  // Filter stretches by area, level, and demo availability
+): (Stretch | TransitionPeriod)[] => {
+  // Filter stretches by area and demo availability first
   let filtered = availableStretches.filter(stretch =>
     config.areas.some(area => stretch.tags.includes(area)) &&
-    stretch.level === config.level &&
     stretch.hasDemo === true // Only include stretches with demo videos
   );
   
-  // If no stretches match the criteria, fall back to any stretches for these areas
+  // Then filter by position if not set to "All"
+  if (config.position !== 'All') {
+    const positionFiltered = filtered.filter(stretch => stretch.position === config.position);
+
+    if (positionFiltered.length > 0) {
+      // Always use only the stretches that match the requested position.
+      filtered = positionFiltered;
+    } else {
+      // As an absolute fallback (no stretches with the requested position), keep previous filtered list
+      // but log the situation for debugging. This prevents the routine from being empty.
+      console.warn(`[WARN] No stretches found for position ${config.position}. Falling back to any position.`);
+    }
+  }
+  
+  // If no stretches match the criteria, fall back to any position for these areas
   if (filtered.length === 0) {
-    console.log('No stretches found for specific level, falling back to any level');
+    console.log('No stretches found for specific area and position combination, falling back to any position');
     filtered = availableStretches.filter(stretch =>
       config.areas.some(area => stretch.tags.includes(area)) &&
       stretch.hasDemo === true // Only include stretches with demo videos
@@ -716,8 +866,18 @@ export const selectStretches = (
     }
   }
   
+  // Prioritize stretches that match the requested position (if not "All")
+  if (config.position !== 'All') {
+    // Sort the filtered stretches so that the ones matching the requested position come first
+    filtered.sort((a, b) => {
+      if (a.position === config.position && b.position !== config.position) return -1;
+      if (a.position !== config.position && b.position === config.position) return 1;
+      return 0;
+    });
+  }
+  
   // Shuffle the filtered stretches
-  filtered.sort(() => Math.random() - 0.5);
+  filtered = shuffleArray(filtered);
   
   // Calculate target duration based on selected duration
   // Use the appropriate range: 5 mins (3-5 mins), 10 mins (6-10 mins), 15 mins (11-15 mins)
@@ -745,15 +905,29 @@ export const selectStretches = (
   }
   
   // Select stretches to fill the time
-  const selectedStretches: Stretch[] = [];
+  const selectedItems: (Stretch | TransitionPeriod)[] = [];
   let currentDuration = 0;
   
   // First pass: try to get at least to the minimum duration
   for (const stretch of filtered) {
     if (currentDuration >= minDuration) break;
     
+    // Add transition before the stretch if needed (except for the first stretch)
+    if (config.transitionDuration && config.transitionDuration > 0 && selectedItems.length > 0) {
+      const transition: TransitionPeriod = {
+        id: `transition-${selectedItems.length}`,
+        name: "Transition",
+        description: "Get ready for the next stretch",
+        duration: config.transitionDuration,
+        isTransition: true
+      };
+      
+      selectedItems.push(transition);
+      currentDuration += config.transitionDuration;
+    }
+    
     const stretchDuration = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
-    selectedStretches.push(stretch);
+    selectedItems.push(stretch);
     currentDuration += stretchDuration;
   }
   
@@ -761,13 +935,31 @@ export const selectStretches = (
   if (currentDuration < maxDuration) {
     for (const stretch of filtered) {
       // Skip stretches we've already added
-      if (selectedStretches.includes(stretch)) continue;
+      if (selectedItems.some(item => !('isTransition' in item) && (item as Stretch).id === stretch.id)) continue;
       
       const stretchDuration = stretch.bilateral ? stretch.duration * 2 : stretch.duration;
       
+      // Account for transition time if needed
+      const transitionTime = config.transitionDuration && config.transitionDuration > 0 ? config.transitionDuration : 0;
+      const totalTimeNeeded = stretchDuration + transitionTime;
+      
       // Only add if it doesn't push us far beyond the max duration
-      if (currentDuration + stretchDuration <= maxDuration * 1.1) {
-        selectedStretches.push(stretch);
+      if (currentDuration + totalTimeNeeded <= maxDuration * 1.1) {
+        // Add transition before the stretch
+        if (transitionTime > 0) {
+          const transition: TransitionPeriod = {
+            id: `transition-${selectedItems.length}`,
+            name: "Transition",
+            description: "Get ready for the next stretch",
+            duration: transitionTime,
+            isTransition: true
+          };
+          
+          selectedItems.push(transition);
+          currentDuration += transitionTime;
+        }
+        
+        selectedItems.push(stretch);
         currentDuration += stretchDuration;
       }
       
@@ -776,12 +968,15 @@ export const selectStretches = (
   }
   
   // Make sure we have at least one stretch
-  if (selectedStretches.length === 0 && filtered.length > 0) {
-    selectedStretches.push(filtered[0]);
+  if (selectedItems.filter(item => !('isTransition' in item)).length === 0 && filtered.length > 0) {
+    selectedItems.push(filtered[0]);
   }
   
-  console.log(`Selected ${selectedStretches.length} stretches for smart routine (${Math.round(currentDuration/60)} minutes)`);
-  return selectedStretches;
+  console.log(`Selected ${selectedItems.filter(item => !('isTransition' in item)).length} stretches for smart routine (${Math.round(currentDuration/60)} minutes)`);
+  console.log(`Selected positions: ${selectedItems.filter(item => !('isTransition' in item)).map(s => (s as Stretch).position).join(', ')}`);
+  console.log(`Added ${selectedItems.filter(item => 'isTransition' in item).length} transition periods (${config.transitionDuration || 0}s each)`);
+  
+  return selectedItems;
 };
 
 /**

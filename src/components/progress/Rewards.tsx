@@ -222,7 +222,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
       case 'premium_stretches':
         Alert.alert(
           'Premium VIP Stretches',
-          'You\'ve unlocked 15 premium VIP stretches! Would you like to view them now?',
+          'You\'ve unlocked 14 premium VIP stretches! Would you like to view them now?',
           [
             { text: 'Not Now', style: 'cancel' },
             { 
