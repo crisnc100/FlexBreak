@@ -448,6 +448,19 @@ const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean,
   const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
   const xpMultiplier = isActive ? data.multiplier : 1;
 
+  // Get all routines from today to check if this is the second one
+  const allRoutines = await cacheUtils.getCachedRoutines();
+  const routineDate = new Date(routine.date);
+  const routineDateString = dateUtils.toDateString(routineDate);
+  
+  const routinesOnSameDay = allRoutines.filter((r) => {
+    return dateUtils.toDateString(new Date(r.date)) === routineDateString;
+  });
+  
+  routinesOnSameDay.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const isSecondOfDay = routinesOnSameDay.length >= 2 && routinesOnSameDay[1].date === routine.date;
+  const isDailyLimitReached = routinesOnSameDay.length > 2 && !isFirstOfDay && !isSecondOfDay;
+
   if (isFirstOfDay) {
     const duration = parseInt(routine.duration, 10);
     let baseXp = duration <= 5 ? 30 : duration <= 10 ? 60 : 90;
@@ -460,7 +473,41 @@ const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean,
       description: `${duration}-Minute Routine${isActive ? ' (2x XP Boost)' : ''}` 
     });
     totalXp += baseXp;
-  } else {
+  } 
+  else if (isSecondOfDay) {
+    // Award same XP for second routine of the day
+    const duration = parseInt(routine.duration, 10);
+    let baseXp = duration <= 5 ? 30 : duration <= 10 ? 60 : 90;
+    const originalBaseXp = baseXp;
+    baseXp = Math.floor(baseXp * xpMultiplier);
+    
+    breakdown.push({ 
+      source: 'routine', 
+      amount: baseXp, 
+      description: `Second Routine Today${isActive ? ' (2x XP Boost)' : ''}` 
+    });
+    totalXp += baseXp;
+  }
+  else if (isDailyLimitReached) {
+    // Motivational messages for routines beyond the second
+    const motivationalMessages = [
+      "Keep stretching for better health!",
+      "Building healthy habits - nice work!",
+      "Way to stay consistent!",
+      "Your body thanks you for the extra care!",
+      "Extra stretching today - impressive!"
+    ];
+    
+    const randomIndex = Math.floor(Math.random() * motivationalMessages.length);
+    const message = motivationalMessages[randomIndex];
+    
+    breakdown.push({ 
+      source: 'routine', 
+      amount: 0, 
+      description: message
+    });
+  } 
+  else {
     breakdown.push({ 
       source: 'routine', 
       amount: 0, 

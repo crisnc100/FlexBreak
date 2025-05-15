@@ -20,6 +20,7 @@ import { SmartRoutineInput, IssueType, Duration, Stretch, Position, RestPeriod, 
 import allStretches from '../../data/stretches';
 import { useTheme } from '../../context/ThemeContext';
 import * as rewardManager from '../../utils/progress/modules/rewardManager';
+import { getTransitionDuration } from '../../services/storageService';
 
 interface SmartRoutineGeneratorProps {
   onRoutineGenerated: (
@@ -80,6 +81,22 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
       setSelectedPosition(parsedInput.parsedPosition);
     }
   }, [parsedInput]);
+
+  useEffect(() => {
+    // Use transition duration setting from storage
+    const loadTransitionDuration = async () => {
+      try {
+        const savedDuration = await getTransitionDuration();
+        setTransitionDuration(savedDuration);
+      } catch (error) {
+        console.error("Error loading transition duration:", error);
+        // Fallback to default
+        setTransitionDuration(5);
+      }
+    };
+    
+    loadTransitionDuration();
+  }, []);
 
   const checkPermissions = async () => {
     // We'll just set this to true to keep the UI clean
@@ -444,34 +461,6 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
               </View>
             </ScrollView>
 
-            <View style={styles.questionContainer}>
-              <View style={styles.questionNumberBadge}>
-                <Text style={styles.questionNumberText}>4</Text>
-              </View>
-              <Text style={[styles.label, { color: theme.text }]}>Transition time between stretches</Text>
-            </View>
-            
-            <View style={styles.transitionContainer}>
-              <Text style={[styles.transitionValue, { color: theme.text }]}>
-                {transitionDuration} seconds
-              </Text>
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={10}
-                step={1}
-                value={transitionDuration}
-                onValueChange={setTransitionDuration}
-                minimumTrackTintColor={theme.accent}
-                maximumTrackTintColor={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
-                thumbTintColor={theme.accent}
-              />
-              <View style={styles.sliderLabelsContainer}>
-                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>None</Text>
-                <Text style={[styles.sliderLabel, { color: theme.textSecondary }]}>10s</Text>
-              </View>
-            </View>
-
             <TouchableOpacity
               style={[
                 styles.generateButton, 
@@ -551,7 +540,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                   <View style={styles.summaryRow}>
                     <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Transitions:</Text>
                     <Text style={[styles.summaryValue, { color: theme.text }]}>
-                      {transitionDuration > 0 ? `${transitionDuration} seconds between stretches` : 'None'}
+                      {transitionDuration > 0 ? `${transitionDuration} seconds between stretches` : 'No transitions'}
                     </Text>
                   </View>
                 </View>
@@ -844,28 +833,6 @@ const styles = StyleSheet.create({
   },
   selectedPositionText: {
     color: '#fff',
-  },
-  transitionContainer: {
-    marginBottom: 24,
-    paddingHorizontal: 10,
-  },
-  transitionValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  sliderLabelsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: -5,
-  },
-  sliderLabel: {
-    fontSize: 12,
   },
 });
 

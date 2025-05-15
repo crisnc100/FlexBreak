@@ -1,15 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Theme } from '../../context/ThemeContext';
-import { BodyArea, Duration } from '../../types';
+import { useTheme } from '../../../context/ThemeContext';
+import { BodyArea, Duration } from '../../../types';
 
 type RoutineStatsProps = {
   area: BodyArea;
   duration: Duration;
   numStretches: number;
   showAnyLevelUp: boolean;
-  theme: Theme;
+  theme: any;
 };
 
 const RoutineStats: React.FC<RoutineStatsProps> = ({

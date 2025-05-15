@@ -313,18 +313,48 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               {transitionDuration === 0 ? 'No transitions' : `${transitionDuration} seconds between stretches`}
             </Text>
           </View>
-          <View style={styles.sliderContainer}>
-            {/* <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={10}
-              step={1}
-              value={transitionDuration}
-              onValueChange={handleTransitionDurationChange}
-              minimumTrackTintColor={theme.accent}
-              maximumTrackTintColor={theme.border}
-              thumbTintColor={theme.accent}
-            /> */}
+          <View style={styles.transitionOptionsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.transitionOption,
+                transitionDuration === 0 && styles.transitionOptionSelected,
+                { backgroundColor: transitionDuration === 0 ? theme.accent : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
+              ]}
+              onPress={() => handleTransitionDurationChange(0)}
+            >
+              <Text style={[
+                styles.transitionOptionText,
+                { color: transitionDuration === 0 ? '#fff' : theme.text }
+              ]}>Off</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.transitionOption,
+                transitionDuration === 5 && styles.transitionOptionSelected,
+                { backgroundColor: transitionDuration === 5 ? theme.accent : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
+              ]}
+              onPress={() => handleTransitionDurationChange(5)}
+            >
+              <Text style={[
+                styles.transitionOptionText,
+                { color: transitionDuration === 5 ? '#fff' : theme.text }
+              ]}>5s</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.transitionOption,
+                transitionDuration === 10 && styles.transitionOptionSelected,
+                { backgroundColor: transitionDuration === 10 ? theme.accent : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
+              ]}
+              onPress={() => handleTransitionDurationChange(10)}
+            >
+              <Text style={[
+                styles.transitionOptionText,
+                { color: transitionDuration === 10 ? '#fff' : theme.text }
+              ]}>10s</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -1616,13 +1646,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  sliderContainer: {
+  transitionOptionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
     width: '100%',
-    paddingHorizontal: 8,
   },
-  slider: {
-    width: '100%',
-    height: 40,
+  transitionOption: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 50,
+  },
+  transitionOptionSelected: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+  transitionOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
 

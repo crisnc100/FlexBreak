@@ -1,15 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { XpBreakdownItem, Achievement } from './types/completedRoutine.types';
-import { Theme } from '../../context/ThemeContext';
+import { XpBreakdownItem, Achievement } from '../../routine/types/completedRoutine.types';
+import { useTheme } from '../../../context/ThemeContext';
 
+// We need both the theme object and the isDark flag
 type XpBreakdownProps = {
   xpBreakdown: XpBreakdownItem[];
   unlockedAchievements: Achievement[];
   hasXpBoost: boolean;
   showAnyLevelUp: boolean;
-  theme: Theme;
+  theme: any;
+  isDark: boolean;
   animValues: {
     shineAnim: Animated.Value;
   };
@@ -21,6 +23,7 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
   hasXpBoost,
   showAnyLevelUp,
   theme,
+  isDark,
   animValues
 }) => {
   // Find achievement-related XP in breakdown
@@ -29,8 +32,24 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
     item.description.includes('Achievement')
   );
 
+  // Find motivational messages (zero XP with motivational content)
+  const isMotivationalMessage = (item: XpBreakdownItem): boolean => {
+    return item.amount === 0 && (
+      item.description.includes("Keep stretching") ||
+      item.description.includes("healthy habits") ||
+      item.description.includes("consistent") ||
+      item.description.includes("Your body thanks") ||
+      item.description.includes("Extra stretching")
+    );
+  };
+
   // Define a mapping of achievement sources to icon names
   const getIconForXpSource = (source: string, description: string): string => {
+    // Check for motivational messages
+    if (isMotivationalMessage({ source, amount: 0, description })) {
+      return 'heart-outline';
+    }
+    
     switch (source) {
       case 'achievement':
         return 'trophy-outline';
@@ -64,6 +83,9 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
     const isAchievement = item.source === 'achievement' || 
                           item.description.includes('Achievement');
     
+    // Check if this is a motivational message
+    const isMotivational = isMotivationalMessage(item);
+    
     return (
       <View key={`${item.source}-${index}`} style={[
         styles.xpBreakdownItem,
@@ -84,6 +106,16 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
           marginVertical: 2,
           borderLeftWidth: 2,
           borderLeftColor: '#3F51B5',
+          marginBottom: 4
+        },
+        // Add special styling for motivational messages
+        isMotivational && {
+          backgroundColor: 'rgba(76, 175, 80, 0.1)',
+          borderRadius: 6,
+          padding: 6,
+          marginVertical: 2,
+          borderLeftWidth: 2,
+          borderLeftColor: '#4CAF50',
           marginBottom: 4
         }
       ]}>
@@ -109,15 +141,27 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
           </View>
         )}
         
+        {/* Motivational badge for zero XP with motivational message */}
+        {isMotivational && (
+          <View style={[styles.achievementBadge, { backgroundColor: '#4CAF50' }]}>
+            <Ionicons 
+              name="heart" 
+              size={showAnyLevelUp ? 10 : 12} 
+              color="#FFFFFF" 
+            />
+          </View>
+        )}
+        
         <Ionicons 
           name={iconName as any} 
           size={showAnyLevelUp ? 14 : 16} 
           color={
-            item.amount > 0 
+            isMotivational ? "#4CAF50" :
+            (item.amount > 0 
               ? (isAchievement 
                   ? "#3F51B5" 
                   : (itemHasBoost ? "#FF8F00" : "#FF9800")) 
-              : theme.textSecondary
+              : theme.textSecondary)
           } 
         />
         <Text 
@@ -133,6 +177,11 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
             isAchievement && {
               color: '#3F51B5',
               fontWeight: 'bold'
+            },
+            isMotivational && {
+              color: '#4CAF50',
+              fontStyle: 'italic',
+              fontSize: 14
             }
           ]}
         >
@@ -147,10 +196,15 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
                 <Text style={[styles.originalXpText, { color: theme.textSecondary }]}> (was +{Math.floor(item.amount / 2)})</Text>
               )}
             </Text>
+          ) : isMotivational ? (
+            // For motivational messages, don't show the "+0 XP" text
+            <Text style={[styles.motivationalText]}>
+              {item.description}
+            </Text>
           ) : (
             <Text style={[styles.xpBreakdownZero, { color: theme.textSecondary }]}>+0 XP</Text>
           )}
-          {" "}{item.description.replace(' (2x XP Boost Applied)', '')}
+          {" "}{!isMotivational && item.description.replace(' (2x XP Boost Applied)', '')}
         </Text>
       </View>
     );
@@ -164,17 +218,17 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
       // Add a subtle border when XP boost is active for better light mode visibility
       hasXpBoost && {
         borderWidth: 1, 
-        borderColor: theme.isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.2)'
+        borderColor: isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.2)'
       }
     ]}>
       {hasXpBoost && (
         <View style={[styles.xpBoostHeader, {
-          backgroundColor: theme.isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 152, 0, 0.07)',
-          borderColor: theme.isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.15)'
+          backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 152, 0, 0.07)',
+          borderColor: isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.15)'
         }]}>
-          <Ionicons name="flash" size={16} color={theme.isDark ? "#FF8F00" : "#FF6F00"} />
+          <Ionicons name="flash" size={16} color={isDark ? "#FF8F00" : "#FF6F00"} />
           <Text style={[styles.xpBoostHeaderText, {
-            color: theme.isDark ? '#FF8F00' : '#FF6F00',
+            color: isDark ? '#FF8F00' : '#FF6F00',
             textShadowColor: 'transparent'
           }]}>XP BOOST</Text>
         </View>
@@ -183,13 +237,13 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
       {/* First show achievement XP at the top if any */}
       {(achievementXp.length > 0 || unlockedAchievements.length > 0) && (
         <View style={[styles.achievementSection, {
-          backgroundColor: theme.isDark ? 'rgba(121, 134, 203, 0.05)' : 'rgba(63, 81, 181, 0.04)',
-          borderColor: theme.isDark ? 'rgba(121, 134, 203, 0.2)' : 'rgba(63, 81, 181, 0.1)'
+          backgroundColor: isDark ? 'rgba(121, 134, 203, 0.05)' : 'rgba(63, 81, 181, 0.04)',
+          borderColor: isDark ? 'rgba(121, 134, 203, 0.2)' : 'rgba(63, 81, 181, 0.1)'
         }]}>
           <Text style={[styles.achievementSectionTitle, {
-            color: theme.isDark ? '#3F51B5' : '#303F9F'
+            color: isDark ? '#3F51B5' : '#303F9F'
           }]}>
-            <Ionicons name="trophy" size={16} color={theme.isDark ? "#3F51B5" : "#303F9F"} /> Achievement Bonus XP
+            <Ionicons name="trophy" size={16} color={isDark ? "#3F51B5" : "#303F9F"} /> Achievement Bonus XP
           </Text>
           
           {/* Show unlocked achievements first */}
@@ -197,29 +251,29 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
             <View key={`unlocked-${achievement.id}`} style={[
               styles.xpBreakdownItem,
               {
-                backgroundColor: theme.isDark ? 'rgba(121, 134, 203, 0.1)' : 'rgba(63, 81, 181, 0.06)',
+                backgroundColor: isDark ? 'rgba(121, 134, 203, 0.1)' : 'rgba(63, 81, 181, 0.06)',
                 borderRadius: 6,
                 padding: 6,
                 marginVertical: 2,
                 borderLeftWidth: 2,
-                borderLeftColor: theme.isDark ? '#3F51B5' : '#303F9F',
+                borderLeftColor: isDark ? '#3F51B5' : '#303F9F',
                 marginBottom: 4
               }
             ]}>
               <View style={[styles.achievementBadge, {
-                backgroundColor: theme.isDark ? '#3F51B5' : '#303F9F'
+                backgroundColor: isDark ? '#3F51B5' : '#303F9F'
               }]}>
                 <Ionicons name="trophy" size={showAnyLevelUp ? 10 : 12} color="#FFFFFF" />
               </View>
               <Ionicons 
                 name={(achievement.icon as any) || "trophy-outline"} 
                 size={showAnyLevelUp ? 14 : 16} 
-                color={theme.isDark ? "#3F51B5" : "#303F9F"} 
+                color={isDark ? "#3F51B5" : "#303F9F"} 
               />
               <Text style={{
                 fontSize: 13,
                 fontWeight: 'bold',
-                color: theme.isDark ? '#3F51B5' : '#303F9F',
+                color: isDark ? '#3F51B5' : '#303F9F',
               }}>
                 <Text style={styles.achievementXpValue}>+{achievement.xp} XP</Text>
                 {" "}{achievement.title}
@@ -282,6 +336,11 @@ const styles = StyleSheet.create({
   originalXpText: {
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  motivationalText: {
+    fontStyle: 'italic',
+    color: '#4CAF50',
+    fontWeight: '500',
   },
   xpBoostHeader: {
     flexDirection: 'row',

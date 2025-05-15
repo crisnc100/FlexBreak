@@ -271,6 +271,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
             hasXpBoost={hasXpBoost}
             showAnyLevelUp={showAnyLevelUp}
             theme={theme}
+            isDark={isDark}
             animValues={{ shineAnim }}
           />
         ) : (

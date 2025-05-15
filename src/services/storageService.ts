@@ -665,20 +665,32 @@ export const getDashboardFlag = async (): Promise<boolean> => {
 };
 
 /**
- * Save transition duration setting
- * @param duration Duration in seconds (0-10)
- * @returns Success boolean
+ * Save transition duration preference
  */
 export const saveTransitionDuration = async (duration: number): Promise<boolean> => {
-  return setData(KEYS.SETTINGS.TRANSITION_DURATION, duration);
+  try {
+    await AsyncStorage.setItem('@transition_duration', duration.toString());
+    return true;
+  } catch (error) {
+    console.error('Failed to save transition duration', error);
+    return false;
+  }
 };
 
 /**
- * Get transition duration setting
- * @returns Duration in seconds, defaults to 5
+ * Get saved transition duration preference, defaults to 5 seconds
  */
 export const getTransitionDuration = async (): Promise<number> => {
-  return getData(KEYS.SETTINGS.TRANSITION_DURATION, 5);
+  try {
+    const value = await AsyncStorage.getItem('@transition_duration');
+    if (value !== null) {
+      return parseInt(value, 10);
+    }
+    return 5; // Default to 5 seconds
+  } catch (error) {
+    console.error('Failed to get transition duration', error);
+    return 5; // Default to 5 seconds on error too
+  }
 };
 
 // ========== DATA MANAGEMENT METHODS ==========
