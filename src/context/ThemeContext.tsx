@@ -3,6 +3,7 @@ import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PremiumContext } from './PremiumContext';
 import * as storageService from '../services/storageService';
+import * as featureAccessUtils from '../utils/featureAccessUtils';
 
 // Define theme types
 export type ThemeType = 'light' | 'dark' | 'system';
@@ -123,28 +124,43 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Check if user can access dark theme based on premium status and level
   const checkDarkThemeAccess = async () => {
     try {
-      // Get user progress to check level and rewards
-      const userProgress = await storageService.getUserProgress();
+      // First check if user is premium - required for dark theme
+      const isPremiumUser = await storageService.getIsPremium();
       
-      // Default to false
-      let hasAccess = false;
-      
-      // Check if user is at least level 2
-      if (userProgress.level >= 2) {
-        hasAccess = true;
-        console.log('User meets level requirement (level 2+) for dark theme');
+      // If not premium, immediately deny access and revert to light theme if needed
+      if (!isPremiumUser) {
+        console.log('User is not premium, denying dark theme access');
+        setCanUseDarkTheme(false);
+        
+        // If currently using dark theme, revert to light
+        if (themeType === 'dark') {
+          console.log('Reverting from dark to light theme due to premium status change');
+          await saveThemePreference('light');
+          setThemeType('light');
+        }
+        
+        // Update the last check timestamp
+        const now = Date.now();
+        await AsyncStorage.setItem(LAST_THEME_CHECK_KEY, now.toString());
+        setLastThemeCheck(now);
+        
+        return false;
       }
       
-      // Also check if the dark_theme reward is explicitly unlocked
-      if (userProgress.rewards && userProgress.rewards.dark_theme) {
-        hasAccess = hasAccess || userProgress.rewards.dark_theme.unlocked;
-        console.log(`Dark theme reward unlocked? ${userProgress.rewards.dark_theme.unlocked}`);
+      // If premium, check level requirements
+      const hasFeatureAccess = await featureAccessUtils.canAccessFeature('dark_theme');
+      
+      // For more detailed logging, also check the level requirement directly
+      const meetsLevel = await featureAccessUtils.meetsLevelRequirement('dark_theme');
+      if (meetsLevel) {
+        console.log('User meets level requirement for dark theme');
       }
       
-      setCanUseDarkTheme(hasAccess);
+      setCanUseDarkTheme(hasFeatureAccess);
       
       // If user can't use dark theme but currently has it set, revert to light
-      if (!hasAccess && themeType === 'dark') {
+      if (!hasFeatureAccess && themeType === 'dark') {
+        console.log('User lost dark theme access, reverting to light theme');
         await saveThemePreference('light');
         setThemeType('light');
       }
@@ -154,7 +170,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await AsyncStorage.setItem(LAST_THEME_CHECK_KEY, now.toString());
       setLastThemeCheck(now);
       
-      return hasAccess;
+      return hasFeatureAccess;
     } catch (error) {
       console.error('Error checking dark theme access:', error);
       return false;
@@ -163,6 +179,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Effect to check access on premium status change
   useEffect(() => {
+    console.log(`Premium status changed to: ${isPremium}, checking dark theme access`);
     checkDarkThemeAccess();
   }, [isPremium]);
   

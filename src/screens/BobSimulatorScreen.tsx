@@ -57,12 +57,12 @@ const DURATIONS = [5, 10, 15];
 // Valid body areas and durations (matching app types)
 const BODY_AREAS = ['Neck', 'Lower Back', 'Upper Back & Chest', 'Shoulders & Arms', 'Hips & Legs', 'Full Body'];
 const DURATION_TYPES = ['5', '10', '15'];
-const DIFFICULTY_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 
 // Define the StretchConfig and SimulationResult types since we're not exporting them anymore
 interface StretchConfig {
   bodyArea: string;
-  difficulty: string;
+  position?: string;
+  difficulty?: string;
   duration: number;
 }
 
@@ -85,8 +85,9 @@ interface SimulationResult {
 const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any }) => {
   const { theme, isDark } = useTheme();
   
-  // Check if coming from testing flow
+  // Check if coming from testing flow or settings
   const fromTesting = route.params?.fromTesting === true;
+  const fromSettings = route.params?.fromSettings === true;
   const testingAccessGranted = route.params?.testingAccessGranted === true;
   const returnToTesting = route.params?.returnToTesting === true;
   
@@ -101,9 +102,13 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     verification: string[];
   } | null>(null);
   
-  // Authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState(fromTesting && testingAccessGranted);
-  const [showAuthModal, setShowAuthModal] = useState(!fromTesting || !testingAccessGranted);
+  // Authentication state - always authenticated when coming from settings
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    (fromTesting && testingAccessGranted) || fromSettings
+  );
+  const [showAuthModal, setShowAuthModal] = useState(
+    !((fromTesting && testingAccessGranted) || fromSettings)
+  );
   
   // Add new state variables for improved simulation
   const [lastBatchEndDate, setLastBatchEndDate] = useState<Date | null>(null);
@@ -203,7 +208,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   useEffect(() => {
     if (isAuthenticated && !isInitialized) {
       logWithTimestamp('Authentication confirmed, initializing Bob');
-    initializeBob();
+      initializeBob();
     }
   }, [isAuthenticated, isInitialized]);
   
@@ -346,6 +351,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       logWithTimestamp(`Error initializing Bob: ${error}`);
       console.error('Error initializing Bob:', error);
       Alert.alert('Error', 'Failed to initialize simulation');
+      
+      // Reset initialized state to allow retry
+      setIsInitialized(false);
     } finally {
       logWithTimestamp('Setting isLoading to false after initialization');
       setIsLoading(false);
@@ -1317,8 +1325,13 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   
   // Add a special check to log navigation params for debugging
   useEffect(() => {
-    logWithTimestamp(`Bob Simulator screen mounted, from testing: ${fromTesting}`);
+    logWithTimestamp(`Bob Simulator screen mounted, from testing: ${fromTesting}, from settings: ${fromSettings}`);
     logWithTimestamp(`Navigation params: ${JSON.stringify(route?.params)}`);
+    
+    // Reset initialization state when screen is mounted to ensure proper setup
+    if (fromSettings) {
+      setIsInitialized(false);
+    }
     
     return () => {
       logWithTimestamp('Bob Simulator screen unmounting');
@@ -1360,7 +1373,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         <View style={styles.headerLeft}>
           <TouchableOpacity 
             onPress={() => {
-              console.log("[BobSimulator] Back button pressed, fromTesting:", fromTesting);
+              console.log("[BobSimulator] Back button pressed, fromTesting:", fromTesting, "fromSettings:", fromSettings);
               // If returning to testing, use a custom navigation reset to restore stack
               if (fromTesting || returnToTesting) {
                 console.log("[BobSimulator] Returning to Testing flow");
@@ -1388,6 +1401,15 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
                   .catch(error => {
                     console.error('Error preserving testing access:', error);
                   });
+              } else if (fromSettings) {
+                // When coming from settings, reset to MainTabs
+                console.log("[BobSimulator] Returning to MainTabs from settings");
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'MainTabs' }],
+                  })
+                );
               } else {
                 // Regular back navigation for non-testing flow
                 navigation.goBack();

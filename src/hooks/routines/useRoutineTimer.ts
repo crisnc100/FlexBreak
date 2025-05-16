@@ -31,6 +31,7 @@ export function useRoutineTimer({
   const [timeRemaining, setTimeRemaining] = useState(initialDuration);
   const [isPaused, setIsPaused] = useState(true);
   const [totalDuration, setTotalDuration] = useState(initialDuration);
+  const totalDurationRef = useRef(initialDuration);
   
   // Refs
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -76,6 +77,7 @@ export function useRoutineTimer({
     const newDuration = duration !== undefined ? duration : initialDuration;
     setTimeRemaining(newDuration);
     setTotalDuration(newDuration);
+    totalDurationRef.current = newDuration;
     setIsPaused(false);
     isPausedRef.current = false;
     
@@ -122,7 +124,7 @@ export function useRoutineTimer({
         }
         
         // Update the progress animation value directly
-        const currentProgress = newTime / totalDuration;
+        const currentProgress = newTime / totalDurationRef.current;
         progressAnim.setValue(currentProgress);
         
         // Schedule the next tick - use a shorter interval for smoother updates
@@ -154,7 +156,7 @@ export function useRoutineTimer({
       isPausedRef.current = false;
       
       // Make sure the progress animation value is correct
-      const currentProgress = timeRemaining / totalDuration;
+      const currentProgress = timeRemaining / totalDurationRef.current;
       progressAnim.setValue(currentProgress);
       
       // Start the timer with fresh timestamp
@@ -182,6 +184,7 @@ export function useRoutineTimer({
     const duration = newDuration !== undefined ? newDuration : initialDuration;
     setTimeRemaining(duration);
     setTotalDuration(duration);
+    totalDurationRef.current = duration;
     setIsPaused(true);
     isPausedRef.current = true;
     

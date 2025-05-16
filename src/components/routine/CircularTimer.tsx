@@ -46,7 +46,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
       Animated.sequence([
         Animated.parallel([
           Animated.timing(textOpacity, {
-            toValue: 0.3,
+            toValue: 0.8,
             duration: 100,
             useNativeDriver: true,
             easing: Easing.out(Easing.ease)
@@ -122,7 +122,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
           style={[
             styles.circularTimerText,
             {
-              color: isDark ? 'white' : textColor,
+              color: isDark ? '#FFFFFF' : textColor,
               opacity: textOpacity,
               transform: [{ scale: textScale }]
             }
@@ -130,7 +130,9 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         >
           {formatTime(timeRemaining)}
         </Animated.Text>
-        <Text style={[styles.circularTimerLabel, { color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }]}>sec</Text>
+        <Text style={[styles.circularTimerLabel, { color: isDark ? '#FFFFFF' : textColor }]}>
+          sec
+        </Text>
       </View>
     </View>
   );

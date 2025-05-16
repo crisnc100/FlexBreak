@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { clearAllData, clearAllPremiumStatus, saveTransitionDuration, getTransitionDuration } from '../services/storageService';
+import { clearAllData, clearAllPremiumStatus, saveTransitionDuration, getTransitionDuration, saveIsPremium } from '../services/storageService';
 import { resetSimulationData } from '../services/storageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import DiagnosticsScreen from './DiagnosticsScreen';
 import { ThemeType, useTheme } from '../context/ThemeContext';
@@ -15,7 +16,9 @@ import { ThemedText, ThemedCard } from '../components/common';
 import { Toast } from 'react-native-toast-notifications';
 import FitnessDisclaimer from '../components/notices/FitnessDisclaimer';
 import NonMedicalNotice from '../components/notices/NonMedicalNotice';
-import { TestingModal } from '../components/testing';
+import { BobSimulatorAccessModal } from '../components/testing';
+import * as soundEffects from '../utils/soundEffects';
+import * as storageService from '../services/storageService';
 
 const { width } = Dimensions.get('window');
 
@@ -72,14 +75,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const { isLoading, level } = useGamification();
   const { canAccessFeature, getRequiredLevel, meetsLevelRequirement } = useFeatureAccess();
   const [showTestingSection, setShowTestingSection] = useState(false);
-  const [isRunningSimulation, setIsRunningSimulation] = useState(false);
-  const [testResults, setTestResults] = useState<string[]>([]);
+  const [bobSimulatorModalVisible, setBobSimulatorModalVisible] = useState(false);
   const hasSeenDarkModeUnlock = useRef(false);
   const appVersion = "1.0.0";
   const [fitnessDisclaimerModalVisible, setFitnessDisclaimerModalVisible] = useState(false);
   const [nonMedicalNoticeModalVisible, setNonMedicalNoticeModalVisible] = useState(false);
-  const [testingModalVisible, setTestingModalVisible] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(5);
+  const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(true);
   
   // Load transition duration on mount
   useEffect(() => {
@@ -90,6 +92,20 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     loadTransitionDuration();
   }, []);
 
+  // Load sound effects setting on mount
+  useEffect(() => {
+    const loadSoundEffectsSetting = () => {
+      setSoundEffectsEnabled(soundEffects.isSoundEnabled());
+    };
+    loadSoundEffectsSetting();
+  }, []);
+
+  // Handle sound effects toggle
+  const handleToggleSoundEffects = async (value: boolean) => {
+    setSoundEffectsEnabled(value);
+    await soundEffects.setSoundEnabled(value);
+  };
+  
   // Handle transition duration change
   const handleTransitionDurationChange = async (value: number) => {
     const roundedValue = Math.round(value);
@@ -178,6 +194,29 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             Alert.alert('Success', 'Premium status has been cleared. Please restart the app for changes to take effect.');
           } else {
             Alert.alert('Error', 'Failed to clear premium status');
+          }
+        }}
+      ]
+    );
+  };
+
+  // Handle grant premium status
+  const handleGrantPremiumStatus = async () => {
+    Alert.alert(
+      'Grant Premium Status',
+      'This will enable premium features for testing purposes. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Grant Premium', style: 'default', onPress: async () => {
+          try {
+            // Save premium status in multiple places to ensure it works
+            await storageService.saveIsPremium(true);
+            await AsyncStorage.setItem('@flexbreak:testing_premium_access', 'true');
+            
+            Alert.alert('Success', 'Premium status has been granted. Please restart the app for changes to take effect.');
+          } catch (error) {
+            console.error('Error granting premium status:', error);
+            Alert.alert('Error', 'Failed to grant premium status');
           }
         }}
       ]
@@ -356,6 +395,25 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               ]}>10s</Text>
             </TouchableOpacity>
           </View>
+        </View>
+        
+        {/* Sound Effects Toggle */}
+        <View style={styles.settingRow}>
+          <View style={styles.settingLabelContainer}>
+            <Text style={[styles.settingLabel, { color: theme.text }]}>
+              Sound Effects
+            </Text>
+            <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
+              Enable click sounds, timer ticks, and other effects
+            </Text>
+          </View>
+          <Switch
+            value={soundEffectsEnabled}
+            onValueChange={handleToggleSoundEffects}
+            trackColor={{ false: '#767577', true: isDark ? theme.accent + '80' : theme.accent + '50' }}
+            thumbColor={soundEffectsEnabled ? theme.accent : '#f4f3f4'}
+            ios_backgroundColor="#3e3e3e"
+          />
         </View>
       </View>
     );
@@ -708,49 +766,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleClearPremiumStatus}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FEEBEF'}]}>
-                  <Ionicons name="star-outline" size={22} color="#F4A261" />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Clear Premium Status</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Remove premium subscription (for testing)</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.settingItem, styles.lastItem]}
-              onPress={handleResetSimulationData}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
-                  <Ionicons name="trash-outline" size={22} color="#F44336" />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset Simulation Data</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all simulation data only (for testers)</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleResetData}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
-                  <Ionicons name="trash-outline" size={22} color="#F44336" />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
           </View>
         )}
         
@@ -775,58 +790,87 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                   styles.testingButton,
                   {backgroundColor: '#4A90E2', marginTop: 16}
                 ]}
-                onPress={() => setTestingModalVisible(true)}
+                onPress={() => setBobSimulatorModalVisible(true)}
               >
-                <Ionicons name="clipboard-outline" size={20} color="#FFF" style={styles.buttonIcon} />
-                <Text style={styles.buttonText}>Access Testing Suite</Text>
+                <Ionicons name="flask-outline" size={20} color="#FFF" style={styles.buttonIcon} />
+                <Text style={styles.buttonText}>Access Bob Simulator</Text>
               </TouchableOpacity>
               
               <Text style={[styles.testDescription, {color: theme.textSecondary}]}>
-                Complete guided testing for core app features and provide structured feedback.
+                Simulate user progress and test features with the Bob Simulator tool.
               </Text>
+              
+              {/* Premium Status Management */}
+              <View style={[styles.premiumStatusContainer, {marginTop: 16, marginBottom: 8}]}>
+                <Text style={[styles.settingTitle, {color: theme.text, marginBottom: 8}]}>Premium Status Management</Text>
+                <Text style={[styles.settingDescription, {color: theme.textSecondary, marginBottom: 12}]}>
+                  Control premium status for testing subscription features
+                </Text>
+                
+                <View style={styles.premiumButtonsRow}>
+                  {/* Grant Premium Status */}
+                  <TouchableOpacity 
+                    style={[
+                      styles.premiumButton,
+                      {backgroundColor: isDark ? '#3D5A3D' : '#E8F5E9'},
+                      isPremium && {opacity: 0.5}
+                    ]}
+                    onPress={handleGrantPremiumStatus}
+                    disabled={isPremium}
+                  >
+                    <Ionicons name="star" size={18} color={isDark ? '#81C784' : '#4CAF50'} style={styles.premiumButtonIcon} />
+                    <Text style={[styles.premiumButtonText, {color: isDark ? '#81C784' : '#4CAF50'}]}>
+                      Grant Premium
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {/* Clear Premium Status */}
+                  <TouchableOpacity 
+                    style={[
+                      styles.premiumButton,
+                      {backgroundColor: isDark ? '#5D3A3A' : '#FFEBEE'},
+                      !isPremium && {opacity: 0.5}
+                    ]}
+                    onPress={handleClearPremiumStatus}
+                    disabled={!isPremium}
+                  >
+                    <Ionicons name="close-circle" size={18} color={isDark ? '#EF9A9A' : '#F44336'} style={styles.premiumButtonIcon} />
+                    <Text style={[styles.premiumButtonText, {color: isDark ? '#EF9A9A' : '#F44336'}]}>
+                      Clear Premium
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
               <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleClearPremiumStatus}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FEEBEF'}]}>
-                  <Ionicons name="star-outline" size={22} color="#F4A261" />
+                style={[styles.settingItem, styles.lastItem]}
+                onPress={handleResetSimulationData}
+              >
+                <View style={styles.settingContent}>
+                  <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                    <Ionicons name="trash-outline" size={22} color="#F44336" />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={[styles.settingTitle, {color: theme.text}]}>Reset Simulation Data</Text>
+                    <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all simulation data only (for testers)</Text>
+                  </View>
                 </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Clear Premium Status</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Remove premium subscription (for testing)</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.settingItem}
+                onPress={handleResetData}
+              >
+                <View style={styles.settingContent}>
+                  <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                    <Ionicons name="trash-outline" size={22} color="#F44336" />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
+                    <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.settingItem, styles.lastItem]}
-              onPress={handleResetSimulationData}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
-                  <Ionicons name="trash-outline" size={22} color="#F44336" />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset Simulation Data</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all simulation data only (for testers)</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleResetData}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
-                  <Ionicons name="trash-outline" size={22} color="#F44336" />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -1043,7 +1087,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
       <SubscriptionModal
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
-        onSubscribe={handleSubscriptionComplete}
       />
       
       {/* Fitness Disclaimer Modal */}
@@ -1060,10 +1103,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         onAcknowledge={() => setNonMedicalNoticeModalVisible(false)}
       />
       
-      {/* Testing Modal */}
-      <TestingModal
-        visible={testingModalVisible}
-        onClose={() => setTestingModalVisible(false)}
+      {/* Bob Simulator Access Modal */}
+      <BobSimulatorAccessModal
+        visible={bobSimulatorModalVisible}
+        onClose={() => setBobSimulatorModalVisible(false)}
       />
       
     </SafeAreaView>
@@ -1672,6 +1715,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  premiumStatusContainer: {
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 8,
+  },
+  premiumButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  premiumButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  premiumButtonIcon: {
+    marginRight: 6,
+  },
+  premiumButtonText: {
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 

@@ -791,7 +791,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               <Ionicons name="shield-checkmark" size={40} color="#FFFFFF" />
               <Text style={styles.successTitle}>Streak Saved!</Text>
               <Text style={styles.successMessage}>
-                Your {streakData.currentStreak}-day streak is preserved. Complete a routine today to continue your streak!
+                Your streak is preserved. Complete a routine today to continue your streak!
               </Text>
             </LinearGradient>
           </Animated.View>

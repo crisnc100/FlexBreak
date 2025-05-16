@@ -65,7 +65,7 @@ const PremiumTeaser: React.FC<PremiumTeaserProps> = ({
         }
       ]}>
         <Ionicons 
-          name={getIcon()} 
+          name={getIcon() as any} 
           size={48} 
           color={isPremium ? theme.accent : isDark ? theme.textSecondary : '#aaa'} 
         />

@@ -2,13 +2,10 @@ import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types
-type SoundEffect = 'success' | 'failure' | 'start' | 'complete' | 'levelUp' | 'click' | 'timerTick' | 'streakFreeze' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 'transition1' | 'transition2';
+type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'streakFreeze' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 'transition1' | 'transition2' | 'halfway';
 
 // Define the cache to store loaded sounds
 const soundCache: Record<SoundEffect, Audio.Sound | null> = {
-  success: null,
-  failure: null,
-  start: null,
   complete: null,
   levelUp: null,
   click: null,
@@ -21,14 +18,12 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   timerTheme2: null,
   timerTheme1: null,
   transition1: null,
-  transition2: null
+  transition2: null,
+  halfway: null
 };
 
 // Add debounce tracking for sounds that are frequently played
 const soundDebounceMap: Record<SoundEffect, number> = {
-  success: 0,
-  failure: 0,
-  start: 0,
   complete: 0,
   levelUp: 0,
   click: 0,
@@ -41,7 +36,8 @@ const soundDebounceMap: Record<SoundEffect, number> = {
   timerTheme2: 0,
   timerTheme1: 0,
   transition1: 0,
-  transition2: 0
+  transition2: 0,
+  halfway: 0
 };
 
 // Minimum time between playing the same sound (in milliseconds)
@@ -59,9 +55,6 @@ let soundEnabled = true;
 
 // Map sound types to their URIs
 const soundUris: Record<SoundEffect, any> = {
-  success: require('../../assets/sounds/routineCompletion.mp3'),
-  failure: require('../../assets/sounds/normalClick.mp3'),
-  start: require('../../assets/sounds/intro2.mp3'),
   complete: require('../../assets/sounds/routineCompletion.mp3'),
   levelUp: require('../../assets/sounds/levelUP.mp3'),
   click: require('../../assets/sounds/normalClick.mp3'),
@@ -74,7 +67,8 @@ const soundUris: Record<SoundEffect, any> = {
   timerTheme2: require('../../assets/sounds/timerTheme2.mp3'),
   timerTheme1: require('../../assets/sounds/timerTheme1.mp3'),
   transition1: require('../../assets/sounds/transition1.mp3'),
-  transition2: require('../../assets/sounds/transition2.mp3')
+  transition2: require('../../assets/sounds/transition2.mp3'),
+  halfway: require('../../assets/sounds/unlockedPremium.mp3')
 };
 
 /**
@@ -217,19 +211,13 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
  */
 export const playClickSound = async (): Promise<void> => {
   try {
-    await playSound('click', 0.5);
+    await playSound('click', 0.3);
   } catch (error) {
     // Silently ignore errors for click sounds to prevent crashes
     console.warn('Click sound error suppressed:', error);
   }
 };
 
-/**
- * Play success sound - for completing tasks
- */
-export const playSuccessSound = async (): Promise<void> => {
-  await playSound('success');
-};
 
 /**
  * Play completion sound - for completing a routine
@@ -239,12 +227,6 @@ export const playCompletionSound = async (): Promise<void> => {
 };
 
 /**
- * Play start sound - when starting a routine
- */
-export const playStartSound = async (): Promise<void> => {
-  await playSound('start');
-};
-
 /**
  * Play level up sound - when user levels up
  */
@@ -299,6 +281,13 @@ export const playXpBoostSound = async (): Promise<void> => {
  */
 export const playIntroSound = async (): Promise<void> => {
   await playSound('intro');
+};
+
+/**
+ * Play halfway sound
+ */
+export const playHalfwaySound = async (): Promise<void> => {
+  await playSound('halfway', 0.5);
 };
 
 /**

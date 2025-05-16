@@ -667,8 +667,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             diameter={125}
             strokeWidth={8}
             color={isDark ? theme.accent : '#4CAF50'}
-            backgroundColor={isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'}
-            textColor="#000"
+            backgroundColor={isDark ? 'rgb(255, 255, 255)' : '#E0E0E0'}
+            textColor={isDark ? theme.text : '#000'}
             isDark={isDark}
           />
         </View>
