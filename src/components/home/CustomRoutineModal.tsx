@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { BodyArea, Duration, RoutineParams, Stretch, CustomRestPeriod } from '../../types';
+import { BodyArea, Duration, RoutineParams, Stretch, CustomRestPeriod, RestPeriod, TransitionPeriod } from '../../types';
 import { 
   saveFavoriteRoutine, 
   saveCustomRoutine as saveCustomRoutineToStorage, 
@@ -508,64 +508,52 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   };
 
   // Handle smart routine generation
-  const handleSmartRoutineGenerated = async (generatedStretches: Stretch[], smartRoutineInput?: { 
+  const handleSmartRoutineGenerated = async (generatedItems: (Stretch | RestPeriod | TransitionPeriod)[], smartRoutineInput?: { 
     description: string;
     issueType: string;
     duration: Duration;
     area?: BodyArea;
   }) => {
     try {
-      console.log(`SMART ROUTINE DEBUG: Received ${generatedStretches.length} stretches`);
+      console.log(`SMART ROUTINE DEBUG: Received ${generatedItems.length} routine items`);
       
       // Check if user has premium access
       const hasPremiumAccess = await rewardManager.isRewardUnlocked('premium_stretches');
       console.log(`SMART ROUTINE DEBUG: User has premium access: ${hasPremiumAccess}`);
       
-      const validatedStretches = generatedStretches
-        // Filter out premium stretches if user doesn't have access
-        .filter(stretch => !stretch.premium || hasPremiumAccess)
-        // Map to ensure all properties are properly set
-        .map(stretch => {
-          // Create a safe copy with all required fields
-          const stretchCopy = {
-            // Convert ID to string to ensure compatibility with ActiveRoutine
-            id: typeof stretch.id === 'number' ? String(stretch.id) : stretch.id,
-            
-            // Ensure name exists
-            name: stretch.name || 'Unnamed Stretch',
-            
-            // Ensure description exists
-            description: stretch.description || 'Follow the instructions for this stretch carefully.',
-            
-            // Ensure duration is a number
-            duration: typeof stretch.duration === 'number' ? stretch.duration : 30,
-            
-            // Ensure tags is an array
-            tags: Array.isArray(stretch.tags) && stretch.tags.length > 0 
-              ? stretch.tags 
-              : [smartRoutineInput?.area || selectedArea],
-            
-            // Ensure level exists
-            position: stretch.position || 'All',
-            
-            // Ensure image exists
-            image: stretch.image || { 
-              uri: `https://via.placeholder.com/200/673AB7/FFFFFF?text=${encodeURIComponent(stretch.name || 'Stretch')}` 
-            },
-            
-            // Set bilateral property
-            bilateral: !!stretch.bilateral,
-            
-            // Optional premium property - ensure it's filtered already
-            premium: !!stretch.premium && hasPremiumAccess
-          };
-          
-          return stretchCopy;
-        });
+      const validatedItems: (Stretch | RestPeriod | TransitionPeriod)[] = generatedItems.map(item => {
+        // Pass through rest/transition items unmodified (except ensure ID is string)
+        if ('isRest' in item || 'isTransition' in item) {
+          return { ...item, id: typeof item.id === 'number' ? String(item.id) : item.id } as any;
+        }
+
+        const stretch = item as Stretch;
+        // Filter out premium stretches without access
+        if (stretch.premium && !hasPremiumAccess) {
+          return null;
+        }
+
+        // Create safe copy of stretch with required fields
+        const stretchCopy: Stretch = {
+          ...stretch,
+          id: typeof stretch.id === 'number' ? String(stretch.id) : stretch.id,
+          name: stretch.name || 'Unnamed Stretch',
+          description: stretch.description || 'Follow the instructions for this stretch carefully.',
+          duration: typeof stretch.duration === 'number' ? stretch.duration : 30,
+          tags: Array.isArray(stretch.tags) && stretch.tags.length > 0 ? stretch.tags : [smartRoutineInput?.area || selectedArea],
+          position: stretch.position || 'All',
+          image: stretch.image || { uri: `https://via.placeholder.com/200/673AB7/FFFFFF?text=${encodeURIComponent(stretch.name || 'Stretch')}` },
+          bilateral: !!stretch.bilateral,
+          premium: !!stretch.premium && hasPremiumAccess,
+        };
+        return stretchCopy;
+      }).filter(Boolean) as (Stretch | RestPeriod | TransitionPeriod)[];
       
-      console.log(`SMART ROUTINE DEBUG: Validated ${validatedStretches.length} stretches`);
+      console.log(`SMART ROUTINE DEBUG: Validated ${validatedItems.length} routine items`);
       
-      if (validatedStretches.length === 0) {
+      // Ensure we have at least one stretch
+      const stretchCount = validatedItems.filter(i => !('isRest' in i) && !('isTransition' in i)).length;
+      if (stretchCount === 0) {
         Alert.alert('Error', 'No valid stretches could be generated. Please try again with different input.');
         return;
       }
@@ -575,9 +563,9 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
         area: smartRoutineInput?.area || selectedArea,
         duration: smartRoutineInput?.duration || selectedDuration as Duration,
         position: 'All',
-        customStretches: validatedStretches
+        customStretches: validatedItems,
+        transitionDuration: validatedItems.find(i => 'isTransition' in i) ? (validatedItems.find(i => 'isTransition' in i) as TransitionPeriod).duration : undefined
       };
-      
       
       // If generated from SmartRoutineGenerator, save it to custom routines
       if (smartRoutineInput) {
@@ -590,7 +578,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
             name: routineName,
             area: routineParams.area,
             duration: routineParams.duration,
-            customStretches: validatedStretches.map(stretch => ({ id: stretch.id }))
+            customStretches: validatedItems.map(stretch => ({ id: stretch.id }))
           };
           
           // Save to storage

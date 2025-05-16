@@ -48,6 +48,13 @@ export function useRoutineTimer({
   const progressAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   
+  // Keep a ref of the latest timeRemaining value so we can access it inside callbacks without stale closures
+  const timeRemainingRef = useRef(timeRemaining);
+  
+  useEffect(() => {
+    timeRemainingRef.current = timeRemaining;
+  }, [timeRemaining]);
+  
   // Clear timer on unmount
   useEffect(() => {
     return () => {
@@ -150,13 +157,16 @@ export function useRoutineTimer({
   
   // Resume the timer
   const resumeTimer = () => {
-    if (isPausedRef.current && timeRemaining > 0) {
+    // Use the ref value here to avoid relying on a potentially stale closure value for timeRemaining
+    const currentTime = timeRemainingRef.current;
+
+    if (isPausedRef.current && currentTime > 0) {
       // Update both the state and ref
       setIsPaused(false);
       isPausedRef.current = false;
       
       // Make sure the progress animation value is correct
-      const currentProgress = timeRemaining / totalDurationRef.current;
+      const currentProgress = currentTime / totalDurationRef.current;
       progressAnim.setValue(currentProgress);
       
       // Start the timer with fresh timestamp

@@ -211,7 +211,7 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
  */
 export const playClickSound = async (): Promise<void> => {
   try {
-    await playSound('click', 0.3);
+    await playSound('click', 0.1);
   } catch (error) {
     // Silently ignore errors for click sounds to prevent crashes
     console.warn('Click sound error suppressed:', error);

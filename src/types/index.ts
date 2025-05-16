@@ -53,7 +53,7 @@ export interface RoutineParams {
   area: BodyArea;
   duration: Duration;
   position: Position;
-  customStretches?: (Stretch | RestPeriod)[];
+  customStretches?: (Stretch | RestPeriod | TransitionPeriod)[];
   includePremiumStretches?: boolean;
   transitionDuration?: number; // Duration in seconds (0-10)
 }

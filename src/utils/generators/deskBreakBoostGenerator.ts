@@ -1,4 +1,4 @@
-import { Stretch, RestPeriod } from '../../types';
+import { Stretch, RestPeriod, TransitionPeriod } from '../../types';
 import stretches from '../../data/stretches';
 
 // The IDs for the desk break boost stretches as specified in the requirements
@@ -29,9 +29,10 @@ const shuffleArray = <T>(array: T[]): T[] => {
 /**
  * Generates a quick Desk Break Boost routine using the predefined stretches
  * These are optimal stretches for desk office workers that can be done quickly
- * @returns Array of stretches in the Desk Break Boost routine
+ * @param transitionDuration Optional duration for transition periods between stretches (in seconds)
+ * @returns Array of stretches and transition periods in the Desk Break Boost routine
  */
-export const generateDeskBreakBoostRoutine = (): (Stretch | RestPeriod)[] => {
+export const generateDeskBreakBoostRoutine = (transitionDuration?: number): (Stretch | RestPeriod | TransitionPeriod)[] => {
   // Get all available stretches from our predefined list
   const availableStretches = stretches.filter(stretch => 
     DESK_BREAK_BOOST_STRETCH_IDS.includes(typeof stretch.id === 'string' ? parseInt(stretch.id, 10) : stretch.id)
@@ -90,6 +91,33 @@ export const generateDeskBreakBoostRoutine = (): (Stretch | RestPeriod)[] => {
     // Return the stretch as is
     return stretch;
   });
+
+  // If transition duration is specified, add transition periods between stretches
+  const routineWithTransitions: (Stretch | RestPeriod | TransitionPeriod)[] = [];
+  
+  if (transitionDuration && transitionDuration > 0) {
+    // Add stretches with transitions in between
+    routineStretches.forEach((stretch, index) => {
+      // Add the stretch
+      routineWithTransitions.push(stretch);
+      
+      // Add a transition after each stretch except the last one
+      if (index < routineStretches.length - 1) {
+        const transition: TransitionPeriod = {
+          id: `transition-${index}`,
+          name: "Transition",
+          description: "Get ready for the next stretch",
+          duration: transitionDuration,
+          isTransition: true
+        };
+        
+        routineWithTransitions.push(transition);
+      }
+    });
+    
+    console.log(`Generated desk break boost routine with ${routineStretches.length} stretches and ${routineWithTransitions.length - routineStretches.length} transitions`);
+    return routineWithTransitions;
+  }
 
   console.log(`Generated desk break boost routine with ${routineStretches.length} stretches`);
   return routineStretches;

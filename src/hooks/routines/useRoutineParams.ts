@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BodyArea, Duration, RootStackParamList, Position, Stretch, RestPeriod } from '../../types';
+import { BodyArea, Duration, RootStackParamList, Position, Stretch, RestPeriod, TransitionPeriod } from '../../types';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 
 type RoutineScreenRouteProp = RouteProp<RootStackParamList, 'Routine'>;
@@ -8,13 +8,13 @@ interface UseRoutineParamsReturn {
   area: BodyArea | null;
   duration: Duration | null;
   position: Position | null;
-  customStretches?: (Stretch | RestPeriod)[];
+  customStretches?: (Stretch | RestPeriod | TransitionPeriod)[];
   includePremiumStretches?: boolean;
   hasParams: boolean;
-  setRoutineParams: (area: BodyArea, duration: Duration, position: Position, customStretches?: (Stretch | RestPeriod)[], includePremiumStretches?: boolean) => void;
+  setRoutineParams: (area: BodyArea, duration: Duration, position: Position, customStretches?: (Stretch | RestPeriod | TransitionPeriod)[], includePremiumStretches?: boolean) => void;
   resetParams: () => void;
   navigateToHome: () => void;
-  navigateToRoutine: (params: { area: BodyArea; duration: Duration; position: Position; customStretches?: (Stretch | RestPeriod)[]; includePremiumStretches?: boolean }) => void;
+  navigateToRoutine: (params: { area: BodyArea; duration: Duration; position: Position; customStretches?: (Stretch | RestPeriod | TransitionPeriod)[]; includePremiumStretches?: boolean }) => void;
 }
 
 export function useRoutineParams(): UseRoutineParamsReturn {
@@ -24,7 +24,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
   const [area, setArea] = useState<BodyArea | null>(null);
   const [duration, setDuration] = useState<Duration | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
-  const [customStretches, setCustomStretches] = useState<(Stretch | RestPeriod)[] | undefined>(undefined);
+  const [customStretches, setCustomStretches] = useState<(Stretch | RestPeriod | TransitionPeriod)[] | undefined>(undefined);
   const [includePremiumStretches, setIncludePremiumStretches] = useState<boolean | undefined>(undefined);
   const [hasParams, setHasParams] = useState(false);
 
@@ -44,7 +44,8 @@ export function useRoutineParams(): UseRoutineParamsReturn {
           console.log('First stretch sample:', {
             id: firstStretch.id,
             name: firstStretch.name,
-            isRest: 'isRest' in firstStretch ? firstStretch.isRest : false
+            isRest: 'isRest' in firstStretch ? firstStretch.isRest : false,
+            isTransition: 'isTransition' in firstStretch ? firstStretch.isTransition : false
           });
         }
       }
@@ -63,7 +64,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     newArea: BodyArea, 
     newDuration: Duration, 
     newPosition: Position = 'All',
-    newCustomStretches?: (Stretch | RestPeriod)[],
+    newCustomStretches?: (Stretch | RestPeriod | TransitionPeriod)[],
     newIncludePremiumStretches?: boolean
   ) => {
     console.log('Setting routine params:', newArea, newDuration, newPosition);
@@ -75,7 +76,8 @@ export function useRoutineParams(): UseRoutineParamsReturn {
         console.log('First stretch sample:', {
           id: firstStretch.id,
           name: firstStretch.name,
-          isRest: 'isRest' in firstStretch ? firstStretch.isRest : false
+          isRest: 'isRest' in firstStretch ? firstStretch.isRest : false,
+          isTransition: 'isTransition' in firstStretch ? firstStretch.isTransition : false
         });
       }
     }
@@ -140,7 +142,7 @@ export function useRoutineParams(): UseRoutineParamsReturn {
     area: BodyArea; 
     duration: Duration; 
     position?: Position;
-    customStretches?: (Stretch | RestPeriod)[];
+    customStretches?: (Stretch | RestPeriod | TransitionPeriod)[];
     includePremiumStretches?: boolean;
   }) => {
     console.log('Navigating to routine screen with params:', params);
@@ -154,7 +156,8 @@ export function useRoutineParams(): UseRoutineParamsReturn {
         id: firstStretch.id,
         name: firstStretch.name,
         type: typeof firstStretch.id,
-        isRest: 'isRest' in firstStretch
+        isRest: 'isRest' in firstStretch,
+        isTransition: 'isTransition' in firstStretch
       });
     }
     

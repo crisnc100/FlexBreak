@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { AppNavigationProp, Playlist } from '../types';
+import { AppNavigationProp, Playlist, Stretch, RestPeriod, TransitionPeriod } from '../types';
 import playlists from '../data/playlists';
 import stretches from '../data/stretches';
 import { usePremium } from '../context/PremiumContext';
@@ -25,6 +25,7 @@ export default function PlaylistsScreen() {
   }, []);
   
   const handlePlaylistPress = (playlist: Playlist) => {
+    // Get the stretches for the playlist
     const selectedStretches = playlist.stretchIds.map(id => {
       const stretch = stretches.find(s => s.id === id);
       
@@ -37,17 +38,43 @@ export default function PlaylistsScreen() {
         };
       }
       return null;
-    }).filter(Boolean);
+    }).filter(Boolean) as Stretch[];
+    
+    // Default transition duration (in seconds)
+    const transitionDuration = 3; // 3 seconds between stretches
+    
+    // Add transition periods between stretches
+    const routineWithTransitions: (Stretch | RestPeriod | TransitionPeriod)[] = [];
+    
+    // Add stretches with transitions in between
+    selectedStretches.forEach((stretch, index) => {
+      // Add the stretch
+      routineWithTransitions.push(stretch);
+      
+      // Add a transition after each stretch except the last one
+      if (index < selectedStretches.length - 1) {
+        const transition: TransitionPeriod = {
+          id: `transition-${index}`,
+          name: "Transition",
+          description: "Get ready for the next stretch",
+          duration: transitionDuration,
+          isTransition: true
+        };
+        
+        routineWithTransitions.push(transition);
+      }
+    });
     
     // Convert number to string for the duration parameter
     const durationStr = playlist.duration.toString() as '5' | '10' | '15';
     
-    // Navigate to Routine screen with custom stretches
+    // Navigate to Routine screen with custom stretches including transitions
     navigation.navigate('Routine', {
       area: playlist.focusArea as any,
       duration: durationStr,
-      level: 'intermediate',
-      customStretches: selectedStretches
+      position: 'All', // Default to all positions
+      customStretches: routineWithTransitions,
+      transitionDuration: transitionDuration
     });
   };
   

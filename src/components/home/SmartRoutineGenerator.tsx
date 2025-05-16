@@ -15,8 +15,10 @@ import {
 import Slider from '@react-native-community/slider';
 import * as Permissions from 'expo-permissions';
 import { Ionicons } from '@expo/vector-icons';
-import { parseUserInput, generateRoutineConfig, selectStretches } from '../../utils/generators/routineGenerator';
-import { SmartRoutineInput, IssueType, Duration, Stretch, Position, RestPeriod, BodyArea } from '../../types';
+import { parseUserInput } from '../../utils/smart/parser';
+import { generateRoutineConfig } from '../../utils/smart/configBuilder';
+import { selectStretches } from '../../utils/smart/stretchSelector';
+import { SmartRoutineInput, IssueType, Duration, Stretch, Position, RestPeriod, BodyArea, TransitionPeriod } from '../../types';
 import allStretches from '../../data/stretches';
 import { useTheme } from '../../context/ThemeContext';
 import * as rewardManager from '../../utils/progress/modules/rewardManager';
@@ -24,7 +26,7 @@ import { getTransitionDuration } from '../../services/storageService';
 
 interface SmartRoutineGeneratorProps {
   onRoutineGenerated: (
-    stretches: Stretch[], 
+    stretches: (Stretch | RestPeriod | TransitionPeriod)[], 
     inputData?: { 
       description: string; 
       issueType: string; 
@@ -116,6 +118,28 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
     setIsRecording(false);
   };
 
+  // Helper to remove orphan transitions (those not followed by a stretch)
+  const sanitizeRoutine = (routine: (Stretch | RestPeriod | TransitionPeriod)[]): (Stretch | RestPeriod | TransitionPeriod)[] => {
+    const cleaned: (Stretch | RestPeriod | TransitionPeriod)[] = [];
+    for (let i = 0; i < routine.length; i++) {
+      const item = routine[i];
+      if ('isTransition' in item) {
+        const next = routine[i + 1];
+        // Keep the transition only if it's followed by a stretch (not rest/transition/undefined)
+        if (next && !('isRest' in next) && !('isTransition' in next)) {
+          cleaned.push(item);
+        }
+      } else {
+        cleaned.push(item);
+      }
+    }
+    // Ensure we don't end with a transition
+    if (cleaned.length > 0 && 'isTransition' in cleaned[cleaned.length - 1]) {
+      cleaned.pop();
+    }
+    return cleaned;
+  };
+
   const handleGenerate = useCallback(async () => {
     if (!parsedInput || !selectedIssueType) return;
 
@@ -134,34 +158,117 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
       config.position = selectedPosition;
 
       console.log("Generating routine with config:", JSON.stringify(config));
+      
+      // Get the full routine with transitions
       const selectedRoutine = await selectStretches(config, allStretches);
       
-      const filteredStretches = selectedRoutine
-        .filter(item => !('isRest' in item))
-        .filter(item => {
+      // Filter out premium stretches if user doesn't have access
+      // But keep the transitions intact
+      const filteredRoutine = selectedRoutine.map(item => {
+        if ('isRest' in item || 'isTransition' in item) {
+          // Keep rest and transition periods as is
+          return item;
+        } else {
+          // For stretches, check premium status
           const stretch = item as Stretch;
-          return !stretch.premium || hasPremiumAccess;
-        }) as Stretch[];
+          if (!stretch.premium || hasPremiumAccess) {
+            return stretch;
+          }
+          return null;
+        }
+      }).filter(Boolean) as (Stretch | RestPeriod | TransitionPeriod)[];
       
-      console.log(`Final routine: ${filteredStretches.length} stretches`);
+      // Calculate how many actual stretches (not transitions or rests) we have
+      const actualStretchCount = filteredRoutine.filter(item => 
+        !('isRest' in item) && !('isTransition' in item)
+      ).length;
       
-      if (filteredStretches.length === 0) {
+      console.log(`Final routine: ${filteredRoutine.length} items including ${actualStretchCount} stretches`);
+      
+      // Check if we have enough stretches
+      if (actualStretchCount === 0) {
         console.error("No valid stretches were generated");
         Alert.alert("No suitable stretches", "Try adjusting your description or selections.");
         setIsGenerating(false);
         return;
       }
-
-      console.log(`Sending ${filteredStretches.length} stretches to routine generator`);
       
-      onRoutineGenerated(filteredStretches, {
-        description: userInput,
-        issueType: selectedIssueType || 'stiffness',
-        duration: selectedDuration,
-        area: parsedInput?.parsedArea && parsedInput.parsedArea.length > 0 ? 
-          parsedInput.parsedArea[0] : 'Full Body',
-        transitionDuration: transitionDuration
-      });
+      // If we only have one stretch, add more related stretches
+      if (actualStretchCount === 1) {
+        console.warn("Only one stretch was generated. Adding more related stretches...");
+        
+        // Modify config to ensure we get more stretches
+        config.transitionDuration = 0; // Temporarily remove transitions for fetch
+        
+        // Try to get more stretches - we'll add transitions later
+        const additionalRoutine = await selectStretches(config, allStretches);
+        const additionalStretches = additionalRoutine
+          .filter(item => !('isRest' in item) && !('isTransition' in item))
+          .filter(item => {
+            const stretch = item as Stretch;
+            return !stretch.premium || hasPremiumAccess;
+          }) as Stretch[];
+        
+        console.log(`Generated ${additionalStretches.length} additional stretches`);
+        
+        // Take up to 3 more stretches
+        const extraStretches = additionalStretches.slice(0, 4);
+        
+        // Create a new routine with the additional stretches and transitions
+        const enhancedRoutine: (Stretch | RestPeriod | TransitionPeriod)[] = [];
+        
+        // Add original stretch first
+        const originalStretch = filteredRoutine.find(item => 
+          !('isRest' in item) && !('isTransition' in item)
+        ) as Stretch;
+        
+        if (originalStretch) {
+          enhancedRoutine.push(originalStretch);
+        }
+        
+        // Add the extra stretches with transitions
+        extraStretches.forEach((stretch, index) => {
+          // Add transition before the stretch if needed
+          if (transitionDuration > 0) {
+            const transition: TransitionPeriod = {
+              id: `transition-${index}`,
+              name: "Transition",
+              description: "Get ready for the next stretch",
+              duration: transitionDuration,
+              isTransition: true
+            };
+            enhancedRoutine.push(transition);
+          }
+          
+          // Add the stretch
+          enhancedRoutine.push(stretch);
+        });
+        
+        // Use the enhanced routine
+        console.log(`Enhanced routine now has ${enhancedRoutine.length} items`);
+        const sanitized = sanitizeRoutine(enhancedRoutine);
+        onRoutineGenerated(sanitized, {
+          description: userInput,
+          issueType: selectedIssueType || 'stiffness',
+          duration: selectedDuration,
+          area: parsedInput?.parsedArea && parsedInput.parsedArea.length > 0 ? 
+            parsedInput.parsedArea[0] : 'Full Body',
+          transitionDuration: transitionDuration
+        });
+      } else {
+        // We have enough stretches, use the filtered routine
+        const sanitized = sanitizeRoutine(filteredRoutine);
+        console.log(`Sending ${sanitized.length} items to routine generator`);
+        
+        onRoutineGenerated(sanitized, {
+          description: userInput,
+          issueType: selectedIssueType || 'stiffness',
+          duration: selectedDuration,
+          area: parsedInput?.parsedArea && parsedInput.parsedArea.length > 0 ? 
+            parsedInput.parsedArea[0] : 'Full Body',
+          transitionDuration: transitionDuration
+        });
+      }
       
       setShowFollowUp(false);
     } catch (error) {
@@ -538,7 +645,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Transitions:</Text>
+                    <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Transition:</Text>
                     <Text style={[styles.summaryValue, { color: theme.text }]}>
                       {transitionDuration > 0 ? `${transitionDuration} seconds between stretches` : 'No transitions'}
                     </Text>

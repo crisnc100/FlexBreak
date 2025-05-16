@@ -49,7 +49,7 @@ const CustomForm: React.FC<CustomFormProps> = ({
 }) => {
   // Body area options
   const bodyAreas: BodyArea[] = [
-    'Full Body', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'
+    'Dynamic Flow', 'Lower Back', 'Upper Back & Chest', 'Neck', 'Hips & Legs', 'Shoulders & Arms'
   ];
   
   // Duration options

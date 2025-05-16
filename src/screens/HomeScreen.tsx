@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { AppNavigationProp, BodyArea, Duration, RoutineParams, Position, Stretch, RestPeriod } from '../types';
+import { AppNavigationProp, BodyArea, Duration, RoutineParams, Position, Stretch, RestPeriod, TransitionPeriod } from '../types';
 import tips from '../data/tips';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { tw } from '../utils/tw';
@@ -684,15 +684,19 @@ export default function HomeScreen() {
       return;
     }
     
-    // Generate the desk break boost routine
-    const deskBreakStretches = generateDeskBreakBoostRoutine();
+    // Define transition duration (in seconds)
+    const transitionDuration = 3; // 3 seconds between stretches
+    
+    // Generate the desk break boost routine with transitions
+    const deskBreakStretches = generateDeskBreakBoostRoutine(transitionDuration);
     
     // Navigate to the routine screen with the desk break stretches
     navigation.navigate('Routine', {
       area: 'Full Body',
       duration: '5',
       position: 'All',
-      customStretches: deskBreakStretches as Stretch[]
+      customStretches: deskBreakStretches,
+      transitionDuration: transitionDuration
     });
   }, [navigation, canAccessFeature, getRequiredLevel, userLevel, getUserLevel, handleStartStretching]);
 
