@@ -9,6 +9,7 @@ interface StretchingPatternsProps {
   mostActiveDay: string;
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
+  isSunset?: boolean;
 }
 
 const StretchingPatterns: React.FC<StretchingPatternsProps> = ({
@@ -16,32 +17,34 @@ const StretchingPatterns: React.FC<StretchingPatternsProps> = ({
   dayNames,
   mostActiveDay,
   theme: propTheme,
-  isDark: propIsDark
+  isDark: propIsDark,
+  isSunset: propIsSunset
 }) => {
   // Use theme from props if provided, otherwise use theme context
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+  const isSunset = propIsSunset !== undefined ? propIsSunset : themeContext.isSunset;
 
   return (
     <View style={[styles.section, { 
-      backgroundColor: isDark ? theme.cardBackground : '#FFF',
+      backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
       shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
     }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+        <Text style={[styles.sectionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
           Stretching Patterns
         </Text>
-        <Text style={[styles.dateRangeText, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.dateRangeText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           All Time
         </Text>
       </View>
       <View style={styles.patternContainer}>
         <View style={styles.patternLegend}>
-          <Text style={[styles.patternLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.patternLabel, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             Most Active Day:
           </Text>
-          <Text style={[styles.patternValue, { color: isDark ? theme.accent : '#4CAF50' }]}>
+          <Text style={[styles.patternValue, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
             {mostActiveDay}
           </Text>
         </View>
@@ -61,14 +64,14 @@ const StretchingPatterns: React.FC<StretchingPatternsProps> = ({
           yAxisLabel=""
           yAxisSuffix=""
           chartConfig={{
-            backgroundColor: isDark ? theme.cardBackground : '#FFF',
-            backgroundGradientFrom: isDark ? theme.cardBackground : '#FFF',
-            backgroundGradientTo: isDark ? theme.cardBackground : '#FFF',
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+            backgroundGradientFrom: isDark || isSunset ? theme.cardBackground : '#FFF',
+            backgroundGradientTo: isDark || isSunset ? theme.cardBackground : '#FFF',
             decimalPlaces: 0,
-            color: (opacity = 1) => isDark 
+            color: (opacity = 1) => isDark || isSunset 
               ? `rgba(${theme.accent.replace('#', '').match(/.{1,2}/g).map(hex => parseInt(hex, 16)).join(', ')}, ${opacity})`
               : `rgba(76, 175, 80, ${opacity})`,
-            labelColor: (opacity = 1) => isDark 
+            labelColor: (opacity = 1) => isDark || isSunset 
               ? `rgba(255, 255, 255, ${opacity})`
               : `rgba(0, 0, 0, ${opacity})`,
             barPercentage: 0.7,

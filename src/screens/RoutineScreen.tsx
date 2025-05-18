@@ -899,8 +899,7 @@ export default function RoutineScreen() {
 
   // Render completed routine
   if (screenState === 'COMPLETED') {
-    console.log('Rendering COMPLETED state with the following level-up data:',
-      levelUpData ? JSON.stringify(levelUpData, null, 2) : 'null');
+  
 
     return (
       <SafeAreaView style={styles.container}>

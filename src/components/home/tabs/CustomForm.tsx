@@ -8,6 +8,7 @@ import RestPeriodSelector from './RestPeriodSelector';
 interface CustomFormProps {
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
   routineName: string;
   setRoutineName: (value: string) => void;
   selectedArea: BodyArea;
@@ -30,6 +31,7 @@ interface CustomFormProps {
 const CustomForm: React.FC<CustomFormProps> = ({
   theme,
   isDark,
+  isSunset,
   routineName,
   setRoutineName,
   selectedArea,
@@ -66,7 +68,7 @@ const CustomForm: React.FC<CustomFormProps> = ({
           styles.textInput,
           { 
             color: theme.text,
-            backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+            backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5',
             borderColor: theme.border
           }
         ]}
@@ -86,7 +88,7 @@ const CustomForm: React.FC<CustomFormProps> = ({
               { 
                 backgroundColor: selectedArea === area 
                   ? theme.accent 
-                  : isDark ? theme.backgroundLight : '#f5f5f5'
+                  : isDark || isSunset ? theme.backgroundLight : '#f5f5f5'
               }
             ]}
             onPress={() => setSelectedArea(area)}
@@ -111,7 +113,7 @@ const CustomForm: React.FC<CustomFormProps> = ({
               { 
                 backgroundColor: selectedDuration === duration.value 
                   ? theme.accent 
-                  : isDark ? theme.backgroundLight : '#f5f5f5'
+                  : isDark || isSunset ? theme.backgroundLight : '#f5f5f5'
               }
             ]}
             onPress={() => setSelectedDuration(duration.value)}
@@ -139,7 +141,7 @@ const CustomForm: React.FC<CustomFormProps> = ({
         style={[
           styles.selectStretchesButton,
           { 
-            backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+            backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5',
             borderColor: theme.border
           }
         ]}
@@ -166,6 +168,7 @@ const CustomForm: React.FC<CustomFormProps> = ({
         addRestPeriod={addRestPeriod}
         theme={theme}
         isDark={isDark}
+        isSunset={isSunset}
       />
       
       {/* Selected Items List */}
@@ -175,6 +178,7 @@ const CustomForm: React.FC<CustomFormProps> = ({
         removeItem={removeItem}
         theme={theme}
         isDark={isDark}
+        isSunset={isSunset}
       />
       
       <TouchableOpacity

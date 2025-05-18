@@ -37,7 +37,7 @@ const ConfirmationModal = ({
   onClose, 
   result 
 }: ConfirmationModalProps) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // Format date for display
   const formatDate = (dateString: string): string => {
@@ -70,7 +70,7 @@ const ConfirmationModal = ({
           
           <ScrollView style={styles.resultsContainer}>
             {/* Success Banner */}
-            <View style={[styles.successBanner, { backgroundColor: isDark ? '#3D5A3D' : '#E8F5E9' }]}>
+            <View style={[styles.successBanner, { backgroundColor: isDark || isSunset ? '#3D5A3D' : '#E8F5E9' }]}>
               <Ionicons name="checkmark-circle" size={24} color={theme.success} />
               <Text style={[styles.successText, { color: theme.success }]}>
                 {result.isBatchMode 
@@ -85,7 +85,7 @@ const ConfirmationModal = ({
                 Simulation Details
               </Text>
               
-              <View style={[styles.detailCard, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}>
+              <View style={[styles.detailCard, { backgroundColor: isDark || isSunset ? '#2D2D2D' : '#f5f5f5' }]}>
                 {result.isBatchMode ? (
                   <Text style={[styles.dateRange, { color: theme.text }]}>
                     Simulated {result.daysSimulated} consecutive days
@@ -119,7 +119,7 @@ const ConfirmationModal = ({
                 Experience & Progress
               </Text>
               
-              <View style={[styles.statsCard, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}>
+              <View style={[styles.statsCard, { backgroundColor: isDark || isSunset ? '#2D2D2D' : '#f5f5f5' }]}>
                 <View style={styles.xpContainer}>
                   <View style={styles.xpBadge}>
                     <Text style={styles.xpEarned}>+{result.xpEarned}</Text>
@@ -156,7 +156,7 @@ const ConfirmationModal = ({
                 </View>
                 
                 <View style={styles.streakContainer}>
-                  <Ionicons name="flame" size={18} color={isDark ? '#FF9800' : '#FF5722'} />
+                  <Ionicons name="flame" size={18} color={isDark || isSunset ? '#FF9800' : '#FF5722'} />
                   <Text style={[styles.streakText, { color: theme.text }]}>
                     Current Streak: {result.streakDays} day{result.streakDays !== 1 ? 's' : ''}
                   </Text>
@@ -171,7 +171,7 @@ const ConfirmationModal = ({
                   Completed Challenges
                 </Text>
                 
-                <View style={[styles.challengesCard, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}>
+                <View style={[styles.challengesCard, { backgroundColor: isDark || isSunset ? '#2D2D2D' : '#f5f5f5' }]}>
                   {result.completedChallenges.map((challenge, index) => (
                     <View key={index} style={styles.challengeItem}>
                       <View style={styles.challengeInfo}>
@@ -196,7 +196,7 @@ const ConfirmationModal = ({
                   Unlocked Achievements
                 </Text>
                 
-                <View style={[styles.achievementsCard, { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' }]}>
+                <View style={[styles.achievementsCard, { backgroundColor: isDark || isSunset ? '#2D2D2D' : '#f5f5f5' }]}>
                   {result.achievements.map((achievement, index) => (
                     <View key={index} style={styles.achievementItem}>
                       <Ionicons name="ribbon" size={18} color="#FFD700" />
@@ -210,7 +210,7 @@ const ConfirmationModal = ({
             )}
             
             {/* Total Stats Summary */}
-            <View style={[styles.totalStats, { backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD' }]}>
+            <View style={[styles.totalStats, { backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD' }]}>
               <Ionicons name="analytics" size={20} color={theme.accent} />
               <Text style={[styles.totalStatsText, { color: theme.text }]}>
                 Total XP: {result.totalXp} • Level: {result.level} • Streak: {result.streakDays} days

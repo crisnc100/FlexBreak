@@ -60,7 +60,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
   onClose,
   onStartRoutine
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const { isPremium, refreshPremiumStatus } = usePremium();
   const { canAccessFeature, getRequiredLevel, getUserLevel, refreshAccess } = useFeatureAccess();
   
@@ -648,7 +648,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
       >
         <SafeAreaView style={[
           styles.container,
-          { backgroundColor: isDark ? theme.background : '#f5f5f5' }
+          { backgroundColor: isDark || isSunset ? theme.background : '#f5f5f5' }
         ]}>
           <View style={styles.loadingContainer}>
             <Text style={[styles.loadingText, { color: theme.text }]}>
@@ -669,16 +669,16 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     >
       <SafeAreaView style={[
         styles.container,
-        { backgroundColor: isDark ? theme.background : '#f5f5f5' }
+        { backgroundColor: isDark || isSunset ? theme.background : '#f5f5f5' }
       ]}>
         <View style={styles.header}>
           <TouchableOpacity 
-            style={[styles.closeButton, { backgroundColor: isDark ? theme.backgroundLight : '#fff' }]} 
+            style={[styles.closeButton, { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#fff' }]} 
             onPress={onClose}
           >
-            <Ionicons name="arrow-back" size={24} color={theme.text} />
+            <Ionicons name="arrow-back" size={24} color={isDark || isSunset ? theme.text : theme.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Custom Routines</Text>
+          <Text style={[styles.headerTitle, { color: isDark || isSunset ? theme.text : theme.text }]}>Custom Routines</Text>
         </View>
         
         {!hasAccess ? (
@@ -686,6 +686,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
           <PremiumTeaser
             theme={theme}
             isDark={isDark}
+            isSunset={isSunset}
             requiredLevel={requiredLevel}
             refreshFeatureAccess={refreshFeatureAccess}
             onClose={onClose}
@@ -705,13 +706,13 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
                   style={[
                     styles.segmentButton,
                     !isCustomMode && styles.segmentButtonActive,
-                    { backgroundColor: !isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
+                    { backgroundColor: !isCustomMode ? theme.accent : isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
                   ]}
                   onPress={() => setIsCustomMode(false)}
                 >
                   <Text style={[
                     styles.segmentButtonText,
-                    { color: !isCustomMode ? '#fff' : theme.text }
+                    { color: !isCustomMode ? '#fff' : isDark || isSunset ? theme.text : theme.text }
                   ]}>
                     Smart
                   </Text>
@@ -720,13 +721,13 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
                   style={[
                     styles.segmentButton,
                     isCustomMode && styles.segmentButtonActive,
-                    { backgroundColor: isCustomMode ? theme.accent : isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
+                    { backgroundColor: isCustomMode ? theme.accent : isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#f0f0f0' }
                   ]}
                   onPress={() => setIsCustomMode(true)}
                 >
                   <Text style={[
                     styles.segmentButtonText,
-                    { color: isCustomMode ? '#fff' : theme.text }
+                    { color: isCustomMode ? '#fff' : isDark || isSunset ? theme.text : theme.text }
                   ]}>
                     Manual
                   </Text>
@@ -785,6 +786,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
                     deleteCustomRoutine={deleteCustomRoutine}
                     theme={theme}
                     isDark={isDark}
+                    isSunset={isSunset}
                     MAX_CUSTOM_ROUTINES={MAX_CUSTOM_ROUTINES}
                   />
                 ) : (
@@ -792,7 +794,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
                     <Ionicons 
                       name="fitness-outline" 
                       size={70} 
-                      color={isDark ? theme.textSecondary : '#ccc'} 
+                      color={isDark || isSunset ? theme.textSecondary : '#ccc'} 
                     />
                     <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
                       No Custom Routines Yet
@@ -819,7 +821,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
               >
                 <View style={[
                   styles.createForm,
-                  { backgroundColor: isDark ? theme.cardBackground : '#fff' }
+                  { backgroundColor: isDark || isSunset ? theme.cardBackground : '#fff' }
                 ]}>
                   <Text style={[
                     styles.formTitle,
@@ -838,6 +840,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
                     <CustomForm
                       theme={theme}
                       isDark={isDark}
+                      isSunset={isSunset}
                       routineName={routineName}
                       setRoutineName={setRoutineName}
                       selectedArea={selectedArea}

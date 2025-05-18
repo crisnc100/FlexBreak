@@ -11,6 +11,7 @@ interface CircularTimerProps {
   backgroundColor?: string;
   textColor?: string;
   isDark?: boolean;
+  isSunset?: boolean;
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -23,7 +24,8 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
   color = '#4CAF50',
   backgroundColor = '#E0E0E0',
   textColor = '#333',
-  isDark = false
+  isDark = false,
+  isSunset = false
 }) => {
   const radius = (diameter - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -99,7 +101,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
           cy={diameter / 2}
           r={radius}
           strokeWidth={strokeWidth}
-          stroke={isDark ? 'rgba(255,255,255,0.15)' : backgroundColor}
+          stroke={isDark || isSunset ? 'rgba(255,255,255,0.15)' : backgroundColor}
           fill="transparent"
         />
         {/* Progress Circle */}
@@ -122,7 +124,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
           style={[
             styles.circularTimerText,
             {
-              color: isDark ? '#FFFFFF' : textColor,
+              color: isDark || isSunset ? '#FFFFFF' : textColor,
               opacity: textOpacity,
               transform: [{ scale: textScale }]
             }
@@ -130,7 +132,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         >
           {formatTime(timeRemaining)}
         </Animated.Text>
-        <Text style={[styles.circularTimerLabel, { color: isDark ? '#FFFFFF' : textColor }]}>
+        <Text style={[styles.circularTimerLabel, { color: isDark || isSunset ? '#FFFFFF' : textColor }]}>
           sec
         </Text>
       </View>

@@ -29,7 +29,7 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
   isLastStretch = false,
   canSkipToNext = true
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // Add state to track countdown time
   const [countdown, setCountdown] = useState(5);
@@ -92,8 +92,8 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
 
   return (
     <View style={[styles.controlsContainer, { 
-      backgroundColor: isDark ? theme.cardBackground : '#FFF',
-      borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
+      backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+      borderTopColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#EEE'
     }]}>
       <TouchableOpacity 
         style={[
@@ -101,7 +101,7 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
           styles.sideButton,
           isPreviousDisabled && styles.disabledButton,
           { 
-            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
+            backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
             opacity: isPreviousDisabled ? 0.7 : 1
           }
         ]} 
@@ -114,15 +114,15 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
             name="chevron-back" 
             size={28} 
             color={isPreviousDisabled 
-              ? (isDark ? "rgba(255,255,255,0.3)" : "#CCC") 
-              : (isDark ? theme.text : "#333")} 
+              ? (isDark || isSunset ? "rgba(255,255,255,0.3)" : "#CCC") 
+              : (isDark || isSunset ? theme.text : "#333")} 
           />
           <Text style={[
             styles.controlText, 
             isPreviousDisabled && styles.disabledText,
             { color: isPreviousDisabled 
-              ? (isDark ? "rgba(255,255,255,0.3)" : "#AAA") 
-              : (isDark ? theme.text : "#333") }
+              ? (isDark || isSunset ? "rgba(255,255,255,0.3)" : "#AAA") 
+              : (isDark || isSunset ? theme.text : "#333") }
           ]}>
             Previous
           </Text>
@@ -136,8 +136,8 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
         activeOpacity={0.7}
       >
         <View style={[styles.centerButtonInner, { 
-          backgroundColor: isDark ? theme.accent : '#4CAF50',
-          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+          backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50',
+          shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000'
         }]}>
           <Ionicons 
             name={isPaused ? "play" : "pause"} 
@@ -145,7 +145,7 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
             color="#FFF" 
           />
         </View>
-        <Text style={[styles.pauseText, { color: isDark ? theme.text : '#333' }]}>
+        <Text style={[styles.pauseText, { color: isDark || isSunset ? theme.text : '#333' }]}>
           {isPaused ? "Resume" : "Pause"}
         </Text>
       </TouchableOpacity>
@@ -159,8 +159,8 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
           !canSkipToNext && styles.disabledButton,
           { 
             backgroundColor: isLastStretch 
-              ? (isDark ? theme.accent : '#4CAF50') 
-              : (isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5'),
+              ? (isDark || isSunset ? theme.accent : '#4CAF50') 
+              : (isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#F5F5F5'),
             opacity: !canSkipToNext ? 0.7 : 1
           }
         ]} 
@@ -173,7 +173,7 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
             <View style={styles.countdownIndicator}>
               <Text style={[
                 styles.countdownText,
-                { color: isDark ? "rgba(255,255,255,0.5)" : "#999" }
+                { color: isDark || isSunset ? "rgba(255,255,255,0.5)" : "#999" }
               ]}>
                 {countdown}s
               </Text>
@@ -183,8 +183,8 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
               name={isLastStretch ? "checkmark-circle" : "chevron-forward"} 
               size={28} 
               color={!canSkipToNext 
-                ? (isDark ? "rgba(255,255,255,0.3)" : "#CCC")
-                : (isLastStretch ? "#FFF" : (isDark ? theme.text : "#333"))} 
+                ? (isDark || isSunset ? "rgba(255,255,255,0.3)" : "#CCC")
+                : (isLastStretch ? "#FFF" : (isDark || isSunset ? theme.text : "#333"))} 
             />
           )}
           <Text style={[
@@ -193,8 +193,8 @@ const NavigationButtons: React.FC<NavigationButtonsProps> = ({
             !canSkipToNext && styles.disabledText,
             { 
               color: !canSkipToNext 
-                ? (isDark ? "rgba(255,255,255,0.3)" : "#AAA")
-                : (isLastStretch ? "#FFF" : (isDark ? theme.text : "#333")) 
+                ? (isDark || isSunset ? "rgba(255,255,255,0.3)" : "#AAA")
+                : (isLastStretch ? "#FFF" : (isDark || isSunset ? theme.text : "#333")) 
             }
           ]}>
             {!canSkipToNext ? "Wait" : (isLastStretch ? "Finish" : "Next")}

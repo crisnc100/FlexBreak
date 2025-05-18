@@ -42,7 +42,7 @@ interface FitnessDisclaimerProps {
 }
 
 const FitnessDisclaimer: React.FC<FitnessDisclaimerProps> = ({ visible, onAccept, viewOnly = false }) => {
-  const { isDark, theme } = useTheme();
+  const { isDark, isSunset, theme } = useTheme();
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleAccept = async () => {
@@ -66,13 +66,13 @@ const FitnessDisclaimer: React.FC<FitnessDisclaimerProps> = ({ visible, onAccept
       <View style={styles.modalOverlay}>
         <View style={[
           styles.modalContainer,
-          { backgroundColor: isDark ? theme.cardBackground : theme.background }
+          { backgroundColor: isDark || isSunset ? theme.cardBackground : theme.background }
         ]}>
           <View style={styles.headerContainer}>
             <Ionicons 
               name="fitness" 
               size={24} 
-              color={isDark ? theme.accent : theme.accent}
+              color={isDark || isSunset ? theme.accent : theme.accent}
               style={styles.icon}
             />
             <Text style={[styles.headerText, { color: theme.text }]}>
@@ -111,7 +111,7 @@ const FitnessDisclaimer: React.FC<FitnessDisclaimerProps> = ({ visible, onAccept
                   <Switch
                     value={acceptedTerms}
                     onValueChange={setAcceptedTerms}
-                    trackColor={{ false: '#767577', true: isDark ? '#4B7BEC' : '#3867D6' }}
+                    trackColor={{ false: '#767577', true: isDark || isSunset ? '#4B7BEC' : '#3867D6' }}
                     thumbColor={Platform.OS === 'ios' ? undefined : acceptedTerms ? theme.accent : '#f4f3f4'}
                     ios_backgroundColor="#3e3e3e"
                     style={styles.switch}

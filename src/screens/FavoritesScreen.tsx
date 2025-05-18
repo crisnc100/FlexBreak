@@ -24,7 +24,7 @@ interface FavoriteRoutine {
 export default function FavoritesScreen() {
   const { isPremium } = usePremium();
   const { isRefreshing, refreshFavorites } = useRefresh();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const navigation = useNavigation<AppNavigationProp>();
   
   const [favoriteRoutines, setFavoriteRoutines] = useState<FavoriteRoutine[]>([]);
@@ -112,8 +112,8 @@ export default function FavoritesScreen() {
       <View style={[
         styles.favoriteRoutineItem, 
         { 
-          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f8f8f8',
-          borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#e0e0e0' 
+          backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : '#f8f8f8',
+          borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#e0e0e0' 
         }
       ]}>
         <View style={styles.routineHeader}>
@@ -122,7 +122,7 @@ export default function FavoritesScreen() {
           </View>
           <Text style={[
             styles.routineDate,
-            { color: isDark ? theme.textSecondary : '#888' }
+            { color: isDark || isSunset ? theme.textSecondary : '#888' }
           ]}>
             Saved on {formattedDate}
           </Text>
@@ -132,13 +132,13 @@ export default function FavoritesScreen() {
           <View style={styles.routineInfo}>
             <Text style={[
               styles.routineName,
-              { color: isDark ? theme.text : '#333' }
+              { color: isDark || isSunset ? theme.text : '#333' }
             ]}>
               {item.name || `${item.area} ${item.duration} min routine`}
             </Text>
             <Text style={[
               styles.routineDuration,
-              { color: isDark ? theme.textSecondary : '#666' }
+              { color: isDark || isSunset ? theme.textSecondary : '#666' }
             ]}>
               Duration: {item.duration} minutes
             </Text>
@@ -169,17 +169,17 @@ export default function FavoritesScreen() {
     return (
       <View style={[
         styles.container,
-        { backgroundColor: isDark ? theme.background : '#fff' }
+        { backgroundColor: isDark || isSunset ? theme.background : '#fff' }
       ]}>
         <Text style={[
           styles.text,
-          { color: isDark ? theme.text : '#000' }
+          { color: isDark || isSunset ? theme.text : '#000' }
         ]}>
           Favorite Routines
         </Text>
         <Text style={[
           styles.subtext,
-          { color: isDark ? theme.textSecondary : '#666' }
+          { color: isDark || isSunset ? theme.textSecondary : '#666' }
         ]}>
           Unlock favorite routines with Premium!
         </Text>
@@ -201,12 +201,12 @@ export default function FavoritesScreen() {
   return (
     <View style={[
       styles.container,
-      { backgroundColor: isDark ? theme.background : '#fff' }
+      { backgroundColor: isDark || isSunset ? theme.background : '#fff' }
     ]}>
       <View style={styles.header}>
         <Text style={[
           styles.headerTitle,
-          { color: isDark ? theme.text : '#333' }
+          { color: isDark || isSunset ? theme.text : '#333' }
         ]}>
           Favorite Routines
         </Text>
@@ -214,7 +214,7 @@ export default function FavoritesScreen() {
         <View style={styles.limitInfo}>
           <Text style={[
             styles.limitText,
-            { color: isDark ? theme.textSecondary : '#666' }
+            { color: isDark || isSunset ? theme.textSecondary : '#666' }
           ]}>
             {favoriteRoutines.length}/15 Routines
           </Text>
@@ -226,11 +226,11 @@ export default function FavoritesScreen() {
           <Ionicons 
             name="bookmark-outline" 
             size={48} 
-            color={isDark ? 'rgba(255,255,255,0.2)' : '#ccc'} 
+            color={isDark || isSunset ? 'rgba(255,255,255,0.2)' : '#ccc'} 
           />
           <Text style={[
             styles.emptyText,
-            { color: isDark ? theme.textSecondary : '#666' }
+            { color: isDark || isSunset ? theme.textSecondary : '#666' }
           ]}>
             No favorite routines yet. When you complete a routine, tap "Save to Favorites" to save it here!
           </Text>

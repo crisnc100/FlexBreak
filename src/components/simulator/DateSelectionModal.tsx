@@ -27,7 +27,7 @@ const DateSelectionModal = ({
   onDateSelected,
   simulatedDates 
 }: DateSelectionModalProps) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // Date selection state
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -170,9 +170,9 @@ const DateSelectionModal = ({
                   key={date.toISOString()}
                   style={[
                     styles.dateItem,
-                    { backgroundColor: isDark ? '#2D2D2D' : '#f5f5f5' },
+                    { backgroundColor: isDark || isSunset ? '#2D2D2D' : '#f5f5f5' },
                     selectedDate && selectedDate.getTime() === date.getTime() && {
-                      backgroundColor: isDark ? '#3D5A3D' : '#E8F5E9',
+                      backgroundColor: isDark || isSunset ? '#3D5A3D' : '#E8F5E9',
                       borderColor: theme.accent,
                       borderWidth: 1
                     }

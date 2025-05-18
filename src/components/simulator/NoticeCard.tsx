@@ -4,12 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 
 const NoticeCard: React.FC = () => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
 
   return (
-    <View style={[styles.noticeCard, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)' }]}>
+    <View style={[styles.noticeCard, { backgroundColor: isDark || isSunset ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)' }]}>
       <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
-      <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
+      <Text style={[styles.noticeText, { color: isDark || isSunset ? '#FFC107' : '#856404' }]}>
         Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
       </Text>
     </View>

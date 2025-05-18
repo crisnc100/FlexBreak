@@ -19,6 +19,7 @@ interface StatsTabProps {
   canAccessFeature: (feature: string) => boolean;
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
   streakFreezeActive?: boolean;
   userLevel?: number;
 }
@@ -35,6 +36,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   canAccessFeature,
   theme,
   isDark,
+  isSunset,
   streakFreezeActive = false,
   userLevel = 1
 }) => {
@@ -47,6 +49,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         isTodayComplete={stats.isTodayComplete}
         theme={theme}
         isDark={isDark}
+        isSunset={isSunset}
         streakFreezeActive={streakFreezeActive}
         userLevel={userLevel}
       />
@@ -56,6 +59,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         <StreakFreezeCard 
           currentStreak={stats.currentStreak} 
           isDark={isDark}
+          isSunset={isSunset}
         />
       )}
       
@@ -83,6 +87,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
       <TipSection
         currentStreak={stats.currentStreak}
         isDark={isDark}
+        isSunset={isSunset}
       />
     </>
   );

@@ -23,12 +23,12 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   barColor,
   backgroundColor
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const progressPercentage = Math.min(Math.max((currentIndex / totalItems) * 100, 0), 100);
   
   // Use provided colors or fall back to theme colors
-  const actualBarColor = barColor || (isDark ? theme.accent : '#4CAF50');
-  const actualBackgroundColor = backgroundColor || (isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0');
+  const actualBarColor = barColor || (isDark || isSunset ? theme.accent : '#4CAF50');
+  const actualBackgroundColor = backgroundColor || (isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0');
 
   const renderLabel = () => {
     if (!label && !showPercentage && !showFraction) return null;
@@ -36,20 +36,20 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
     return (
       <View style={styles.labelContainer}>
         {label ? (
-          <Text style={[styles.label, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.label, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {label}
           </Text>
         ) : null}
         
         <View style={styles.rightLabels}>
           {showFraction ? (
-            <Text style={[styles.fractionText, { color: isDark ? theme.text : '#333' }]}>
+            <Text style={[styles.fractionText, { color: isDark || isSunset ? theme.text : '#333' }]}>
               {currentIndex}/{totalItems}
             </Text>
           ) : null}
           
           {showPercentage ? (
-            <Text style={[styles.percentageText, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.percentageText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               {Math.round(progressPercentage)}%
             </Text>
           ) : null}

@@ -28,7 +28,7 @@ interface RewardsProps {
 const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPremium }) => {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { theme, isDark, themeType, toggleTheme, setThemeType } = useTheme();
+  const { theme, isDark, isSunset, themeType, toggleTheme, setThemeType } = useTheme();
   const [refreshKey, setRefreshKey] = useState(0); // Add refresh key to force re-render
   const [showPremiumStretches, setShowPremiumStretches] = useState(false);
   const [realUserLevel, setRealUserLevel] = useState(userLevel);
@@ -55,7 +55,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
   // Also reload rewards when the theme changes to update UI
   useEffect(() => {
     loadRewards();
-  }, [isDark]);
+  }, [isDark, isSunset]);
   
   // Load rewards data from storage
   const loadRewards = async () => {
@@ -91,7 +91,6 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
         // Sort rewards by level required
         finalRewards.sort((a, b) => a.levelRequired - b.levelRequired);
         
-        console.log('Rewards loaded, dark theme is', isDark ? 'ACTIVE' : 'INACTIVE');
         setRewards(finalRewards);
       } else {
         // Use fallback rewards as a last resort
@@ -125,7 +124,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
     console.log('DIRECT THEME TOGGLE - NO ALERTS, NO CHECKS');
     
     // Do exactly what the settings screen does - bypass toggleTheme
-    if (isDark) {
+    if (isDark || isSunset) {
       // Go to light theme DIRECTLY
       setThemeType('light');
     } else {
@@ -135,7 +134,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
     
     // Force refresh immediately
     setRefreshKey(prev => prev + 1);
-  }, [isDark, setThemeType]);
+  }, [isDark, isSunset, setThemeType]);
   
   // Handle pressing on a reward card - Now with a stable callback handler that won't break rules of hooks
   const handleRewardPress = useCallback(async (reward: Reward) => {
@@ -182,7 +181,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
     switch (reward.id) {
       case 'dark_theme':
         // DIRECTLY SET THEME - no alerts, no conditions, no logs
-        setThemeType(isDark ? 'light' : 'dark');
+        setThemeType(isDark || isSunset ? 'light' : 'dark');
         break;
         
       case 'custom_reminders':
@@ -256,7 +255,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
           [{ text: 'Close' }]
         );
     }
-  }, [isPremium, onUpgradeToPremium, setThemeType, realUserLevel, isDark, setShowPremiumStretches]);
+  }, [isPremium, onUpgradeToPremium, setThemeType, realUserLevel, isDark, isSunset, setShowPremiumStretches]);
   
   // Close premium stretches preview modal
   const closePremiumStretches = useCallback(() => {

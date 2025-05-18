@@ -14,13 +14,13 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   onStartRoutine,
   allRoutinesHidden = false
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   if (isLoading) {
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.background : '#F5F5F5' }]}>
-        <ActivityIndicator size="large" color={isDark ? theme.accent : "#4CAF50"} />
-        <Text style={[styles.emptySubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+      <View style={[styles.emptyContainer, { backgroundColor: isDark || isSunset ? theme.background : '#F5F5F5' }]}>
+        <ActivityIndicator size="large" color={isDark || isSunset ? theme.accent : "#4CAF50"} />
+        <Text style={[styles.emptySubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           Loading your progress data...
         </Text>
       </View>
@@ -29,18 +29,18 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   
   if (allRoutinesHidden) {
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.background : '#F5F5F5' }]}>
+      <View style={[styles.emptyContainer, { backgroundColor: isDark || isSunset ? theme.background : '#F5F5F5' }]}>
         <View style={styles.iconContainer}>
-          <Ionicons name="eye-off-outline" size={80} color={isDark ? theme.textSecondary : "#CCCCCC"} />
+          <Ionicons name="eye-off-outline" size={80} color={isDark || isSunset ? theme.textSecondary : "#CCCCCC"} />
         </View>
         
-        <Text style={[styles.emptyTitle, { color: isDark ? theme.text : '#333' }]}>All Routines Hidden</Text>
-        <Text style={[styles.emptySubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.emptyTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>All Routines Hidden</Text>
+        <Text style={[styles.emptySubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           You've hidden all your routines. You still have progress data and achievements saved.
         </Text>
         
         <TouchableOpacity 
-          style={[styles.createButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
+          style={[styles.createButton, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}
           onPress={onStartRoutine}
         >
           <Ionicons name="play" size={20} color="#FFF" style={styles.buttonIcon} />
@@ -51,39 +51,39 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   }
 
   return (
-    <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.background : '#F5F5F5' }]}>
+    <View style={[styles.emptyContainer, { backgroundColor: isDark || isSunset ? theme.background : '#F5F5F5' }]}>
       <View style={styles.iconContainer}>
-        <Ionicons name="fitness-outline" size={80} color={isDark ? theme.accent : "#4CAF50"} />
+        <Ionicons name="fitness-outline" size={80} color={isDark || isSunset ? theme.accent : "#4CAF50"} />
         <View style={[styles.badge, { backgroundColor: isDark ? '#FF9800' : '#FF9800' }]}>
           <Ionicons name="star" size={24} color="#FFF" />
         </View>
       </View>
       
-      <Text style={[styles.emptyTitle, { color: isDark ? theme.text : '#333' }]}>Begin Your Journey!</Text>
-      <Text style={[styles.emptySubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+      <Text style={[styles.emptyTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Begin Your Journey!</Text>
+      <Text style={[styles.emptySubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
         Complete your first stretching routine to start tracking your progress and earning achievements
       </Text>
       
       <View style={[styles.benefitsContainer, { 
-        backgroundColor: isDark ? theme.cardBackground : '#FFF',
-        shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000'
+        backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+        shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000'
       }]}>
         <View style={styles.benefitItem}>
-          <Ionicons name="trophy-outline" size={24} color={isDark ? theme.accent : "#4CAF50"} />
-          <Text style={[styles.benefitText, { color: isDark ? theme.text : '#333' }]}>Earn XP and level up</Text>
+          <Ionicons name="trophy-outline" size={24} color={isDark || isSunset ? theme.accent : "#4CAF50"} />
+          <Text style={[styles.benefitText, { color: isDark || isSunset ? theme.text : '#333' }]}>Earn XP and level up</Text>
         </View>
         <View style={styles.benefitItem}>
-          <Ionicons name="trending-up-outline" size={24} color={isDark ? theme.accent : "#4CAF50"} />
+          <Ionicons name="trending-up-outline" size={24} color={isDark || isSunset ? theme.accent : "#4CAF50"} />
           <Text style={[styles.benefitText, { color: isDark ? theme.text : '#333' }]}>Track your consistency</Text>
         </View>
         <View style={styles.benefitItem}>
-          <Ionicons name="ribbon-outline" size={24} color={isDark ? theme.accent : "#4CAF50"} />
+          <Ionicons name="ribbon-outline" size={24} color={isDark || isSunset ? theme.accent : "#4CAF50"} />
           <Text style={[styles.benefitText, { color: isDark ? theme.text : '#333' }]}>Unlock achievements</Text>
         </View>
       </View>
       
       <TouchableOpacity 
-        style={[styles.createButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
+        style={[styles.createButton, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}
         onPress={onStartRoutine}
       >
         <Ionicons name="play" size={20} color="#FFF" style={styles.buttonIcon} />

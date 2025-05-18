@@ -4,9 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PremiumContext } from './PremiumContext';
 import * as storageService from '../services/storageService';
 import * as featureAccessUtils from '../utils/featureAccessUtils';
+import * as achievementService from '../utils/progress/modules/achievementManager';
 
 // Define theme types
-export type ThemeType = 'light' | 'dark' | 'system';
+export type ThemeType = 'light' | 'dark' | 'sunset' | 'system';
 
 // Define theme colors
 export interface ThemeColors {
@@ -53,6 +54,21 @@ const darkTheme: ThemeColors = {
   error: '#E57373'
 };
 
+// Sunset theme colors - improved version
+const sunsetTheme: ThemeColors = {
+  background: '#1E1229',      // Deeper purple for background - better readability
+  backgroundLight: '#2A1B36', // Lighter purple but still dark enough for contrast
+  cardBackground: '#321E40',  // Richer card background for better content separation
+  text: '#FFF1E6',           // Warmer, brighter text for better readability
+  textSecondary: '#FFBEA0',   // Slightly muted but still visible secondary text
+  accent: '#FF7B5A',         // Vibrant orange-coral that pops against the purple
+  accentLight: '#FF9E7A',     // Lighter version of accent
+  border: '#4A2945',         // More visible borders for better UI distinction
+  success: '#FF9248',        // Orange-amber success color
+  successLight: '#FFAD7F',    // Lighter success variant
+  error: '#FF5252'           // Keeping the same error color as it works well
+};
+
 // Update the ThemeContextType to include a safe toggle method
 export type ThemeContextType = {
   theme: ThemeColors;
@@ -60,10 +76,15 @@ export type ThemeContextType = {
   setThemeType: (type: ThemeType) => void;
   toggleTheme: () => void; // Add this safe toggle method
   isDark: boolean;
+  isSunset: boolean;
   canUseDarkTheme: boolean;
+  canUseSunsetTheme: boolean;
   refreshThemeAccess: () => Promise<void>;
   refreshTheme: () => void;
 };
+
+// Constants
+const REQUIRED_BADGES_FOR_SUNSET = 6; // Number of badges required to unlock sunset theme
 
 // Update the context creation with the new toggle method
 const ThemeContext = createContext<ThemeContextType>({
@@ -72,9 +93,11 @@ const ThemeContext = createContext<ThemeContextType>({
   setThemeType: () => {},
   toggleTheme: () => {}, // Add default implementation
   isDark: false,
+  isSunset: false,
   canUseDarkTheme: false,
+  canUseSunsetTheme: false,
   refreshThemeAccess: async () => {},
-  refreshTheme: () => {}
+  refreshTheme: () => {},
 });
 
 // Storage key for theme preference
@@ -87,6 +110,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const systemColorScheme = useColorScheme();
   const [themeType, setThemeType] = useState<ThemeType>('system');
   const [canUseDarkTheme, setCanUseDarkTheme] = useState(false);
+  const [canUseSunsetTheme, setCanUseSunsetTheme] = useState(false);
+  const [badgeCount, setBadgeCount] = useState(0);
   
   // Use a simpler approach - just initialize isPremium to false
   const [isPremium, setIsPremium] = useState(false);
@@ -120,6 +145,47 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     loadLastThemeCheck();
   }, []);
+
+  // Get earned badge count - private function
+  const getBadgeCount = async (): Promise<number> => {
+    try {
+      // Get user progress
+      const userProgress = await storageService.getUserProgress();
+      
+      // Get achievements summary
+      const achievementsSummary = achievementService.getAchievementsSummary(userProgress);
+      
+      // Count completed achievements
+      const completedCount = achievementsSummary.completed.length;
+      setBadgeCount(completedCount);
+      return completedCount;
+    } catch (error) {
+      console.error('Error getting badge count:', error);
+      return 0;
+    }
+  };
+
+  // Check if user can access sunset theme based on badge count
+  // No premium requirement here
+  const checkSunsetThemeAccess = async () => {
+    try {
+      const count = await getBadgeCount();
+      const hasAccess = count >= REQUIRED_BADGES_FOR_SUNSET;
+      setCanUseSunsetTheme(hasAccess);
+      
+      // If user can't use sunset theme but currently has it set, revert to light
+      if (!hasAccess && themeType === 'sunset') {
+        console.log('User lost sunset theme access, reverting to light theme');
+        await saveThemePreference('light');
+        setThemeType('light');
+      }
+      
+      return hasAccess;
+    } catch (error) {
+      console.error('Error checking sunset theme access:', error);
+      return false;
+    }
+  };
   
   // Check if user can access dark theme based on premium status and level
   const checkDarkThemeAccess = async () => {
@@ -191,6 +257,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Only check if it's been at least 1 second since the last check
       if (now - lastThemeCheck > 1000) {
         await checkDarkThemeAccess();
+        await checkSunsetThemeAccess();
       }
     };
     
@@ -235,8 +302,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // If trying to set dark theme but don't have access, show alert and return
     if (type === 'dark' && !canUseDarkTheme) {
       console.log('Attempted to set dark theme but user lacks permission');
-      
-      
+      return;
+    }
+    
+    // If trying to set sunset theme but don't have access, show alert and return
+    if (type === 'sunset' && !canUseSunsetTheme) {
+      console.log('Attempted to set sunset theme but user lacks required badges');
       return;
     }
     
@@ -277,44 +348,77 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
   
-  // Add safe toggle method that doesn't rely on reading state directly in handlers
+  // Improved theme cycling: Light → Sunset → Dark → Light
   const toggleTheme = useCallback(() => {
-    console.log('THEME TOGGLE - DIRECT SWITCH');
+    console.log('THEME TOGGLE - IMPROVED CYCLING');
     
     try {
-      // Skip all complex handling and directly switch
-      if (themeType === 'dark') {
-        // Directly set light theme without any alerts
+      // Improved theme rotation logic
+      if (themeType === 'light' || themeType === 'system') {
+        // From light/system → sunset (if available)
+        if (canUseSunsetTheme) {
+          setThemeType('sunset');
+          saveThemePreference('sunset');
+          console.log('Changed theme: LIGHT → SUNSET');
+        } 
+        // If sunset not available, try dark
+        else if (canUseDarkTheme) {
+          setThemeType('dark');
+          saveThemePreference('dark');
+          console.log('Changed theme: LIGHT → DARK (sunset not available)');
+        }
+      } 
+      else if (themeType === 'sunset') {
+        // From sunset → dark (if available)
+        if (canUseDarkTheme) {
+          setThemeType('dark');
+          saveThemePreference('dark');
+          console.log('Changed theme: SUNSET → DARK');
+        } else {
+          // If dark not available, go to light
+          setThemeType('light');
+          saveThemePreference('light');
+          console.log('Changed theme: SUNSET → LIGHT (dark not available)');
+        }
+      } 
+      else if (themeType === 'dark') {
+        // From dark → light
         setThemeType('light');
         saveThemePreference('light');
         console.log('Changed theme: DARK → LIGHT');
-      } else {
-        // Check permission first
-        if (!canUseDarkTheme) {
-          console.log('Cannot set dark theme - permission denied');
-          return;
-        }
-        
-        // Directly set dark theme without any alerts
-        setThemeType('dark');
-        saveThemePreference('dark');
-        console.log('Changed theme: LIGHT → DARK');
       }
     } catch (error) {
-      console.error('Error during direct theme toggle:', error);
+      console.error('Error during improved theme cycling:', error);
     }
-  }, [themeType, canUseDarkTheme]);
+  }, [themeType, canUseDarkTheme, canUseSunsetTheme]);
   
-  // Determine if we're using dark mode
-  const isDark = themeType === 'dark' || (themeType === 'system' && systemColorScheme === 'dark');
-  
-  // Use dark theme only if user has access and has selected dark mode
-  const actualTheme = (isDark && canUseDarkTheme) ? darkTheme : lightTheme;
+  // Improved theme selection logic to prioritize sunset theme
+  let actualTheme = lightTheme;
+  let isDark = false;
+  let isSunset = false;
+
+  // Priority: explicit selection > system preference
+  if (themeType === 'dark' && canUseDarkTheme) {
+    actualTheme = darkTheme;
+    isDark = true;
+  } else if (themeType === 'sunset' && canUseSunsetTheme) {
+    actualTheme = sunsetTheme;
+    isSunset = true;
+  } else if (themeType === 'system') {
+    // For system preference, prioritize sunset if available
+    if (canUseSunsetTheme) {
+      actualTheme = sunsetTheme;
+      isSunset = true;
+    } else if (systemColorScheme === 'dark' && canUseDarkTheme) {
+      actualTheme = darkTheme;
+      isDark = true;
+    }
+  }
   
   // For logging/debugging
   useEffect(() => {
-    console.log(`Theme status - Type: ${themeType}, isDark: ${isDark}, canUseDark: ${canUseDarkTheme}`);
-  }, [themeType, isDark, canUseDarkTheme]);
+    console.log(`Theme status - Type: ${themeType}, isDark: ${isDark}, isSunset: ${isSunset}, canUseDark: ${canUseDarkTheme}, canUseSunset: ${canUseSunsetTheme}`);
+  }, [themeType, isDark, isSunset, canUseDarkTheme, canUseSunsetTheme]);
   
   // Public method to refresh theme access
   const refreshThemeAccess = async () => {
@@ -329,6 +433,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     // Check access directly
     await checkDarkThemeAccess();
+    await checkSunsetThemeAccess();
   };
   
   // Force theme refresh - this triggers re-renders throughout the app
@@ -348,7 +453,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setThemeType: handleSetThemeType,
       toggleTheme, // Add the toggle function to the context value 
       isDark, 
+      isSunset,
       canUseDarkTheme,
+      canUseSunsetTheme,
       refreshThemeAccess,
       refreshTheme
     }}>

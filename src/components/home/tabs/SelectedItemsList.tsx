@@ -9,6 +9,7 @@ interface SelectedItemsListProps {
   removeItem: (index: number) => void;
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
 }
 
 const SelectedItemsList: React.FC<SelectedItemsListProps> = ({
@@ -16,7 +17,8 @@ const SelectedItemsList: React.FC<SelectedItemsListProps> = ({
   moveItem,
   removeItem,
   theme,
-  isDark
+  isDark,
+  isSunset
 }) => {
   if (selectedStretches.length === 0) {
     return null;
@@ -42,7 +44,7 @@ const SelectedItemsList: React.FC<SelectedItemsListProps> = ({
               key={`${item.id}-${index}`} 
               style={[
                 styles.selectedItemRow, 
-                { backgroundColor: isDark ? theme.backgroundLight : '#f8f8f8' }
+                { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f8f8f8' }
               ]}
             >
               <View style={styles.selectedItemInfo}>

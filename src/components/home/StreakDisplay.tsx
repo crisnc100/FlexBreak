@@ -16,56 +16,32 @@ import { usePremium } from '../../context/PremiumContext';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as storageService from '../../services/storageService';
 import * as featureAccessUtils from '../../utils/featureAccessUtils';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../../utils/haptics';
 import { useStreak } from '../../hooks/progress/useStreak';
 
 // Helper function for consistent haptic feedback
 const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error') => {
   try {
-    // Use expo-haptics when available (most devices)
-    if (Platform.OS === 'ios') {
-      switch (type) {
-        case 'light':
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          break;
-        case 'medium':
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          break;
-        case 'heavy':
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-          break;
-        case 'success':
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          break;
-        case 'warning':
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          break;
-        case 'error':
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          break;
-      }
-    } else if (Platform.OS === 'android') {
-      // Android pattern durations
-      switch (type) {
-        case 'light':
-          Vibration.vibrate(10);
-          break;
-        case 'medium':
-          Vibration.vibrate(20);
-          break;
-        case 'heavy':
-          Vibration.vibrate(30);
-          break;
-        case 'success':
-          Vibration.vibrate([0, 50, 50, 50]);
-          break;
-        case 'warning':
-          Vibration.vibrate([0, 50, 100, 50]);
-          break;
-        case 'error':
-          Vibration.vibrate([0, 50, 30, 50, 30, 50]);
-          break;
-      }
+    // Use our custom haptics utility which handles cross-device compatibility
+    switch (type) {
+      case 'light':
+        haptics.light();
+        break;
+      case 'medium':
+        haptics.medium();
+        break;
+      case 'heavy':
+        haptics.heavy();
+        break;
+      case 'success':
+        haptics.success();
+        break;
+      case 'warning':
+        haptics.warning();
+        break;
+      case 'error':
+        haptics.error();
+        break;
     }
   } catch (error) {
     // Fallback to basic vibration if haptics fail
@@ -82,7 +58,7 @@ const StreakDisplay: React.FC<StreakDisplayProps> = ({
   currentStreak = 0,
   onPremiumPress
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const { isPremium } = usePremium();
   const [streak, setStreak] = useState(currentStreak);
   const [freezeCount, setFreezeCount] = useState(0);
@@ -264,8 +240,8 @@ useEffect(() => {
   // Show loading indicator while data is loading
   if (loading) {
     return (
-      <View style={[styles.container, {backgroundColor: isDark ? theme.cardBackground : '#FFF'}]}>
-        <ActivityIndicator size="small" color={isDark ? '#90CAF9' : '#2196F3'} />
+      <View style={[styles.container, {backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF'}]}>
+        <ActivityIndicator size="small" color={isDark || isSunset ? '#90CAF9' : '#2196F3'} />
         <Text style={[styles.loadingText, {color: theme.text}]}>Loading...</Text>
       </View>
     );
@@ -318,7 +294,7 @@ useEffect(() => {
   };
   
   return (
-    <View style={[styles.container, {backgroundColor: isDark ? theme.cardBackground : '#FFF'}]}>
+    <View style={[styles.container, {backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF'}]}>
       {/* Header with streak count and freeze info */}
       <View style={styles.header}>
         <View style={styles.streakTitleContainer}>
@@ -350,14 +326,22 @@ useEffect(() => {
         {isPremium && canUseStreakFreeze ? (
           <TouchableOpacity 
             style={[styles.freezeContainer, { 
-              backgroundColor: isDark ? 'rgba(144, 202, 249, 0.15)' : 'rgba(144, 202, 249, 0.1)' 
+              backgroundColor: isDark || isSunset ? 
+                'rgba(144, 202, 249, 0.15)' : 
+                'rgba(144, 202, 249, 0.1)' 
             }]}
             onPress={() => triggerHaptic('medium')}
             activeOpacity={0.7}
           >
-            <Ionicons name="snow" size={16} color={isDark ? '#90CAF9' : '#2196F3'} />
+            <Ionicons 
+              name="snow" 
+              size={16} 
+              color={isDark || isSunset ? '#90CAF9' : '#2196F3'} 
+            />
             <Text style={[styles.freezeCount, { 
-              color: freezeCount > 0 ? (isDark ? '#90CAF9' : '#2196F3') : '#EF5350' 
+              color: freezeCount > 0 ? 
+                (isDark || isSunset ? '#90CAF9' : '#2196F3') : 
+                '#EF5350' 
             }]}>
               {freezeCount}
             </Text>
@@ -365,7 +349,9 @@ useEffect(() => {
         ) : !isPremium ? (
           <TouchableOpacity 
             style={[styles.premiumBadge, {
-              backgroundColor: isDark ? 'rgba(255, 167, 38, 0.15)' : 'rgba(255, 167, 38, 0.1)'
+              backgroundColor: isDark || isSunset ? 
+                'rgba(255, 167, 38, 0.15)' : 
+                'rgba(255, 167, 38, 0.1)'
             }]}
             onPress={() => {
               triggerHaptic('medium');
@@ -373,18 +359,30 @@ useEffect(() => {
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="shield" size={14} color="#FFA726" />
-            <Text style={styles.premiumText}>PROTECT</Text>
+            <Ionicons 
+              name="shield" 
+              size={14} 
+              color={isDark || isSunset ? '#FFA726' : '#FFA726'} 
+            />
+            <Text style={[
+              styles.premiumText, 
+              { color: isDark || isSunset ? '#FFA726' : '#FFA726' }
+            ]}>PROTECT</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity 
             style={[styles.levelBadge, {
-              backgroundColor: isDark ? 'rgba(149, 117, 205, 0.15)' : 'rgba(149, 117, 205, 0.1)'
+              backgroundColor: isDark || isSunset ? 
+                'rgba(149, 117, 205, 0.15)' : 
+                'rgba(149, 117, 205, 0.1)'
             }]}
             onPress={() => triggerHaptic('light')}
             activeOpacity={0.8}
           >
-            <Text style={styles.levelText}>LVL 6 UNLOCKS</Text>
+            <Text style={[
+              styles.levelText,
+              { color: isDark || isSunset ? '#9575CD' : '#9575CD' }
+            ]}>LVL 6 UNLOCKS</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -405,8 +403,14 @@ useEffect(() => {
             
             // Determine colors based on completion and theme
             const dotColor = isCompleted 
-              ? (isDark ? '#FFB74D' : '#FF9800') 
-              : (isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0');
+              ? (isDark ? 
+                  '#FFB74D' : 
+                  isSunset ? 
+                    '#FF8C5A' : 
+                    '#FF9800') 
+              : (isDark || isSunset ? 
+                  'rgba(255,255,255,0.2)' : 
+                  '#E0E0E0');
             
             // Enhanced glow effect for the current milestone and focused milestones
             const glowOpacity = isCurrent 
@@ -442,8 +446,18 @@ useEffect(() => {
                       styles.glowDot,
                       { 
                         backgroundColor: isCurrent 
-                          ? (isDark ? '#FF9800' : '#FF9800')
-                          : (isCompleted ? '#81C784' : '#90CAF9'),
+                          ? (isDark ? 
+                              '#FF9800' : 
+                              isSunset ? 
+                                '#FF8C5A' : 
+                                '#FF9800')
+                          : (isCompleted ? 
+                              isSunset ? 
+                                '#FF8C5A' : 
+                                '#81C784' : 
+                              isSunset ? 
+                                '#FFB38E' : 
+                                '#90CAF9'),
                         opacity: isFocused ? 0.7 : glowAnim.interpolate({
                           inputRange: [0, 1],
                           outputRange: [0.3, 0.5]
@@ -462,10 +476,18 @@ useEffect(() => {
                   <View style={[
                     styles.milestoneDot, 
                     { 
-                      backgroundColor: isFocused && !isCompleted ? '#90CAF9' : dotColor,
+                      backgroundColor: isFocused && !isCompleted ? 
+                        (isSunset ? '#FFB38E' : '#90CAF9') : 
+                        dotColor,
                       borderColor: isCompleted 
-                        ? (isDark ? '#FF9800' : '#FF9800') 
-                        : isFocused ? '#90CAF9' : 'transparent',
+                        ? (isDark ? 
+                            '#FF9800' : 
+                            isSunset ? 
+                              '#FF8C5A' : 
+                              '#FF9800') 
+                        : isFocused ? 
+                            (isSunset ? '#FFB38E' : '#90CAF9') : 
+                            'transparent',
                       width: (isCurrent || isFocused) ? 16 : 12,
                       height: (isCurrent || isFocused) ? 16 : 12,
                     }
@@ -481,10 +503,16 @@ useEffect(() => {
                   styles.milestoneLabel, 
                   { 
                     color: isFocused
-                      ? (isCompleted ? '#FF9800' : '#2196F3')
+                      ? (isCompleted ? 
+                          isSunset ? '#FF8C5A' : '#FF9800' : 
+                          isSunset ? '#FFB38E' : '#2196F3')
                       : isCompleted 
-                        ? (isDark ? '#FFB74D' : '#FF9800') 
-                        : (isDark ? theme.textSecondary : '#9E9E9E'),
+                        ? (isDark ? 
+                            '#FFB74D' : 
+                            isSunset ? 
+                              '#FF8C5A' : 
+                              '#FF9800') 
+                        : theme.textSecondary,
                     fontWeight: (isCurrent || isFocused) ? '700' : (isCompleted ? '600' : 'normal'),
                     fontSize: isFocused ? 12 : 10
                   }
@@ -499,8 +527,14 @@ useEffect(() => {
                       styles.milestoneLine,
                       {
                         backgroundColor: index < currentMilestoneIndex + 1 
-                          ? (isDark ? '#FFB74D' : '#FF9800') 
-                          : (isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0')
+                          ? (isDark ? 
+                              '#FFB74D' : 
+                              isSunset ? 
+                                '#FF8C5A' : 
+                                '#FF9800') 
+                          : (isDark || isSunset ? 
+                              'rgba(255,255,255,0.1)' : 
+                              '#E0E0E0')
                       }
                     ]} />
                     {/* Progress line for current segment */}
@@ -509,7 +543,11 @@ useEffect(() => {
                         style={[
                           styles.progressLine,
                           {
-                            backgroundColor: isDark ? '#FFB74D' : '#FF9800',
+                            backgroundColor: isDark ? 
+                              '#FFB74D' : 
+                              isSunset ? 
+                                '#FF8C5A' : 
+                                '#FF9800',
                             width: progressAnim.interpolate({
                               inputRange: [0, 1],
                               outputRange: ['0%', `${progress * 100}%`]
@@ -543,10 +581,10 @@ useEffect(() => {
                 size={20} 
                 color={
                   focusedMilestone <= streak 
-                    ? "#FF9800" 
+                    ? isSunset ? "#FF8C5A" : "#FF9800" 
                     : focusedMilestone === nextMilestone?.days 
-                      ? "#2196F3" 
-                      : "#9E9E9E"
+                      ? isSunset ? "#FFB38E" : "#2196F3" 
+                      : theme.textSecondary
                 }
               />
               <Text style={[styles.focusedMilestoneText, { 

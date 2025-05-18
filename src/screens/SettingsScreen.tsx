@@ -19,6 +19,7 @@ import NonMedicalNotice from '../components/notices/NonMedicalNotice';
 import { BobSimulatorAccessModal } from '../components/testing';
 import * as soundEffects from '../utils/soundEffects';
 import * as storageService from '../services/storageService';
+import * as achievementService from '../utils/progress/modules/achievementManager';
 
 const { width } = Dimensions.get('window');
 
@@ -70,7 +71,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const [privacyPolicyModalVisible, setPrivacyPolicyModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
-  const { theme, themeType, setThemeType, toggleTheme, isDark, canUseDarkTheme } = useTheme();
+  const { theme, themeType, setThemeType, toggleTheme, isDark, isSunset, canUseDarkTheme, canUseSunsetTheme } = useTheme();
   const { isPremium } = usePremium();
   const { isLoading, level } = useGamification();
   const { canAccessFeature, getRequiredLevel, meetsLevelRequirement } = useFeatureAccess();
@@ -82,6 +83,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const [nonMedicalNoticeModalVisible, setNonMedicalNoticeModalVisible] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(5);
   const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(true);
+  const [badgeCount, setBadgeCount] = useState(0);
   
   // Load transition duration on mount
   useEffect(() => {
@@ -98,6 +100,26 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
       setSoundEffectsEnabled(soundEffects.isSoundEnabled());
     };
     loadSoundEffectsSetting();
+  }, []);
+
+  // Load badge count on mount
+  useEffect(() => {
+    const loadBadgeCount = async () => {
+      try {
+        // Get user progress
+        const userProgress = await storageService.getUserProgress();
+        
+        // Get achievements summary
+        const achievementsSummary = achievementService.getAchievementsSummary(userProgress);
+        
+        // Count completed achievements
+        const completedCount = achievementsSummary.completed.length;
+        setBadgeCount(completedCount);
+      } catch (error) {
+        console.error('Error loading badge count:', error);
+      }
+    };
+    loadBadgeCount();
   }, []);
 
   // Handle sound effects toggle
@@ -247,21 +269,33 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         return;
       }
       
-      // For dark theme toggle, use the safe toggle method if switching to dark
+      // For dark theme, directly set to dark theme instead of using toggleTheme
       if (themeType !== 'dark') {
-        console.log('Settings screen: Toggling from light to dark theme');
-        toggleTheme();
+        console.log('Settings screen: Directly setting dark theme');
+        setThemeType('dark');
         return;
       }
-    } else if (themeType === 'dark' && type === 'light') {
-      // If switching from dark to light, also use toggleTheme
-      console.log('Settings screen: Toggling from dark to light theme');
-      toggleTheme();
-      return;
-    } else if (type === 'system') {
-      // For system theme, use regular setThemeType
-      console.log(`Settings screen: Setting theme to system`);
-      setThemeType('system');
+    } else if (type === 'sunset') {
+      if (!canUseSunsetTheme) {
+        // For sunset theme, don't tell them exactly how many achievements are needed
+        Alert.alert(
+          'Hidden Theme Locked',
+          'Continue collecting achievement badges to unlock this special theme.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // For sunset theme toggle
+      if (themeType !== 'sunset') {
+        console.log('Settings screen: Toggling to sunset theme');
+        setThemeType('sunset');
+        return;
+      }
+    } else if (themeType === 'dark' && type === 'light' || themeType === 'sunset' && type === 'light') {
+      // If switching from dark/sunset to light, also use setThemeType directly
+      console.log('Settings screen: Toggling to light theme');
+      setThemeType('light');
       return;
     }
   };
@@ -357,7 +391,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               style={[
                 styles.transitionOption,
                 transitionDuration === 0 && styles.transitionOptionSelected,
-                { backgroundColor: transitionDuration === 0 ? theme.accent : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
+                { backgroundColor: transitionDuration === 0 ? theme.accent : (isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
               ]}
               onPress={() => handleTransitionDurationChange(0)}
             >
@@ -371,7 +405,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               style={[
                 styles.transitionOption,
                 transitionDuration === 5 && styles.transitionOptionSelected,
-                { backgroundColor: transitionDuration === 5 ? theme.accent : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
+                { backgroundColor: transitionDuration === 5 ? theme.accent : (isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
               ]}
               onPress={() => handleTransitionDurationChange(5)}
             >
@@ -385,7 +419,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               style={[
                 styles.transitionOption,
                 transitionDuration === 10 && styles.transitionOptionSelected,
-                { backgroundColor: transitionDuration === 10 ? theme.accent : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
+                { backgroundColor: transitionDuration === 10 ? theme.accent : (isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') }
               ]}
               onPress={() => handleTransitionDurationChange(10)}
             >
@@ -410,7 +444,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           <Switch
             value={soundEffectsEnabled}
             onValueChange={handleToggleSoundEffects}
-            trackColor={{ false: '#767577', true: isDark ? theme.accent + '80' : theme.accent + '50' }}
+            trackColor={{ false: '#767577', true: isDark || isSunset ? theme.accent + '80' : theme.accent + '50' }}
             thumbColor={soundEffectsEnabled ? theme.accent : '#f4f3f4'}
             ios_backgroundColor="#3e3e3e"
           />
@@ -421,7 +455,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   
   return (
     <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+      <StatusBar barStyle={isDark || isSunset ? "light-content" : "dark-content"} backgroundColor={theme.background} />
       
       {/* Header */}
       <View style={[styles.header, {borderBottomColor: theme.border, backgroundColor: theme.cardBackground}]}>
@@ -447,17 +481,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           {/* Theme selection */}
           <View style={styles.settingItem}>
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isSunset ? '#462639' : (isDark || isSunset ? '#2D2D2D' : '#E3F2FD')}]}>
                 <Ionicons 
-                  name={isDark ? "moon" : "sunny"} 
+                  name={isSunset ? "partly-sunny" : (isDark || isSunset ? "moon" : "sunny")} 
                   size={22} 
-                  color={isDark ? "#BB86FC" : "#FF9800"} 
+                  color={isSunset ? "#FF8C5A" : (isDark ? "#BB86FC" : "#FF9800")} 
                 />
               </View>
               <View style={styles.textContainer}>
                 <Text style={[styles.settingTitle, {color: theme.text}]}>App Theme</Text>
                 <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
-                  {canAccessFeature('dark_theme') 
+                  {canAccessFeature('dark_theme') || canUseSunsetTheme
                     ? 'Choose how the app looks' 
                     : isPremium && !meetsLevelRequirement('dark_theme')
                       ? `Dark mode unlocks at level ${getRequiredLevel('dark_theme')} (Current: ${level})`
@@ -468,7 +502,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           </View>
           
           {/* Theme options */}
-          {canAccessFeature('dark_theme') && (
+          {(canAccessFeature('dark_theme') || canUseSunsetTheme) && (
             <View style={styles.themeOptions}>
               <TouchableOpacity
                 style={[
@@ -478,7 +512,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 ]}
                 onPress={() => handleThemeTypeSelection('light')}
               >
-                <View style={[styles.themeIconContainer, {backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
+                <View style={[styles.themeIconContainer, {backgroundColor: isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
                   <Ionicons name="sunny" size={22} color="#FF9800" />
                 </View>
                 <Text style={[styles.themeOptionText, {color: theme.text}]}>Light</Text>
@@ -489,43 +523,49 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 )}
               </TouchableOpacity>
               
-              <TouchableOpacity
-                style={[
-                  styles.themeOption, 
-                  themeType === 'dark' && styles.themeOptionSelected,
-                  {backgroundColor: themeType === 'dark' ? theme.accent + '20' : theme.backgroundLight}
-                ]}
-                onPress={() => handleThemeTypeSelection('dark')}
-              >
-                <View style={[styles.themeIconContainer, {backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
-                  <Ionicons name="moon" size={22} color={isDark ? "#BB86FC" : "#673AB7"} />
-                </View>
-                <Text style={[styles.themeOptionText, {color: theme.text}]}>Dark</Text>
-                {themeType === 'dark' && (
-                  <View style={styles.selectedIndicator}>
-                    <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
+              {canAccessFeature('dark_theme') && (
+                <TouchableOpacity
+                  style={[
+                    styles.themeOption, 
+                    themeType === 'dark' && styles.themeOptionSelected,
+                    {backgroundColor: themeType === 'dark' ? theme.accent + '20' : theme.backgroundLight}
+                  ]}
+                  onPress={() => handleThemeTypeSelection('dark')}
+                >
+                  <View style={[styles.themeIconContainer, {backgroundColor: isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
+                    <Ionicons name="moon" size={22} color={isDark || isSunset ? "#BB86FC" : "#673AB7"} />
                   </View>
-                )}
-              </TouchableOpacity>
+                  <Text style={[styles.themeOptionText, {color: theme.text}]}>Dark</Text>
+                  {themeType === 'dark' && (
+                    <View style={styles.selectedIndicator}>
+                      <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
               
-              <TouchableOpacity
-                style={[
-                  styles.themeOption, 
-                  themeType === 'system' && styles.themeOptionSelected,
-                  {backgroundColor: themeType === 'system' ? theme.accent + '20' : theme.backgroundLight}
-                ]}
-                onPress={() => handleThemeTypeSelection('system')}
-              >
-                <View style={[styles.themeIconContainer, {backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
-                  <Ionicons name="phone-portrait" size={22} color="#64B5F6" />
-                </View>
-                <Text style={[styles.themeOptionText, {color: theme.text}]}>System</Text>
-                {themeType === 'system' && (
-                  <View style={styles.selectedIndicator}>
-                    <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
+              {canUseSunsetTheme && (
+                <TouchableOpacity
+                  style={[
+                    styles.themeOption, 
+                    themeType === 'sunset' && styles.themeOptionSelected,
+                    {backgroundColor: themeType === 'sunset' ? '#FF8C5A20' : theme.backgroundLight}
+                  ]}
+                  onPress={() => handleThemeTypeSelection('sunset')}
+                >
+                  <View style={[styles.themeIconContainer, {backgroundColor: isSunset ? 'rgba(255, 140, 90, 0.2)' : 'rgba(255, 255, 255, 0.5)'}]}>
+                    <Ionicons name="partly-sunny" size={22} color="#FF8C5A" />
                   </View>
-                )}
-              </TouchableOpacity>
+                  <Text style={[styles.themeOptionText, {color: theme.text}]}>Sunset</Text>
+                  {themeType === 'sunset' && (
+                    <View style={styles.selectedIndicator}>
+                      <Ionicons name="checkmark-circle" size={16} color="#FF8C5A" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+              
+             
             </View>
           )}
           
@@ -560,6 +600,24 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               )}
             </>
           )}
+          
+          {/* Sunset theme lock info - only shown if user has some badges but can't access the theme yet */}
+          {!canUseSunsetTheme && badgeCount > 0 && (
+            <View style={styles.sunsetModeLockContainer}>
+              <View style={styles.sunsetModeLockHeaderRow}>
+                <Ionicons name="partly-sunny" size={24} color="#FF8C5A" />
+                <ThemedText bold size={16} style={styles.sunsetModeLockTitle}>
+                  Hidden Theme
+                </ThemedText>
+                <View style={[styles.lockBadge, { backgroundColor: '#FF8C5A' }]}>
+                  <Ionicons name="trophy" size={16} color="#FFFFFF" />
+                </View>
+              </View>
+              <ThemedText type="secondary" style={styles.unlockTip}>
+                Continue collecting achievements to unlock a special theme
+              </ThemedText>
+            </View>
+          )}
         </View>
         
         {/* Workout Settings Section */}
@@ -571,13 +629,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           
           {isPremium ? (
             <>
-              <View style={[styles.premiumInfoCard, { backgroundColor: isDark ? 'rgba(76, 175, 80, 0.1)' : '#E8F5E9' }]}>
+              <View style={[styles.premiumInfoCard, { backgroundColor: isDark || isSunset ? 'rgba(76, 175, 80, 0.1)' : '#E8F5E9' }]}>
                 <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
                 <View style={styles.premiumInfoContent}>
-                  <Text style={[styles.premiumInfoTitle, { color: isDark ? '#81C784' : '#4CAF50' }]}>
+                  <Text style={[styles.premiumInfoTitle, { color: isDark || isSunset ? '#81C784' : '#4CAF50' }]}>
                     Premium Subscription Active
                   </Text>
-                  <Text style={[styles.premiumInfoText, { color: isDark ? theme.textSecondary : '#666' }]}>
+                  <Text style={[styles.premiumInfoText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                     Thank you for supporting FlexBreak! You have access to all premium features.
                   </Text>
                 </View>
@@ -588,7 +646,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 onPress={openSubscriptionManagement}
               >
                 <View style={styles.settingContent}>
-                  <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                  <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                     <Ionicons name="card-outline" size={22} color="#2196F3" />
                   </View>
                   <View style={styles.textContainer}>
@@ -607,7 +665,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               onPress={handleOpenSubscription}
             >
               <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                   <Ionicons name="star" size={22} color="#FFD700" />
                 </View>
                 <View style={styles.textContainer}>
@@ -628,7 +686,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
           
           <TouchableOpacity style={styles.settingItem}>
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="information-circle-outline" size={22} color="#2196F3" />
               </View>
               <View style={styles.textContainer}>
@@ -643,7 +701,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             onPress={() => Linking.openURL('https://flexbreak-privacy-app.netlify.app/')}
           >
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="document-text-outline" size={22} color="#2196F3" />
               </View>
               <View style={styles.textContainer}>
@@ -659,7 +717,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             onPress={() => setHelpModalVisible(true)}  
           >
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="help-circle-outline" size={22} color="#2196F3" />
               </View>
               <View style={styles.textContainer}>
@@ -675,7 +733,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             onPress={handleOpenWebsite}
           >
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="globe-outline" size={22} color="#2196F3" />
               </View>
               <View style={styles.textContainer}>
@@ -691,7 +749,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             onPress={handleContactSupport}
           >
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="mail-outline" size={22} color="#2196F3" />
               </View>
               <View style={styles.textContainer}>
@@ -713,7 +771,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             onPress={() => setFitnessDisclaimerModalVisible(true)}
           >
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="fitness-outline" size={22} color={theme.accent} />
               </View>
               <View style={styles.textContainer}>
@@ -732,7 +790,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             onPress={() => setNonMedicalNoticeModalVisible(true)}
           >
             <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                 <Ionicons name="information-circle-outline" size={22} color={theme.accent} />
               </View>
               <View style={styles.textContainer}>
@@ -755,7 +813,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
               onPress={() => setDiagnosticsModalVisible(true)}
             >
               <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark ? '#2D2D2D' : '#E3F2FD'}]}>
+                <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
                   <Ionicons name="analytics-outline" size={22} color={theme.accent} />
                 </View>
                 <View style={styles.textContainer}>
@@ -812,14 +870,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                   <TouchableOpacity 
                     style={[
                       styles.premiumButton,
-                      {backgroundColor: isDark ? '#3D5A3D' : '#E8F5E9'},
+                      {backgroundColor: isDark || isSunset ? '#3D5A3D' : '#E8F5E9'},
                       isPremium && {opacity: 0.5}
                     ]}
                     onPress={handleGrantPremiumStatus}
                     disabled={isPremium}
                   >
-                    <Ionicons name="star" size={18} color={isDark ? '#81C784' : '#4CAF50'} style={styles.premiumButtonIcon} />
-                    <Text style={[styles.premiumButtonText, {color: isDark ? '#81C784' : '#4CAF50'}]}>
+                    <Ionicons name="star" size={18} color={isDark || isSunset ? '#81C784' : '#4CAF50'} style={styles.premiumButtonIcon} />
+                    <Text style={[styles.premiumButtonText, {color: isDark || isSunset ? '#81C784' : '#4CAF50'}]}>
                       Grant Premium
                     </Text>
                   </TouchableOpacity>
@@ -828,14 +886,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                   <TouchableOpacity 
                     style={[
                       styles.premiumButton,
-                      {backgroundColor: isDark ? '#5D3A3A' : '#FFEBEE'},
+                      {backgroundColor: isDark || isSunset ? '#5D3A3A' : '#FFEBEE'},
                       !isPremium && {opacity: 0.5}
                     ]}
                     onPress={handleClearPremiumStatus}
                     disabled={!isPremium}
                   >
-                    <Ionicons name="close-circle" size={18} color={isDark ? '#EF9A9A' : '#F44336'} style={styles.premiumButtonIcon} />
-                    <Text style={[styles.premiumButtonText, {color: isDark ? '#EF9A9A' : '#F44336'}]}>
+                    <Ionicons name="close-circle" size={18} color={isDark || isSunset ? '#EF9A9A' : '#F44336'} style={styles.premiumButtonIcon} />
+                    <Text style={[styles.premiumButtonText, {color: isDark || isSunset ? '#EF9A9A' : '#F44336'}]}>
                       Clear Premium
                     </Text>
                   </TouchableOpacity>
@@ -847,7 +905,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 onPress={handleResetSimulationData}
               >
                 <View style={styles.settingContent}>
-                  <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                  <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#3B2E2E' : '#FFEBEE'}]}>
                     <Ionicons name="trash-outline" size={22} color="#F44336" />
                   </View>
                   <View style={styles.textContainer}>
@@ -862,7 +920,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 onPress={handleResetData}
               >
                 <View style={styles.settingContent}>
-                  <View style={[styles.iconContainer, {backgroundColor: isDark ? '#3B2E2E' : '#FFEBEE'}]}>
+                  <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#3B2E2E' : '#FFEBEE'}]}>
                     <Ionicons name="trash-outline" size={22} color="#F44336" />
                   </View>
                   <View style={styles.textContainer}>
@@ -1741,6 +1799,25 @@ const styles = StyleSheet.create({
   premiumButtonText: {
     fontWeight: '600',
     fontSize: 14,
+  },
+  sunsetModeLockContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: 'rgba(255, 140, 90, 0.05)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF8C5A',
+  },
+  sunsetModeLockHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sunsetModeLockTitle: {
+    marginLeft: 8,
+    flex: 1,
+    color: '#FF8C5A',
   },
 });
 

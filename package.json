@@ -12,9 +12,10 @@
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/netinfo": "^11.4.1",
+    "@react-native-community/slider": "4.5.5",
     "@react-navigation/bottom-tabs": "^7.2.1",
-    "@react-navigation/native": "^7.0.15",
-    "@react-navigation/stack": "^7.2.0",
+    "@react-navigation/native": "7",
+    "@react-navigation/stack": "^7.2.1",
     "@reduxjs/toolkit": "^2.6.1",
     "eas-cli": "^16.4.0",
     "expo": "^52.0.16",
@@ -37,8 +38,7 @@
     "react-native-svg": "^15.11.2",
     "react-native-toast-notifications": "^3.3.1",
     "react-native-web": "~0.19.6",
-    "react-redux": "^9.2.0",
-    "@react-native-community/slider": "4.5.5"
+    "react-redux": "^9.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",

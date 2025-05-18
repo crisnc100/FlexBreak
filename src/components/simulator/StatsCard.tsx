@@ -21,7 +21,7 @@ interface StatsCardProps {
  * Extracted from BobSimulatorScreen to keep that screen leaner.
  */
 const StatsCard: React.FC<StatsCardProps> = ({ stats, bobProgress }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
 
   if (!bobProgress) return null;
 

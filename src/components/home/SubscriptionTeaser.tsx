@@ -20,12 +20,12 @@ const SubscriptionTeaser: React.FC<SubscriptionTeaserProps> = ({
   text = 'Unlock Premium Features',
   buttonText = 'Upgrade Now'
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={isDark ? 
+        colors={isDark || isSunset ? 
           ['#263238', '#37474F'] : 
           ['#FFD54F', '#FFA000']}
         start={{ x: 0, y: 0 }}
@@ -37,13 +37,13 @@ const SubscriptionTeaser: React.FC<SubscriptionTeaserProps> = ({
             <Ionicons 
               name="star" 
               size={24} 
-              color={isDark ? "#FFD700" : "#FFFFFF"} 
+              color={isDark || isSunset ? "#FFD700" : "#FFFFFF"} 
             />
           </View>
           
           <View style={styles.textContainer}>
             <Text style={styles.title}>
-              {isDark ? 'flexbreak Premium' : 'Go Premium'}
+              {isDark || isSunset ? 'flexbreak Premium' : 'Go Premium'}
             </Text>
             <Text style={styles.description}>
               {text}
@@ -51,15 +51,15 @@ const SubscriptionTeaser: React.FC<SubscriptionTeaserProps> = ({
             
             <View style={styles.featuresContainer}>
               <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={16} color={isDark ? "#4CAF50" : "#FFFFFF"} />
+                <Ionicons name="checkmark-circle" size={16} color={isDark || isSunset ? "#4CAF50" : "#FFFFFF"} />
                 <Text style={styles.featureText}>Custom Routines</Text>
               </View>
               <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={16} color={isDark ? "#4CAF50" : "#FFFFFF"} />
+                <Ionicons name="checkmark-circle" size={16} color={isDark || isSunset ? "#4CAF50" : "#FFFFFF"} />
                 <Text style={styles.featureText}>Analytics and Rewards</Text>
               </View>
               <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={16} color={isDark ? "#4CAF50" : "#FFFFFF"} />
+                <Ionicons name="checkmark-circle" size={16} color={isDark || isSunset ? "#4CAF50" : "#FFFFFF"} />
                 <Text style={styles.featureText}>Smart Reminders</Text>
               </View>
             </View>
@@ -69,12 +69,12 @@ const SubscriptionTeaser: React.FC<SubscriptionTeaserProps> = ({
             onPress={onPremiumPress}
             style={[
               styles.button,
-              { backgroundColor: isDark ? '#FFD700' : '#FFFFFF' }
+              { backgroundColor: isDark || isSunset ? '#FFD700' : '#FFFFFF' }
             ]}
           >
             <Text style={[
               styles.buttonText,
-              { color: isDark ? '#263238' : '#FF9800' }
+              { color: isDark || isSunset ? '#263238' : '#FF9800' }
             ]}>
               {buttonText}
             </Text>

@@ -41,7 +41,7 @@ const NonMedicalNotice: React.FC<NonMedicalNoticeProps> = ({
   onAcknowledge,
   isModal = false
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   const handleAcknowledge = async () => {
     if (onAcknowledge) {
@@ -54,7 +54,7 @@ const NonMedicalNotice: React.FC<NonMedicalNoticeProps> = ({
     <View style={[
       styles.container, 
       { 
-        backgroundColor: isDark 
+        backgroundColor: isDark || isSunset 
           ? 'rgba(255, 255, 255, 0.05)' 
           : 'rgba(66, 135, 245, 0.05)',
         borderColor: theme.border
@@ -64,11 +64,11 @@ const NonMedicalNotice: React.FC<NonMedicalNoticeProps> = ({
         <Ionicons 
           name="information-circle-outline" 
           size={22} 
-          color={isDark ? '#A0D0FF' : '#4287F5'} 
+          color={isDark || isSunset ? '#A0D0FF' : '#4287F5'} 
         />
         <Text style={[
           styles.title, 
-          { color: isDark ? '#A0D0FF' : '#4287F5' }
+          { color: isDark || isSunset ? '#A0D0FF' : '#4287F5' }
         ]}>
           Non-Medical Wellness Content
         </Text>
@@ -81,7 +81,7 @@ const NonMedicalNotice: React.FC<NonMedicalNoticeProps> = ({
             <Ionicons 
               name={expanded ? "chevron-up" : "chevron-down"} 
               size={18} 
-              color={isDark ? theme.textSecondary : '#6F6F6F'} 
+              color={isDark || isSunset ? theme.textSecondary : '#6F6F6F'} 
             />
           </TouchableOpacity>
         )}
@@ -91,7 +91,7 @@ const NonMedicalNotice: React.FC<NonMedicalNoticeProps> = ({
         <View>
           <Text style={[
             styles.content, 
-            { color: isDark ? theme.textSecondary : '#505050' }
+            { color: isDark || isSunset ? theme.textSecondary : '#505050' }
           ]}>
             FlexBreak provides general wellness stretching routines to support your physical wellbeing.
             This content is not medical advice and isn't intended to diagnose, treat, or cure any condition.
@@ -125,7 +125,7 @@ const NonMedicalNotice: React.FC<NonMedicalNoticeProps> = ({
         <View style={styles.modalOverlay}>
           <View style={[
             styles.modalContainer,
-            { backgroundColor: isDark ? theme.cardBackground : theme.background }
+            { backgroundColor: isDark || isSunset ? theme.cardBackground : theme.background }
           ]}>
             <NoticeContent />
           </View>

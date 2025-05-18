@@ -52,7 +52,7 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
   backdropOpacity,
   multiSelect = false
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // Generate icon for each option based on its value
   const getIconForOption = (option: Option): IoniconsName => {
@@ -143,7 +143,7 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
       >
         {/* Dropdown Header with Gradient Background */}
         <LinearGradient
-          colors={isDark ? 
+          colors={isDark || isSunset ? 
             ['rgba(66, 153, 225, 0.5)', 'rgba(99, 102, 241, 0.5)'] : 
             ['rgba(66, 153, 225, 0.2)', 'rgba(99, 102, 241, 0.2)']}
           start={{ x: 0, y: 0 }}
@@ -158,7 +158,7 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
               {title}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <View style={[styles.closeButtonCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+              <View style={[styles.closeButtonCircle, { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
                 <Ionicons name="close" size={22} color={theme.textSecondary} />
               </View>
             </TouchableOpacity>
@@ -198,7 +198,7 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
                       { 
                         backgroundColor: isItemSelected 
                           ? `${theme.accent}20`
-                          : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                          : isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
                       }
                     ]}>
                       <Ionicons 

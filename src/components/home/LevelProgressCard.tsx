@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, ScrollView, Modal } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import LevelProgressBar from '../progress/LevelProgressBar';
@@ -7,19 +7,33 @@ import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp } from '../../types';
 import { usePremium } from '../../context/PremiumContext';
 import { useLevelProgress } from '../../hooks/progress/useLevelProgress';
-import { gamificationEvents, XP_UPDATED_EVENT, LEVEL_UP_EVENT } from '../../hooks/progress/useGamification';
+import { gamificationEvents, XP_UPDATED_EVENT, LEVEL_UP_EVENT, ACHIEVEMENT_COMPLETED_EVENT } from '../../hooks/progress/useGamification';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as achievementManager from '../../utils/progress/modules/achievementManager';
+import * as storageService from '../../services/storageService';
+import { Achievement } from '../../utils/progress/types';
 
 interface LevelProgressCardProps {
   onPress?: () => void;
   onOpenSubscription?: () => void;
 }
 
+// Format a date string to a more user-friendly format
+const formatDate = (dateString: string | undefined): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  });
+};
+
 const LevelProgressCard: React.FC<LevelProgressCardProps> = ({ 
   onPress, 
   onOpenSubscription 
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const navigation = useNavigation<AppNavigationProp>();
   const { 
     currentLevel, 
@@ -32,10 +46,50 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
   } = useLevelProgress();
   const { isPremium } = usePremium();
   
+  // Achievement data
+  const [recentAchievements, setRecentAchievements] = useState<Achievement[]>([]);
+  const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
+  const [isLoadingAchievements, setIsLoadingAchievements] = useState(true);
+  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [showAchievementModal, setShowAchievementModal] = useState(false);
+  
   // Animation for visual feedback when XP updates
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const shineAnim = useRef(new Animated.Value(-100)).current;
   const [lastXp, setLastXp] = useState(totalXP);
+  
+  // Animation for badge press
+  const badgePulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Load achievement data
+  useEffect(() => {
+    const loadAchievements = async () => {
+      try {
+        setIsLoadingAchievements(true);
+        const userProgress = await storageService.getUserProgress();
+        const achievementsSummary = achievementManager.getAchievementsSummary(userProgress);
+        
+        // Get all completed achievements
+        const completedAchievements = achievementsSummary.completed || [];
+        
+        // Sort by completion date, most recent first
+        const sortedAchievements = [...completedAchievements].sort((a, b) => {
+          if (!a.dateCompleted) return 1;
+          if (!b.dateCompleted) return -1;
+          return new Date(b.dateCompleted).getTime() - new Date(a.dateCompleted).getTime();
+        });
+        
+        setAllAchievements(sortedAchievements);
+        setRecentAchievements(sortedAchievements.slice(0, 3));
+      } catch (error) {
+        console.error('Error loading achievements:', error);
+      } finally {
+        setIsLoadingAchievements(false);
+      }
+    };
+    
+    loadAchievements();
+  }, []);
   
   // Detect XP changes and animate
   useEffect(() => {
@@ -108,16 +162,48 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
       ]).start();
     };
     
+    // Handle achievement completion
+    const handleAchievementCompleted = (achievement: Achievement) => {
+      console.log('LevelProgressCard: Achievement completed event received', achievement.title);
+      // Refresh achievements
+      loadAchievements();
+    };
+    
     // Add event listeners
     gamificationEvents.on(XP_UPDATED_EVENT, handleXpUpdate);
     gamificationEvents.on(LEVEL_UP_EVENT, handleLevelUp);
+    gamificationEvents.on(ACHIEVEMENT_COMPLETED_EVENT, handleAchievementCompleted);
     
     // Cleanup on unmount
     return () => {
       gamificationEvents.off(XP_UPDATED_EVENT, handleXpUpdate);
       gamificationEvents.off(LEVEL_UP_EVENT, handleLevelUp);
+      gamificationEvents.off(ACHIEVEMENT_COMPLETED_EVENT, handleAchievementCompleted);
     };
   }, [refreshLevelData, pulseAnim]);
+  
+  // Load achievements function to be called on achievement completion
+  const loadAchievements = async () => {
+    try {
+      const userProgress = await storageService.getUserProgress();
+      const achievementsSummary = achievementManager.getAchievementsSummary(userProgress);
+      
+      // Get completed achievements
+      const completedAchievements = achievementsSummary.completed || [];
+      
+      // Sort by completion date, most recent first
+      const sortedAchievements = [...completedAchievements].sort((a, b) => {
+        if (!a.dateCompleted) return 1;
+        if (!b.dateCompleted) return -1;
+        return new Date(b.dateCompleted).getTime() - new Date(a.dateCompleted).getTime();
+      });
+      
+      setAllAchievements(sortedAchievements);
+      setRecentAchievements(sortedAchievements.slice(0, 3));
+    } catch (error) {
+      console.error('Error loading achievements:', error);
+    }
+  };
   
   // Initial refresh when component mounts
   useEffect(() => {
@@ -143,6 +229,39 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
     }
   };
   
+  // Handle achievement badge press
+  const handleBadgePress = (achievement: Achievement) => {
+    // Animate the badge
+    Animated.sequence([
+      Animated.timing(badgePulseAnim, {
+        toValue: 1.3,
+        duration: 150,
+        useNativeDriver: true
+      }),
+      Animated.timing(badgePulseAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true
+      })
+    ]).start();
+    
+    // Set the selected achievement and show modal
+    setSelectedAchievement(achievement);
+    setShowAchievementModal(true);
+  };
+  
+  // Navigate to all achievements
+  const handleViewAllAchievements = () => {
+    navigation.navigate('Progress', { screen: 'Achievements' } as any);
+  };
+  
+  // Show achievement modal with all achievements
+  const handleShowAllAchievements = () => {
+    // We'll open a modal with all achievements
+    // For now, navigate to the Achievements screen
+    navigation.navigate('Progress', { screen: 'Achievements' } as any);
+  };
+  
   // Development only - Debug tap handler to test XP updates (long press)
   const handleDebugLongPress = () => {
     if (__DEV__) {
@@ -151,13 +270,98 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
     }
   };
   
+  // Get badge icon for achievement type
+  const getBadgeIcon = (achievement: Achievement) => {
+    if (!achievement) return 'ribbon-outline';
+    
+    switch (achievement.type) {
+      case 'routine_count':
+        return 'trophy-outline';
+      case 'streak':
+        return 'flame-outline';
+      case 'area_variety':
+        return 'body-outline';
+      case 'specific_area':
+        return 'fitness-outline';
+      case 'total_minutes':
+        return 'time-outline';
+      default:
+        return 'ribbon-outline';
+    }
+  };
+  
+  // Get badge color for achievement type
+  const getBadgeColor = (achievement: Achievement) => {
+    const { isDark, isSunset, theme } = useTheme();
+    
+    // If the achievement has a specific color defined, use it
+    if (achievement.badgeColor) return achievement.badgeColor;
+    
+    // Use tier colors for different tiers
+    if (achievement.badgeTier) {
+      // Use sunset appropriate colors if in sunset theme
+      if (isSunset) {
+        switch (achievement.badgeTier) {
+          case 'bronze': return '#E67E51'; // Warm bronze for sunset
+          case 'silver': return '#D9D4E8'; // Warmer silver for sunset
+          case 'gold': return '#FFAA5A';   // Orange-gold for sunset
+          case 'platinum': return '#F5E9E2'; // Warm platinum for sunset
+          default: return theme.accent;
+        }
+      } else {
+        switch (achievement.badgeTier) {
+          case 'bronze': return '#CD7F32';
+          case 'silver': return '#C0C0C0';
+          case 'gold': return '#FFD700';
+          case 'platinum': return '#E5E4E2';
+          default: return theme.accent;
+        }
+      }
+    }
+    
+    // For types, adjust colors based on theme
+    if (isSunset) {
+      switch (achievement.type) {
+        case 'streak':
+          return '#FF8C5A'; // Sunset orange
+        case 'routine_count':
+          return '#E67E51'; // Darker sunset
+        case 'area_variety':
+          return '#FFB38E'; // Lighter sunset
+        case 'specific_area':
+          return '#FF9D6C'; // Medium sunset
+        case 'total_minutes':
+          return '#E67341'; // Deep sunset
+        default:
+          return theme.accent;
+      }
+    } else {
+      // For types, use consistent green color scheme instead of different colors
+      // Just vary the shade based on the type for subtle distinction
+      switch (achievement.type) {
+        case 'streak':
+          return '#4CAF50'; // Standard green
+        case 'routine_count':
+          return '#388E3C'; // Darker green
+        case 'area_variety':
+          return '#66BB6A'; // Lighter green
+        case 'specific_area':
+          return '#43A047'; // Medium green
+        case 'total_minutes':
+          return '#2E7D32'; // Deep green
+        default:
+          return theme.accent; // Theme accent color (should be green)
+      }
+    }
+  };
+  
   return (
     <Animated.View
       style={[
         styles.container,
         { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFF',
-          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
+          backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+          shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000',
           transform: [{ scale: pulseAnim }]
         }
       ]}
@@ -175,7 +379,9 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
         colors={
           isDark ? 
             ['rgba(76, 175, 80, 0.1)', 'rgba(33, 150, 243, 0.05)'] : 
-            ['rgba(200, 230, 201, 0.5)', 'rgba(187, 222, 251, 0.3)']
+            isSunset ? 
+              ['rgba(255, 140, 90, 0.15)', 'rgba(255, 179, 142, 0.05)'] : 
+              ['rgba(200, 230, 201, 0.5)', 'rgba(187, 222, 251, 0.3)']
         }
         style={styles.cardBackground}
         start={{x: 0, y: 0}}
@@ -190,7 +396,13 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
           <View style={styles.header}>
             <View style={styles.levelBadgeContainer}>
               <LinearGradient
-                colors={isDark ? ['#388E3C', '#2E7D32'] : ['#4CAF50', '#388E3C']}
+                colors={
+                  isDark ? 
+                    ['#388E3C', '#2E7D32'] : 
+                    isSunset ? 
+                      ['#FF8C5A', '#E67E51'] : 
+                      ['#4CAF50', '#388E3C']
+                }
                 style={styles.levelBadge}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 0}}
@@ -210,10 +422,16 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
             
             <View style={[
               styles.xpContainer, 
-              { backgroundColor: isDark ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 215, 0, 0.2)' }
+              { 
+                backgroundColor: isDark ? 
+                  'rgba(255, 215, 0, 0.15)' : 
+                  isSunset ? 
+                    'rgba(255, 241, 230, 0.25)' : 
+                    'rgba(255, 215, 0, 0.2)' 
+              }
             ]}>
-              <Ionicons name="flash" size={16} color={isDark ? "#FFD700" : "#FF9800"} />
-              <Text style={[styles.xpText, { color: isDark ? '#FFD700' : '#FF9800' }]}>
+              <Ionicons name="flash" size={16} color={theme.accent} />
+              <Text style={[styles.xpText, { color: theme.accent }]}>
                 {totalXP} XP
               </Text>
             </View>
@@ -233,6 +451,60 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
             />
           </View>
           
+          {/* Recent achievement badges for premium users */}
+          {isPremium && recentAchievements.length > 0 && (
+            <View style={styles.badgesContainer}>
+              <View style={styles.badgesHeader}>
+                <Text style={[styles.badgesTitle, { color: theme.text }]}>
+                  Badges Unlocked
+                </Text>
+                {allAchievements.length > 3 && (
+                  <TouchableOpacity onPress={handleViewAllAchievements}>
+                    <Text style={[styles.viewAllText, { color: theme.accent }]}>
+                      View All ({allAchievements.length})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.badgesRow}>
+                {recentAchievements.map((achievement) => (
+                  <TouchableOpacity 
+                    key={achievement.id} 
+                    style={styles.badgeItem}
+                    onPress={() => handleBadgePress(achievement)}
+                    activeOpacity={0.7}
+                  >
+                    <Animated.View
+                      style={[
+                        {transform: [{ scale: badgePulseAnim }]}
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[getBadgeColor(achievement), getBadgeColor(achievement)]}
+                        style={styles.badgeCircle}
+                        start={{x: 0, y: 0}}
+                        end={{x: 1, y: 1}}
+                      >
+                        <Ionicons 
+                          name={getBadgeIcon(achievement)} 
+                          size={22} 
+                          color="white" 
+                        />
+                      </LinearGradient>
+                    </Animated.View>
+                    <Text 
+                      style={[styles.badgeName, { color: theme.text }]}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
+                      {achievement.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+          
           {isPremium ? (
             <View style={styles.viewMoreContainer}>
               <Text style={[styles.viewMoreText, { color: theme.accent }]}>
@@ -245,7 +517,10 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
               />
             </View>
           ) : (
-            <View style={[styles.perkContainer, { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+            <View style={[
+              styles.perkContainer, 
+              { borderTopColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+            ]}>
               <View style={styles.perkItem}>
                 <Ionicons name="rocket-outline" size={15} color={theme.accent} />
                 <Text style={[styles.perkText, { color: theme.textSecondary }]}>
@@ -262,6 +537,103 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
           )}
         </TouchableOpacity>
       </LinearGradient>
+      
+      {/* Achievement Detail Modal */}
+      <Modal
+        visible={showAchievementModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAchievementModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAchievementModal(false)}
+        >
+          <View 
+            style={[
+              styles.modalContent, 
+              { 
+                backgroundColor: theme.cardBackground,
+                shadowColor: isDark || isSunset ? 'black' : '#000',
+              }
+            ]}
+          >
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowAchievementModal(false)}
+            >
+              <Ionicons 
+                name="close-circle" 
+                size={24} 
+                color={isDark || isSunset ? theme.textSecondary : 'rgba(0,0,0,0.5)'} 
+              />
+            </TouchableOpacity>
+            
+            {selectedAchievement && (
+              <View style={styles.achievementDetail}>
+                <LinearGradient
+                  colors={[getBadgeColor(selectedAchievement), getBadgeColor(selectedAchievement)]}
+                  style={styles.detailBadge}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 1}}
+                >
+                  <Ionicons 
+                    name={getBadgeIcon(selectedAchievement)} 
+                    size={40} 
+                    color="white" 
+                  />
+                </LinearGradient>
+                
+                <Text style={[styles.detailTitle, { color: theme.text }]}>
+                  {selectedAchievement.title}
+                </Text>
+                
+                <Text style={[styles.detailDescription, { color: theme.textSecondary }]}>
+                  {selectedAchievement.description}
+                </Text>
+                
+                <View style={styles.detailInfo}>
+                  <View style={styles.detailInfoItem}>
+                    <Ionicons name="flash" size={16} color={theme.accent} />
+                    <Text style={[styles.detailInfoText, { color: theme.accent }]}>
+                      {selectedAchievement.xp} XP
+                    </Text>
+                  </View>
+                  
+                  {selectedAchievement.dateCompleted && (
+                    <View style={styles.detailInfoItem}>
+                      <Ionicons name="calendar" size={16} color={theme.textSecondary} />
+                      <Text style={[styles.detailInfoText, { color: theme.textSecondary }]}>
+                        Earned on {formatDate(selectedAchievement.dateCompleted)}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {selectedAchievement.badgeTier && (
+                    <View style={styles.detailInfoItem}>
+                      <Ionicons name="trophy" size={16} color={getBadgeColor(selectedAchievement)} />
+                      <Text style={[styles.detailInfoText, { color: theme.textSecondary }]}>
+                        {selectedAchievement.badgeTier.charAt(0).toUpperCase() + selectedAchievement.badgeTier.slice(1)} tier
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                
+                <TouchableOpacity
+                  style={[styles.viewAllButton, { backgroundColor: theme.accent }]}
+                  onPress={() => {
+                    setShowAchievementModal(false);
+                    handleViewAllAchievements();
+                  }}
+                >
+                  <Text style={styles.viewAllButtonText}>View All Achievements</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </Animated.View>
   );
 };
@@ -394,7 +766,121 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
     transform: [{ skewX: '-20deg' }],
     zIndex: 10
-  }
+  },
+  badgesContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(150, 150, 150, 0.1)',
+  },
+  badgesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  badgesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  badgeItem: {
+    alignItems: 'center',
+    width: '30%',
+  },
+  badgeCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  badgeName: {
+    fontSize: 12,
+    textAlign: 'center',
+    height: 32,
+  },
+  viewAllText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '85%',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 1,
+  },
+  achievementDetail: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 10,
+  },
+  detailBadge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  detailTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  detailDescription: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  detailInfo: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  detailInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  detailInfoText: {
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  viewAllButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  viewAllButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 });
 
 export default LevelProgressCard; 

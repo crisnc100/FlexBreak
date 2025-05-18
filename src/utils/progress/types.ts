@@ -28,6 +28,10 @@ export interface Achievement {
   type: string;
   area?: string;
   dateCompleted?: string;
+  badgeImage?: string; // Path to badge image
+  badgeTier?: 'bronze' | 'silver' | 'gold' | 'platinum';
+  badgeColor?: string; // Color code for the badge
+  badgeUnlocked?: boolean; // Whether the badge has been viewed/acknowledged
 }
 
 // Interface for challenge objects

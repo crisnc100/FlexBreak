@@ -15,6 +15,7 @@ interface StatsOverviewProps {
   isTodayComplete?: boolean;
   theme?: any;
   isDark?: boolean;
+  isSunset?: boolean;
   streakFreezeActive: boolean;
   userLevel: number;
 }
@@ -26,6 +27,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   isTodayComplete = false,
   theme: propTheme,
   isDark: propIsDark,
+  isSunset: propIsSunset,
   streakFreezeActive,
   userLevel = 1
 }) => {
@@ -33,7 +35,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
-
+  const isSunset = propIsSunset !== undefined ? propIsSunset : themeContext.isSunset;
   // Track if streak can be saved with a freeze
   const [streakAtRisk, setStreakAtRisk] = useState(false);
   const [isStreakBroken, setIsStreakBroken] = useState(false);
@@ -140,12 +142,12 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   const displayStreak = isStreakBroken ? 0 : validatedStreak;
 
   return (
-    <View style={{ backgroundColor: isDark ? theme.background : 'transparent' }}>
+    <View style={{ backgroundColor: isDark || isSunset ? theme.background : 'transparent' }}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: isDark ? theme.text : '#333' }]}>
+        <Text style={[styles.headerTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
           Your Progress
         </Text>
-        <Text style={[styles.headerSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.headerSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           Keep up the great work!
         </Text>
       </View>
@@ -153,35 +155,35 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
       <View style={styles.statsGrid}>
         {/* Total Minutes Stat */}
         <View style={[styles.statCard, { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFF',
-          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
-          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-          borderWidth: isDark ? 1 : 0
+          backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+          shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000',
+          borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+          borderWidth: isDark || isSunset ? 1 : 0
         }]}>
           <View style={[styles.statIconContainer, { 
-            backgroundColor: isDark ? 'rgba(76, 175, 80, 0.2)' : '#F0F0F0'
+            backgroundColor: isDark || isSunset ? 'rgba(76, 175, 80, 0.2)' : '#F0F0F0'
           }]}>
             <Ionicons name="time-outline" size={20} color="#4CAF50" />
           </View>
-          <Text style={[styles.statValue, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.statValue, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {totalMinutes}
           </Text>
-          <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.statLabel, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             Total Minutes
           </Text>
         </View>
         
         {/* Streak Stat */}
         <View style={[styles.statCard, { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFF',
-          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
-          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-          borderWidth: isDark ? 1 : 0,
+          backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+          shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000',
+          borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+          borderWidth: isDark || isSunset ? 1 : 0,
           overflow: 'hidden'
         }]}>
           
           <View style={[styles.statIconContainer, { 
-            backgroundColor: isDark ? 
+            backgroundColor: isDark || isSunset ? 
               (streakFreezeActive ? 'rgba(33, 150, 243, 0.2)' : 
                 (streakAtRisk ? 'rgba(255, 193, 7, 0.2)' :
                   (showWarning ? 'rgba(255, 87, 34, 0.2)' : 
@@ -213,11 +215,11 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
               style={[
                 styles.statValue, 
                 { 
-                  color: isDark ? '#FFC107' : '#333', // Yellow in dark mode, dark in light mode
+                  color: isDark || isSunset ? '#FFC107' : '#333', // Yellow in dark mode, dark in light mode
                   transform: [{ scale: pulseAnim }],
-                  textShadowColor: isDark ? 'rgba(255, 193, 7, 0.6)' : 'rgba(0, 0, 0, 0.2)',
+                  textShadowColor: isDark || isSunset ? 'rgba(255, 193, 7, 0.6)' : 'rgba(0, 0, 0, 0.2)',
                   textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: isDark ? 4 : 2,
+                  textShadowRadius: isDark || isSunset ? 4 : 2,
                   fontWeight: 'bold'
                 }
               ]}
@@ -226,7 +228,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
             </Animated.Text>
           ) : (
             <Text style={[styles.statValue, { 
-              color: isDark ? theme.text : '#333',
+              color: isDark || isSunset ? theme.text : '#333',
               opacity: isStreakBroken ? 0.7 : 1
             }]}>
               {displayStreak}
@@ -234,7 +236,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
           )}
           
           <Text style={[styles.statLabel, { 
-            color: isDark ? theme.textSecondary : '#666'
+            color: isDark || isSunset ? theme.textSecondary : '#666'
           }]}>
             {isStreakBroken ? "Streak Reset" :
              "Day Streak"
@@ -281,20 +283,20 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
         
         {/* Routines Stat */}
         <View style={[styles.statCard, { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFF',
-          shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
-          borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-          borderWidth: isDark ? 1 : 0
+          backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+          shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000',
+          borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+          borderWidth: isDark || isSunset ? 1 : 0
         }]}>
           <View style={[styles.statIconContainer, { 
-            backgroundColor: isDark ? 'rgba(33, 150, 243, 0.2)' : '#F0F0F0'
+            backgroundColor: isDark || isSunset ? 'rgba(33, 150, 243, 0.2)' : '#F0F0F0'
           }]}>
             <Ionicons name="fitness-outline" size={20} color="#2196F3" />
           </View>
-          <Text style={[styles.statValue, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.statValue, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {totalRoutines}
           </Text>
-          <Text style={[styles.statLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.statLabel, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             Routines
           </Text>
         </View>

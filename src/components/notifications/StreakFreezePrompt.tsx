@@ -10,7 +10,7 @@ import {
   Easing
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../../utils/haptics';
 import { useTheme } from '../../context/ThemeContext';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
@@ -113,7 +113,7 @@ interface StreakFreezePromptProps {
 }
 
 const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const { isPremium } = usePremium();
   const [visible, setVisible] = useState(false);
   const [streakData, setStreakData] = useState({
@@ -406,7 +406,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         setVisible(true);
         
         // Vibrate to get user attention
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        haptics.warning();
         
         // Animate in
         Animated.parallel([
@@ -510,7 +510,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     ]).start();
     
     // Provide haptic feedback
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     
     // Call the newer API to apply freeze
     const result = await streakManager.applyFreeze();
@@ -554,7 +554,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       console.error('Failed to save streak with freeze.');
       
       // Provide error feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       
       // Close the prompt after a short delay
       setTimeout(() => {
@@ -580,7 +580,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     ]).start();
     
     // Provide haptic feedback
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    haptics.warning();
     
     try {
       // No need to call letStreakBreak anymore as we've optimized the flow
@@ -702,7 +702,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         setVisible(true);
         
         // Haptic feedback
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        haptics.warning();
         
         // Animate in
         Animated.parallel([
@@ -756,7 +756,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       <View 
         style={[
           styles.modalBackground, 
-          { backgroundColor: isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)' }
+          { backgroundColor: isDark || isSunset ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)' }
         ]}
       >
         {/* Snowflake particle effect */}
@@ -802,7 +802,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
           style={[
             styles.container, 
             { 
-              backgroundColor: isDark ? theme.cardBackground : '#FFF',
+              backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
               transform: [
                 { translateY: slideAnim },
                 { scale: scaleAnim }
@@ -834,7 +834,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
             <View style={[
               styles.freezeInfo, 
               { 
-                backgroundColor: isDark 
+                backgroundColor: isDark || isSunset 
                   ? 'rgba(33, 150, 243, 0.1)' 
                   : 'rgba(33, 150, 243, 0.1)' 
               }
@@ -859,13 +859,13 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
               style={[
                 styles.button,
                 styles.denyButton,
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F5F5F5' }
+                { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.08)' : '#F5F5F5' }
               ]}
               onPress={handleLetStreakBreak}
             >
               <Text style={[
                 styles.buttonText,
-                { color: isDark ? 'rgba(255,255,255,0.8)' : '#757575' }
+                { color: isDark || isSunset ? 'rgba(255,255,255,0.8)' : '#757575' }
               ]}>
                 Not now
               </Text>

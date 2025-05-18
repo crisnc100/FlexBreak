@@ -29,7 +29,7 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
   onClose,
   isModal = true // Default to true when used as a modal
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [premiumStretches, setPremiumStretches] = useState<(Stretch & { isPremium: boolean; vipBadgeColor: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [videoLoadingStates, setVideoLoadingStates] = useState<Record<string, boolean>>({});
@@ -188,9 +188,9 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
     const isVisible = visibleItems.includes(item.id.toString());
     
     return (
-      <View style={[styles.stretchCard, { backgroundColor: isDark ? theme.cardBackground : '#FFF' }]}>
+      <View style={[styles.stretchCard, { backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF' }]}>
         <View style={styles.stretchHeader}>
-          <Text style={[styles.stretchName, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.stretchName, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {item.name}
           </Text>
           <View style={[styles.premiumBadge, { backgroundColor: item.vipBadgeColor }]}>
@@ -268,7 +268,7 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
           </View>
 
           <View style={styles.infoContainer}>
-            <Text style={[styles.description, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.description, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               {item.description}
             </Text>
 
@@ -277,28 +277,15 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
                 {item.tags.slice(0, 2).map((tag, index) => (
                   <View 
                     key={index} 
-                    style={[styles.tag, { backgroundColor: isDark ? theme.backgroundLight : '#E0F7FA' }]}
+                    style={[styles.tag, { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#E0F7FA' }]}
                   >
-                    <Text style={[styles.tagText, { color: isDark ? theme.accent : '#00838F' }]}>
+                    <Text style={[styles.tagText, { color: isDark || isSunset ? theme.accent : '#00838F' }]}>
                       {tag}
                     </Text>
                   </View>
                 ))}
               </View>
               
-              <View style={[styles.levelBadge, {
-                backgroundColor: 
-                  item.level === 'beginner' ? '#4CAF5020' : 
-                  item.level === 'intermediate' ? '#FF980020' : 
-                  '#F4433620'
-              }]}>
-                <Text style={[styles.levelText, { 
-                  color: item.level === 'beginner' ? '#4CAF50' : 
-                        item.level === 'intermediate' ? '#FF9800' : '#F44336'
-                }]}>
-                  {item.level.charAt(0).toUpperCase() + item.level.slice(1)}
-                </Text>
-              </View>
             </View>
           </View>
         </View>
@@ -307,17 +294,17 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? theme.background : '#F5F5F5' }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark || isSunset ? theme.background : '#F5F5F5' }]}>
+      <StatusBar barStyle={isDark || isSunset ? "light-content" : "dark-content"} />
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Ionicons 
             name="star" 
             size={24} 
-            color={isDark ? '#FFD700' : '#FFD700'} 
+            color={isDark || isSunset ? '#FFD700' : '#FFD700'} 
             style={styles.titleIcon}
           />
-          <Text style={[styles.title, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {isModal ? 'Premium VIP Stretches' : 'Premium Stretches Preview'}
           </Text>
         </View>
@@ -325,12 +312,12 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
           <Ionicons 
             name="close-circle" 
             size={28} 
-            color={isDark ? theme.text : '#333'} 
+            color={isDark || isSunset ? theme.text : '#333'} 
           />
         </TouchableOpacity>
       </View>
 
-      <Text style={[styles.subtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+      <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
         {isModal ? 
           "You've unlocked 14 premium VIP stretches! These are available in all your routines." : 
           "Unlock these 14 premium stretches when you reach Level 7!"}
@@ -339,7 +326,7 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.accent} />
-          <Text style={[styles.loadingText, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.loadingText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             Loading premium stretches...
           </Text>
         </View>
@@ -360,8 +347,8 @@ const PremiumStretchesPreview: React.FC<PremiumStretchesPreviewProps> = ({
           removeClippedSubviews={true}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="fitness-outline" size={60} color={isDark ? theme.textSecondary : '#ccc'} />
-              <Text style={[styles.emptyText, { color: isDark ? theme.textSecondary : '#666' }]}>
+              <Ionicons name="fitness-outline" size={60} color={isDark || isSunset ? theme.textSecondary : '#ccc'} />
+              <Text style={[styles.emptyText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                 No premium stretches available for preview.
               </Text>
             </View>

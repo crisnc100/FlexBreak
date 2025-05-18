@@ -4,6 +4,11 @@ import * as storageService from '../../../services/storageService';
 import * as streakManager from './streakManager';
 import { calculateStreakWithFreezes } from './progressTracker';
 import * as dateUtils from './utils/dateUtils';
+import { gamificationEvents } from '../../../hooks/progress/useGamification';
+
+// Define achievement completed event constant
+export const ACHIEVEMENT_COMPLETED_EVENT = 'achievement_completed';
+
 /**
  * Initialize achievements for a user progress object
  * @param userProgress The user progress object to initialize achievements in
@@ -35,6 +40,7 @@ export const initializeAchievements = (userProgress: UserProgress): void => {
  */
 export const updateAchievements = async (userProgress: UserProgress): Promise<number> => {
   let updatedCount = 0;
+  const newlyCompletedAchievements: Achievement[] = [];
   
   // Ensure achievements are initialized
   initializeAchievements(userProgress);
@@ -95,10 +101,21 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
     
     // Check for completion and award XP
     if (achievement.progress >= achievement.requirement) {
+      // Record the previous completed state
+      const wasAlreadyCompleted = achievement.completed;
+      
+      // Update achievement status
       achievement.completed = true;
       achievement.dateCompleted = new Date().toISOString();
+      achievement.badgeUnlocked = false; // Badge has been earned but not acknowledged yet
       userProgress.totalXP += achievement.xp;
+      
       console.log(`Achievement completed: ${achievement.title} (+${achievement.xp} XP)`);
+      
+      // If this is a newly completed achievement, add to the array
+      if (!wasAlreadyCompleted) {
+        newlyCompletedAchievements.push(achievement);
+      }
     }
     
     // Count if progress changed
@@ -106,6 +123,20 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
       updatedCount++;
       console.log(`Achievement "${achievement.title}" progress updated: ${oldProgress} → ${achievement.progress}`);
     }
+  }
+  
+  // Emit events for newly completed achievements
+  if (newlyCompletedAchievements.length > 0) {
+    // Send them one at a time to avoid overwhelming the UI
+    setTimeout(() => {
+      newlyCompletedAchievements.forEach((achievement, index) => {
+        // Stagger notifications by 2 seconds each
+        setTimeout(() => {
+          console.log(`Emitting achievement completed event for: ${achievement.title}`);
+          gamificationEvents.emit(ACHIEVEMENT_COMPLETED_EVENT, achievement);
+        }, index * 2000);
+      });
+    }, 1000); // Wait 1 second after routine completion
   }
   
   if (updatedCount > 0) {
@@ -169,7 +200,76 @@ export const getAchievementsSummary = (userProgress: UserProgress) => {
     summary.byCategory[category].push(achievement);
   });
   
-
-  
   return summary;
+};
+
+/**
+ * Get badge tier based on achievement category
+ * @param achievement The achievement to determine badge tier for
+ * @returns The badge tier
+ */
+export const getBadgeTier = (achievement: Achievement): 'bronze' | 'silver' | 'gold' | 'platinum' => {
+  // If badge tier is already set, use it
+  if (achievement.badgeTier) {
+    return achievement.badgeTier;
+  }
+  
+  // Determine tier based on achievement category
+  switch (achievement.category) {
+    case 'beginner':
+      return 'bronze';
+    case 'intermediate':
+      return 'silver';
+    case 'advanced':
+      return 'gold';
+    case 'elite':
+      return 'platinum';
+    default:
+      // Default based on achievement type and requirement
+      if (achievement.type === 'streak') {
+        if (achievement.requirement >= 30) return 'platinum';
+        if (achievement.requirement >= 14) return 'gold';
+        if (achievement.requirement >= 7) return 'silver';
+        return 'bronze';
+      } else if (achievement.type === 'routine_count') {
+        if (achievement.requirement >= 50) return 'platinum';
+        if (achievement.requirement >= 30) return 'gold';
+        if (achievement.requirement >= 20) return 'silver';
+        return 'bronze';
+      }
+      return 'bronze';
+  }
+};
+
+/**
+ * Mark an achievement badge as unlocked/viewed in the UI
+ * @param userProgress User progress object
+ * @param achievementId ID of the achievement to mark as unlocked
+ * @returns True if the achievement was marked as unlocked, false otherwise
+ */
+export const markBadgeAsUnlocked = async (userProgress: UserProgress, achievementId: string): Promise<boolean> => {
+  if (
+    userProgress.achievements && 
+    userProgress.achievements[achievementId] && 
+    userProgress.achievements[achievementId].completed &&
+    !userProgress.achievements[achievementId].badgeUnlocked
+  ) {
+    userProgress.achievements[achievementId].badgeUnlocked = true;
+    await storageService.saveUserProgress(userProgress);
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Get all newly unlocked achievement badges that haven't been viewed yet
+ * @param userProgress User progress object
+ * @returns Array of achievements with unlocked but not viewed badges
+ */
+export const getNewlyUnlockedBadges = (userProgress: UserProgress): Achievement[] => {
+  if (!userProgress.achievements) return [];
+  
+  return Object.values(userProgress.achievements).filter(achievement => 
+    achievement.completed && achievement.badgeUnlocked === false
+  );
 };

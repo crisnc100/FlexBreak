@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 interface StructuredInstructionsProps {
   description: string;
   isDark: boolean;
+  isSunset: boolean;
   theme: any;
 }
 
@@ -54,20 +55,20 @@ const parseStretchInstructions = (description: string) => {
   };
 };
 
-const StructuredInstructions: React.FC<StructuredInstructionsProps> = ({ description, isDark, theme }) => {
+const StructuredInstructions: React.FC<StructuredInstructionsProps> = ({ description, isDark, isSunset, theme }) => {
   const parsed = parseStretchInstructions(description);
 
   if (parsed.type === 'simple') {
     return (
       <View style={styles.simpleContainer}>
         <View style={styles.headerRow}>
-          <Ionicons name="information-circle-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-          <Text style={[styles.headerText, { color: isDark ? theme.accent : '#4CAF50' }]}>Instructions</Text>
+          <Ionicons name="information-circle-outline" size={18} color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+          <Text style={[styles.headerText, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>Instructions</Text>
         </View>
         {parsed.instructions.map((instruction, idx) => (
           <View key={idx} style={styles.simpleItemRow}>
-            <View style={[styles.dot, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
-            <Text style={[styles.simpleItemText, { color: isDark ? theme.text : '#333' }]}>{instruction}</Text>
+            <View style={[styles.dot, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]} />
+            <Text style={[styles.simpleItemText, { color: isDark || isSunset ? theme.text : '#333' }]}>{instruction}</Text>
           </View>
         ))}
       </View>
@@ -79,15 +80,15 @@ const StructuredInstructions: React.FC<StructuredInstructionsProps> = ({ descrip
       {parsed.setup.length > 0 && (
         <View style={styles.section}>
           <View style={styles.headerRow}>
-            <Ionicons name="body-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-            <Text style={[styles.headerText, { color: isDark ? theme.accent : '#4CAF50' }]}>Starting Position</Text>
+            <Ionicons name="body-outline" size={18} color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.headerText, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>Starting Position</Text>
           </View>
           {parsed.setup.map((step, idx) => (
             <View key={`setup-${idx}`} style={styles.numberRow}>
-              <View style={[styles.numberCircle, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}> 
+              <View style={[styles.numberCircle, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}> 
                 <Text style={styles.numberText}>{idx + 1}</Text>
               </View>
-              <Text style={[styles.stepText, { color: isDark ? theme.text : '#333' }]}>{step}</Text>
+              <Text style={[styles.stepText, { color: isDark || isSunset ? theme.text : '#333' }]}>{step}</Text>
             </View>
           ))}
         </View>
@@ -95,29 +96,29 @@ const StructuredInstructions: React.FC<StructuredInstructionsProps> = ({ descrip
 
       <View style={styles.section}>
         <View style={styles.headerRow}>
-          <Ionicons name="fitness-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-          <Text style={[styles.headerText, { color: isDark ? theme.accent : '#4CAF50' }]}>Movement</Text>
+          <Ionicons name="fitness-outline" size={18} color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+          <Text style={[styles.headerText, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>Movement</Text>
         </View>
         {parsed.execution.map((step, idx) => (
           <View key={`exec-${idx}`} style={styles.numberRow}>
-            <View style={[styles.numberCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0' }]}> 
-              <Text style={[styles.numberText, { color: isDark ? 'white' : '#666' }]}>{parsed.setup.length + idx + 1}</Text>
+            <View style={[styles.numberCircle, { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.2)' : '#E0E0E0' }]}> 
+              <Text style={[styles.numberText, { color: isDark || isSunset ? 'white' : '#666' }]}>{parsed.setup.length + idx + 1}</Text>
             </View>
-            <Text style={[styles.stepText, { color: isDark ? theme.text : '#333' }]}>{step}</Text>
+            <Text style={[styles.stepText, { color: isDark || isSunset ? theme.text : '#333' }]}>{step}</Text>
           </View>
         ))}
       </View>
 
       {parsed.cues.length > 0 && (
-        <View style={[styles.cuesContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(76,175,80,0.05)' }]}> 
+        <View style={[styles.cuesContainer, { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : 'rgba(76,175,80,0.05)' }]}> 
           <View style={styles.headerRow}>
-            <Ionicons name="alert-circle-outline" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-            <Text style={[styles.headerText, { color: isDark ? theme.accent : '#4CAF50' }]}>Form Tips</Text>
+            <Ionicons name="alert-circle-outline" size={18} color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.headerText, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>Form Tips</Text>
           </View>
           {parsed.cues.map((cue, idx) => (
             <View key={`cue-${idx}`} style={styles.cueRow}>
-              <View style={[styles.cueDot, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
-              <Text style={[styles.cueText, { color: isDark ? theme.textSecondary : '#555' }]}>{cue}</Text>
+              <View style={[styles.cueDot, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]} />
+                <Text style={[styles.cueText, { color: isDark || isSunset ? theme.textSecondary : '#555' }]}>{cue}</Text>
             </View>
           ))}
         </View>

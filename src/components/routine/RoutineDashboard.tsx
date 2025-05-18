@@ -44,7 +44,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   onDeleteRoutine,
   onFavoriteRoutine
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   // Move hooks to the top level of the component
   const [hasCompletedRoutinesBefore, setHasCompletedRoutinesBefore] = useState<boolean | null>(null);
   const [activeTimePeriod, setActiveTimePeriod] = useState<TimePeriod>('This Week');
@@ -181,9 +181,9 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
         refreshing={isRefreshing}
         showRefreshingFeedback={true}
       >
-        <View style={[styles.loadingContainer, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
-          <ActivityIndicator size="large" color={isDark ? theme.accent : "#4CAF50"} />
-          <Text style={[styles.loadingText, { color: isDark ? theme.textSecondary : '#666' }]}>Loading your routines...</Text>
+        <View style={[styles.loadingContainer, { backgroundColor: isDark || isSunset ? theme.background : '#FFF' }]}>
+          <ActivityIndicator size="large" color={isDark || isSunset ? theme.accent : "#4CAF50"} />
+          <Text style={[styles.loadingText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>Loading your routines...</Text>
         </View>
       </RefreshableScrollView>
     );
@@ -197,18 +197,18 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
         refreshing={isRefreshing}
         showRefreshingFeedback={true}
       >
-        <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
+        <View style={[styles.emptyContainer, { backgroundColor: isDark || isSunset ? theme.background : '#FFF' }]}>
           <Ionicons 
             name="fitness-outline" 
             size={80} 
-            color={isDark ? "#555555" : "#CCCCCC"} 
+            color={isDark || isSunset ? "#555555" : "#CCCCCC"} 
           />
-          <Text style={[styles.emptyTitle, { color: isDark ? theme.text : '#333' }]}>No Routines Yet</Text>
-          <Text style={[styles.emptySubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.emptyTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>No Routines Yet</Text>
+          <Text style={[styles.emptySubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             Create your first personalized stretching routine
           </Text>
           <TouchableOpacity 
-            style={[styles.createButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
+            style={[styles.createButton, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}
             onPress={onCreateNew}
           >
             <Text style={styles.createButtonText}>Create Routine</Text>
@@ -221,30 +221,30 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
   // User has completed routines before but has hidden all of them
   if (recentRoutines.length === 0 && hasCompletedRoutinesBefore === true) {
     return (
-      <GestureHandlerRootView style={[styles.container, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
+      <GestureHandlerRootView style={[styles.container, { backgroundColor: isDark || isSunset ? theme.background : '#FFF' }]}>
         <RefreshableScrollView
           onRefresh={onRefresh}
           refreshing={isRefreshing}
           showRefreshingFeedback={true}
         >
           <View style={[styles.hiddenRoutinesContainer, { 
-            backgroundColor: isDark ? theme.cardBackground : '#F9F9F9',
-            shadowColor: isDark ? 'rgba(0,0,0,0.3)' : '#000'
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#F9F9F9',
+            shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.3)' : '#000'
           }]}>
             <Ionicons 
               name="eye-off-outline" 
               size={60} 
-              color={isDark ? "#555555" : "#CCCCCC"} 
+              color={isDark || isSunset ? "#555555" : "#CCCCCC"} 
             />
-            <Text style={[styles.emptyTitle, { color: isDark ? theme.text : '#333' }]}>No Recent Routines</Text>
-            <Text style={[styles.emptySubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.emptyTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>No Recent Routines</Text>
+            <Text style={[styles.emptySubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               You've hidden all your recent routines. Start a new one or try a suggestion below.
             </Text>
           </View>
           
           {/* Suggestions section */}
           <View style={styles.suggestionsContainer}>
-            <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+            <Text style={[styles.sectionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
               {isPremium ? 'Smart Suggestions' : 'Try Something New'}
             </Text>
             
@@ -252,15 +252,15 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
               {/* Random suggestion - available to all users */}
               <TouchableOpacity 
                 style={[styles.suggestionCard, { 
-                  backgroundColor: isDark ? theme.cardBackground : '#F5F5F5',
-                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  borderWidth: isDark ? 1 : 0
+                  backgroundColor: isDark || isSunset ? theme.cardBackground : '#F5F5F5',
+                  borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  borderWidth: isDark || isSunset ? 1 : 0
                 }]}
                 onPress={onRandomSuggestion}
               >
                 <Ionicons name="shuffle" size={32} color="#FF9800" />
-                <Text style={[styles.suggestionTitle, { color: isDark ? theme.text : '#333' }]}>Random</Text>
-                <Text style={[styles.suggestionSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+                <Text style={[styles.suggestionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Random</Text>
+                <Text style={[styles.suggestionSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                   Try a random routine
                 </Text>
               </TouchableOpacity>
@@ -268,9 +268,9 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
               {/* Smart suggestion - show to all but locked for free users */}
               <TouchableOpacity 
                 style={[styles.suggestionCard, { 
-                  backgroundColor: isDark ? theme.cardBackground : '#F5F5F5',
-                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  borderWidth: isDark ? 1 : 0
+                  backgroundColor: isDark || isSunset ? theme.cardBackground : '#F5F5F5',
+                  borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  borderWidth: isDark || isSunset ? 1 : 0
                 }]}
                 onPress={onSmartPick}
               >
@@ -278,17 +278,17 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                   <Ionicons name="bulb" size={32} color="#4CAF50" />
                   {!isPremium && (
                     <View style={[styles.premiumBadge, {
-                      backgroundColor: isDark ? '#FF9800' : '#FF9800',
+                      backgroundColor: isDark || isSunset ? '#FF9800' : '#FF9800',
                       // Add subtle border in dark mode for better visibility
-                      borderWidth: isDark ? 1 : 0,
-                      borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'transparent'
+                      borderWidth: isDark || isSunset ? 1 : 0,
+                      borderColor: isDark || isSunset ? 'rgba(255,255,255,0.2)' : 'transparent'
                     }]}>
                       <Ionicons name="lock-closed" size={12} color="#FFF" />
                     </View>
                   )}
                 </View>
-                <Text style={[styles.suggestionTitle, { color: isDark ? theme.text : '#333' }]}>Smart Pick</Text>
-                <Text style={[styles.suggestionSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+                <Text style={[styles.suggestionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Smart Pick</Text>
+                <Text style={[styles.suggestionSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                   {isPremium ? "Based on your progress" : "Personalized for you"}
                 </Text>
               </TouchableOpacity>
@@ -296,15 +296,15 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
               {/* Custom routine - available to all */}
               <TouchableOpacity 
                 style={[styles.suggestionCard, { 
-                  backgroundColor: isDark ? theme.cardBackground : '#F5F5F5',
-                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  borderWidth: isDark ? 1 : 0
+                  backgroundColor: isDark || isSunset ? theme.cardBackground : '#F5F5F5',
+                  borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  borderWidth: isDark || isSunset ? 1 : 0
                 }]}
                 onPress={onCreateNew}
               >
                 <Ionicons name="create" size={32} color="#2196F3" />
-                <Text style={[styles.suggestionTitle, { color: isDark ? theme.text : '#333' }]}>Custom</Text>
-                <Text style={[styles.suggestionSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+                <Text style={[styles.suggestionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Custom</Text>
+                <Text style={[styles.suggestionSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                   Create your own
                 </Text>
               </TouchableOpacity>
@@ -322,20 +322,20 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
     : recentRoutines.slice(0, 3);
   
   return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: isDark || isSunset ? theme.background : '#FFF' }]}>
       <RefreshableScrollView
         onRefresh={onRefresh}
         refreshing={isRefreshing}
         showRefreshingFeedback={true}
       >
         <View style={[styles.headerContainer, { 
-          borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE',
+          borderBottomColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#EEE',
           borderBottomWidth: 1,
         }]}>
-          <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>Your Recent Routines</Text>
+          <Text style={[styles.sectionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Your Recent Routines</Text>
           {!isPremium && recentRoutines.length > 3 && (
-            <Text style={[styles.premiumNote, { color: isDark ? '#FFC107' : '#FF9800' }]}>
-              <Ionicons name="lock-closed" size={14} color={isDark ? '#FFC107' : '#FF9800'} /> 
+            <Text style={[styles.premiumNote, { color: isDark || isSunset ? '#FFC107' : '#FF9800' }]}>
+              <Ionicons name="lock-closed" size={14} color={isDark || isSunset ? '#FFC107' : '#FF9800'} /> 
               Upgrade to premium to access all your history
             </Text>
           )}
@@ -354,6 +354,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 hideLabel="Hide"
                 theme={theme}
                 isDark={isDark}
+                isSunset={isSunset}
                 favorite={isFavoriteRoutine(item)}
                 isCustom={!!item.customStretches && item.customStretches.length > 0}
               />
@@ -374,15 +375,15 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 <Ionicons 
                   name="chevron-back" 
                   size={24} 
-                  color={isDark ? theme.text : '#333'} 
+                  color={isDark || isSunset ? theme.text : '#333'} 
                 />
               </TouchableOpacity>
               
               <View style={styles.timePeriodContainer}>
-                <Text style={[styles.timePeriodText, { color: isDark ? theme.text : '#333' }]}>
+                <Text style={[styles.timePeriodText, { color: isDark || isSunset ? theme.text : '#333' }]}>
                   {activeTimePeriod}
                 </Text>
-                <Text style={[styles.timePeriodCount, { color: isDark ? theme.textSecondary : '#666' }]}>
+                <Text style={[styles.timePeriodCount, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                   {organizedRoutines[activeTimePeriod]?.length || 0} routines
                 </Text>
               </View>
@@ -395,7 +396,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 <Ionicons 
                   name="chevron-forward" 
                   size={24} 
-                  color={isDark ? theme.text : '#333'} 
+                  color={isDark || isSunset ? theme.text : '#333'} 
                 />
               </TouchableOpacity>
             </View>
@@ -411,6 +412,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 hideLabel="Hide"
                 theme={theme}
                 isDark={isDark}
+                isSunset={isSunset}
                 favorite={isFavoriteRoutine(item)}
                 isCustom={!!item.customStretches && item.customStretches.length > 0}
               />
@@ -420,7 +422,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
         
         {/* Suggestions section */}
         <View style={styles.suggestionsContainer}>
-          <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.sectionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {isPremium ? 'Smart Suggestions' : 'Try Something New'}
           </Text>
           
@@ -428,15 +430,15 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
             {/* Random suggestion - available to all users */}
             <TouchableOpacity 
               style={[styles.suggestionCard, { 
-                backgroundColor: isDark ? theme.cardBackground : '#F5F5F5',
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-                borderWidth: isDark ? 1 : 0
+                backgroundColor: isDark || isSunset ? theme.cardBackground : '#F5F5F5',
+                borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+                borderWidth: isDark || isSunset ? 1 : 0
               }]}
               onPress={onRandomSuggestion}
             >
               <Ionicons name="shuffle" size={32} color="#FF9800" />
-              <Text style={[styles.suggestionTitle, { color: isDark ? theme.text : '#333' }]}>Random</Text>
-              <Text style={[styles.suggestionSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+              <Text style={[styles.suggestionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Random</Text>
+              <Text style={[styles.suggestionSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                 Try a random routine
               </Text>
             </TouchableOpacity>
@@ -444,9 +446,9 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
             {/* Smart suggestion - show to all but locked for free users */}
             <TouchableOpacity 
               style={[styles.suggestionCard, { 
-                backgroundColor: isDark ? theme.cardBackground : '#F5F5F5',
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-                borderWidth: isDark ? 1 : 0
+                backgroundColor: isDark || isSunset ? theme.cardBackground : '#F5F5F5',
+                borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+                borderWidth: isDark || isSunset ? 1 : 0
               }]}
               onPress={onSmartPick}
             >
@@ -454,17 +456,17 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
                 <Ionicons name="bulb" size={32} color="#4CAF50" />
                 {!isPremium && (
                   <View style={[styles.premiumBadge, {
-                    backgroundColor: isDark ? '#FF9800' : '#FF9800',
+                    backgroundColor: isDark || isSunset ? '#FF9800' : '#FF9800',
                     // Add subtle border in dark mode for better visibility
-                    borderWidth: isDark ? 1 : 0,
-                    borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'transparent'
+                    borderWidth: isDark || isSunset ? 1 : 0,
+                    borderColor: isDark || isSunset ? 'rgba(255,255,255,0.2)' : 'transparent'
                   }]}>
                     <Ionicons name="lock-closed" size={12} color="#FFF" />
                   </View>
                 )}
               </View>
-              <Text style={[styles.suggestionTitle, { color: isDark ? theme.text : '#333' }]}>Smart Pick</Text>
-              <Text style={[styles.suggestionSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+              <Text style={[styles.suggestionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Smart Pick</Text>
+              <Text style={[styles.suggestionSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                 {isPremium ? "Based on your progress" : "Personalized for you"}
               </Text>
             </TouchableOpacity>
@@ -472,15 +474,15 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
             {/* Custom routine - available to all */}
             <TouchableOpacity 
               style={[styles.suggestionCard, { 
-                backgroundColor: isDark ? theme.cardBackground : '#F5F5F5',
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-                borderWidth: isDark ? 1 : 0
+                backgroundColor: isDark || isSunset ? theme.cardBackground : '#F5F5F5',
+                borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+                borderWidth: isDark || isSunset ? 1 : 0
               }]}
               onPress={onCreateNew}
             >
               <Ionicons name="create" size={32} color="#2196F3" />
-              <Text style={[styles.suggestionTitle, { color: isDark ? theme.text : '#333' }]}>Custom</Text>
-              <Text style={[styles.suggestionSubtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+              <Text style={[styles.suggestionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>Custom</Text>
+              <Text style={[styles.suggestionSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                 Create your own
               </Text>
             </TouchableOpacity>

@@ -8,59 +8,62 @@ interface ConsistencyInsightsProps {
   mostActiveDay: string;
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
+  isSunset?: boolean;
 }
 
 const ConsistencyInsights: React.FC<ConsistencyInsightsProps> = ({
   activeRoutineDays,
   mostActiveDay,
   theme: propTheme,
-  isDark: propIsDark
+  isDark: propIsDark,
+  isSunset: propIsSunset
 }) => {
   // Use theme from props if provided, otherwise use theme context
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+  const isSunset = propIsSunset !== undefined ? propIsSunset : themeContext.isSunset;
 
   return (
     <View style={[styles.section, { 
-      backgroundColor: isDark ? theme.cardBackground : '#FFF',
-      shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
-      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-      borderWidth: isDark ? 1 : 0
+      backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+      shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000',
+      borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+      borderWidth: isDark || isSunset ? 1 : 0
     }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+        <Text style={[styles.sectionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
           Consistency Insights
         </Text>
-        <Text style={[styles.dateRangeText, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.dateRangeText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           Last 30 Days
         </Text>
       </View>
       <View style={styles.insightRow}>
         <View style={[styles.insightCard, { 
-          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F5F5F5'
+          backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : '#F5F5F5'
         }]}>
-          <Text style={[styles.insightLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.insightLabel, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             30-Day Activity
           </Text>
-          <Text style={[styles.insightValue, { color: isDark ? theme.accent : '#4CAF50' }]}>
+          <Text style={[styles.insightValue, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
             {getConsistencyPercentage(activeRoutineDays)}%
           </Text>
-          <Text style={[styles.insightDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.insightDescription, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             {activeRoutineDays} active days in the last 30 days
           </Text>
         </View>
         
         <View style={[styles.insightCard, { 
-          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F5F5F5'
+          backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : '#F5F5F5'
         }]}>
-          <Text style={[styles.insightLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.insightLabel, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             Most Active
           </Text>
-          <Text style={[styles.insightValue, { color: isDark ? theme.accent : '#4CAF50' }]}>
+          <Text style={[styles.insightValue, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
             {mostActiveDay}
           </Text>
-          <Text style={[styles.insightDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.insightDescription, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             Your most consistent stretching day
           </Text>
         </View>

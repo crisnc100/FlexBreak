@@ -62,7 +62,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
 }) => {
   /* hooks */
   const navigation = useNavigation<AppNavigationProp>();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const { triggerRefresh } = useRefresh();
   const dispatch = useAppDispatch();
   const styles = themedStyles(theme);
@@ -258,6 +258,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
             oldLevel={displayOldLevel}
             newLevel={displayNewLevel}
             isDark={isDark}
+            isSunset={isSunset}
             isSimulated={false}
             rewards={levelUp?.rewards || []}
             animValues={{ levelUpAnim, levelUpScale }}
@@ -272,6 +273,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
             showAnyLevelUp={showAnyLevelUp}
             theme={theme}
             isDark={isDark}
+            isSunset={isSunset}
             animValues={{ shineAnim }}
           />
         ) : (

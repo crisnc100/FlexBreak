@@ -13,6 +13,7 @@ interface RoutineItemProps {
   hideLabel?: string;
   theme?: any;
   isDark?: boolean;
+  isSunset?: boolean;
   favorite?: boolean;
   isCustom?: boolean;
 }
@@ -46,6 +47,7 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
   hideLabel = 'Delete',
   theme: propTheme,
   isDark: propIsDark,
+  isSunset: propIsSunset,
   favorite = false,
   isCustom = false
 }) => {
@@ -53,7 +55,7 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
-
+  const isSunset = propIsSunset !== undefined ? propIsSunset : themeContext.isSunset;
   // Get the formatted date
   const formattedDate = formatDate(item.date);
 
@@ -128,8 +130,8 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
         style={[
           styles.routineItem, 
           { 
-            backgroundColor: isDark ? theme.cardBackground : '#FFF',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+            borderBottomColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#EEE'
           }
         ]}
         onPress={onPress}
@@ -138,12 +140,12 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
           
           <View style={styles.iconContainer}>
             <View style={[styles.areaIconBackground, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5'
+              backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#F5F5F5'
             }]}>
               <Ionicons 
                 name={getAreaIcon(item.area)} 
                 size={24} 
-                color={isDark ? theme.accent : "#4CAF50"} 
+                color={isDark || isSunset ? theme.accent : "#4CAF50"} 
               />
             </View>
           </View>
@@ -153,7 +155,7 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
           <View style={styles.topRow}>
             <Text style={[
               styles.routineArea, 
-              { color: isDark ? theme.text : '#333' }
+              { color: isDark || isSunset ? theme.text : '#333' }
             ]}>
               {item.area}
             </Text>
@@ -162,7 +164,7 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
                 <Ionicons 
                   name="create-outline" 
                   size={16} 
-                  color={isDark ? theme.accent : "#4CAF50"}
+                  color={isDark || isSunset ? theme.accent : "#4CAF50"}
                   style={styles.customIcon}
                 />
               )}
@@ -173,11 +175,11 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
               <Ionicons 
                 name="time-outline" 
                 size={14} 
-                color={isDark ? theme.textSecondary : '#666'} 
+                color={isDark || isSunset ? theme.textSecondary : '#666'} 
               />
               <Text style={[
                 styles.routineDetail, 
-                { color: isDark ? theme.textSecondary : '#666' }
+                { color: isDark || isSunset ? theme.textSecondary : '#666' }
               ]}>
                 {item.duration} min
               </Text>
@@ -186,11 +188,11 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
               <Ionicons 
                 name="calendar-outline" 
                 size={14} 
-                color={isDark ? theme.textSecondary : '#666'} 
+                color={isDark || isSunset ? theme.textSecondary : '#666'} 
               />
               <Text style={[
                 styles.routineDetail, 
-                { color: isDark ? theme.textSecondary : '#666' }
+                { color: isDark || isSunset ? theme.textSecondary : '#666' }
               ]}>
                 {formattedDate}
               </Text>
@@ -200,11 +202,11 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
                 <Ionicons 
                   name="fitness-outline" 
                   size={14} 
-                  color={isDark ? theme.textSecondary : '#666'} 
+                  color={isDark || isSunset ? theme.textSecondary : '#666'} 
                 />
                 <Text style={[
                   styles.routineDetail, 
-                  { color: isDark ? theme.textSecondary : '#666' }
+                  { color: isDark || isSunset ? theme.textSecondary : '#666' }
                 ]}>
                   {stretchesInfo}
                 </Text>
@@ -215,7 +217,7 @@ const RoutineItem: React.FC<RoutineItemProps> = ({
         <Ionicons 
           name="play-circle" 
           size={32} 
-          color={isDark ? theme.accent : "#4CAF50"} 
+          color={isDark || isSunset ? theme.accent : "#4CAF50"} 
         />
       </TouchableOpacity>
     </Swipeable>

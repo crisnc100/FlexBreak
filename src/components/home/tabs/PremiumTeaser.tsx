@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 interface PremiumTeaserProps {
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
   requiredLevel: number;
   refreshFeatureAccess: () => Promise<void>;
   onClose: () => void;
@@ -15,6 +16,7 @@ interface PremiumTeaserProps {
 const PremiumTeaser: React.FC<PremiumTeaserProps> = ({
   theme,
   isDark,
+  isSunset,
   requiredLevel,
   refreshFeatureAccess,
   onClose,
@@ -61,13 +63,13 @@ const PremiumTeaser: React.FC<PremiumTeaserProps> = ({
         { 
           backgroundColor: isPremium 
             ? `${theme.accent}20` 
-            : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' 
+            : isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' 
         }
       ]}>
         <Ionicons 
           name={getIcon() as any} 
           size={48} 
-          color={isPremium ? theme.accent : isDark ? theme.textSecondary : '#aaa'} 
+          color={isPremium ? theme.accent : isDark || isSunset ? theme.textSecondary : '#aaa'} 
         />
       </View>
       

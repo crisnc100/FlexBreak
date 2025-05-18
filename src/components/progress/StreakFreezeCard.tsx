@@ -14,7 +14,7 @@ import * as streakManager from '../../utils/progress/modules/streakManager';
 import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import { usePremium } from '../../context/PremiumContext';
 import { useTheme } from '../../context/ThemeContext';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../../utils/haptics';
 import * as featureAccessUtils from '../../utils/featureAccessUtils';
 import * as dateUtils from '../../utils/progress/modules/utils/dateUtils'
 
@@ -93,15 +93,18 @@ const Snowflake = ({ x, y, size, duration, delay, rotation }) => {
 interface StreakFreezeCardProps {
   currentStreak: number;
   isDark?: boolean;
+  isSunset?: boolean;
 }
 
 const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({ 
   currentStreak,
-  isDark: propIsDark 
+  isDark: propIsDark,
+  isSunset: propIsSunset
 }) => {
-  const { theme, isDark: contextIsDark } = useTheme();
+  const { theme, isDark: contextIsDark, isSunset: contextIsSunset } = useTheme();
   // Use the prop value if provided, otherwise fall back to context
   const isDark = propIsDark !== undefined ? propIsDark : contextIsDark;
+  const isSunset = propIsSunset !== undefined ? propIsSunset : contextIsSunset;
   const [isLoading, setIsLoading] = useState(true);
   const [freezeCount, setFreezeCount] = useState(0);
   const [isStreakBroken, setIsStreakBroken] = useState(false);
@@ -520,7 +523,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         
         if (result.success) {
           // Apply quick haptic feedback on success
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          haptics.success();
           
           // Update the freeze count immediately with the result
           setFreezeCount(result.remainingFreezes);
@@ -555,7 +558,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
             remainingFreezes: result.remainingFreezes
           });
           // Show error feedback
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          haptics.error();
           setIsLoading(false);
         }
         
@@ -579,7 +582,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   const SavedMessage = () => (
     <View style={[
       styles.savedMessageContainer,
-      { backgroundColor: isDark ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.05)' }
+      { backgroundColor: isDark || isSunset ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.05)' }
     ]}>
       <Ionicons 
         name="shield-checkmark" 
@@ -588,10 +591,10 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         style={styles.savedIcon}
       />
       <View>
-        <Text style={[styles.savedMessageTitle, { color: isDark ? '#81C784' : '#4CAF50' }]}>
+        <Text style={[styles.savedMessageTitle, { color: isDark || isSunset ? '#81C784' : '#4CAF50' }]}>
           Streak Protected!
         </Text>
-        <Text style={[styles.savedMessage, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.savedMessage, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           Your {currentStreak}-day streak is safe! Complete a routine today to keep it going.
         </Text>
       </View>
@@ -614,20 +617,20 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     checkFeatureAccess();
 
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? theme.cardBackground : '#FFF' }]}>
-        <View style={[styles.iconContainer, { backgroundColor: isDark ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD' }]}>
-          <Ionicons name="snow" size={24} color={isDark ? '#90CAF9' : '#BDBDBD'} />
+      <View style={[styles.container, { backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF' }]}>
+        <View style={[styles.iconContainer, { backgroundColor: isDark || isSunset ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD' }]}>
+          <Ionicons name="snow" size={24} color={isDark || isSunset ? '#90CAF9' : '#BDBDBD'} />
         </View>
         <View style={styles.contentContainer}>
-          <Text style={[styles.title, { color: isDark ? theme.text : '#333' }]}>Streak Freezes</Text>
-          <Text style={[styles.subtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Streak Freezes</Text>
+          <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             {!isPremium 
               ? 'Premium Feature' 
               : `Unlocks at Level ${getRequiredLevel('streak_freezes')}`}
           </Text>
         </View>
         <View style={styles.lockedContainer}>
-          <Ionicons name="lock-closed" size={18} color={isDark ? 'rgba(255,255,255,0.5)' : '#BDBDBD'} />
+          <Ionicons name="lock-closed" size={18} color={isDark || isSunset ? 'rgba(255,255,255,0.5)' : '#BDBDBD'} />
         </View>
       </View>
     );
@@ -636,15 +639,15 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   // If still loading
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? theme.cardBackground : '#FFF' }]}>
-        <View style={[styles.iconContainer, { backgroundColor: isDark ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD' }]}>
-          <Ionicons name="snow" size={24} color={isDark ? '#90CAF9' : '#2196F3'} />
+      <View style={[styles.container, { backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF' }]}>
+        <View style={[styles.iconContainer, { backgroundColor: isDark || isSunset ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD' }]}>
+          <Ionicons name="snow" size={24} color={isDark || isSunset ? '#90CAF9' : '#2196F3'} />
         </View>
         <View style={styles.contentContainer}>
-          <Text style={[styles.title, { color: isDark ? theme.text : '#333' }]}>Streak Freezes</Text>
-          <Text style={[styles.subtitle, { color: isDark ? theme.textSecondary : '#666' }]}>Loading data...</Text>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Streak Freezes</Text>
+          <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>Loading data...</Text>
         </View>
-        <ActivityIndicator size="small" color={isDark ? '#90CAF9' : '#2196F3'} />
+        <ActivityIndicator size="small" color={isDark || isSunset ? '#90CAF9' : '#2196F3'} />
       </View>
     );
   }
@@ -654,7 +657,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       style={[
         styles.container, 
         { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFF',
+          backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
           transform: [{ translateX: shakeAnim }]
         }
       ]}
@@ -680,35 +683,35 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         style={[
           styles.iconContainer, 
           { 
-            backgroundColor: isDark ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD',
+            backgroundColor: isDark || isSunset ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD',
             transform: [{ rotate }]
           }
         ]}
       >
-        <Ionicons name="snow" size={24} color={isDark ? '#90CAF9' : '#2196F3'} />
+        <Ionicons name="snow" size={24} color={isDark || isSunset ? '#90CAF9' : '#2196F3'} />
       </Animated.View>
       
       <View style={styles.contentContainer}>
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: isDark ? theme.text : '#333' }]}>Streak Freezes</Text>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Streak Freezes</Text>
           
           {/* Updated freezes counter with clear indicator */}
           <Animated.View style={[
             styles.freezeCounterContainer,
             { 
-              backgroundColor: isDark ? 'rgba(144, 202, 249, 0.2)' : '#E3F2FD',
+              backgroundColor: isDark || isSunset ? 'rgba(144, 202, 249, 0.2)' : '#E3F2FD',
               transform: [{ scale: freezeCounterAnim }]
             }
           ]}>
             <Ionicons 
               name="snow" 
               size={16} 
-              color={isDark ? '#90CAF9' : '#2196F3'} 
+              color={isDark || isSunset ? '#90CAF9' : '#2196F3'} 
               style={styles.freezeIcon}
             />
             <Text style={[
               styles.freezeCount, 
-              { color: isDark ? '#90CAF9' : '#2196F3' }
+              { color: isDark || isSunset ? '#90CAF9' : '#2196F3' }
             ]}>
               {freezeCount}
               <Text style={styles.freezeCountMax}></Text>
@@ -719,24 +722,24 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         {recentlySaved ? (
           <>
             <SavedMessage />
-            <Text style={[styles.freezeInfoText, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.freezeInfoText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               You have {freezeCount} streak {freezeCount === 1 ? 'freeze' : 'freezes'} remaining.
             </Text>
           </>
         ) : (
           <>
-            <Text style={[styles.subtitle, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               Missing a day won't break your streak! Your streak freezes reset at the beginning of each month.
             </Text>
             
             {currentStreak >= 1 && !isStreakBroken && (
-              <Text style={[styles.streakText, { color: isDark ? '#81C784' : '#4CAF50' }]}>
+              <Text style={[styles.streakText, { color: isDark || isSunset ? '#81C784' : '#4CAF50' }]}>
                 Current streak: {currentStreak} days
               </Text>
             )}
             
             {currentStreak >= 1 && isStreakBroken && (
-              <Text style={[styles.streakText, { color: isDark ? '#FF5722' : '#FF5722', fontStyle: 'italic' }]}>
+              <Text style={[styles.streakText, { color: isDark || isSunset ? '#FF5722' : '#FF5722', fontStyle: 'italic' }]}>
                 Previous streak: {currentStreak} days (inactive)
               </Text>
             )}
@@ -746,7 +749,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.applyButton,
-                    { backgroundColor: isDark ? '#90CAF9' : '#2196F3' }
+                    { backgroundColor: isDark || isSunset ? '#90CAF9' : '#2196F3' }
                   ]}
                   onPress={handleApplyStreakFreeze}
                   activeOpacity={0.7}
@@ -764,8 +767,8 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
             
             {isStreakBroken && !canSaveStreak && currentStreak === 0 && (
               <View style={styles.warningContainer}>
-                <Ionicons name="alert-circle-outline" size={18} color={isDark ? '#FFB74D' : '#FF9800'} style={{ marginRight: 6 }} />
-                <Text style={[styles.warningText, { color: isDark ? '#FFB74D' : '#FF9800' }]}>
+                <Ionicons name="alert-circle-outline" size={18} color={isDark || isSunset ? '#FFB74D' : '#FF9800'} style={{ marginRight: 6 }} />
+                <Text style={[styles.warningText, { color: isDark || isSunset ? '#FFB74D' : '#FF9800' }]}>
                   Streak reset: You missed 2+ days. Streak freezes only work for 1-day gaps.
                 </Text>
               </View>
@@ -773,8 +776,8 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
             
             {isStreakBroken && !canSaveStreak && currentStreak > 0 && (
               <View style={styles.warningContainer}>
-                <Ionicons name="alert-circle-outline" size={18} color={isDark ? '#FF5722' : '#FF5722'} style={{ marginRight: 6 }} />
-                <Text style={[styles.warningText, { color: isDark ? '#FF5722' : '#FF5722' }]}>
+                <Ionicons name="alert-circle-outline" size={18} color={isDark || isSunset ? '#FF5722' : '#FF5722'} style={{ marginRight: 6 }} />
+                <Text style={[styles.warningText, { color: isDark || isSunset ? '#FF5722' : '#FF5722' }]}>
                   Streak broken: It's been more than 2 days since your last activity. Your streak will reset when you next complete a routine.
                 </Text>
               </View>
@@ -783,7 +786,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
           
             
             {!canSaveStreak && !isStreakBroken && !hasTodayActivity && currentStreak > 0 && (
-              <Text style={[styles.explainerText, { color: isDark ? theme.textSecondary : '#666' }]}>
+              <Text style={[styles.explainerText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                 Streak freezes apply when you've missed a day of activity.
               </Text>
             )}
@@ -796,16 +799,16 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
             styles.freezePill, 
             { 
               backgroundColor: freezeCount >= 1 
-                ? (isDark ? 'rgba(144, 202, 249, 0.5)' : '#2196F3') 
-                : (isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E0E0') 
+                ? (isDark || isSunset ? 'rgba(144, 202, 249, 0.5)' : '#2196F3') 
+                : (isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : '#E0E0E0') 
             }
           ]} />
           <View style={[
             styles.freezePill, 
             { 
               backgroundColor: freezeCount >= 2 
-                ? (isDark ? 'rgba(144, 202, 249, 0.5)' : '#2196F3') 
-                : (isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E0E0') 
+                ? (isDark || isSunset ? 'rgba(144, 202, 249, 0.5)' : '#2196F3') 
+                : (isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : '#E0E0E0') 
             }
           ]} />
         </View>

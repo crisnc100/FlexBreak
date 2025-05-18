@@ -42,7 +42,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
   requiredLevel,
   currentLevel
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // Format time for display (24h to 12h)
   const formatTimeFor12Hour = (time24h: string) => {
@@ -76,13 +76,13 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
     ]}>
       {/* Premium Badge */}
       {isPremium ? (
-        <View style={[styles.premiumBadge, { backgroundColor: isDark ? '#e6c25e' : '#FFD700' }]}>
+        <View style={[styles.premiumBadge, { backgroundColor: isDark || isSunset ? '#e6c25e' : '#FFD700' }]}>
           <Ionicons name="star" size={12} color={isDark ? '#000' : '#7D6608'} />
           <Text style={styles.premiumBadgeText}>Premium</Text>
         </View>
       ) : (
-        <View style={[styles.premiumBadge, { backgroundColor: isDark ? '#666' : '#DDD' }]}>
-          <Ionicons name="lock-closed" size={12} color={isDark ? '#CCC' : '#666'} />
+        <View style={[styles.premiumBadge, { backgroundColor: isDark || isSunset ? '#666' : '#DDD' }]}>
+          <Ionicons name="lock-closed" size={12} color={isDark || isSunset ? '#CCC' : '#666'} />
           <Text style={styles.premiumBadgeText}>Premium Only</Text>
         </View>
       )}
@@ -114,10 +114,10 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
           value={reminderEnabled}
           onValueChange={onToggleReminder}
           trackColor={{ 
-            false: isDark ? '#555' : '#D1D1D1', 
+            false: isDark || isSunset ? '#555' : '#D1D1D1', 
             true: theme.accent 
           }}
-          thumbColor={reminderEnabled ? '#FFFFFF' : isDark ? '#888' : '#F4F4F4'}
+          thumbColor={reminderEnabled ? '#FFFFFF' : isDark || isSunset ? '#888' : '#F4F4F4'}
           disabled={!isPremium}
         />
       </View>
@@ -130,7 +130,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
           style={[
             styles.settingItem,
             { 
-              backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+              backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5',
             }
           ]}
           disabled={!isPremium || !reminderEnabled}
@@ -154,7 +154,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
             style={[
               styles.settingItem,
               { 
-                backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+                backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5',
               }
             ]}
             disabled={!isPremium || !reminderEnabled}
@@ -179,7 +179,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
             style={[
               styles.settingItem,
               { 
-                backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+                backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5',
               }
             ]}
             disabled={!isPremium || !reminderEnabled}
@@ -204,7 +204,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
             style={[
               styles.settingItem,
               { 
-                backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
+                backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5',
               }
             ]}
             disabled={!isPremium || !reminderEnabled}
@@ -257,7 +257,7 @@ const ReminderSection: React.FC<ReminderSectionProps> = ({
           <Text style={[styles.levelText, { color: theme.textSecondary }]}>
             Custom Reminders unlock at Level {requiredLevel}
           </Text>
-          <View style={[styles.progressBar, { backgroundColor: isDark ? '#333' : '#f0f0f0' }]}>
+          <View style={[styles.progressBar, { backgroundColor: isDark || isSunset ? '#333' : '#f0f0f0' }]}>
             <View 
               style={[
                 styles.progressFill, 

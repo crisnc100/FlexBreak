@@ -9,31 +9,34 @@ interface WeeklyActivityProps {
   orderedDayNames: string[];
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
+  isSunset?: boolean;
 }
 
 const WeeklyActivity: React.FC<WeeklyActivityProps> = ({
   weeklyActivity,
   orderedDayNames,
   theme: propTheme,
-  isDark: propIsDark
+  isDark: propIsDark,
+  isSunset: propIsSunset
 }) => {
   // Use theme from props if provided, otherwise use theme context
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+  const isSunset = propIsSunset !== undefined ? propIsSunset : themeContext.isSunset;
 
   return (
     <View style={[styles.section, { 
-      backgroundColor: isDark ? theme.cardBackground : '#FFF',
-      shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
-      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-      borderWidth: isDark ? 1 : 0
+      backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+      shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000',
+      borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+      borderWidth: isDark || isSunset ? 1 : 0
     }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+        <Text style={[styles.sectionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
           Weekly Activity
         </Text>
-        <Text style={[styles.dateRangeText, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.dateRangeText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           {getWeeklyActivityDateRange()}
         </Text>
       </View>
@@ -50,14 +53,14 @@ const WeeklyActivity: React.FC<WeeklyActivityProps> = ({
           height={180}
           yAxisInterval={1}
           chartConfig={{
-            backgroundColor: isDark ? theme.cardBackground : '#FFF',
-            backgroundGradientFrom: isDark ? theme.cardBackground : '#FFF',
-            backgroundGradientTo: isDark ? theme.cardBackground : '#FFF',
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+            backgroundGradientFrom: isDark || isSunset ? theme.cardBackground : '#FFF',
+            backgroundGradientTo: isDark || isSunset ? theme.cardBackground : '#FFF',
             decimalPlaces: 0,
-            color: (opacity = 1) => isDark 
+            color: (opacity = 1) => isDark || isSunset 
               ? `rgba(${theme.accent.replace('#', '').match(/.{1,2}/g).map(hex => parseInt(hex, 16)).join(', ')}, ${opacity})`
               : `rgba(76, 175, 80, ${opacity})`,
-            labelColor: (opacity = 1) => isDark 
+            labelColor: (opacity = 1) => isDark || isSunset 
               ? `rgba(255, 255, 255, ${opacity})`
               : `rgba(0, 0, 0, ${opacity})`,
             style: {
@@ -66,17 +69,17 @@ const WeeklyActivity: React.FC<WeeklyActivityProps> = ({
             propsForDots: {
               r: "6",
               strokeWidth: "2",
-              stroke: isDark ? theme.accent : "#4CAF50"
+              stroke: isDark || isSunset ? theme.accent : "#4CAF50"
             },
             // Add these for better dark mode visibility
             strokeWidth: 2,
             propsForBackgroundLines: {
-              stroke: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+              stroke: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
               strokeDasharray: ''
             },
             propsForLabels: {
               fontSize: '12',
-              fill: isDark ? theme.textSecondary : '#666'
+              fill: isDark || isSunset ? theme.textSecondary : '#666'
             }
           }}
           bezier
@@ -86,7 +89,7 @@ const WeeklyActivity: React.FC<WeeklyActivityProps> = ({
           }}
         />
       ) : (
-        <Text style={[styles.emptyText, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.emptyText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           Complete some routines to see your weekly activity
         </Text>
       )}

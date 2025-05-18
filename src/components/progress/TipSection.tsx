@@ -6,11 +6,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 interface TipSectionProps {
   currentStreak: number;
   isDark?: boolean;
+  isSunset?: boolean;
 }
 
 const TipSection: React.FC<TipSectionProps> = ({
   currentStreak,
-  isDark = false
+  isDark = false,
+  isSunset = false
 }) => {
   const generateTipMessage = () => {
     if (currentStreak === 0) {
@@ -26,7 +28,26 @@ const TipSection: React.FC<TipSectionProps> = ({
     }
   };
 
-  if (isDark) {
+  if (isSunset) {
+    // Sunset theme specific colors
+    return (
+      <LinearGradient
+        colors={['rgba(50, 30, 64, 0.8)', 'rgba(32, 18, 41, 0.9)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.darkTipContainer, styles.sunsetTipContainer]}
+      >
+        <View style={[styles.iconContainer, styles.sunsetIconContainer]}>
+          <Ionicons name="flame" size={24} color="#FF8C5A" />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={[styles.darkTipText, styles.sunsetTipText]}>
+            {generateTipMessage()}
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  } else if (isDark) {
     return (
       <LinearGradient
         colors={['#1F2937', '#111827']}
@@ -89,6 +110,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  sunsetTipContainer: {
+    borderColor: 'rgba(255, 140, 90, 0.4)',
+    shadowColor: '#FF8C5A',
+  },
   iconContainer: {
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
     borderRadius: 12,
@@ -96,6 +121,9 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  sunsetIconContainer: {
+    backgroundColor: 'rgba(255, 140, 90, 0.15)',
   },
   textContainer: {
     flex: 1,
@@ -106,6 +134,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#D1D5DB',
     lineHeight: 20,
+  },
+  sunsetTipText: {
+    color: '#FFF1E6',
   },
 });
 

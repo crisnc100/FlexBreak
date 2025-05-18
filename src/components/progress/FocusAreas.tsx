@@ -8,18 +8,21 @@ interface FocusAreasProps {
   totalRoutines: number;
   theme?: any; // Optional theme prop passed from parent
   isDark?: boolean; // Optional isDark flag passed from parent
+  isSunset?: boolean;
 }
 
 const FocusAreas: React.FC<FocusAreasProps> = ({
   areaBreakdown,
   totalRoutines,
   theme: propTheme,
-  isDark: propIsDark
+  isDark: propIsDark,
+  isSunset: propIsSunset
 }) => {
   // Use theme from props if provided, otherwise use theme context
   const themeContext = useTheme();
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
+  const isSunset = propIsSunset !== undefined ? propIsSunset : themeContext.isSunset;
 
   // Convert area breakdown to chart data
   const getAreaBreakdownChartData = () => {
@@ -41,7 +44,7 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
           name: area,
           count: count,
           color: colors[index % colors.length],
-          legendFontColor: isDark ? theme.textSecondary : '#7F7F7F',
+          legendFontColor: isDark || isSunset ? theme.textSecondary : '#7F7F7F',
           legendFontSize: 12
         };
       });
@@ -49,16 +52,16 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
 
   return (
     <View style={[styles.section, {
-      backgroundColor: isDark ? theme.cardBackground : '#FFF',
-      shadowColor: isDark ? 'rgba(0,0,0,0.5)' : '#000',
-      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'transparent',
-      borderWidth: isDark ? 1 : 0
+      backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+      shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.5)' : '#000',
+      borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'transparent',
+      borderWidth: isDark || isSunset ? 1 : 0
     }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: isDark ? theme.text : '#333' }]}>
+        <Text style={[styles.sectionTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
           Focus Areas
         </Text>
-        <Text style={[styles.dateRangeText, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.dateRangeText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           All Time
         </Text>
       </View>
@@ -75,10 +78,10 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
             width={Dimensions.get('window').width - 32}
             height={200}
             chartConfig={{
-              color: (opacity = 1) => isDark
+              color: (opacity = 1) => isDark || isSunset
                 ? `rgba(255, 255, 255, ${opacity})`
                 : `rgba(0, 0, 0, ${opacity})`,
-              labelColor: (opacity = 1) => isDark
+              labelColor: (opacity = 1) => isDark || isSunset
                 ? `rgba(255, 255, 255, ${opacity})`
                 : `rgba(0, 0, 0, ${opacity})`,
             }}
@@ -93,12 +96,12 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
               .map(([area, count], index) => (
                 <View key={area} style={[
                   styles.areaBreakdownItem,
-                  { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#F0F0F0' }
+                  { borderBottomColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#F0F0F0' }
                 ]}>
-                  <Text style={[styles.areaBreakdownName, { color: isDark ? theme.text : '#333' }]}>
+                  <Text style={[styles.areaBreakdownName, { color: isDark || isSunset ? theme.text : '#333' }]}>
                     {area}
                   </Text>
-                  <Text style={[styles.areaBreakdownCount, { color: isDark ? theme.textSecondary : '#666' }]}>
+                  <Text style={[styles.areaBreakdownCount, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                     {String(count)} {count === 1 ? 'activity' : 'activities'}
                     {' '}({Math.round((count / totalRoutines) * 100)}%)
                   </Text>
@@ -108,7 +111,7 @@ const FocusAreas: React.FC<FocusAreasProps> = ({
           </View>
         </View>
       ) : (
-        <Text style={[styles.emptyText, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.emptyText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
           Complete some routines to see your focus area breakdown
         </Text>
       )}

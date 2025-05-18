@@ -61,7 +61,7 @@ const CustomReminderModal: React.FC<CustomReminderModalProps> = ({
   maxLength = 80,
   isCustomFrequencyEnabled = false
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [localMessage, setLocalMessage] = useState(message);
   const [localDays, setLocalDays] = useState(days);
   const [localFrequency, setLocalFrequency] = useState(frequency);
@@ -198,7 +198,7 @@ const CustomReminderModal: React.FC<CustomReminderModalProps> = ({
                       { 
                         borderColor: theme.border,
                         color: theme.text,
-                        backgroundColor: isDark ? theme.backgroundLight : 'white'
+                        backgroundColor: isDark || isSunset ? theme.backgroundLight : 'white'
                       }
                     ]}
                     placeholder="Enter your reminder message"
@@ -245,7 +245,7 @@ const CustomReminderModal: React.FC<CustomReminderModalProps> = ({
                         key={i}
                         style={[
                           styles.exampleChip,
-                          { backgroundColor: isDark ? theme.backgroundLight : '#f0f0f0' }
+                          { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f0f0f0' }
                         ]}
                         onPress={() => handleMessageChange(ex)}
                       >
@@ -270,7 +270,7 @@ const CustomReminderModal: React.FC<CustomReminderModalProps> = ({
                         style={[
                           styles.frequencyOption,
                           { 
-                            backgroundColor: isDark ? theme.backgroundLight : '#f0f0f0',
+                            backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f0f0f0',
                             borderColor: localFrequency === option.id ? theme.accent : 'transparent',
                             borderWidth: localFrequency === option.id ? 2 : 0
                           }
@@ -281,7 +281,7 @@ const CustomReminderModal: React.FC<CustomReminderModalProps> = ({
                           styles.radioButton,
                           { 
                             borderColor: theme.accent,
-                            backgroundColor: isDark ? theme.backgroundLight : '#f0f0f0'
+                            backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f0f0f0'
                           }
                         ]}>
                           {localFrequency === option.id && (
@@ -311,7 +311,7 @@ const CustomReminderModal: React.FC<CustomReminderModalProps> = ({
                               { 
                                 backgroundColor: localDays.includes(day.id) 
                                   ? theme.accent 
-                                  : isDark ? theme.backgroundLight : '#f0f0f0',
+                                  : isDark || isSunset ? theme.backgroundLight : '#f0f0f0',
                               }
                             ]}
                             onPress={() => toggleDay(day.id)}

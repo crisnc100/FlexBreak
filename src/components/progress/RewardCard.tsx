@@ -14,7 +14,7 @@ interface RewardCardProps {
 }
 
 const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, userLevel }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [realUserLevel, setRealUserLevel] = useState(userLevel);
   
   // Get the actual user level from storage
@@ -34,13 +34,13 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   
   // Check if reward is dark theme and it's unlocked (to show active state)
   const isDarkThemeReward = reward.id === 'dark_theme';
-  const isDarkThemeActive = isDarkThemeReward && isDark;
+  const isDarkThemeActive = isDarkThemeReward && (isDark || isSunset);
   
   // Get icon color based on reward type
   const getIconColor = () => {
     switch (reward.id) {
       case 'dark_theme':
-        return isDark ? '#BB86FC' : '#673AB7'; // Purple - brighter in dark mode
+        return isDark || isSunset ? '#BB86FC' : '#673AB7'; // Purple - brighter in dark mode
       case 'custom_reminders':
         return '#2196F3'; // Blue
       case 'xp_boost':
@@ -64,7 +64,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   const getIconName = () => {
     // For dark theme, show filled icon when active, outline when inactive but unlocked
     if (isDarkThemeReward) {
-      if (isDark) return 'moon'; // Dark theme is active
+      if (isDark || isSunset) return 'moon'; // Dark theme is active
       return reward.unlocked ? 'moon-outline' : 'lock-closed-outline';
     }
     
@@ -114,7 +114,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   // Get badge text for active toggleable features
   const getBadgeText = () => {
     if (isDarkThemeReward) {
-      if (isDark) return 'Active';
+      if (isDark || isSunset) return 'Active';
       if (reward.unlocked || realUserLevel >= reward.levelRequired) return 'Tap to Enable';
       return null;
     }
@@ -159,10 +159,10 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
         styles.container, 
         { 
           backgroundColor: theme.cardBackground,
-          borderColor: isEnabled ? (isDarkThemeReward && isDark ? '#BB86FC' : theme.accent + '40') : theme.border,
+          borderColor: isEnabled ? (isDarkThemeReward && (isDark || isSunset) ? '#BB86FC' : theme.accent + '40') : theme.border,
           opacity: isEnabled ? 1 : 0.8
         },
-        isDarkThemeReward && isDark && styles.activeContainer
+        isDarkThemeReward && (isDark || isSunset) && styles.activeContainer
       ]}
       onPress={handleRewardPress}
       activeOpacity={0.4}
@@ -209,7 +209,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
           <Ionicons 
             name={
               isDarkThemeReward 
-                ? (isDark ? 'checkmark-circle' : 'chevron-forward') 
+                ? (isDark || isSunset ? 'checkmark-circle' : 'chevron-forward') 
                 : isStreakFreezeUnlocked 
                   ? 'chevron-forward'
                   : 'chevron-forward'

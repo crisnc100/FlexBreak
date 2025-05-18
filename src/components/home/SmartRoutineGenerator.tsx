@@ -12,7 +12,6 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import Slider from '@react-native-community/slider';
 import * as Permissions from 'expo-permissions';
 import { Ionicons } from '@expo/vector-icons';
 import { parseUserInput } from '../../utils/smart/parser';
@@ -38,7 +37,7 @@ interface SmartRoutineGeneratorProps {
 }
 
 export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ onRoutineGenerated }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [userInput, setUserInput] = useState('');
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [parsedInput, setParsedInput] = useState<SmartRoutineInput | null>(null);
@@ -304,14 +303,14 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
       <View style={[
         styles.inputContainer, 
         { 
-          backgroundColor: isDark ? theme.backgroundLight : '#f0f0f5',
-          borderColor: isDark ? theme.border : '#e0e0e5'
+          backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f0f0f5',
+          borderColor: isDark || isSunset ? theme.border : '#e0e0e5'
         }
       ]}>
         <TextInput
           style={[styles.input, { color: theme.text }]}
           placeholder="Example: My neck is stiff from working at my desk all day"
-          placeholderTextColor={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
+          placeholderTextColor={isDark || isSunset ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
           value={isRecording ? recognizedText : userInput}
           onChangeText={setUserInput}
           onSubmitEditing={handleInputSubmit}
@@ -324,7 +323,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
             { 
               backgroundColor: isRecording 
                 ? theme.accent 
-                : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')
+                : (isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')
             }
           ]}
           onPress={isRecording ? stopRecording : startRecording}
@@ -363,7 +362,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           <TouchableOpacity 
             style={[
               styles.exampleChip, 
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
             ]}
             onPress={() => setUserInput("My lower back hurts after sitting all day")}
           >
@@ -376,7 +375,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           <TouchableOpacity 
             style={[
               styles.exampleChip, 
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
             ]}
             onPress={() => setUserInput("My shoulders are tight from typing")}
           >
@@ -389,7 +388,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           <TouchableOpacity 
             style={[
               styles.exampleChip, 
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
             ]}
             onPress={() => setUserInput("I need to stretch before my run")}
           >
@@ -402,7 +401,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           <TouchableOpacity 
             style={[
               styles.exampleChip, 
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
             ]}
             onPress={() => setUserInput("I feel stiff after waking up")}
           >
@@ -415,7 +414,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           <TouchableOpacity 
             style={[
               styles.exampleChip, 
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
             ]}
             onPress={() => setUserInput("Quick 5-minute stretch for my full body")}
           >
@@ -428,7 +427,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
           <TouchableOpacity 
             style={[
               styles.exampleChip, 
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
             ]}
             onPress={() => setUserInput("My neck gets sore from looking at my phone")}
           >
@@ -447,7 +446,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
 
       <Modal visible={showFollowUp} animationType="slide" transparent>
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? theme.cardBackground : '#fff' }]}>
+          <View style={[styles.modalContent, { backgroundColor: isDark || isSunset ? theme.cardBackground : '#fff' }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Quick Follow-up</Text>
               <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
@@ -469,7 +468,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                     key={issue}
                     style={[
                       styles.issueButton,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
                       selectedIssueType === issue && [styles.selectedIssue, { backgroundColor: theme.accent }],
                     ]}
                     onPress={() => setSelectedIssueType(issue as IssueType)}
@@ -500,7 +499,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                     key={duration}
                     style={[
                       styles.durationButton,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
                       selectedDuration === duration.toString() && [styles.selectedDuration, { backgroundColor: theme.accent }],
                     ]}
                     onPress={() => setSelectedDuration(duration.toString() as Duration)}
@@ -540,7 +539,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                     key={position}
                     style={[
                       styles.positionButton,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
                       selectedPosition === position && [styles.selectedPosition, { backgroundColor: theme.accent }],
                     ]}
                     onPress={() => setSelectedPosition(position as Position)}
@@ -573,7 +572,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                 styles.generateButton, 
                 { 
                   backgroundColor: !selectedIssueType || isGenerating ? 
-                    (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)') : 
+                    (isDark || isSunset ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)') : 
                     theme.accent,
                   opacity: !selectedIssueType || isGenerating ? 0.7 : 1
                 }
@@ -596,7 +595,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
                 <Text style={[styles.summaryTitle, { color: theme.textSecondary }]}>
                   Will generate:
                 </Text>
-                <View style={[styles.summaryBox, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+                <View style={[styles.summaryBox, { borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
                   <View style={styles.summaryRow}>
                     <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Area:</Text>
                     <Text style={[styles.summaryValue, { color: theme.text }]}>

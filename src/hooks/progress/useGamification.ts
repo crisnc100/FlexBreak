@@ -50,6 +50,7 @@ export const LEVEL_UP_EVENT = 'level_up';
 export const REWARD_UNLOCKED_EVENT = 'reward_unlocked';
 export const XP_UPDATED_EVENT = 'xp_updated';
 export const CHALLENGE_COMPLETED_EVENT = 'challenge_completed';
+export const ACHIEVEMENT_COMPLETED_EVENT = 'achievement_completed';
 
 /**
  * Hook for interacting with the gamification system

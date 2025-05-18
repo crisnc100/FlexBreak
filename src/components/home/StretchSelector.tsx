@@ -50,7 +50,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
   onStretchesSelected,
   onClose
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [availableStretches, setAvailableStretches] = useState<Stretch[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<BodyArea[]>([area]);
   const [filters, setFilters] = useState<{
@@ -288,8 +288,8 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
         style={[
           styles.stretchItem,
           { 
-            backgroundColor: isDark ? theme.cardBackground : '#fff',
-            borderColor: isSelected ? theme.accent : isDark ? theme.border : '#e0e0e0',
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#fff',
+            borderColor: isSelected ? theme.accent : isDark || isSunset ? theme.border : '#e0e0e0',
             borderWidth: isSelected ? 2 : 1
           }
         ]}
@@ -336,7 +336,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
               {item.tags.map((tag, index) => (
                 <View 
                   key={index} 
-                  style={[styles.tag, { backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5' }]}
+                  style={[styles.tag, { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5' }]}
                 >
                   <Text style={[styles.tagText, { color: theme.textSecondary }]}>
                     {tag}
@@ -358,7 +358,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
             <Ionicons 
               name="add-circle-outline" 
               size={24} 
-              color={isDark ? theme.textSecondary : '#757575'} 
+              color={isDark || isSunset ? theme.textSecondary : '#757575'} 
             />
           )}
         </View>
@@ -367,7 +367,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? theme.background : '#f5f5f5' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark || isSunset ? theme.background : '#f5f5f5' }]}>
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={onClose}
@@ -391,7 +391,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
           style={[
             styles.saveButton, 
             { 
-              backgroundColor: meetsMinimumRequirement ? theme.accent : isDark ? '#555' : '#ccc',
+              backgroundColor: meetsMinimumRequirement ? theme.accent : isDark || isSunset ? '#555' : '#ccc',
               opacity: meetsMinimumRequirement ? 1 : 0.7
             }
           ]}
@@ -404,7 +404,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
       <View style={styles.searchContainer}>
         <View style={[
           styles.searchInputContainer,
-          { backgroundColor: isDark ? theme.backgroundLight : '#fff' }
+          { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#fff' }
         ]}>
           <Ionicons name="search" size={20} color={theme.textSecondary} />
           <TextInput
@@ -482,8 +482,8 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
                     { 
                       backgroundColor: selectedAreas.includes(bodyArea) 
                         ? theme.accent 
-                        : isDark ? theme.backgroundLight : '#fff',
-                      borderColor: isDark ? theme.border : '#e0e0e0'
+                        : isDark || isSunset ? theme.backgroundLight : '#fff',
+                      borderColor: isDark || isSunset ? theme.border : '#e0e0e0'
                     }
                   ]}
                   onPress={() => toggleArea(bodyArea)}
@@ -517,7 +517,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
                   { 
                     backgroundColor: filters.position === 'All' 
                       ? theme.accent 
-                      : isDark ? theme.backgroundLight : '#fff'
+                      : isDark || isSunset ? theme.backgroundLight : '#fff'
                   }
                 ]}
                 onPress={() => setFilters({...filters, position: 'All'})}
@@ -538,7 +538,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
                   { 
                     backgroundColor: filters.position === 'Sitting' 
                       ? '#4CAF50' 
-                      : isDark ? theme.backgroundLight : '#fff'
+                      : isDark || isSunset ? theme.backgroundLight : '#fff'
                   }
                 ]}
                 onPress={() => setFilters({...filters, position: 'Sitting'})}
@@ -559,7 +559,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
                   { 
                     backgroundColor: filters.position === 'Lying' 
                       ? '#FF9800' 
-                      : isDark ? theme.backgroundLight : '#fff'
+                      : isDark || isSunset ? theme.backgroundLight : '#fff'
                   }
                 ]}
                 onPress={() => setFilters({...filters, position: 'Lying'})}
@@ -580,7 +580,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
                   { 
                     backgroundColor: filters.position === 'Standing' 
                       ? '#F44336' 
-                      : isDark ? theme.backgroundLight : '#fff'
+                      : isDark || isSunset ? theme.backgroundLight : '#fff'
                   }
                 ]}
                 onPress={() => setFilters({...filters, position: 'Standing'})}
@@ -598,7 +598,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
           </View>
           
           <View style={styles.timeInfoContainer}>
-            <View style={[styles.timeInfo, { backgroundColor: isDark ? theme.backgroundLight : '#e3f2fd' }]}>
+            <View style={[styles.timeInfo, { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#e3f2fd' }]}>
               <View style={styles.timeRow}>
                 <Text style={[styles.timeLabel, { color: theme.text }]}>
                   Target Time:
@@ -652,8 +652,8 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
                 style={[
                   styles.clearButton,
                   { 
-                    backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5',
-                    borderColor: isDark ? theme.border : '#ddd',
+                    backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5',
+                    borderColor: isDark || isSunset ? theme.border : '#ddd',
                   }
                 ]}
                 onPress={clearAllStretches}
@@ -666,7 +666,7 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
                   styles.autoCompleteButton,
                   { 
                     backgroundColor: remainingTime <= 0 ? 
-                      isDark ? '#555' : '#ccc' : 
+                      isDark || isSunset ? '#555' : '#ccc' : 
                       theme.accent,
                     opacity: remainingTime <= 0 ? 0.7 : 1
                   }
@@ -686,9 +686,9 @@ const StretchSelector: React.FC<StretchSelectorProps> = ({
           </View>
           
           {!premiumUnlocked && (
-            <View style={[styles.premiumInfo, { backgroundColor: isDark ? theme.backgroundLight : '#FFF9E5' }]}>
+            <View style={[styles.premiumInfo, { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#FFF9E5' }]}>
               <Ionicons name="lock-closed" size={20} color="#FFD700" />
-              <Text style={[styles.premiumInfoText, { color: isDark ? theme.textSecondary : '#5D4037' }]}>
+              <Text style={[styles.premiumInfoText, { color: isDark || isSunset ? theme.textSecondary : '#5D4037' }]}>
                 Premium stretches will be available at level 7
               </Text>
             </View>

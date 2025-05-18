@@ -63,7 +63,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   canSkipToNext = true,
   nextStretch = null
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // App states
   const [viewMode, setViewMode] = useState<'demo' | 'stretch' | 'rest' | 'transition'>('stretch');
@@ -385,8 +385,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     if (isRest || imageLoadError) {
       return (
         <View style={styles.fallbackImageContainer}>
-          <Ionicons name="image-outline" size={50} color={isDark ? "#666" : "#999"} />
-          <Text style={[styles.fallbackImageText, { color: isDark ? theme.textSecondary : '#666' }]}>
+          <Ionicons name="image-outline" size={50} color={isDark || isSunset ? "#666" : "#999"} />
+          <Text style={[styles.fallbackImageText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             {isRest ? (stretch.name || 'Rest Period') : 'Image unavailable'}
           </Text>
         </View>
@@ -457,8 +457,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           />
           {isImageLoading && (
             <View style={styles.imageLoadingContainer}>
-              <ActivityIndicator size="large" color={isDark ? theme.accent : '#4CAF50'} />
-              <Text style={[styles.loadingText, { color: isDark ? theme.textSecondary : '#666', marginTop: 10 }]}>
+              <ActivityIndicator size="large" color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+              <Text style={[styles.loadingText, { color: isDark || isSunset ? theme.textSecondary : '#666', marginTop: 10 }]}>
                 Loading video...
               </Text>
             </View>
@@ -494,7 +494,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         />
         {isImageLoading && (
           <View style={styles.imageLoadingContainer}>
-            <ActivityIndicator size="large" color={isDark ? theme.accent : '#4CAF50'} />
+            <ActivityIndicator size="large" color={isDark || isSunset ? theme.accent : '#4CAF50'} />
           </View>
         )}
       </Animated.View>
@@ -511,13 +511,13 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       <View style={styles.demoContainer}>
         {/* Demo header */}
         <View style={styles.demoHeader}>
-          <Text style={[styles.demoTitle, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.demoTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {stretchObj.name || 'Stretch Demo'}
           </Text>
           
           <View style={styles.badgeContainer}>
             {stretchObj.bilateral && (
-              <View style={[styles.badgeItem, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+              <View style={[styles.badgeItem, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
                 <Ionicons name="swap-horizontal" size={16} color="#FFF" />
                 <Text style={styles.badgeText}>Both Sides</Text>
               </View>
@@ -552,8 +552,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }
         ]}>
           <View style={styles.instructionsHeader}>
-            <Ionicons name="information-circle" size={22} color={isDark ? theme.accent : '#4CAF50'} />
-            <Text style={[styles.instructionsTitle, { color: isDark ? theme.accent : '#4CAF50' }]}>
+            <Ionicons name="information-circle" size={22} color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.instructionsTitle, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
               How to perform this stretch
             </Text>
           </View>
@@ -563,19 +563,20 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             <StructuredInstructions 
               description={stretchObj.description || 'Follow along with the demonstration video.'} 
               isDark={isDark}
+              isSunset={isSunset}
               theme={theme}
             />
             
             {/* Display tips if available */}
             {hasTips && (
               <View style={styles.tipsList}>
-                <Text style={[styles.tipsListHeader, { color: isDark ? theme.text : '#333', marginTop: 12 }]}>
+                <Text style={[styles.tipsListHeader, { color: isDark || isSunset ? theme.text : '#333', marginTop: 12 }]}>
                   Tips for best results:
                 </Text>
                 {(stretchObj as any).tips.map((tip: string, index: number) => (
                   <View key={index} style={styles.tipListItem}>
-                    <View style={[styles.tipItemBullet, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]} />
-                    <Text style={[styles.tipItemText, { color: isDark ? theme.textSecondary : '#555' }]}>
+                    <View style={[styles.tipItemBullet, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]} />
+                    <Text style={[styles.tipItemText, { color: isDark || isSunset ? theme.textSecondary : '#555' }]}>
                       {tip}
                     </Text>
                   </View>
@@ -587,7 +588,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             {/* Ready to Stretch button now inside the instructions panel */}
             <View style={styles.inlineDemoFooter}>
               <TouchableOpacity
-                style={[styles.readyButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
+                style={[styles.readyButton, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}
                 onPress={handleReadyToStretch}
               >
                 <Text style={styles.readyButtonText}>Ready to Stretch</Text>
@@ -614,13 +615,13 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       ]}>
         {/* Header with title and badges */}
         <View style={styles.stretchHeader}>
-          <Text style={[styles.stretchName, { color: isDark ? theme.text : '#333' }]}>
+          <Text style={[styles.stretchName, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {stretchObj.name || 'Stretch'}
           </Text>
           
           <View style={styles.badgeContainer}>
             {stretchObj.bilateral && (
-              <View style={[styles.badgeItem, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+              <View style={[styles.badgeItem, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
                 <Ionicons name="swap-horizontal" size={16} color="#FFF" />
                 <Text style={styles.badgeText}>Both Sides</Text>
               </View>
@@ -666,10 +667,11 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             timeRemaining={displayedTime}
             diameter={125}
             strokeWidth={8}
-            color={isDark ? theme.accent : '#4CAF50'}
-            backgroundColor={isDark ? 'rgb(255, 255, 255)' : '#E0E0E0'}
-            textColor={isDark ? theme.text : '#000'}
+            color={isDark || isSunset ? theme.accent : '#4CAF50'}
+            backgroundColor={isDark || isSunset ? 'rgb(255, 255, 255)' : '#E0E0E0'}
+            textColor={isDark || isSunset ? theme.text : '#000'}
             isDark={isDark}
+            isSunset={isSunset}
           />
         </View>
         
@@ -677,8 +679,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         <View style={[
           styles.imageContainer,
           { 
-            backgroundColor: isDark ? theme.cardBackground : '#FFF',
-            borderColor: isPremium ? ((stretch as any).vipBadgeColor || '#FFD700') : (isDark ? theme.border : '#DDD'),
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+            borderColor: isPremium ? ((stretch as any).vipBadgeColor || '#FFD700') : (isDark || isSunset ? theme.border : '#DDD'),
             height: hasTips ? height * 0.25 : height * 0.3 // Make smaller when tips are present
           }
         ]}>
@@ -691,16 +693,16 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         {hasTips && (
           <View style={[
             styles.tipsContainerCompact,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }
+            { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }
           ]}>
             <View style={styles.tipsHeader}>
-              <Ionicons name="bulb" size={18} color={isDark ? theme.accent : '#4CAF50'} />
-              <Text style={[styles.tipsTitle, { color: isDark ? theme.accent : '#4CAF50' }]}>
+              <Ionicons name="bulb" size={18} color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+              <Text style={[styles.tipsTitle, { color: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
                 Tips:
               </Text>
             </View>
             {tips.map((tip: string, index: number) => (
-              <Text key={index} style={[styles.tipTextCompact, { color: isDark ? theme.text : '#333' }]}>
+              <Text key={index} style={[styles.tipTextCompact, { color: isDark || isSunset ? theme.text : '#333' }]}>
                 • {tip}
               </Text>
             ))}
@@ -715,22 +717,22 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     return (
       <View style={styles.restContainer}>
         <LinearGradient
-          colors={isDark ? ['#1a1a1a', '#2a2a2a'] : ['#f5f5f5', '#e0e0e0']}
+          colors={isDark || isSunset ? ['#1a1a1a', '#2a2a2a'] : ['#f5f5f5', '#e0e0e0']}
           style={styles.restGradient}
         >
           <View style={styles.restContent}>
             <Ionicons 
               name="time-outline" 
               size={50} 
-              color={isDark ? theme.accent : '#4CAF50'} 
+              color={isDark || isSunset ? theme.accent : '#4CAF50'} 
               style={styles.restIcon} 
             />
             
-            <Text style={[styles.restTitle, { color: isDark ? theme.text : '#333' }]}>
+            <Text style={[styles.restTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
               Rest Period
             </Text>
             
-            <Text style={[styles.restDescription, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.restDescription, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               {stretch.description}
             </Text>
             
@@ -741,26 +743,27 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
                 timeRemaining={timeRemaining}
                 diameter={120}
                 strokeWidth={8}
-                color={isDark ? theme.accent : '#4CAF50'}
-                backgroundColor={isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0'}
+                color={isDark || isSunset ? theme.accent : '#4CAF50'}
+                backgroundColor={isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0'}
                 textColor="#000"
                 isDark={isDark}
+                isSunset={isSunset}
               />
             </View>
             
             <View style={styles.restButtonsContainer}>
               {currentIndex > 0 && (
                 <TouchableOpacity
-                  style={[styles.restButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}
+                  style={[styles.restButton, { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}
                   onPress={onPrevious}
                 >
-                  <Ionicons name="chevron-back" size={24} color={isDark ? theme.text : '#333'} />
-                  <Text style={[styles.restButtonText, { color: isDark ? theme.text : '#333' }]}>Previous</Text>
+                  <Ionicons name="chevron-back" size={24} color={isDark || isSunset ? theme.text : '#333'} />
+                  <Text style={[styles.restButtonText, { color: isDark || isSunset ? theme.text : '#333' }]}>Previous</Text>
                 </TouchableOpacity>
               )}
               
               <TouchableOpacity
-                style={[styles.restButton, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}
+                style={[styles.restButton, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}
                 onPress={onTogglePause}
               >
                 <Ionicons name={isPaused ? "play" : "pause"} size={24} color="#FFF" />
@@ -769,11 +772,11 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               
               {canSkipToNext && (
                 <TouchableOpacity
-                  style={[styles.restButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}
+                  style={[styles.restButton, { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#EEEEEE' }]}
                   onPress={onNext}
                 >
-                  <Text style={[styles.restButtonText, { color: isDark ? theme.text : '#333' }]}>Skip</Text>
-                  <Ionicons name="chevron-forward" size={24} color={isDark ? theme.text : '#333'} />
+                  <Text style={[styles.restButtonText, { color: isDark || isSunset ? theme.text : '#333' }]}>Skip</Text>
+                  <Ionicons name="chevron-forward" size={24} color={isDark || isSunset ? theme.text : '#333'} />
                 </TouchableOpacity>
               )}
             </View>
@@ -898,17 +901,17 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     }
 
     return (
-      <View style={[styles.transitionContainer, { backgroundColor: isDark ? theme.background : '#F9F9F9' }]}>
+      <View style={[styles.transitionContainer, { backgroundColor: isDark || isSunset ? theme.background : '#F9F9F9' }]}>
         {/* Preview of next stretch if available */}
         {nextStretch && !('isRest' in nextStretch) && !('isTransition' in nextStretch) && (
           <View style={[
             styles.nextStretchPreviewContainer, 
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)' }
+            { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)' }
           ]}>
-            <Text style={[styles.nextStretchPreviewLabel, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.nextStretchPreviewLabel, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               Up Next:
             </Text>
-            <Text style={[styles.nextStretchPreviewName, { color: isDark ? theme.text : '#333' }]}>
+            <Text style={[styles.nextStretchPreviewName, { color: isDark || isSunset ? theme.text : '#333' }]}>
               {nextStretch.name}
             </Text>
             
@@ -927,10 +930,10 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             <View style={[
               styles.nextStretchImageContainer, 
               { 
-                backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)',
+                backgroundColor: isDark || isSunset ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)',
                 borderColor: (nextStretch as any).isPremium ? 
                   ((nextStretch as any).vipBadgeColor || '#FFD700') : 
-                  (isDark ? theme.border : '#DDD')
+                  (isDark || isSunset ? theme.border : '#DDD')
               }
             ]}>
               {nextStretch.image ? (
@@ -940,7 +943,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
                     <Text style={styles.previewLoadingText}>
                       Video Preview Loading...
                     </Text>
-                    <ActivityIndicator size="large" color={isDark ? theme.accent : '#4CAF50'} />
+                    <ActivityIndicator size="large" color={isDark || isSunset ? theme.accent : '#4CAF50'} />
                     <Video 
                       ref={transitionVideoRef}
                       source={
@@ -974,7 +977,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
                     <Text style={styles.previewLoadingText}>
                       Image Preview Loading...
                     </Text>
-                    <ActivityIndicator size="small" color={isDark ? theme.accent : '#4CAF50'} />
+                    <ActivityIndicator size="small" color={isDark || isSunset ? theme.accent : '#4CAF50'} />
                     <Image 
                       source={nextStretch.image}
                       style={styles.previewMedia}
@@ -991,8 +994,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               ) : (
                 // Fallback when no image is available
                 <View style={styles.fallbackImageContainer}>
-                  <Ionicons name="image-outline" size={50} color={isDark ? "#666" : "#999"} />
-                  <Text style={[styles.fallbackImageText, { color: isDark ? theme.textSecondary : '#666' }]}>
+                  <Ionicons name="image-outline" size={50} color={isDark || isSunset ? "#666" : "#999"} />
+                  <Text style={[styles.fallbackImageText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
                     {nextStretch.name || 'Next Stretch'}
                   </Text>
                 </View>
@@ -1001,7 +1004,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             
             {/* Show bilateral badge if applicable */}
             {nextStretch.bilateral && (
-              <View style={[styles.nextStretchBilateralBadge, { backgroundColor: isDark ? theme.accent : '#4CAF50' }]}>
+              <View style={[styles.nextStretchBilateralBadge, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
                 <Ionicons name="swap-horizontal" size={14} color="#FFF" />
                 <Text style={styles.nextStretchBadgeText}>Both Sides</Text>
               </View>
@@ -1011,7 +1014,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
         
         {/* Smaller, more compact "Get Ready" card */}
         <View style={[styles.transitionContent, { 
-          backgroundColor: isDark ? theme.cardBackground : '#FFFFFF',
+          backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFFFFF',
           padding: 16,
           marginTop: 8,
           flexDirection: 'row',
@@ -1024,10 +1027,11 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               timeRemaining={timeRemaining}
               diameter={70}
               strokeWidth={6}
-              color={isDark ? theme.accent : '#4CAF50'}
-              backgroundColor={isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0'}
+              color={isDark || isSunset ? theme.accent : '#4CAF50'}
+              backgroundColor={isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0'}
               textColor="#000"
               isDark={isDark}
+              isSunset={isSunset}
             />
           </View>
           
@@ -1036,10 +1040,10 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               <Ionicons
                 name="sync-outline" 
                 size={18} 
-                color={isDark ? theme.accent : '#4CAF50'} 
+                color={isDark || isSunset ? theme.accent : '#4CAF50'} 
               />
               <Text style={[styles.transitionTitle, { 
-                color: isDark ? theme.text : '#333',
+                color: isDark || isSunset ? theme.text : '#333',
                 fontSize: 18,
                 marginTop: 0,
                 marginLeft: 6
@@ -1049,7 +1053,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             </View>
             
             <Text style={[styles.transitionSubtitle, { 
-              color: isDark ? theme.textSecondary : '#666',
+              color: isDark || isSunset ? theme.textSecondary : '#666',
               fontSize: 14,
               marginBottom: 8,
               textAlign: 'left'
@@ -1065,16 +1069,16 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               {currentIndex > 0 && (
                 <TouchableOpacity
                   style={[styles.transitionButton, { 
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
+                    backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
                     marginRight: 8,
                     paddingVertical: 8,
                     paddingHorizontal: 12
                   }]}
                   onPress={onPrevious}
                 >
-                  <Ionicons name="chevron-back" size={18} color={isDark ? theme.text : '#333'} />
+                  <Ionicons name="chevron-back" size={18} color={isDark || isSunset ? theme.text : '#333'} />
                   <Text style={[styles.transitionButtonText, { 
-                    color: isDark ? theme.text : '#333',
+                    color: isDark || isSunset ? theme.text : '#333',
                     fontSize: 14
                   }]}>
                     Previous
@@ -1085,7 +1089,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               {canSkipToNext && (
                 <TouchableOpacity
                   style={[styles.transitionButton, { 
-                    backgroundColor: isDark ? theme.accent : '#4CAF50',
+                    backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50',
                     marginLeft: currentIndex > 0 ? 8 : 0,
                     paddingVertical: 8,
                     paddingHorizontal: 12

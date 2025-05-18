@@ -9,6 +9,7 @@ interface CustomRoutineHeaderProps {
   setShowCreateForm: (value: boolean) => void;
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
 }
 
 const CustomRoutineHeader: React.FC<CustomRoutineHeaderProps> = ({
@@ -17,7 +18,8 @@ const CustomRoutineHeader: React.FC<CustomRoutineHeaderProps> = ({
   showCreateForm,
   setShowCreateForm,
   theme,
-  isDark
+  isDark,
+  isSunset
 }) => {
   return (
     <View style={styles.header}>

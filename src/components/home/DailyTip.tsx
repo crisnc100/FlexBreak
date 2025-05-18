@@ -19,7 +19,7 @@ const DailyTip: React.FC<DailyTipProps> = ({
   iconName = 'bulb-outline',
   iconColor = '#FF9800'
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   
@@ -76,19 +76,40 @@ const DailyTip: React.FC<DailyTipProps> = ({
       ]}
     >
       <LinearGradient
-        colors={isDark ? 
-          [theme.backgroundLight, 'rgba(255,152,0,0.1)'] : 
-          ['#f8f9fa', '#fff3e0']}
+        colors={
+          isDark ? 
+            [theme.backgroundLight, 'rgba(255,152,0,0.1)'] : 
+            isSunset ?
+              ['rgba(50, 30, 64, 0.6)', 'rgba(255, 140, 90, 0.2)'] :
+              ['#f8f9fa', '#fff3e0']
+        }
         start={{x: 0, y: 0}}
         end={{x: 1, y: 1}}
         style={styles.gradient}
       >
         <View style={[
           styles.iconContainer,
-          { backgroundColor: isDark ? 'rgba(255, 152, 0, 0.2)' : 'rgba(255, 152, 0, 0.15)' }
+          { 
+            backgroundColor: 
+              isDark ? 
+                'rgba(255, 152, 0, 0.2)' : 
+                isSunset ? 
+                  'rgba(255, 140, 90, 0.3)' : 
+                  'rgba(255, 152, 0, 0.15)' 
+          }
         ]}>
           <Animated.View style={{ transform: [{ rotate }] }}>
-            <Ionicons name={iconName as any} size={24} color={isDark ? iconColor : '#FF8F00'} />
+            <Ionicons 
+              name={isSunset ? "flame" : (iconName as any)} 
+              size={24} 
+              color={
+                isDark ? 
+                  iconColor : 
+                  isSunset ? 
+                    '#FF8C5A' : 
+                    '#FF8F00'
+              } 
+            />
           </Animated.View>
         </View>
         <Text style={[styles.tipText, { color: theme.text }]}>

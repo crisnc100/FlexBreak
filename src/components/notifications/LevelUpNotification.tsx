@@ -27,8 +27,8 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
   showInRoutineScreen = true
 }) => {
   const [animation] = useState(new Animated.Value(0));
-  const { theme, isDark } = useTheme();
-  const styles = themedStyles(theme, isDark);
+  const { theme, isDark, isSunset } = useTheme();
+  const styles = themedStyles(theme, isDark, isSunset);
   const [isVisible, setIsVisible] = useState(false);
   const [isFullyMounted, setIsFullyMounted] = useState(false);
   
@@ -136,7 +136,7 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
     return (
       <View style={[styles.container, { opacity: 0 }]}>
         <TouchableOpacity style={styles.dismissButton} onPress={onDismiss}>
-          <Ionicons name="close" size={16} color={isDark ? "#999" : "#ccc"} />
+          <Ionicons name="close" size={16} color={isDark || isSunset ? "#999" : "#ccc"} />
         </TouchableOpacity>
         
         <View style={styles.contentWrapper}>
@@ -152,7 +152,7 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
               <View style={styles.levelBadge}>
                 <Text style={styles.levelText}>{oldLevel}</Text>
               </View>
-              <Ionicons name="arrow-forward" size={18} color={isDark ? theme.text : "#FFF"} style={styles.arrow} />
+              <Ionicons name="arrow-forward" size={18} color={isDark || isSunset ? theme.text : "#FFF"} style={styles.arrow} />
               <View style={[styles.levelBadge, styles.newLevelBadge]}>
                 <Text style={styles.levelText}>{newLevel}</Text>
               </View>
@@ -190,7 +190,7 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
       ]}
     >
       <TouchableOpacity style={styles.dismissButton} onPress={onDismiss}>
-        <Ionicons name="close" size={16} color={isDark ? "#999" : "#ccc"} />
+        <Ionicons name="close" size={16} color={isDark || isSunset ? "#999" : "#ccc"} />
       </TouchableOpacity>
       
       <View style={styles.contentWrapper}>
@@ -206,7 +206,7 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
             <View style={styles.levelBadge}>
               <Text style={styles.levelText}>{oldLevel}</Text>
             </View>
-            <Ionicons name="arrow-forward" size={18} color={isDark ? theme.text : "#FFF"} style={styles.arrow} />
+            <Ionicons name="arrow-forward" size={18} color={isDark || isSunset ? theme.text : "#FFF"} style={styles.arrow} />
             <View style={[styles.levelBadge, styles.newLevelBadge]}>
               <Text style={styles.levelText}>{newLevel}</Text>
             </View>
@@ -221,13 +221,13 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
 };
 
 // Use themed styles
-const themedStyles = (theme, isDark) => StyleSheet.create({
+const themedStyles = (theme, isDark, isSunset) => StyleSheet.create({
   container: {
     position: 'absolute',
     top: 40,
     left: 16,
     right: 16,
-    backgroundColor: isDark 
+    backgroundColor: isDark || isSunset 
       ? 'rgba(45, 45, 60, 0.95)' 
       : 'rgba(67, 93, 141, 0.95)',
     borderRadius: 12,
@@ -241,7 +241,7 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     borderWidth: 1,
-    borderColor: isDark ? 'rgba(255,215,0,0.3)' : 'rgba(255,215,0,0.5)',
+    borderColor: isDark || isSunset ? 'rgba(255,215,0,0.3)' : 'rgba(255,215,0,0.5)',
     // Ensure the component has enough height
     minHeight: 120,
   },
@@ -270,7 +270,7 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
     height: 38,
     width: 38,
     borderRadius: 19,
-    backgroundColor: isDark ? 'rgba(255,215,0,0.2)' : 'rgba(255,215,0,0.3)',
+    backgroundColor: isDark || isSunset ? 'rgba(255,215,0,0.2)' : 'rgba(255,215,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#FFD700',
@@ -300,7 +300,7 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)',
+    backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 6,
@@ -315,13 +315,13 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
   levelText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: isDark ? theme.text : '#FFF',
+    color: isDark || isSunset ? theme.text : '#FFF',
   },
   arrow: {
     marginHorizontal: 3,
   },
   description: {
-    color: isDark ? theme.text : 'white',
+    color: isDark || isSunset ? theme.text : 'white',
     fontSize: 13,
     textAlign: 'center',
     marginVertical: 2,

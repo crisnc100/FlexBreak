@@ -9,33 +9,74 @@ import {
   ThemedCard 
 } from './common';
 
+interface ThemePreviewProps {
+  isDark?: boolean;
+  isSunset?: boolean;
+}
+
 /**
  * A component to preview theme elements
  * This can be embedded in a screen for testing theme implementations
  */
-const ThemePreview: React.FC = () => {
-  const { theme, isDark, themeType, setThemeType } = useTheme();
+const ThemePreview: React.FC<ThemePreviewProps> = ({ isDark, isSunset }) => {
+  const { theme, isDark: currentIsDark, themeType, setThemeType } = useTheme();
   
   const toggleTheme = () => {
-    setThemeType(isDark ? 'light' : 'dark');
+    setThemeType(currentIsDark ? 'light' : 'dark');
+  };
+  
+  // Theme colors based on props
+  const colors = isSunset ? {
+    bg: '#2D1B2E',
+    cardBg: '#3D2A3F',
+    text: '#FFE0D0',
+    accent: '#FF8C5A',
+    textSecondary: '#FFC4A3',
+  } : isDark ? {
+    bg: '#121212',
+    cardBg: '#1E1E1E',
+    text: '#FFFFFF',
+    accent: '#81C784',
+    textSecondary: '#AAAAAA',
+  } : {
+    bg: '#F5F5F5',
+    cardBg: '#FFFFFF',
+    text: '#333333',
+    accent: '#4CAF50',
+    textSecondary: '#666666',
   };
   
   return (
     <ThemedScreen>
       <ScrollView>
+        <View style={[styles.container, { backgroundColor: colors.bg }]}>
+          <View style={[styles.card, { backgroundColor: colors.cardBg }]}>
+            <View style={styles.header}>
+              <Ionicons name="fitness" size={18} color={colors.accent} />
+              <ThemedText style={[styles.title, { color: colors.text }]}>Theme Preview</ThemedText>
+            </View>
+            <ThemedText style={[styles.subtext, { color: colors.textSecondary }]}>
+              {isSunset ? 'Sunset Theme' : isDark ? 'Dark Mode' : 'Light Mode'}
+            </ThemedText>
+            <View style={[styles.button, { backgroundColor: colors.accent }]}>
+              <ThemedText style={styles.buttonText}>Button</ThemedText>
+            </View>
+          </View>
+        </View>
+        
         <View style={styles.section}>
           <ThemedText bold size={20}>Theme Preview</ThemedText>
           <ThemedText type="secondary">
-            Current theme: {themeType} ({isDark ? 'Dark' : 'Light'})
+            Current theme: {themeType} ({currentIsDark ? 'Dark' : 'Light'})
           </ThemedText>
           
           <View style={styles.themeToggle}>
             <ThemedText>Toggle Theme</ThemedText>
             <Switch
-              value={isDark}
+              value={currentIsDark}
               onValueChange={toggleTheme}
               trackColor={{ false: '#d3d3d3', true: theme.accent + '80' }}
-              thumbColor={isDark ? theme.accent : '#f4f3f4'}
+              thumbColor={currentIsDark ? theme.accent : '#f4f3f4'}
             />
           </View>
         </View>
@@ -184,6 +225,44 @@ const ThemePreview: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    height: 150,
+    padding: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  card: {
+    padding: 15,
+    borderRadius: 10,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  subtext: {
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  button: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
   section: {
     padding: 16,
     marginBottom: 16,
@@ -213,14 +292,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginTop: 12,
     marginBottom: 8,
-  },
-  button: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 100,
   },
   outlineButton: {
     paddingHorizontal: 16,

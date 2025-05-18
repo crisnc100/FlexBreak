@@ -29,7 +29,7 @@ const DeskBreakBoost: React.FC<DeskBreakBoostProps> = ({
   userLevel,
   isPremium
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   
   // Create a pulsing animation for the active button
@@ -62,7 +62,7 @@ const DeskBreakBoost: React.FC<DeskBreakBoostProps> = ({
     return (
       <View style={[styles.container, { backgroundColor: theme.cardBackground }]}>
         <LinearGradient
-          colors={isDark ? 
+          colors={isDark || isSunset ? 
             ['#455A64', '#37474F'] : 
             ['#ECEFF1', '#CFD8DC']}
           start={{x: 0, y: 0}}
@@ -72,17 +72,17 @@ const DeskBreakBoost: React.FC<DeskBreakBoostProps> = ({
           <View style={styles.lockedContent}>
             <View style={styles.iconTextRow}>
               <View style={styles.iconContainer}>
-                <Ionicons name="desktop-outline" size={22} color={isDark ? '#90A4AE' : '#78909C'} />
+                <Ionicons name="desktop-outline" size={22} color={isDark || isSunset ? '#90A4AE' : '#78909C'} />
                 <View style={styles.lockBadge}>
                   <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
                 </View>
               </View>
               
               <View style={styles.textContainer}>
-                <Text style={[styles.buttonText, { color: isDark ? '#CFD8DC' : '#546E7A', fontSize: 16 }]}>
+                <Text style={[styles.buttonText, { color: isDark || isSunset ? '#CFD8DC' : '#546E7A', fontSize: 16 }]}>
                   Desk Break Boost
                 </Text>
-                <Text style={[styles.description, { color: isDark ? '#90A4AE' : '#78909C', fontSize: 12 }]}>
+                <Text style={[styles.description, { color: isDark || isSunset ? '#90A4AE' : '#78909C', fontSize: 12 }]}>
                   Fast desk stretches to recharge the grind!
                 </Text>
               </View>
@@ -108,7 +108,7 @@ const DeskBreakBoost: React.FC<DeskBreakBoostProps> = ({
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={isDark ? 
+          colors={isDark || isSunset ? 
             ['#2E7D32', '#0D47A1'] : 
             ['#4CAF50', '#2196F3']}
           start={{x: 0, y: 0}}

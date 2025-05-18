@@ -39,7 +39,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
   
   // Use the refresh context to properly handle refreshes
   const { isRefreshing, refreshProgress, refreshTimestamp } = useRefresh();
-  const { isDark, theme } = useTheme();
+  const { isDark, isSunset, theme } = useTheme();
   
   // Get challenges from gamification system
   const { 
@@ -357,7 +357,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
       return (
         <View style={[
           styles.centerContainer,
-          { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
+          { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
         ]}>
           <ActivityIndicator size="large" color={theme.accent} />
           <Text style={[styles.emptyText, { color: theme.text }]}>Loading challenges...</Text>
@@ -372,7 +372,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
         return (
           <View style={[
             styles.centerContainer,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
+            { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
           ]}>
             <MaterialCommunityIcons 
               name="trophy-outline"
@@ -418,7 +418,7 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
       return (
         <View style={[
           styles.centerContainer,
-          { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
+          { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }
         ]}>
           <MaterialCommunityIcons 
             name="calendar-check"
@@ -562,8 +562,8 @@ export const ChallengesTab: React.FC<ChallengesTabProps> = React.memo(({
               <View style={[
                 styles.explanationContainer, 
                 { 
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : theme.backgroundLight 
-                }
+                  backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : theme.backgroundLight 
+                } 
               ]}>
                 <MaterialCommunityIcons 
                   name={activeTab === 'claimable' ? 'information-outline' : 'calendar-clock'} 

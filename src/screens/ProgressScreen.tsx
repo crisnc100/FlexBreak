@@ -41,7 +41,7 @@ const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
  */
 export default function ProgressScreen({ navigation }) {
   const { isPremium } = usePremium();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const { canAccessFeature } = useFeatureAccess();
   
   // State for subscription modal
@@ -338,6 +338,7 @@ export default function ProgressScreen({ navigation }) {
                 canAccessFeature={canAccessFeature}
                 theme={theme}
                 isDark={isDark}
+                isSunset={isSunset}
                 streakFreezeActive={streakFreezeActive}
                 userLevel={level}
               />
@@ -371,6 +372,7 @@ export default function ProgressScreen({ navigation }) {
             <ProgressFooter
               progressSystemData={gamificationSummary}
               isDark={isDark}
+              isSunset={isSunset}
               onResetProgress={handleResetProgress}
             />
           </RefreshableScrollView>

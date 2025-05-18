@@ -25,7 +25,7 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
   compact = false,
   showXpCounter = true
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const progressAnim = useRef(new Animated.Value(0)).current;
   
   // Ensure xpProgress is between 0 and 1
@@ -53,11 +53,17 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
         <View style={[
           styles.progressContainer, 
           styles.enhancedProgressContainer,
-          { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }
+          { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }
         ]}>
           <Animated.View style={{ width: animatedWidth, overflow: 'hidden' }}>
             <LinearGradient
-              colors={isDark ? ['#388E3C', '#7CB342'] : ['#4CAF50', '#8BC34A']}
+              colors={
+                isDark ? 
+                  ['#388E3C', '#7CB342'] : 
+                  isSunset ? 
+                    ['#FF8C5A', '#FFB38E'] : 
+                    ['#4CAF50', '#8BC34A']
+              }
               style={[
                 styles.progressBar,
                 styles.enhancedProgressBar
@@ -73,7 +79,12 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
               styles.progressIndicator,
               { 
                 left: animatedWidth,
-                backgroundColor: isDark ? '#7CB342' : '#4CAF50',
+                backgroundColor: 
+                  isDark ? 
+                    '#7CB342' : 
+                    isSunset ? 
+                      '#FF8C5A' : 
+                      '#4CAF50',
               }
             ]}
           />
@@ -83,7 +94,7 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
         <View style={styles.minimalXpInfoContainer}>
           <Text style={[
             styles.minimalXpText, 
-            { color: isDark ? theme.textSecondary : '#757575' }
+            { color: theme.textSecondary }
           ]}>
             {xpToNextLevel ? `${xpToNextLevel} XP to next level` : ''}
           </Text>
@@ -96,28 +107,55 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
     <View style={[
       styles.container,
       compact && styles.compactContainer,
-      { backgroundColor: isDark ? theme.cardBackground : '#FFF' }
+      { backgroundColor: theme.cardBackground }
     ]}>
       <View style={styles.levelHeader}>
         <View>
           <Text style={[
             compact ? styles.compactLevelTitle : styles.levelTitle, 
-            { color: isDark ? theme.text : '#333' }
+            { color: theme.text }
           ]}>
             Level {currentLevel}
-            {levelTitle && <Text style={styles.levelSubtitle}> • {levelTitle}</Text>}
+            {levelTitle && <Text style={[styles.levelSubtitle, { color: theme.textSecondary }]}> • {levelTitle}</Text>}
           </Text>
         </View>
         
         {showXpCounter && (
           <View style={[styles.xpContainer, { 
-            backgroundColor: isDark ? 'rgba(255,249,196,0.2)' : '#FFF9C4',
-            borderColor: isDark ? 'rgba(255,224,130,0.5)' : '#FFE082'
+            backgroundColor: 
+              isDark ? 
+                'rgba(255,249,196,0.2)' : 
+                isSunset ? 
+                  'rgba(255,241,230,0.25)' : 
+                  '#FFF9C4',
+            borderColor: 
+              isDark ? 
+                'rgba(255,224,130,0.5)' : 
+                isSunset ? 
+                  'rgba(255,195,170,0.5)' : 
+                  '#FFE082'
           }]}>
-            <Ionicons name="flash" size={compact ? 14 : 18} color={isDark ? "#FFD700" : "#FFD700"} />
+            <Ionicons 
+              name="flash" 
+              size={compact ? 14 : 18} 
+              color={
+                isDark ? 
+                  "#FFD700" : 
+                  isSunset ? 
+                    theme.accent : 
+                    "#FFD700"
+              } 
+            />
             <Text style={[
               compact ? styles.compactXpTotal : styles.xpTotal, 
-              { color: isDark ? '#FFD700' : '#FF8F00' }
+              { 
+                color: 
+                  isDark ? 
+                    '#FFD700' : 
+                    isSunset ? 
+                      theme.accent : 
+                      '#FF8F00' 
+              }
             ]}>
               {totalXP} XP
             </Text>
@@ -128,11 +166,17 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
       <View style={[
         styles.progressContainer, 
         compact && styles.compactProgressContainer,
-        { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }
+        { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }
       ]}>
         <Animated.View style={{ width: animatedWidth, overflow: 'hidden' }}>
           <LinearGradient
-            colors={isDark ? ['#388E3C', '#7CB342'] : ['#4CAF50', '#8BC34A']}
+            colors={
+              isDark ? 
+                ['#388E3C', '#7CB342'] : 
+                isSunset ? 
+                  ['#FF8C5A', '#FFB38E'] : 
+                  ['#4CAF50', '#8BC34A']
+            }
             style={[
               styles.progressBar, 
               compact && styles.compactProgressBar,
@@ -144,7 +188,7 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
       </View>
       
       {!compact && xpToNextLevel && nextLevelTitle && (
-        <Text style={[styles.nextLevelText, { color: isDark ? theme.textSecondary : '#666' }]}>
+        <Text style={[styles.nextLevelText, { color: theme.textSecondary }]}>
           {xpToNextLevel} XP to Level {currentLevel + 1}: {nextLevelTitle}
         </Text>
       )}

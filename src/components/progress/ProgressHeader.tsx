@@ -9,7 +9,7 @@ interface ProgressHeaderProps {
 }
 
 const ProgressHeader: React.FC<ProgressHeaderProps> = ({ title = 'Your Progress' }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const { totalXP, level, xpToNextLevel, percentToNextLevel, gamificationSummary } = useGamification();
   
   // Get level info from gamification summary

@@ -7,6 +7,7 @@ import { useGamification, gamificationEvents, XP_UPDATED_EVENT } from '../../hoo
 interface ProgressFooterProps {
   progressSystemData?: any; // Make this optional since we'll use the hook directly
   isDark: boolean;
+  isSunset: boolean;
   onResetProgress?: () => void;
 }
 
@@ -16,6 +17,7 @@ interface ProgressFooterProps {
 export const ProgressFooter: React.FC<ProgressFooterProps> = ({ 
   progressSystemData, 
   isDark,
+  isSunset,
   onResetProgress
 }) => {
   // Use the gamification hook directly to get real-time XP and level data
@@ -47,11 +49,11 @@ export const ProgressFooter: React.FC<ProgressFooterProps> = ({
   const userLevel = level || progressSystemData?.user?.level || progressSystemData?.level || 1;
   const userXP = totalXP || progressSystemData?.user?.totalXP || progressSystemData?.totalXP || 0;
   
-  if (isDark) {
+  if (isDark || isSunset) {
     return (
       <View style={styles.footer}>
         <LinearGradient
-          colors={['#111827', '#1F2937']}
+          colors={isSunset ? ['#111827', '#1F2937'] : ['#111827', '#1F2937']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.darkFooterContent}
@@ -77,7 +79,7 @@ export const ProgressFooter: React.FC<ProgressFooterProps> = ({
   
   return (
     <View style={styles.footer}>
-      <Text style={[styles.footerText, { color: isDark ? '#FFFFFF' : '#666' }]}>
+      <Text style={[styles.footerText, { color: isDark || isSunset ? '#FFFFFF' : '#666' }]}>
         FlexBreak Premium • Level {userLevel} • {userXP.toLocaleString()} XP
       </Text>
     </View>

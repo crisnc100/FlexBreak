@@ -9,6 +9,7 @@ type LevelUpDisplayProps = {
   oldLevel: number;
   newLevel: number;
   isDark: boolean;
+  isSunset: boolean;
   isSimulated: boolean;
   rewards?: RewardItem[];
   animValues: {
@@ -21,6 +22,7 @@ const LevelUpDisplay: React.FC<LevelUpDisplayProps> = ({
   oldLevel,
   newLevel,
   isDark,
+  isSunset,
   isSimulated,
   rewards,
   animValues
@@ -69,7 +71,7 @@ const LevelUpDisplay: React.FC<LevelUpDisplayProps> = ({
       }
     ]}>
       <LinearGradient
-        colors={isDark ? 
+        colors={isDark || isSunset ? 
           (isSimulated ? ['#ff6f00', '#ff9800'] : ['#1a237e', '#3949ab']) : 
           (isSimulated ? ['#ff9800', '#ffb74d'] : ['#3f51b5', '#7986cb'])
         }

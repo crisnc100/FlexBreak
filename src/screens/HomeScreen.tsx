@@ -76,7 +76,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
   const { canAccessFeature, meetsLevelRequirement, getRequiredLevel, getUserLevel, refreshAccess } = useFeatureAccess();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
 
   // Animated values for dropdowns
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -707,7 +707,9 @@ export default function HomeScreen() {
         <LinearGradient
           colors={isDark ? 
             ['rgba(18, 18, 18, 1)', 'rgba(30, 30, 30, 1)'] : 
-            ['rgba(240, 240, 240, 1)', 'rgba(255, 255, 255, 1)']}
+            isSunset ?
+              ['rgba(50, 30, 64, 0.95)', 'rgba(32, 18, 41, 1)'] :
+              ['rgba(240, 240, 240, 1)', 'rgba(255, 255, 255, 1)']}
           style={StyleSheet.absoluteFill}
         />
         <ActivityIndicator size="large" color={theme.accent} />
@@ -726,7 +728,9 @@ export default function HomeScreen() {
       <LinearGradient
         colors={isDark ? 
           ['rgba(18, 18, 18, 1)', 'rgba(30, 30, 30, 1)'] : 
-          ['rgba(245, 245, 250, 1)', 'rgba(255, 255, 255, 1)']}
+          isSunset ?
+            ['rgba(50, 30, 64, 0.95)', 'rgba(32, 18, 41, 1)'] :
+            ['rgba(245, 245, 250, 1)', 'rgba(255, 255, 255, 1)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -750,6 +754,9 @@ export default function HomeScreen() {
           currentStreak={currentStreak} 
           onPremiumPress={showPremiumModal}
         />
+
+        {/* Level Progress Card - shows for all users */}
+        <LevelProgressCard onOpenSubscription={() => setSubscriptionModalVisible(true)} />
 
         {/* Routine Picker */}
         <RoutinePicker
@@ -778,9 +785,6 @@ export default function HomeScreen() {
 
         {/* Daily Tip */}
         <DailyTip tip={dailyTip.text} />
-
-        {/* Level Progress Card - shows for all users */}
-        <LevelProgressCard onOpenSubscription={() => setSubscriptionModalVisible(true)} />
 
         {/* Subscription Teaser - only show for non-premium users */}
         {!isPremium && <SubscriptionTeaser onPremiumPress={showPremiumModal} />}

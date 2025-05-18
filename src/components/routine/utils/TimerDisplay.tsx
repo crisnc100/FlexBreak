@@ -18,7 +18,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   style,
   paused = false,
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // Format time from seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -40,7 +40,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   };
 
   const { fontSize, iconSize } = getSize();
-  const color = isDark ? theme.text : '#333';
+  const color = isDark || isSunset ? theme.text : '#333';
 
   return (
     <View style={[styles.container, style]}>
@@ -48,7 +48,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
         <Ionicons 
           name={paused ? "pause-circle-outline" : "timer-outline"} 
           size={iconSize} 
-          color={isDark ? theme.accent : '#4CAF50'} 
+          color={isDark || isSunset ? theme.accent : '#4CAF50'} 
           style={styles.icon} 
         />
       )}

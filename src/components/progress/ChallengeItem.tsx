@@ -19,7 +19,7 @@ interface ChallengeItemProps {
 
 const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess, style, isXpBoosted = false }) => {
   const { claimChallenge, getTimeRemainingForChallenge, formatTimeRemaining } = useGamification();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [isClaiming, setIsClaiming] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [opacity] = useState(new Animated.Value(1));
@@ -75,7 +75,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
     inputRange: [0, 0.5, 1],
     outputRange: [
       'transparent', 
-      isDark ? 'rgba(76, 175, 80, 0.2)' : 'rgba(76, 175, 80, 0.15)',
+      isDark || isSunset ? 'rgba(76, 175, 80, 0.2)' : 'rgba(76, 175, 80, 0.15)',
       'transparent'
     ]
   });
@@ -288,8 +288,8 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
     <Animated.View style={[
       styles.container, 
       { 
-        backgroundColor: isDark ? theme.cardBackground : '#FFF',
-        shadowColor: isDark ? 'rgba(0,0,0,0.8)' : '#000',
+        backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+        shadowColor: isDark || isSunset ? 'rgba(0,0,0,0.8)' : '#000',
       },
       style, 
       { 
@@ -303,20 +303,20 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
       <View style={styles.header}>
         <View style={styles.titleRow}>
           {getStatusIcon()}
-          <Text style={[styles.title, { color: isDark ? theme.text : '#333' }]} numberOfLines={1} ellipsizeMode="tail">{challenge.title}</Text>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]} numberOfLines={1} ellipsizeMode="tail">{challenge.title}</Text>
         </View>
         
         {!challenge.completed && (
           <View style={[
             styles.deadlineTag,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }
+            { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }
           ]}>
             <MaterialCommunityIcons 
               name="calendar"
               size={14} 
-              color={isDark ? theme.textSecondary : "#757575"}
+              color={isDark || isSunset ? theme.textSecondary : "#757575"}
             />
-            <Text style={[styles.deadlineText, { color: isDark ? theme.textSecondary : "#757575" }]}>
+            <Text style={[styles.deadlineText, { color: isDark || isSunset ? theme.textSecondary : "#757575" }]}>
               {formatEndDate()}
             </Text>
           </View>
@@ -326,17 +326,17 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
           <View style={[
             styles.expiryTag, 
             isExpiring && styles.expiryTagWarning,
-            { backgroundColor: isDark ? (isExpiring ? 'rgba(244,67,54,0.2)' : 'rgba(255,255,255,0.1)') : (isExpiring ? '#FFEBEE' : '#F5F5F5') }
+            { backgroundColor: isDark || isSunset ? (isExpiring ? 'rgba(244,67,54,0.2)' : 'rgba(255,255,255,0.1)') : (isExpiring ? '#FFEBEE' : '#F5F5F5') }
           ]}>
             <MaterialCommunityIcons 
               name={isExpiring ? "alarm" : "timer-outline"} 
               size={14} 
-              color={isExpiring ? "#F44336" : (isDark ? theme.textSecondary : "#757575")} 
+              color={isExpiring ? "#F44336" : (isDark || isSunset ? theme.textSecondary : "#757575")} 
             />
             <Text style={[
               styles.expiryText, 
               isExpiring && styles.expiryTextWarning,
-              { color: isExpiring ? "#F44336" : (isDark ? theme.textSecondary : "#757575") }
+              { color: isExpiring ? "#F44336" : (isDark || isSunset ? theme.textSecondary : "#757575") }
             ]}>
               {timeRemaining}
             </Text>
@@ -344,14 +344,14 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         )}
       </View>
       
-      <Text style={[styles.description, { color: isDark ? theme.textSecondary : '#666' }]}>{challenge.description}</Text>
+      <Text style={[styles.description, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>{challenge.description}</Text>
       
       <View style={styles.progressContainer}>
-        <View style={[styles.progressBarBackground, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }]}>
+        <View style={[styles.progressBarBackground, { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }]}>
           <LinearGradient
             colors={challenge.completed ? 
-              (isDark ? ['#388E3C', '#7CB342'] : ['#4CAF50', '#8BC34A']) : 
-              (isDark ? ['#1565C0', '#2196F3'] : ['#2196F3', '#03A9F4'])
+              (isDark || isSunset ? ['#388E3C', '#7CB342'] : ['#4CAF50', '#8BC34A']) : 
+              (isDark || isSunset ? ['#1565C0', '#2196F3'] : ['#2196F3', '#03A9F4'])
             }
             start={[0, 0]}
             end={[1, 0]}
@@ -363,7 +363,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         </View>
         <Text style={[
           styles.progressText,
-          { color: isDark ? theme.textSecondary : '#757575' }
+          { color: isDark || isSunset ? theme.textSecondary : '#757575' }
         ]}>
           {getProgressDescription()}
         </Text>
@@ -373,7 +373,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         <View style={styles.leftFooter}>
           <View style={[
             styles.xpContainer,
-            { backgroundColor: isDark ? 'rgba(227,242,253,0.2)' : '#E3F2FD' },
+            { backgroundColor: isDark || isSunset ? 'rgba(227,242,253,0.2)' : '#E3F2FD' },
             isXpBoosted && styles.xpBoostContainer
           ]}>
             {isXpBoosted && (
@@ -384,7 +384,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
             )}
             <Text style={[
               styles.xpText,
-              { color: isDark ? '#82B1FF' : '#1976D2' },
+              { color: isDark || isSunset ? '#82B1FF' : '#1976D2' },
               isXpBoosted && styles.xpBoostText
             ]}>
               +{boostedXp} XP
@@ -395,7 +395,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
           </View>
           <Text style={[
             styles.categoryText,
-            { color: isDark ? theme.textSecondary : '#757575' }
+            { color: isDark || isSunset ? theme.textSecondary : '#757575' }
           ]}>{getTimeType()}</Text>
         </View>
         
@@ -419,7 +419,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         {challenge.status === CHALLENGE_STATUS.CLAIMED && (
           <View style={[
             styles.claimedTag,
-            { backgroundColor: isDark ? 'rgba(232,245,233,0.2)' : '#E8F5E9' }
+            { backgroundColor: isDark || isSunset ? 'rgba(232,245,233,0.2)' : '#E8F5E9' }
           ]}>
             <MaterialCommunityIcons name="check" size={16} color="#4CAF50" />
             <Text style={styles.claimedText}>Claimed</Text>
@@ -429,7 +429,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         {challenge.status === CHALLENGE_STATUS.EXPIRED && (
           <View style={[
             styles.expiredTag,
-            { backgroundColor: isDark ? 'rgba(255,235,238,0.2)' : '#FFEBEE' }
+            { backgroundColor: isDark || isSunset ? 'rgba(255,235,238,0.2)' : '#FFEBEE' }
           ]}>
             <MaterialCommunityIcons name="timer-off" size={16} color="#F44336" />
             <Text style={styles.expiredText}>Expired</Text>
@@ -442,7 +442,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
           styles.claimWarning, 
           isExpiring && styles.claimWarningUrgent,
           { 
-            backgroundColor: isDark 
+            backgroundColor: isDark || isSunset 
               ? (isExpiring ? 'rgba(255,235,238,0.2)' : 'rgba(227,242,253,0.2)')
               : (isExpiring ? '#FFEBEE' : '#E3F2FD')
           }
@@ -450,7 +450,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
           <MaterialCommunityIcons 
             name={isExpiring ? "alert-circle" : "information"} 
             size={16} 
-            color={isExpiring ? "#F44336" : (isDark ? '#82B1FF' : "#2196F3")} 
+            color={isExpiring ? "#F44336" : (isDark || isSunset ? '#82B1FF' : "#2196F3")} 
           />
           <Text style={[
             styles.claimWarningText, 
@@ -458,7 +458,7 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
             { 
               color: isExpiring 
                 ? "#F44336" 
-                : (isDark ? '#82B1FF' : "#2196F3")
+                : (isDark || isSunset ? '#82B1FF' : "#2196F3")
             }
           ]}>
             {formatClaimDeadline()}

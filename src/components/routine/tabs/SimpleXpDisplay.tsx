@@ -23,12 +23,13 @@ const SimpleXpDisplay: React.FC<SimpleXpDisplayProps> = ({
   animValues
 }) => {
   const isDark = theme.isDark;
+  const isSunset = theme.isSunset;
 
   return (
     <View style={[
       styles.xpContainer,
       { backgroundColor: hasXpBoost 
-        ? (isDark ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 235, 59, 0.15)') 
+        ? (isDark || isSunset ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 235, 59, 0.15)') 
         : theme.backgroundLight 
       },
       showAnyLevelUp && styles.xpContainerCompact,
@@ -42,7 +43,7 @@ const SimpleXpDisplay: React.FC<SimpleXpDisplayProps> = ({
       {hasXpBoost && (
         <View style={[
           styles.boostAccent,
-          { backgroundColor: isDark ? '#FF9800' : '#FF9800' }
+          { backgroundColor: isDark || isSunset ? '#FF9800' : '#FF9800' }
         ]} />
       )}
 
@@ -53,14 +54,14 @@ const SimpleXpDisplay: React.FC<SimpleXpDisplayProps> = ({
         {hasXpBoost && (
           <View style={[
             styles.boostBadgeContainer,
-            { backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.85)' }
+            { backgroundColor: isDark || isSunset ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.85)' }
           ]}>
             <Animated.View 
               style={[
                 styles.xpBoostBadge,
                 { 
                   transform: [{ scale: animValues.boostPulseAnim }],
-                  backgroundColor: isDark ? '#FF9800' : '#FF9800',
+                  backgroundColor: isDark || isSunset ? '#FF9800' : '#FF9800',
                 }
               ]}
             >
@@ -68,7 +69,7 @@ const SimpleXpDisplay: React.FC<SimpleXpDisplayProps> = ({
             </Animated.View>
             <Text style={[
               styles.boostMultiplierText,
-              { color: isDark ? '#FFC107' : '#FF9800' }
+              { color: isDark || isSunset ? '#FFC107' : '#FF9800' }
             ]}>
               2× BOOST
             </Text>
@@ -80,7 +81,7 @@ const SimpleXpDisplay: React.FC<SimpleXpDisplayProps> = ({
             <Ionicons 
               name="star" 
               size={showAnyLevelUp ? 24 : 28} 
-              color={hasXpBoost ? '#FF9800' : (isDark ? "#FF9800" : "#FF9800")} 
+              color={hasXpBoost ? '#FF9800' : (isDark || isSunset ? "#FF9800" : "#FF9800")} 
             />
           </View>
           
@@ -95,7 +96,7 @@ const SimpleXpDisplay: React.FC<SimpleXpDisplayProps> = ({
               styles.xpValue, 
               { color: theme.text },
               hasXpBoost && { 
-                color: isDark ? '#FF9800' : '#FF6F00',
+                color: isDark || isSunset ? '#FF9800' : '#FF6F00',
                 fontSize: 24
               }
             ]}>
@@ -103,7 +104,7 @@ const SimpleXpDisplay: React.FC<SimpleXpDisplayProps> = ({
               {hasXpBoost && (
                 <Text style={[
                   styles.originalXpText, 
-                  { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }
+                  { color: isDark || isSunset ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }
                 ]}>
                   {" "}(was {originalXpEarned})
                 </Text>

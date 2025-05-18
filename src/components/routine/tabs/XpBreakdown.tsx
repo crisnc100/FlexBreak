@@ -12,6 +12,7 @@ type XpBreakdownProps = {
   showAnyLevelUp: boolean;
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
   animValues: {
     shineAnim: Animated.Value;
   };
@@ -24,6 +25,7 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
   showAnyLevelUp,
   theme,
   isDark,
+  isSunset,
   animValues
 }) => {
   // Find achievement-related XP in breakdown
@@ -218,17 +220,18 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
       // Add a subtle border when XP boost is active for better light mode visibility
       hasXpBoost && {
         borderWidth: 1, 
-        borderColor: isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.2)'
+        borderColor: isDark || isSunset ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.2)'
+
       }
     ]}>
       {hasXpBoost && (
         <View style={[styles.xpBoostHeader, {
-          backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 152, 0, 0.07)',
-          borderColor: isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.15)'
+          backgroundColor: isDark || isSunset ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 152, 0, 0.07)',
+          borderColor: isDark || isSunset ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 152, 0, 0.15)'
         }]}>
-          <Ionicons name="flash" size={16} color={isDark ? "#FF8F00" : "#FF6F00"} />
+          <Ionicons name="flash" size={16} color={isDark || isSunset ? "#FF8F00" : "#FF6F00"} />
           <Text style={[styles.xpBoostHeaderText, {
-            color: isDark ? '#FF8F00' : '#FF6F00',
+            color: isDark || isSunset ? '#FF8F00' : '#FF6F00',
             textShadowColor: 'transparent'
           }]}>XP BOOST</Text>
         </View>
@@ -237,13 +240,13 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
       {/* First show achievement XP at the top if any */}
       {(achievementXp.length > 0 || unlockedAchievements.length > 0) && (
         <View style={[styles.achievementSection, {
-          backgroundColor: isDark ? 'rgba(121, 134, 203, 0.05)' : 'rgba(63, 81, 181, 0.04)',
-          borderColor: isDark ? 'rgba(121, 134, 203, 0.2)' : 'rgba(63, 81, 181, 0.1)'
+          backgroundColor: isDark || isSunset ? 'rgba(121, 134, 203, 0.05)' : 'rgba(63, 81, 181, 0.04)',
+          borderColor: isDark || isSunset ? 'rgba(121, 134, 203, 0.2)' : 'rgba(63, 81, 181, 0.1)'
         }]}>
           <Text style={[styles.achievementSectionTitle, {
-            color: isDark ? '#3F51B5' : '#303F9F'
+            color: isDark || isSunset ? '#3F51B5' : '#303F9F'
           }]}>
-            <Ionicons name="trophy" size={16} color={isDark ? "#3F51B5" : "#303F9F"} /> Achievement Bonus XP
+            <Ionicons name="trophy" size={16} color={isDark || isSunset ? "#3F51B5" : "#303F9F"} /> Achievement Bonus XP
           </Text>
           
           {/* Show unlocked achievements first */}
@@ -251,29 +254,29 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
             <View key={`unlocked-${achievement.id}`} style={[
               styles.xpBreakdownItem,
               {
-                backgroundColor: isDark ? 'rgba(121, 134, 203, 0.1)' : 'rgba(63, 81, 181, 0.06)',
+                backgroundColor: isDark || isSunset ? 'rgba(121, 134, 203, 0.1)' : 'rgba(63, 81, 181, 0.06)',
                 borderRadius: 6,
                 padding: 6,
                 marginVertical: 2,
                 borderLeftWidth: 2,
-                borderLeftColor: isDark ? '#3F51B5' : '#303F9F',
+                borderLeftColor: isDark || isSunset ? '#3F51B5' : '#303F9F',
                 marginBottom: 4
               }
             ]}>
               <View style={[styles.achievementBadge, {
-                backgroundColor: isDark ? '#3F51B5' : '#303F9F'
+                backgroundColor: isDark || isSunset ? '#3F51B5' : '#303F9F'
               }]}>
                 <Ionicons name="trophy" size={showAnyLevelUp ? 10 : 12} color="#FFFFFF" />
               </View>
               <Ionicons 
                 name={(achievement.icon as any) || "trophy-outline"} 
                 size={showAnyLevelUp ? 14 : 16} 
-                color={isDark ? "#3F51B5" : "#303F9F"} 
+                color={isDark || isSunset ? "#3F51B5" : "#303F9F"} 
               />
               <Text style={{
                 fontSize: 13,
                 fontWeight: 'bold',
-                color: isDark ? '#3F51B5' : '#303F9F',
+                color: isDark || isSunset ? '#3F51B5' : '#303F9F',
               }}>
                 <Text style={styles.achievementXpValue}>+{achievement.xp} XP</Text>
                 {" "}{achievement.title}

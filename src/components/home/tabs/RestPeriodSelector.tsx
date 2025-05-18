@@ -8,13 +8,15 @@ interface RestPeriodSelectorProps {
   addRestPeriod: (restPeriod: CustomRestPeriod) => void;
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
 }
 
 const RestPeriodSelector: React.FC<RestPeriodSelectorProps> = ({
   restPeriods,
   addRestPeriod,
   theme,
-  isDark
+  isDark,
+  isSunset
 }) => {
   return (
     <>
@@ -28,7 +30,7 @@ const RestPeriodSelector: React.FC<RestPeriodSelectorProps> = ({
             key={restPeriod.id}
             style={[
               styles.restPeriodButton,
-              { backgroundColor: isDark ? theme.backgroundLight : '#f5f5f5' }
+              { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#f5f5f5' }
             ]}
             onPress={() => addRestPeriod(restPeriod)}
           >

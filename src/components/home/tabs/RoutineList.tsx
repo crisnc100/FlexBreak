@@ -18,6 +18,7 @@ interface RoutineListProps {
   deleteCustomRoutine: (id: string) => void;
   theme: any;
   isDark: boolean;
+  isSunset: boolean;
   MAX_CUSTOM_ROUTINES: number;
 }
 
@@ -27,6 +28,7 @@ const RoutineList: React.FC<RoutineListProps> = ({
   deleteCustomRoutine,
   theme,
   isDark,
+  isSunset,
   MAX_CUSTOM_ROUTINES
 }) => {
   // Render a routine item
@@ -43,7 +45,7 @@ const RoutineList: React.FC<RoutineListProps> = ({
     return (
       <View style={[
         styles.routineItem,
-        { backgroundColor: isDark ? theme.backgroundLight : '#fff' }
+        { backgroundColor: isDark || isSunset ? theme.backgroundLight : '#fff' }
       ]}>
         <View style={styles.routineInfo}>
           <Text style={[
@@ -86,12 +88,12 @@ const RoutineList: React.FC<RoutineListProps> = ({
       {customRoutines.length >= MAX_CUSTOM_ROUTINES - 3 && (
         <View style={[
           styles.warningBox, 
-          { backgroundColor: isDark ? theme.cardBackground : '#FFF9C4' }
+          { backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF9C4' }
         ]}>
-          <Ionicons name="information-circle" size={20} color={isDark ? theme.textSecondary : '#FFA000'} />
+          <Ionicons name="information-circle" size={20} color={isDark || isSunset ? theme.textSecondary : '#FFA000'} />
           <Text style={[
             styles.warningText,
-            { color: isDark ? theme.textSecondary : '#5D4037' }
+            { color: isDark || isSunset ? theme.textSecondary : '#5D4037' }
           ]}>
             You have {MAX_CUSTOM_ROUTINES - customRoutines.length} routine slots remaining. Maximum is {MAX_CUSTOM_ROUTINES}.
           </Text>
@@ -112,7 +114,7 @@ const RoutineList: React.FC<RoutineListProps> = ({
           <Ionicons 
             name="fitness-outline" 
             size={48} 
-            color={isDark ? theme.textSecondary : '#ccc'} 
+            color={isDark || isSunset ? theme.textSecondary : '#ccc'} 
           />
           <Text style={[
             styles.emptyText,

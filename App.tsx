@@ -19,6 +19,7 @@ import BobSimulatorScreen from './src/screens/BobSimulatorScreen';
 import { PremiumProvider, usePremium } from './src/context/PremiumContext';
 import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { AchievementProvider, useAchievements } from './src/context/AchievementContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as streakFreezeManager from './src/utils/progress/modules/streakFreezeManager';
 import * as streakManager from './src/utils/progress/modules/streakManager';
@@ -150,12 +151,14 @@ export default function App() {
         <ThemeProvider>
           <PremiumProvider>
             <RefreshProvider>
-              <StatusBar 
-                barStyle="dark-content" 
-                backgroundColor="transparent" 
-                translucent={true} 
-              />
-              <MainApp />
+              <AchievementProvider>
+                <StatusBar 
+                  barStyle="dark-content" 
+                  backgroundColor="transparent" 
+                  translucent={true} 
+                />
+                <MainApp />
+              </AchievementProvider>
             </RefreshProvider>
           </PremiumProvider>
         </ThemeProvider>
@@ -166,7 +169,7 @@ export default function App() {
 
 // Create the main tab navigator component
 const TabNavigator = () => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const { isPremium } = usePremium();
   const { canAccessFeature } = useFeatureAccess();
@@ -335,6 +338,7 @@ function MainApp() {
   const { theme, isDark } = useTheme();
   const [showIntro, setShowIntro] = useState(true);
   const fadeInAnim = useRef(new Animated.Value(0)).current;
+  const { recentAchievement, clearRecentAchievement } = useAchievements();
   
   // Mark component render for performance tracking
   useEffect(() => {
@@ -490,6 +494,8 @@ function MainApp() {
       
       {/* Streak Freeze Prompt */}
       <StreakFreezePrompt />
+      
+    
     </Animated.View>
   );
 } 

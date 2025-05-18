@@ -22,8 +22,8 @@ const XpNotification: React.FC<XpNotificationProps> = ({
   onDismiss 
 }) => {
   const [animation] = useState(new Animated.Value(0));
-  const { theme, isDark } = useTheme();
-  const styles = themedStyles(theme, isDark);
+  const { theme, isDark, isSunset } = useTheme();
+  const styles = themedStyles(theme, isDark, isSunset);
   
   useEffect(() => {
     // Animate in
@@ -137,13 +137,13 @@ const XpNotification: React.FC<XpNotificationProps> = ({
 };
 
 // Use themed styles
-const themedStyles = (theme, isDark) => StyleSheet.create({
+const themedStyles = (theme, isDark, isSunset) => StyleSheet.create({
   container: {
     position: 'absolute',
     top: 50,
     left: 20,
     right: 20,
-    backgroundColor: isDark 
+    backgroundColor: isDark || isSunset 
       ? 'rgba(40, 40, 40, 0.9)' 
       : 'rgba(0, 0, 0, 0.8)',
     borderRadius: 10,
@@ -170,7 +170,7 @@ const themedStyles = (theme, isDark) => StyleSheet.create({
     fontWeight: 'bold',
   },
   description: {
-    color: isDark ? theme.text : 'white',
+    color: isDark || isSunset ? theme.text : 'white',
     fontSize: 14,
   },
   boostBadgeContainer: {

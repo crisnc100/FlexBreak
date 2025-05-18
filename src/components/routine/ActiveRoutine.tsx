@@ -58,7 +58,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   onComplete,
   onNavigateHome
 }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   // State
   const [routine, setRoutine] = useState<(Stretch | RestPeriod & { isPremium?: boolean; vipBadgeColor?: string; } | TransitionPeriod)[]>([]);
@@ -886,8 +886,8 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const renderCurrentItem = () => {
     if (!currentStretch) {
       return (
-        <View style={[styles.loadingContainer, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
-          <Text style={[styles.loadingText, { color: isDark ? theme.text : '#333' }]}>
+        <View style={[styles.loadingContainer, { backgroundColor: isDark || isSunset ? theme.background : '#FFF' }]}>
+          <Text style={[styles.loadingText, { color: isDark || isSunset ? theme.text : '#333' }]}>
             Loading stretch data...
           </Text>
         </View>
@@ -1045,8 +1045,8 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   // If routine is not loaded yet, show loading
   if (!routine || routine.length === 0 || !currentStretch) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? theme.background : '#FFF' }]}>
-        <Text style={[styles.loadingText, { color: isDark ? theme.text : '#333' }]}>Creating your routine...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark || isSunset ? theme.background : '#FFF' }]}>
+        <Text style={[styles.loadingText, { color: isDark || isSunset ? theme.text : '#333' }]}>Creating your routine...</Text>
       </View>
     );
   }
@@ -1072,7 +1072,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
             style={[
               styles.countNumberContainer,
               {
-                backgroundColor: isDark ? theme.accent : '#4CAF50',
+                backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50',
                 transform: [
                   { scale: countdownAnimation },
                   { translateY: countdownAnimation.interpolate({
@@ -1102,14 +1102,14 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   return (
     <View style={{ 
       flex: 1, 
-      backgroundColor: isDark ? theme.background : '#FFF'
+      backgroundColor: isDark || isSunset ? theme.background : '#FFF'
     }}>
       {!showCountdown && (
         <>
           {/* Header with stretch count */}
           <View style={[styles.header, { 
-            backgroundColor: isDark ? theme.cardBackground : '#FFF',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#EEE'
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+            borderBottomColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#EEE'
           }]}>
             <TouchableOpacity 
               style={styles.backButton} 
@@ -1127,16 +1127,16 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
                 );
               }}
             >
-              <Ionicons name="arrow-back" size={24} color={isDark ? theme.text : "#333"} />
+              <Ionicons name="arrow-back" size={24} color={isDark || isSunset ? theme.text : "#333"} />
             </TouchableOpacity>
             
             <View style={styles.headerTitleContainer}>
-              <Text style={[styles.headerTitle, { color: isDark ? theme.text : '#333' }]}>
+              <Text style={[styles.headerTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
                 Current Routine
               </Text>
             </View>
             
-            <Text style={[styles.progressText, { color: isDark ? theme.textSecondary : '#666' }]}>
+            <Text style={[styles.progressText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
               {currentIndex + 1}/{routine.length}
             </Text>
           </View>
@@ -1145,7 +1145,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           <ScrollView 
             style={{
               flex: 1, 
-              backgroundColor: isDark ? theme.background : '#FFF'
+              backgroundColor: isDark || isSunset ? theme.background : '#FFF'
             }}
             contentContainerStyle={{
               flexGrow: 1
@@ -1156,10 +1156,10 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
           
           {/* Overall progress */}
           <View style={[styles.overallProgressContainer, { 
-            backgroundColor: isDark ? theme.cardBackground : '#FFF'
+            backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF'
           }]}>
             <View style={[styles.overallProgressTrack, { 
-              backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E0E0E0'
+              backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.2)' : '#E0E0E0'
             }]}>
               <Animated.View 
                 style={[

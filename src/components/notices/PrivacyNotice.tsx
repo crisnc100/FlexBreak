@@ -8,14 +8,14 @@ interface PrivacyNoticeProps {
 }
 
 const PrivacyNotice: React.FC<PrivacyNoticeProps> = ({ onClose }) => {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   
   return (
     <View style={[
       styles.container, 
       { 
-        backgroundColor: isDark ? theme.cardBackground : '#FFFFFF',
-        borderColor: isDark ? theme.border : '#E0E0E0'
+        backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFFFFF',
+        borderColor: isDark || isSunset ? theme.border : '#E0E0E0'
       }
     ]}>
       <View style={styles.header}>

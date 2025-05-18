@@ -12,7 +12,7 @@ import { RefreshableScrollView } from '../components/common';
 
 export default function PlaylistsScreen() {
   const navigation = useNavigation<AppNavigationProp>();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function PlaylistsScreen() {
     <TouchableOpacity 
       style={[
         styles.playlistCard, 
-        { backgroundColor: isDark ? theme.cardBackground : '#fff' }
+        { backgroundColor: isDark || isSunset ? theme.cardBackground : '#fff' }
       ]}
       onPress={() => handlePlaylistPress(item)}
     >
