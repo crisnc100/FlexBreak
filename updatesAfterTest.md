@@ -18,3 +18,6 @@
 * Deploy
 Change buildl number in app.json
 and use this command : npx eas-cli build --platform ios --profile testflight --clear-cache --non-interactive --no-wait
+
+Final Production: 
+npx eas-cli build --platform ios --profile production --clear-cache --non-interactive --no-wait
