@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as achievementManager from '../../utils/progress/modules/achievementManager';
 import * as storageService from '../../services/storageService';
 import { Achievement } from '../../utils/progress/types';
+import * as haptics from '../../utils/haptics';
 
 interface LevelProgressCardProps {
   onPress?: () => void;
@@ -205,6 +206,11 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
       
       // Update the last XP value
       setLastXp(totalXP);
+
+      // Provide haptic feedback when XP increases (routine completion or similar)
+      if (totalXP > lastXp) {
+        haptics.medium();
+      }
     }
   }, [totalXP, lastXp, pulseAnim, shineAnim]);
   
@@ -214,11 +220,19 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
     
     const handleXpUpdate = (data: any) => {
       console.log('LevelProgressCard: XP updated event received', data);
+      // Trigger haptics ONLY if XP came from completing a routine
+      if (data?.source === 'routine') {
+        haptics.medium(); // Provide tactile feedback for routine completion
+      }
       refreshLevelData();
     };
     
     const handleLevelUp = (data: any) => {
       console.log('LevelProgressCard: Level up event received', data);
+      // Provide celebratory haptic when level up originates from routine as well
+      if (data?.source === 'routine') {
+        haptics.success();
+      }
       refreshLevelData();
       
       // Additional animation for level up
