@@ -88,20 +88,23 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
         <TouchableOpacity 
           style={[
             styles.customRoutinesButton,
-            { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.3)' }
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 
+              isSunset ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)' }
           ]}
           onPress={onCustomRoutinesPress}
         >
           <Text style={[
             styles.customRoutinesText, 
-            { color: isDark || isSunset ? '#fff' : theme.accent }
+            { color: isDark ? '#fff' : 
+              isSunset ? '#FFF6EC' : theme.accent }
           ]}>
             Custom
           </Text>
           <Ionicons 
             name="chevron-forward" 
             size={16} 
-            color={isDark || isSunset ? '#fff' : theme.accent} 
+            color={isDark ? '#fff' : 
+              isSunset ? '#FFF6EC' : theme.accent} 
           />
         </TouchableOpacity>
       );
@@ -111,7 +114,7 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
     else if (isPremium && userLevel < requiredLevel) {
       const handleLockedButtonPress = () => {
         // Trigger haptic feedback
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         
         // Show a small alert about level requirement
         Alert.alert(
@@ -127,8 +130,10 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
           style={[
             styles.lockedCustomRoutinesButton,
             { 
-              backgroundColor: isDark || isSunset ? 'rgba(100,100,100,0.3)' : 'rgba(200, 200, 200, 0.15)',
-              borderColor: isDark || isSunset ? 'rgba(100,100,100,0.5)' : 'rgba(200, 200, 200, 0.3)'
+              backgroundColor: isDark ? 'rgba(100,100,100,0.3)' : 
+                isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(200, 200, 200, 0.15)',
+              borderColor: isDark ? 'rgba(100,100,100,0.5)' : 
+                isSunset ? 'rgba(255,255,255,0.2)' : 'rgba(200, 200, 200, 0.3)'
             }
           ]}
           onPress={handleLockedButtonPress}
@@ -136,14 +141,16 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
         >
           <Text style={[
             styles.lockedCustomRoutinesText, 
-            { color: isDark || isSunset ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }
+            { color: isDark ? 'rgba(255,255,255,0.7)' : 
+              isSunset ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.5)' }
           ]}>
             Custom Routines
           </Text>
           <Ionicons 
             name="lock-closed" 
             size={12} 
-            color={isDark || isSunset ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)'} 
+            color={isDark ? 'rgba(255,255,255,0.7)' : 
+              isSunset ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.5)'} 
             style={{marginLeft: 6}} 
           />
         </TouchableOpacity>
@@ -165,7 +172,9 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
       {/* Header with decorative elements */}
       <LinearGradient
         colors={isDark || isSunset ? 
-          ['rgba(66, 153, 225, 0.6)', 'rgba(99, 102, 241, 0.6)'] : 
+          isSunset ? 
+            ['rgba(255, 142, 60, 0.7)', 'rgba(255, 122, 30, 0.6)'] : 
+            ['rgba(66, 153, 225, 0.6)', 'rgba(99, 102, 241, 0.6)'] : 
           ['rgba(66, 153, 225, 0.2)', 'rgba(99, 102, 241, 0.2)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -206,8 +215,10 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
             style={[
               styles.selectionButton,
               { 
-                backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : 'white',
-                borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : theme.border
+                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 
+                  isSunset ? 'rgba(255,255,255,0.08)' : 'white',
+                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 
+                  isSunset ? 'rgba(255,255,255,0.15)' : theme.border
               }
             ]}
             activeOpacity={0.7}
@@ -216,7 +227,8 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
               <View style={[
                 styles.iconContainer, 
                 { 
-                  backgroundColor: isDark || isSunset ? `${theme.accent}30` : `${theme.accent}20` 
+                  backgroundColor: isDark ? `${theme.accent}30` : 
+                    isSunset ? 'rgba(255, 142, 60, 0.25)' : `${theme.accent}20` 
                 }
               ]}>
                 <Ionicons name={getAreaIcon(area)} size={22} color={theme.accent} />
@@ -245,8 +257,10 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
             style={[
               styles.selectionButton,
               { 
-                backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : 'white',
-                borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : theme.border
+                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 
+                  isSunset ? 'rgba(255,255,255,0.08)' : 'white',
+                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 
+                  isSunset ? 'rgba(255,255,255,0.15)' : theme.border
               }
             ]}
             activeOpacity={0.7}
@@ -255,7 +269,8 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
               <View style={[
                 styles.iconContainer, 
                 { 
-                  backgroundColor: isDark || isSunset ? `${theme.accent}30` : `${theme.accent}20` 
+                  backgroundColor: isDark ? `${theme.accent}30` : 
+                    isSunset ? 'rgba(255, 142, 60, 0.25)' : `${theme.accent}20` 
                 }
               ]}>
                 <Ionicons name={getDurationIcon(duration)} size={22} color={theme.accent} />
@@ -275,7 +290,8 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
         <View style={[
           styles.toggleContainer,
           { 
-            backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 
+              isSunset ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.02)',
             borderRadius: 14,
             marginVertical: 10,
             paddingHorizontal: 12
@@ -287,16 +303,19 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
                 styles.officeFriendlyIconContainer,
                 {
                   backgroundColor: area !== 'Dynamic Flow' 
-                    ? (isDark || isSunset ? `${theme.accent}30` : `${theme.accent}15`)
-                    : (isDark || isSunset ? 'rgba(100,100,100,0.3)' : 'rgba(200,200,200,0.3)')
+                    ? (isDark ? `${theme.accent}30` : 
+                       isSunset ? 'rgba(255, 142, 60, 0.25)' : `${theme.accent}15`)
+                    : (isDark ? 'rgba(100,100,100,0.3)' : 
+                       isSunset ? 'rgba(100,100,100,0.2)' : 'rgba(200,200,200,0.3)')
                 }
               ]}>
                 <Ionicons 
                   name="briefcase-outline" 
                   size={18} 
                   color={area === 'Dynamic Flow' 
-                    ? (isDark || isSunset ? '#999999' : '#999999')
-                    : (isDark || isSunset ? theme.accent : theme.accent)
+                    ? (isDark ? '#999999' : 
+                       isSunset ? '#BBB' : '#999999')
+                    : theme.accent
                   } 
                 />
               </View>
@@ -326,15 +345,20 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
             value={officeFriendly}
             onValueChange={onOfficeFriendlyToggle}
             trackColor={{ 
-              false: isDark || isSunset ? '#555' : '#e0e0e0', 
-              true: isDark || isSunset ? `${theme.accent}80` : `${theme.accent}90` 
+              false: isDark ? '#555' : 
+                isSunset ? 'rgba(77, 60, 42, 0.5)' : '#e0e0e0', 
+              true: isDark ? `${theme.accent}80` : 
+                isSunset ? 'rgba(255, 142, 60, 0.7)' : `${theme.accent}90` 
             }}
             thumbColor={
-              isDark || isSunset 
+              isDark 
                 ? (officeFriendly ? theme.accent : '#888')
-                : (officeFriendly ? theme.accent : '#f5f5f5')
+                : isSunset
+                  ? (officeFriendly ? '#FF8E3C' : '#ccc')
+                  : (officeFriendly ? theme.accent : '#f5f5f5')
             }
-            ios_backgroundColor={isDark || isSunset ? '#555' : '#e0e0e0'}
+            ios_backgroundColor={isDark ? '#555' : 
+              isSunset ? 'rgba(77, 60, 42, 0.5)' : '#e0e0e0'}
             disabled={area === 'Dynamic Flow'}
           />
         </View>
@@ -347,14 +371,17 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={isDark || isSunset ? 
+          colors={isDark ? 
             ['#4299E1', '#6366F1'] : 
-            ['#4299E1', '#6366F1']}
+            isSunset ?
+              ['#FF8E3C', '#E67D28'] :
+              ['#4299E1', '#6366F1']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[
             styles.startButtonGradient,
-            { shadowColor: isDark || isSunset ? 'rgba(99, 102, 241, 0.5)' : 'rgba(0, 0, 0, 0.2)' }
+            { shadowColor: isDark ? 'rgba(99, 102, 241, 0.5)' : 
+              isSunset ? 'rgba(230, 125, 40, 0.5)' : 'rgba(0, 0, 0, 0.2)' }
           ]}
         >
           <Ionicons name="play" size={20} color="#ffffff" style={styles.startIcon} />

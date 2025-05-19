@@ -68,7 +68,7 @@ This document outlines the steps required to complete the migration to a central
 
 - [ ] Centralize reward unlocking logic
 - [ ] Add proper validation for feature availability
-- [ ] Ensure streak freezes and XP boosts function correctly
+- [ ] Ensure streak flexSaves and XP boosts function correctly
 - [ ] Create smooth reward unlocking experience
 
 ### 8. Testing Plan

@@ -53,24 +53,44 @@ export const ProgressFooter: React.FC<ProgressFooterProps> = ({
     return (
       <View style={styles.footer}>
         <LinearGradient
-          colors={isSunset ? ['#111827', '#1F2937'] : ['#111827', '#1F2937']}
+          colors={isSunset ? 
+            ['rgba(50, 30, 64, 0.8)', 'rgba(32, 18, 41, 0.9)'] : 
+            ['#111827', '#1F2937']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.darkFooterContent}
+          style={[
+            styles.darkFooterContent, 
+            isSunset && styles.sunsetFooterContent
+          ]}
         >
-          <View style={styles.darkLevelBadge}>
-            <Text style={styles.darkLevelText}>{userLevel}</Text>
+          <View style={[
+            styles.darkLevelBadge,
+            isSunset && styles.sunsetLevelBadge
+          ]}>
+            <Text style={[
+              styles.darkLevelText,
+              isSunset && styles.sunsetLevelText
+            ]}>{userLevel}</Text>
           </View>
           <View style={styles.darkTextContainer}>
-            <Text style={styles.darkFooterTitle}>
+            <Text style={[
+              styles.darkFooterTitle,
+              isSunset && styles.sunsetFooterTitle
+            ]}>
               FlexBreak Premium
             </Text>
-            <Text style={styles.darkFooterXP}>
+            <Text style={[
+              styles.darkFooterXP,
+              isSunset && styles.sunsetFooterXP
+            ]}>
               {userXP.toLocaleString()} XP
             </Text>
           </View>
-          <View style={styles.darkIconContainer}>
-            <Ionicons name="trophy" size={20} color="#F59E0B" />
+          <View style={[
+            styles.darkIconContainer,
+            isSunset && styles.sunsetIconContainer
+          ]}>
+            <Ionicons name="trophy" size={20} color={isSunset ? "#FF8C5A" : "#F59E0B"} />
           </View>
         </LinearGradient>
       </View>
@@ -155,6 +175,24 @@ const styles = StyleSheet.create({
   testingButtonText: {
     color: '#FFF',
     fontWeight: 'bold',
+  },
+  sunsetFooterContent: {
+    // Add sunset-specific styles here
+  },
+  sunsetLevelBadge: {
+    // Add sunset-specific styles here
+  },
+  sunsetLevelText: {
+    // Add sunset-specific styles here
+  },
+  sunsetFooterTitle: {
+    // Add sunset-specific styles here
+  },
+  sunsetFooterXP: {
+    // Add sunset-specific styles here
+  },
+  sunsetIconContainer: {
+    // Add sunset-specific styles here
   },
 });
 

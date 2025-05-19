@@ -7,8 +7,8 @@ import * as progressTracker from './progressTracker';
 import { saveUserProgressWithVersionCheck } from './utils';
 
 // Constants
-const STREAK_FREEZE_REWARD_ID = 'streak_freezes';
-const MAX_FREEZES = 2;
+const FLEX_SAVE_REWARD_ID = 'flex_saves';
+const MAX_FLEX_SAVES = 2;
 
 // Event emitter for streak-related events
 export const streakEvents = new EventEmitter();
@@ -21,8 +21,8 @@ export const STREAK_UPDATED_EVENT = 'streak_updated';
 export let streakCache = {
   currentStreak: 0,
   routineDates: [] as string[],
-  freezeDates: [] as string[],
-  freezesAvailable: 0,
+  flexSaveDates: [] as string[],
+  flexSavesAvailable: 0,
   initialized: false
 };
 
@@ -41,59 +41,59 @@ export const initializeStreak = async (): Promise<void> => {
       
 
       
-    // Get streak freezes from storage
+    // Get streak flexSaves from storage
     const userProgress = await storageService.getUserProgress();
-    const freezeDates = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.appliedDates?.map((d: string) => 
+    const flexSaveDates = userProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.appliedDates?.map((d: string) => 
       dateUtils.toDateString(d)
     ) || [];
     
 
     
-    // Read freeze count from storage
-    let freezesAvailable = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.uses || 0;
+    // Read flexSave count from storage
+    let flexSavesAvailable = userProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.uses || 0;
     
-    // Calculate freeze usage for this month to validate the count
+    // Calculate flexSave usage for this month to validate the count
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const firstDayOfMonthStr = dateUtils.formatDateYYYYMMDD(firstDayOfMonth);
     
-    // Count freezes used in the current month
-    const usedFreezesThisMonth = freezeDates.filter(date => 
+    // Count flexSaves used in the current month
+    const usedFlexSavesThisMonth = flexSaveDates.filter(date => 
       date >= firstDayOfMonthStr && date <= dateUtils.todayStringLocal()
     ).length;
     
-    // The correct freeze count should be MAX_FREEZES - usedFreezesThisMonth
-    const calculatedFreezeCount = Math.max(0, MAX_FREEZES - usedFreezesThisMonth);
+    // The correct flexSave count should be MAX_FLEX_SAVES - usedFlexSavesThisMonth
+    const calculatedFlexSaveCount = Math.max(0, MAX_FLEX_SAVES - usedFlexSavesThisMonth);
     
     
     // If there's a discrepancy, update storage with the correct value
-    if (freezesAvailable !== calculatedFreezeCount) {
+    if (flexSavesAvailable !== calculatedFlexSaveCount) {
       
       // Update in storage
-      if (userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]) {
-        userProgress.rewards[STREAK_FREEZE_REWARD_ID].uses = calculatedFreezeCount;
-        await saveUserProgressWithVersionCheck(userProgress, 'streak_init_freezes');
+      if (userProgress.rewards?.[FLEX_SAVE_REWARD_ID]) {
+        userProgress.rewards[FLEX_SAVE_REWARD_ID].uses = calculatedFlexSaveCount;
+        await saveUserProgressWithVersionCheck(userProgress, 'streak_init_flexSaves');
       }
       
       // Use the corrected count
-      freezesAvailable = calculatedFreezeCount;
+      flexSavesAvailable = calculatedFlexSaveCount;
     }
     
-    // Force refill freezes for certain conditions
-    const forceRefill = freezesAvailable === 0 && userProgress.level >= 6;
+    // Force refill flexSaves for certain conditions
+    const forceRefill = flexSavesAvailable === 0 && userProgress.level >= 6;
     if (forceRefill) {
       // Attempt direct refill
-      if (userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]) {
-        userProgress.rewards[STREAK_FREEZE_REWARD_ID].uses = 2; // Set to MAX_FREEZES
+      if (userProgress.rewards?.[FLEX_SAVE_REWARD_ID]) {
+        userProgress.rewards[FLEX_SAVE_REWARD_ID].uses = 2; // Set to MAX_FLEX_SAVES
         await saveUserProgressWithVersionCheck(userProgress, 'streak_init_refill');
-        freezesAvailable = 2;
+        flexSavesAvailable = 2;
       }
     }
     
-    // Calculate streak with freezes included
-    const calculatedStreak = progressTracker.calculateStreakWithFreezes(
+    // Calculate streak with flexSaves included
+    const calculatedStreak = progressTracker.calculateStreakWithFlexSaves(
       routineDates,
-      freezeDates
+      flexSaveDates
     );
     
     
@@ -101,22 +101,22 @@ export const initializeStreak = async (): Promise<void> => {
     streakCache = {
       currentStreak: calculatedStreak,
       routineDates,
-      freezeDates,
-      freezesAvailable: forceRefill ? 2 : freezesAvailable,
+      flexSaveDates,
+      flexSavesAvailable: forceRefill ? 2 : flexSavesAvailable,
       initialized: true
     };
     
     console.log(`[STREAK TIMEZONE DEBUG] initializeStreak - Final streak cache:`, JSON.stringify({
       currentStreak: streakCache.currentStreak,
       routineDatesCount: streakCache.routineDates.length,
-      freezeDatesCount: streakCache.freezeDates.length,
-      freezesAvailable: streakCache.freezesAvailable
+      flexSaveDatesCount: streakCache.flexSaveDates.length,
+      flexSavesAvailable: streakCache.flexSavesAvailable
     }));
     
     // Emit streak updated event
     streakEvents.emit(STREAK_UPDATED_EVENT, {
       value: calculatedStreak,
-      freezesRemaining: streakCache.freezesAvailable
+      flexSavesRemaining: streakCache.flexSavesAvailable
     });
     
   } catch (error) {
@@ -126,15 +126,15 @@ export const initializeStreak = async (): Promise<void> => {
 };
 
 /**
- * Calculate the current streak based on routine and freeze dates
+ * Calculate the current streak based on routine and flexSave dates
  * This is used only for validation and recovery, not normal operations
  */
 export const calculateStreakFromHistory = (): number => {
-  const { routineDates, freezeDates } = streakCache;
-  if (!routineDates.length && !freezeDates.length) return 0;
+  const { routineDates, flexSaveDates } = streakCache;
+  if (!routineDates.length && !flexSaveDates.length) return 0;
   
-  // Combine and sort all dates when user was active (routine) or had a freeze
-  const allDates = [...new Set([...routineDates, ...freezeDates])].sort();
+  // Combine and sort all dates when user was active (routine) or had a flexSave
+  const allDates = [...new Set([...routineDates, ...flexSaveDates])].sort();
   
   // Get today's date and yesterday's date
   const todayStr = dateUtils.todayStringLocal();
@@ -168,11 +168,11 @@ export const calculateStreakFromHistory = (): number => {
     currentDate.setDate(currentDate.getDate() - 1);
     const dateStr = dateUtils.toDateString(currentDate);
     
-    // Check if the previous day has activity or freeze
+    // Check if the previous day has activity or flexSave
     if (allDates.includes(dateStr)) {
       streak++;
     } else {
-      // No activity or freeze on this day - streak ends
+      // No activity or flexSave on this day - streak ends
       break;
     }
   }
@@ -206,16 +206,16 @@ export const hasRoutineYesterday = async (): Promise<boolean> => {
 };
 
 /**
- * Check if a freeze was applied for yesterday
+ * Check if a flexSave was applied for yesterday
  */
-export const hasFreezeYesterday = async (): Promise<boolean> => {
+export const hasFlexSaveYesterday = async (): Promise<boolean> => {
   if (!streakCache.initialized) {
     await initializeStreak();
   }
   
   const yesterdayStr = dateUtils.yesterdayStringLocal();
   
-  return streakCache.freezeDates.includes(yesterdayStr);
+  return streakCache.flexSaveDates.includes(yesterdayStr);
 };
 
 /**
@@ -224,8 +224,8 @@ export const hasFreezeYesterday = async (): Promise<boolean> => {
 export const getStreakStatus = async (forceRefresh = false): Promise<{
   currentStreak: number;
   maintainedToday: boolean;
-  canFreeze: boolean;
-  freezesAvailable: number;
+  canFlexSave: boolean;
+  flexSavesAvailable: number;
 }> => {
   if (forceRefresh || !streakCache.initialized) {
     await initializeStreak();
@@ -237,7 +237,7 @@ export const getStreakStatus = async (forceRefresh = false): Promise<{
   
   const hasToday = streakCache.routineDates.includes(today);
   const hasYesterday = streakCache.routineDates.includes(yesterdayStr) || 
-                      streakCache.freezeDates.includes(yesterdayStr);
+                      streakCache.flexSaveDates.includes(yesterdayStr);
   
   
   // Check if streak is maintained today
@@ -253,17 +253,17 @@ export const getStreakStatus = async (forceRefresh = false): Promise<{
   const hasRecentActivity = mostRecentRoutineDate >= twoWeeksAgoStr;
   
   
-  // Check if we can apply a freeze for yesterday
-  // Allow freezes even if streak is 0 as long as there's recent activity
-  const canFreeze = !hasYesterday && 
-                    streakCache.freezesAvailable > 0 && 
+  // Check if we can apply a flexSave for yesterday
+  // Allow flexSaves even if streak is 0 as long as there's recent activity
+  const canFlexSave = !hasYesterday && 
+                    streakCache.flexSavesAvailable > 0 && 
                     (streakCache.currentStreak > 0 || hasRecentActivity);
   
   return {
     currentStreak: streakCache.currentStreak,
     maintainedToday,
-    canFreeze,
-    freezesAvailable: streakCache.freezesAvailable
+    canFlexSave,
+    flexSavesAvailable: streakCache.flexSavesAvailable
   };
 };
 
@@ -295,22 +295,22 @@ export const completeRoutine = async (dateToUse: string = dateUtils.todayStringL
     // Get yesterday
     const yesterdayStr = dateUtils.yesterdayStringLocal();
     
-    // Check if yesterday had activity or a freeze
+    // Check if yesterday had activity or a flexSave
     const hasYesterdayActivity = streakCache.routineDates.includes(yesterdayStr);
-    const hasYesterdayFreeze = streakCache.freezeDates.includes(yesterdayStr);
-    const yesterdayCovered = hasYesterdayActivity || hasYesterdayFreeze;
+    const hasYesterdayFlexSave = streakCache.flexSaveDates.includes(yesterdayStr);
+    const yesterdayCovered = hasYesterdayActivity || hasYesterdayFlexSave;
     
-    // Also check if we have a freeze for 2 days ago when today is being processed
-    // This handles the case when user completes routine today after applying a freeze for yesterday
+    // Also check if we have a flexSave for 2 days ago when today is being processed
+    // This handles the case when user completes routine today after applying a flexSave for yesterday
     const twoDaysAgoStr = dateUtils.getDaysAgoString(2);
-    const hasTwoDaysAgoFreeze = streakCache.freezeDates.includes(twoDaysAgoStr);
+    const hasTwoDaysAgoFlexSave = streakCache.flexSaveDates.includes(twoDaysAgoStr);
     const hasTwoDaysAgoActivity = streakCache.routineDates.includes(twoDaysAgoStr);
     
     // Using dateToUse === dateUtils.todayStringLocal() checks if we're processing today's routine
     const processingToday = dateToUse === dateUtils.todayStringLocal();
     
-    // Special case: Check if we're processing today and have a freeze for yesterday
-    const hasActiveFreeze = processingToday && hasYesterdayFreeze;
+    // Special case: Check if we're processing today and have a flexSave for yesterday
+    const hasActiveFlexSave = processingToday && hasYesterdayFlexSave;
     
     
     let newStreak = streakCache.currentStreak;
@@ -319,9 +319,9 @@ export const completeRoutine = async (dateToUse: string = dateUtils.todayStringL
     if (yesterdayCovered) {
       newStreak += 1;
       streakIncremented = true;
-    } else if (hasActiveFreeze) {
-      // Special case: Today's routine after yesterday's freeze
-      // We should maintain streak + 1 since the freeze already "saved" the previous streak
+    } else if (hasActiveFlexSave) {
+      // Special case: Today's routine after yesterday's flexSave
+      // We should maintain streak + 1 since the flexSave already "saved" the previous streak
       newStreak += 1;
       streakIncremented = true;
     } else if (streakCache.currentStreak > 0) {
@@ -347,14 +347,14 @@ export const completeRoutine = async (dateToUse: string = dateUtils.todayStringL
     await updateStorage(
       newStreak,
       updatedRoutineDates,
-      streakCache.freezeDates,
-      streakCache.freezesAvailable
+      streakCache.flexSaveDates,
+      streakCache.flexSavesAvailable
     );
     
     // Emit streak updated event
     streakEvents.emit(STREAK_UPDATED_EVENT, {
       value: newStreak,
-      freezesRemaining: streakCache.freezesAvailable
+      flexSavesRemaining: streakCache.flexSavesAvailable
     });
     
     return {
@@ -370,12 +370,12 @@ export const completeRoutine = async (dateToUse: string = dateUtils.todayStringL
 };
 
 /**
- * Apply a streak freeze to save the current streak
+ * Apply a streak flexSave to save the current streak
  */
-export const applyFreeze = async (): Promise<{
+export const applyFlexSave = async (): Promise<{
   success: boolean;
   currentStreak: number;
-  remainingFreezes: number;
+  remainingFlexSaves: number;
 }> => {
   try {
     if (!streakCache.initialized) {
@@ -385,41 +385,41 @@ export const applyFreeze = async (): Promise<{
     // Get yesterday's date in local time
     const yesterdayStr = dateUtils.yesterdayStringLocal();
     
-    // Check if yesterday already has activity or a freeze
+    // Check if yesterday already has activity or a flexSave
     if (streakCache.routineDates.includes(yesterdayStr)) {
       return {
         success: false,
         currentStreak: streakCache.currentStreak,
-        remainingFreezes: streakCache.freezesAvailable
+        remainingFlexSaves: streakCache.flexSavesAvailable
       };
     }
     
-    if (streakCache.freezeDates.includes(yesterdayStr)) {
+    if (streakCache.flexSaveDates.includes(yesterdayStr)) {
       return {
         success: true,
         currentStreak: streakCache.currentStreak,
-        remainingFreezes: streakCache.freezesAvailable
+        remainingFlexSaves: streakCache.flexSavesAvailable
       };
     }
     
-    // Get user progress to check freeze count directly from storage
+    // Get user progress to check flexSave count directly from storage
     const userProgress = await storageService.getUserProgress();
-    const storedFreezeCount = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.uses || 0;
-    const cachedFreezeCount = streakCache.freezesAvailable;
+    const storedFlexSaveCount = userProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.uses || 0;
+    const cachedFlexSaveCount = streakCache.flexSavesAvailable;
     
     // Use the higher value between storage and cache to avoid discrepancies
-    const currentFreezes = Math.max(storedFreezeCount, cachedFreezeCount);
+    const currentFlexSaves = Math.max(storedFlexSaveCount, cachedFlexSaveCount);
     
-    // Check if we have freezes available
-    if (currentFreezes <= 0) {
+    // Check if we have flexSaves available
+    if (currentFlexSaves <= 0) {
       return {
         success: false,
         currentStreak: streakCache.currentStreak,
-        remainingFreezes: 0
+        remainingFlexSaves: 0
       };
     }
     
-    // Check if there's any recent activity (max 2 weeks back) to apply a freeze to
+    // Check if there's any recent activity (max 2 weeks back) to apply a flexSave to
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
     const twoWeeksAgoStr = dateUtils.formatDateYYYYMMDD(twoWeeksAgo);
@@ -434,37 +434,37 @@ export const applyFreeze = async (): Promise<{
       return {
         success: false,
         currentStreak: 0,
-        remainingFreezes: currentFreezes
+        remainingFlexSaves: currentFlexSaves
       };
     }
     
     
-    // Get all freezes in the current month
+    // Get all flexSaves in the current month
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const firstDayOfMonthStr = dateUtils.formatDateYYYYMMDD(firstDayOfMonth);
 
-    // Count freezes used this month for an accurate count
-    const existingFreezeDates = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.appliedDates || [];
-    const freezesUsedThisMonth = existingFreezeDates.filter(date => 
+    // Count flexSaves used this month for an accurate count
+    const existingFlexSaveDates = userProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.appliedDates || [];
+    const flexSavesUsedThisMonth = existingFlexSaveDates.filter(date => 
       date >= firstDayOfMonthStr && date <= dateUtils.todayStringLocal()
     ).length;
     
-    console.log(`[STREAK DEBUG] Current month freeze usage: ${freezesUsedThisMonth} used, about to use 1 more`);
+    console.log(`[STREAK DEBUG] Current month flexSave usage: ${flexSavesUsedThisMonth} used, about to use 1 more`);
     
-    // Apply the freeze
-    const updatedFreezeDates = [...streakCache.freezeDates, yesterdayStr].sort();
+    // Apply the flexSave
+    const updatedFlexSaveDates = [...streakCache.flexSaveDates, yesterdayStr].sort();
     
-    // Calculate the updated freeze count (this month's usage + this freeze)
-    const updatedFreezeCount = freezesUsedThisMonth + 1;
-    const updatedFreezesAvailable = Math.max(0, MAX_FREEZES - updatedFreezeCount);
+    // Calculate the updated flexSave count (this month's usage + this flexSave)
+    const updatedFlexSaveCount = flexSavesUsedThisMonth + 1;
+    const updatedFlexSavesAvailable = Math.max(0, MAX_FLEX_SAVES - updatedFlexSaveCount);
     
-    console.log(`[STREAK DEBUG] Updated freeze availability: ${updatedFreezesAvailable} remaining after this use`);
+    console.log(`[STREAK DEBUG] Updated flexSave availability: ${updatedFlexSavesAvailable} remaining after this use`);
     
-    // Calculate what the streak should be with this freeze
-    const updatedStreak = progressTracker.calculateStreakWithFreezes(
+    // Calculate what the streak should be with this flexSave
+    const updatedStreak = progressTracker.calculateStreakWithFlexSaves(
       streakCache.routineDates,
-      updatedFreezeDates
+      updatedFlexSaveDates
     );
     
     // For streak recovery, if current streak is 0 but most recent activity is recent,
@@ -475,64 +475,64 @@ export const applyFreeze = async (): Promise<{
     streakCache = {
       ...streakCache,
       currentStreak: finalStreak,
-      freezeDates: updatedFreezeDates,
-      freezesAvailable: updatedFreezesAvailable
+      flexSaveDates: updatedFlexSaveDates,
+      flexSavesAvailable: updatedFlexSavesAvailable
     };
     
     // Update storage with all streak data
     await updateStorage(
       finalStreak,
       streakCache.routineDates,
-      updatedFreezeDates,
-      updatedFreezesAvailable
+      updatedFlexSaveDates,
+      updatedFlexSavesAvailable
     );
     
     // Double check UserProgress was updated correctly
     const updatedUserProgress = await storageService.getUserProgress();
-    const updatedStoredFreezes = updatedUserProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.uses || 0;
+    const updatedStoredFlexSaves = updatedUserProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.uses || 0;
     
     // If storage has a different value than what we calculated, update it directly
-    if (updatedStoredFreezes !== updatedFreezesAvailable) {
-      console.log(`[STREAK DEBUG] Storage freeze count (${updatedStoredFreezes}) doesn't match calculated (${updatedFreezesAvailable}), fixing...`);
+    if (updatedStoredFlexSaves !== updatedFlexSavesAvailable) {
+      console.log(`[STREAK DEBUG] Storage flexSave count (${updatedStoredFlexSaves}) doesn't match calculated (${updatedFlexSavesAvailable}), fixing...`);
       
-      if (updatedUserProgress.rewards?.[STREAK_FREEZE_REWARD_ID]) {
-        updatedUserProgress.rewards[STREAK_FREEZE_REWARD_ID].uses = updatedFreezesAvailable;
-        await saveUserProgressWithVersionCheck(updatedUserProgress, 'streak_freeze_apply');
+      if (updatedUserProgress.rewards?.[FLEX_SAVE_REWARD_ID]) {
+        updatedUserProgress.rewards[FLEX_SAVE_REWARD_ID].uses = updatedFlexSavesAvailable;
+        await saveUserProgressWithVersionCheck(updatedUserProgress, 'flex_save_apply');
         
         // Re-validate to make sure it was applied correctly
         const finalCheck = await storageService.getUserProgress();
-        console.log(`[STREAK DEBUG] Final freeze count validation: ${finalCheck.rewards?.[STREAK_FREEZE_REWARD_ID]?.uses}`);
+        console.log(`[STREAK DEBUG] Final flexSave count validation: ${finalCheck.rewards?.[FLEX_SAVE_REWARD_ID]?.uses}`);
       }
     }
     
-    // Play freeze sound
-    await soundEffects.playSound('streakFreeze');
+    // Play flexSave sound
+    await soundEffects.playSound('flexSave');
     
     // Emit event
     streakEvents.emit(STREAK_SAVED_EVENT, {
       currentStreak: finalStreak,
-      freezesRemaining: updatedFreezesAvailable
+      flexSavesRemaining: updatedFlexSavesAvailable
     });
     
     
     return {
       success: true,
       currentStreak: finalStreak,
-      remainingFreezes: updatedFreezesAvailable
+      remainingFlexSaves: updatedFlexSavesAvailable
     };
   } catch (error) {
     return {
       success: false,
       currentStreak: streakCache.currentStreak,
-      remainingFreezes: streakCache.freezesAvailable
+      remainingFlexSaves: streakCache.flexSavesAvailable
     };
   }
 };
 
 /**
- * Refill streak freezes (e.g., at the start of a month)
+ * Refill streak flexSaves (e.g., at the start of a month)
  */
-export const refillFreezes = async (): Promise<boolean> => {
+export const refillFlexSaves = async (): Promise<boolean> => {
   try {
     if (!streakCache.initialized) {
       await initializeStreak();
@@ -540,10 +540,10 @@ export const refillFreezes = async (): Promise<boolean> => {
     
     // Get the current value directly from UserProgress
     const userProgress = await storageService.getUserProgress();
-    const currentFreezes = userProgress.rewards?.[STREAK_FREEZE_REWARD_ID]?.uses || 0;
+    const currentFlexSaves = userProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.uses || 0;
     
     // Determine if we need to refill
-    const needsRefill = currentFreezes < MAX_FREEZES;
+    const needsRefill = currentFlexSaves < MAX_FLEX_SAVES;
     
     // Already at max or we already refilled this month
     if (!needsRefill) {
@@ -553,15 +553,15 @@ export const refillFreezes = async (): Promise<boolean> => {
     // Update cache
     streakCache = {
       ...streakCache,
-      freezesAvailable: MAX_FREEZES
+      flexSavesAvailable: MAX_FLEX_SAVES
     };
     
     // Update storage
     await updateStorage(
       streakCache.currentStreak,
       streakCache.routineDates,
-      streakCache.freezeDates,
-      MAX_FREEZES
+      streakCache.flexSaveDates,
+      MAX_FLEX_SAVES
     );
     
     return true;
@@ -603,8 +603,8 @@ export const updateStoredStreak = async (streak: number): Promise<boolean> => {
 export const updateStorage = async (
   streak: number,
   routineDates: string[],
-  freezeDates: string[],
-  freezesAvailable: number
+  flexSaveDates: string[],
+  flexSavesAvailable: number
 ): Promise<boolean> => {
   try {
     const userProgress = await storageService.getUserProgress();
@@ -617,25 +617,25 @@ export const updateStorage = async (
       userProgress.statistics.bestStreak = streak;
     }
     
-    // Update freeze data
-    if (!userProgress.rewards[STREAK_FREEZE_REWARD_ID]) {
+    // Update flexSave data
+    if (!userProgress.rewards[FLEX_SAVE_REWARD_ID]) {
       // Create the reward if it doesn't exist
-      userProgress.rewards[STREAK_FREEZE_REWARD_ID] = {
-        id: STREAK_FREEZE_REWARD_ID,
-        title: "Streak Freezes",
-        description: "Freeze your streak to protect it when you miss a day",
+      userProgress.rewards[FLEX_SAVE_REWARD_ID] = {
+        id: FLEX_SAVE_REWARD_ID,
+        title: "Flex Saves",
+        description: "FlexSave your streak to protect it when you miss a day",
         icon: "snow",
         unlocked: true,
         levelRequired: 6,
         type: "consumable",
-        uses: freezesAvailable,
-        appliedDates: [...freezeDates],
+        uses: flexSavesAvailable,
+        appliedDates: [...flexSaveDates],
         lastRefill: new Date().toISOString()
       };
     } else {
       // Update existing reward
-      userProgress.rewards[STREAK_FREEZE_REWARD_ID].uses = freezesAvailable;
-      userProgress.rewards[STREAK_FREEZE_REWARD_ID].appliedDates = [...freezeDates];
+      userProgress.rewards[FLEX_SAVE_REWARD_ID].uses = flexSavesAvailable;
+      userProgress.rewards[FLEX_SAVE_REWARD_ID].appliedDates = [...flexSaveDates];
     }
     
     // Save all changes at once
@@ -646,8 +646,8 @@ export const updateStorage = async (
       ...streakCache,
       currentStreak: streak,
       routineDates: [...routineDates],
-      freezeDates: [...freezeDates],
-      freezesAvailable: freezesAvailable
+      flexSaveDates: [...flexSaveDates],
+      flexSavesAvailable: flexSavesAvailable
     };
     
     return true;
@@ -672,9 +672,9 @@ export const isStreakActive = async (): Promise<boolean> => {
  */
 export const getLegacyStreakStatus = async (): Promise<{
   streakBroken: boolean;
-  freezesAvailable: number;
+  flexSavesAvailable: number;
   currentStreak: number;
-  shouldShowFreezePrompt: boolean;
+  shouldShowFlexSavePrompt: boolean;
   canSaveYesterdayStreak: boolean;
   hasTodayActivity: boolean;
 }> => {
@@ -687,12 +687,12 @@ export const getLegacyStreakStatus = async (): Promise<{
   
   const hasTodayActivity = streakCache.routineDates.includes(todayStr);
   const hasYesterdayActivity = streakCache.routineDates.includes(yesterdayStr);
-  const hasYesterdayFreeze = streakCache.freezeDates.includes(yesterdayStr);
+  const hasYesterdayFlexSave = streakCache.flexSaveDates.includes(yesterdayStr);
   
   // Double-check the streak to ensure it's correct
-  const calculatedStreak = progressTracker.calculateStreakWithFreezes(
+  const calculatedStreak = progressTracker.calculateStreakWithFlexSaves(
     streakCache.routineDates,
-    streakCache.freezeDates
+    streakCache.flexSaveDates
   );
   
   // If calculated streak differs from cached streak, update it
@@ -700,19 +700,19 @@ export const getLegacyStreakStatus = async (): Promise<{
     await updateStoredStreak(calculatedStreak);
   }
   
-  // Get freeze count directly from UserProgress for accuracy
+  // Get flexSave count directly from UserProgress for accuracy
   const userProgress = await storageService.getUserProgress();
-  let freezesAvailable = streakCache.freezesAvailable;
+  let flexSavesAvailable = streakCache.flexSavesAvailable;
   
   // If UserProgress has a different count, prefer that one
-  if (userProgress.rewards?.streak_freezes?.uses !== undefined) {
-    const storedCount = userProgress.rewards.streak_freezes.uses;
+  if (userProgress.rewards?.flex_saves?.uses !== undefined) {
+    const storedCount = userProgress.rewards.flex_saves.uses;
     
-    if (storedCount !== freezesAvailable) {
-      freezesAvailable = storedCount;
+    if (storedCount !== flexSavesAvailable) {
+      flexSavesAvailable = storedCount;
       
       // Update cache to match
-      streakCache.freezesAvailable = storedCount;
+      streakCache.flexSavesAvailable = storedCount;
     }
   }
   
@@ -726,17 +726,17 @@ export const getLegacyStreakStatus = async (): Promise<{
   const hasRecentActivity = mostRecentRoutineDate >= twoWeeksAgoStr;
   
   
-  // Check if we can apply a freeze for yesterday
+  // Check if we can apply a flexSave for yesterday
   const canSaveYesterdayStreak = !hasYesterdayActivity && 
-                               !hasYesterdayFreeze && 
-                               freezesAvailable > 0 &&
+                               !hasYesterdayFlexSave && 
+                               flexSavesAvailable > 0 &&
                                (streakCache.currentStreak > 0 || hasRecentActivity);
   
   return {
     streakBroken: streakCache.currentStreak === 0,
-    freezesAvailable,
+    flexSavesAvailable,
     currentStreak: streakCache.currentStreak,
-    shouldShowFreezePrompt: canSaveYesterdayStreak,
+    shouldShowFlexSavePrompt: canSaveYesterdayStreak,
     canSaveYesterdayStreak,
     hasTodayActivity
   };
@@ -750,7 +750,7 @@ export const checkStreakStatus = async (): Promise<{
   currentStreak: number;
   streakBroken: boolean;
   canSaveYesterdayStreak: boolean;
-  freezesAvailable: number;
+  flexSavesAvailable: number;
   hasTodayActivity: boolean;
   streakState: StreakState
 }> => {
@@ -758,35 +758,35 @@ export const checkStreakStatus = async (): Promise<{
     // Get legacy status which will correct the streak if needed
     const legacyStatus = await getLegacyStreakStatus();
     
-    // Double check freeze count directly from UserProgress
+    // Double check flexSave count directly from UserProgress
     const userProgress = await storageService.getUserProgress();
-    let freezesAvailable = legacyStatus.freezesAvailable;
+    let flexSavesAvailable = legacyStatus.flexSavesAvailable;
     
     // If UserProgress has a different count, prefer that
-    if (userProgress.rewards?.streak_freezes?.uses !== undefined) {
-      const storedCount = userProgress.rewards.streak_freezes.uses;
+    if (userProgress.rewards?.flex_saves?.uses !== undefined) {
+      const storedCount = userProgress.rewards.flex_saves.uses;
       
       // If there's a discrepancy, prioritize UserProgress count
-      if (storedCount !== freezesAvailable) {
-        freezesAvailable = storedCount;
+      if (storedCount !== flexSavesAvailable) {
+        flexSavesAvailable = storedCount;
         
         // Update the cached value to match storage
-        streakCache.freezesAvailable = storedCount;
+        streakCache.flexSavesAvailable = storedCount;
       }
     }
     
     // Add the old streakState property
     let streakState: StreakState = 'BROKEN';
     if (legacyStatus.currentStreak > 0) {
-      const hasFreeze = await hasFreezeYesterday();
-      streakState = hasFreeze ? 'FROZEN' : 'ACTIVE';
+      const hasFlexSave = await hasFlexSaveYesterday();
+      streakState = hasFlexSave ? 'FROZEN' : 'ACTIVE';
     }
     
     return {
       currentStreak: legacyStatus.currentStreak,
       streakBroken: legacyStatus.streakBroken,
       canSaveYesterdayStreak: legacyStatus.canSaveYesterdayStreak,
-      freezesAvailable,
+      flexSavesAvailable,
       hasTodayActivity: legacyStatus.hasTodayActivity,
       streakState
     };
@@ -795,7 +795,7 @@ export const checkStreakStatus = async (): Promise<{
       currentStreak: 0,
       streakBroken: true,
       canSaveYesterdayStreak: false,
-      freezesAvailable: 0,
+      flexSavesAvailable: 0,
       hasTodayActivity: false,
       streakState: 'BROKEN'
     };
@@ -804,14 +804,14 @@ export const checkStreakStatus = async (): Promise<{
 
 /**
  * @deprecated Backward compatibility function for old API
- * Use applyFreeze instead
+ * Use applyFlexSave instead
  */
-export const saveStreakWithFreeze = async (): Promise<{
+export const saveStreakWithFlexSave = async (): Promise<{
   success: boolean;
   streakState: StreakState;
 }> => {
   try {
-    const result = await applyFreeze();
+    const result = await applyFlexSave();
     
     let streakState: StreakState = 'BROKEN';
     if (result.success && result.currentStreak > 0) {
@@ -887,17 +887,17 @@ export const isStreakBroken = async (): Promise<boolean> => {
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
   const twoDaysAgoStr = dateUtils.toDateString(twoDaysAgo);
   
-  // Check if any of the recent days have routines or freezes
+  // Check if any of the recent days have routines or flexSaves
   const hasToday = streakCache.routineDates.includes(todayStr);
   const hasYesterday = streakCache.routineDates.includes(yesterdayStr) || 
-                      streakCache.freezeDates.includes(yesterdayStr);
+                      streakCache.flexSaveDates.includes(yesterdayStr);
   const hasTwoDaysAgo = streakCache.routineDates.includes(twoDaysAgoStr) || 
-                        streakCache.freezeDates.includes(twoDaysAgoStr);
+                        streakCache.flexSaveDates.includes(twoDaysAgoStr);
   
   // The streak is broken if:
   // 1. Today is not completed AND
-  // 2. Yesterday is not completed (with no freeze) AND
-  // 3. Two days ago is not completed (with no freeze)
+  // 2. Yesterday is not completed (with no flexSave) AND
+  // 3. Two days ago is not completed (with no flexSave)
   const isStreakBroken = !hasToday && !hasYesterday && !hasTwoDaysAgo;
   
   return isStreakBroken;

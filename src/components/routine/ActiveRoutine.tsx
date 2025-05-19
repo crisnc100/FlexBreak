@@ -149,7 +149,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         // For iOS, we could use a custom Toast component or an alert,
         // but let's keep it simple and just rely on the button visual change
         try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           // Remove sound effect for the countdown completion
         } catch (error) {
           console.error('Error providing feedback:', error);
@@ -170,7 +170,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
     if (!isCurrentTransition && !canSkipToNext) {
       // Provide haptic feedback to indicate action not allowed yet
       try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } catch (error) {
         console.error('Error providing haptic feedback:', error);
       }
@@ -961,7 +961,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
         } else {
           // Countdown finished
           // Final haptic feedback - stronger to indicate start
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           
           // Hide countdown and resume timer
           setShowCountdown(false);

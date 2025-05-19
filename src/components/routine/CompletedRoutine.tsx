@@ -17,6 +17,7 @@ import { AppNavigationProp } from '../../types';
 import { generateRoutine } from '../../utils/generators/routineGenerator';
 import { saveFavoriteRoutine } from '../../services/storageService';
 import XpNotificationManager from '../notifications/XpNotificationManager';
+import { ThemeUnlockNotification } from '../notifications';
 import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
 import { useRefresh } from '../../context/RefreshContext';
@@ -42,6 +43,9 @@ import {
 } from './utils/xpUtils';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import { useDispatch } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as achievementService from '../../utils/progress/modules/achievementManager';
+import * as storageService from '../../services/storageService';
 
 /* ───────────── types ───────────── */
 type CompletedRoutineProps = CompletedRoutinePropsType;
@@ -74,9 +78,39 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
 
   /* state */
   const [routineLength, setRoutineLength] = useState(0);
+  const [showThemeUnlock, setShowThemeUnlock] = useState(false);
 
   /* achievements */
   const { unlockedAchievements } = useAchievements(levelUp);
+
+  /* Check for newly unlocked sunset theme access */
+  useEffect(() => {
+    const checkForThemeUnlock = async () => {
+      try {
+        // Check if the user just unlocked the sunset theme by reaching 6 badges
+        const userProgress = await storageService.getUserProgress();
+        if (!userProgress) return;
+        
+        const achievementsSummary = achievementService.getAchievementsSummary(userProgress);
+        const completedAchievements = achievementsSummary.completed || [];
+        
+        // Only show the notification if they just reached exactly 6 achievements
+        // This prevents showing it every time after they've already unlocked it
+        if (completedAchievements.length === 6) {
+          // Store a flag in AsyncStorage to avoid showing the notification again
+          const hasShownThemeUnlock = await AsyncStorage.getItem('hasShownSunsetThemeUnlock');
+          if (hasShownThemeUnlock !== 'true') {
+            setShowThemeUnlock(true);
+            AsyncStorage.setItem('hasShownSunsetThemeUnlock', 'true');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for theme unlock:', error);
+      }
+    };
+    
+    checkForThemeUnlock();
+  }, []);
 
   /* listen for streak-updated events so UI refreshes */
   useEffect(() => {
@@ -230,6 +264,26 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   return (
     <View style={styles.container}>
       <XpNotificationManager showLevelUpInRoutine={!showAnyLevelUp} />
+      
+      {/* Theme unlock notification */}
+      {showThemeUnlock && (
+        <View style={styles.themeUnlockContainer}>
+          <ThemeUnlockNotification 
+            onDismiss={() => setShowThemeUnlock(false)}
+            onNavigateToSettings={() => {
+              setShowThemeUnlock(false);
+              // Set a flag to open settings modal on dashboard return
+              AsyncStorage.setItem('@flexbreak:reopen_settings', 'true')
+                .then(() => {
+                  console.log('Settings flag set, will open settings when returning to dashboard');
+                  // Go back to dashboard, which will detect the flag and open settings
+                  onShowDashboard();
+                })
+                .catch(err => console.error('Error setting settings flag:', err));
+            }} 
+          />
+        </View>
+      )}
 
       {isSaving && (
         <Animated.View style={[styles.savingOverlay, { opacity: favOpacity }]}>
@@ -362,6 +416,17 @@ const themedStyles = createThemedStyles(theme =>
       minWidth: 200,
     },
     savingText: { fontSize: 20, fontWeight: 'bold', color: theme.text, marginTop: 20, textAlign: 'center' },
+    themeUnlockContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 11,
+    },
   }),
 );
 

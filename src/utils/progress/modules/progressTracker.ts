@@ -5,8 +5,8 @@ import * as dateUtils from './utils/dateUtils';
 
 /**
  * Calculates the current streak from a list of routines
- * This method handles basic streak calculation, not streak freeze logic
- * Streak freeze handling is now centralized in streakManager.ts
+ * This method handles basic streak calculation, not streak flexSave logic
+ * Streak flexSave handling is now centralized in streakManager.ts
  * 
  * @param routines List of completed routines
  * @returns The current streak based on consecutive days
@@ -240,19 +240,19 @@ export const getMostActiveDay = (dayOfWeekBreakdown: number[], dayNames: string[
 };
 
 /**
- * Calculates the streak with freeze dates included
+ * Calculates the streak with flexSave dates included
  * This addresses inconsistencies between streakManager and the main stats system
  *
  * @param routineDates Array of routine dates (YYYY-MM-DD, local tz)
- * @param freezeDates  Array of freeze dates  (YYYY-MM-DD, local tz)
+ * @param flexSaveDates  Array of flexSave dates  (YYYY-MM-DD, local tz)
  * @returns The current streak based on consecutive days
  */
-export const calculateStreakWithFreezes = (
+export const calculateStreakWithFlexSaves = (
   routineDates: string[],
-  freezeDates:  string[]
+  flexSaveDates:  string[]
 ): number => {
   // ────────────────  early-out for empty data  ────────────────
-  if ((!routineDates?.length) && (!freezeDates?.length)) return 0;
+  if ((!routineDates?.length) && (!flexSaveDates?.length)) return 0;
 
 
 
@@ -262,7 +262,7 @@ export const calculateStreakWithFreezes = (
    * ------------------------------------------------------------------ */
   const normalisedDates = [
     ...routineDates.map(d => dateUtils.toDateString(d)),
-    ...freezeDates .map(d => dateUtils.toDateString(d))
+    ...flexSaveDates .map(d => dateUtils.toDateString(d))
   ];
 
   const uniqueDates = Array.from(new Set(normalisedDates)).sort().reverse();
@@ -295,20 +295,20 @@ export const calculateStreakWithFreezes = (
 
   // missing two *full* days (and nothing today/yesterday) ⇒ streak broken
   if (daysSince > 1 && !hasToday && !hasYesterday) {
-    console.log('[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Streak broken, no recent activity');
+    console.log('[TRACKER TIMEZONE DEBUG] calculateStreakWithFlexSaves - Streak broken, no recent activity');
     return 0;
   }
 
   /* ------------------------------------------------------------------
    * 2️⃣  walk newest → oldest, counting ONLY routine days
-   *     (freeze days keep the chain alive but don't add to length)
+   *     (flexSave days keep the chain alive but don't add to length)
    * ------------------------------------------------------------------ */
 
-  // quick lookup table for freezes → O(1) membership test
-  const freezeSet = new Set(freezeDates.map(d => dateUtils.toDateString(d)));
+  // quick lookup table for flexSaves → O(1) membership test
+  const flexSaveSet = new Set(flexSaveDates.map(d => dateUtils.toDateString(d)));
 
-  // If the most–recent day is *not* a freeze it contributes 1 to the streak
-  let streak  = freezeSet.has(mostRecent) ? 0 : 1;
+  // If the most–recent day is *not* a flexSave it contributes 1 to the streak
+  let streak  = flexSaveSet.has(mostRecent) ? 0 : 1;
   let cursor  = toLocalDate(mostRecent);
 
   for (let i = 1; i < uniqueDates.length; i++) {
@@ -320,8 +320,8 @@ export const calculateStreakWithFreezes = (
     // gap larger than 1 day → chain broken
     if (diff !== 1) break;
 
-    // consecutive – only bump streak if this date is *not* a freeze
-    if (!freezeSet.has(dayStr)) {
+    // consecutive – only bump streak if this date is *not* a flexSave
+    if (!flexSaveSet.has(dayStr)) {
       streak += 1;
     }
 
@@ -329,6 +329,6 @@ export const calculateStreakWithFreezes = (
     cursor = dayDate;
   }
 
-  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreakWithFreezes - Final streak count: ${streak}`);
+  console.log(`[TRACKER TIMEZONE DEBUG] calculateStreakWithFlexSaves - Final streak count: ${streak}`);
   return streak;
 };

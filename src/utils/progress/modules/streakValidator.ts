@@ -7,7 +7,7 @@
 
 import * as storageService from '../../../services/storageService';
 import * as streakManager from './streakManager';
-import { calculateStreakWithFreezes } from './progressTracker';
+import { calculateStreakWithFlexSaves } from './progressTracker';
 import * as dateUtils from './utils/dateUtils';
 
 /**
@@ -22,10 +22,10 @@ export const validateAndCorrectStreak = async (): Promise<{
     storedStreak: number;
     managerStreak: number;
     calculatedStreak: number;
-    freezeCount: number;
+    flexSaveCount: number;
   };
   correctedStreak: number;
-  correctedFreezeCount: number;
+  correctedFlexSaveCount: number;
   corrections: string[];
 }> => {
   try {
@@ -41,8 +41,8 @@ export const validateAndCorrectStreak = async (): Promise<{
     const userProgress = await storageService.getUserProgress();
     const storedStreak = userProgress.statistics.currentStreak || 0;
     
-    // Get stored freeze count
-    const storedFreezeCount = userProgress.rewards?.streak_freezes?.uses || 0;
+    // Get stored flexSave count
+    const storedFlexSaveCount = userProgress.rewards?.flex_saves?.uses || 0;
     
     // 2. Get streak from streak manager
     if (!streakManager.streakCache.initialized) {
@@ -50,11 +50,11 @@ export const validateAndCorrectStreak = async (): Promise<{
     }
     const streakStatus = await streakManager.getStreakStatus();
     const managerStreak = streakStatus.currentStreak;
-    const managerFreezeCount = streakStatus.freezesAvailable;
+    const managerFlexSaveCount = streakStatus.flexSavesAvailable;
     
     // 3. Calculate streak directly from data
     const routines = await storageService.getAllRoutines();
-    const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+    const flexSaveDates = userProgress.rewards?.flex_saves?.appliedDates || [];
     
     console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Routine count: ${routines.length}`);
     if (routines.length > 0) {
@@ -67,35 +67,35 @@ export const validateAndCorrectStreak = async (): Promise<{
       .filter(r => r.date)
       .map(r => dateUtils.toDateString(r.date));
     
-    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Found ${routineDates.length} routine dates and ${freezeDates.length} freeze dates for calculation`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Found ${routineDates.length} routine dates and ${flexSaveDates.length} flexSave dates for calculation`);
     console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - First few routine dates: ${routineDates.slice(0, 3).join(', ')}`);
-    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - Freeze dates: ${freezeDates.join(', ')}`);
+    console.log(`[VALIDATOR TIMEZONE DEBUG] validateAndCorrectStreak - FlexSave dates: ${flexSaveDates.join(', ')}`);
     
-    // Calculate with freezes
-    const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
+    // Calculate with flexSaves
+    const calculatedStreak = calculateStreakWithFlexSaves(routineDates, flexSaveDates);
     
     // 4. Compare and log discrepancies
     console.log('[VALIDATOR DEBUG] Streak validation values:', {
       storedStreak,
       managerStreak,
       calculatedStreak,
-      storedFreezeCount,
-      managerFreezeCount
+      storedFlexSaveCount,
+      managerFlexSaveCount
     });
     
-    // 5. Determine correct streak (prefer calculated streak with freezes)
+    // 5. Determine correct streak (prefer calculated streak with flexSaves)
     const correctedStreak = calculatedStreak;
     
-    // 6. Determine correct freeze count
-    // IMPORTANT: Always respect the stored freeze count unless there's a significant issue
-    const MAX_FREEZES = 2;
-    let correctedFreezeCount = storedFreezeCount;
+    // 6. Determine correct flexSave count
+    // IMPORTANT: Always respect the stored flexSave count unless there's a significant issue
+    const MAX_FLEX_SAVES = 2;
+    let correctedFlexSaveCount = storedFlexSaveCount;
     
     // Only cap if it exceeds the maximum
-    if (correctedFreezeCount > MAX_FREEZES) {
-      correctedFreezeCount = MAX_FREEZES;
-      corrections.push(`Capped freeze count to maximum ${MAX_FREEZES}`);
-      console.log(`[VALIDATOR DEBUG] Capping freeze count from ${storedFreezeCount} to max ${MAX_FREEZES}`);
+    if (correctedFlexSaveCount > MAX_FLEX_SAVES) {
+      correctedFlexSaveCount = MAX_FLEX_SAVES;
+      corrections.push(`Capped flexSave count to maximum ${MAX_FLEX_SAVES}`);
+      console.log(`[VALIDATOR DEBUG] Capping flexSave count from ${storedFlexSaveCount} to max ${MAX_FLEX_SAVES}`);
     }
     
     // 7. Fix any streak discrepancies
@@ -111,21 +111,21 @@ export const validateAndCorrectStreak = async (): Promise<{
       corrections.push(`Manager streak corrected: ${managerStreak} → ${correctedStreak}`);
     }
     
-    // 8. Fix freeze count only if it exceeds the maximum
-    if (storedFreezeCount > MAX_FREEZES) {
-      console.log(`[VALIDATOR DEBUG] Correcting excessive stored freeze count: ${storedFreezeCount} → ${correctedFreezeCount}`);
+    // 8. Fix flexSave count only if it exceeds the maximum
+    if (storedFlexSaveCount > MAX_FLEX_SAVES) {
+      console.log(`[VALIDATOR DEBUG] Correcting excessive stored flexSave count: ${storedFlexSaveCount} → ${correctedFlexSaveCount}`);
       
-      if (userProgress.rewards?.streak_freezes) {
-        userProgress.rewards.streak_freezes.uses = correctedFreezeCount;
-        corrections.push(`Stored freeze count capped: ${storedFreezeCount} → ${correctedFreezeCount}`);
+      if (userProgress.rewards?.flex_saves) {
+        userProgress.rewards.flex_saves.uses = correctedFlexSaveCount;
+        corrections.push(`Stored flexSave count capped: ${storedFlexSaveCount} → ${correctedFlexSaveCount}`);
       }
-    } else if (storedFreezeCount !== managerFreezeCount) {
+    } else if (storedFlexSaveCount !== managerFlexSaveCount) {
       // If manager cache doesn't match storage, update the cache to match storage
       // This specifically prevents the manager from overriding the storage
-      console.log(`[VALIDATOR DEBUG] Syncing manager freeze count with storage: ${managerFreezeCount} → ${storedFreezeCount}`);
+      console.log(`[VALIDATOR DEBUG] Syncing manager flexSave count with storage: ${managerFlexSaveCount} → ${storedFlexSaveCount}`);
       
-      streakManager.streakCache.freezesAvailable = storedFreezeCount;
-      corrections.push(`Manager freeze count synced with storage: ${managerFreezeCount} → ${storedFreezeCount}`);
+      streakManager.streakCache.flexSavesAvailable = storedFlexSaveCount;
+      corrections.push(`Manager flexSave count synced with storage: ${managerFlexSaveCount} → ${storedFlexSaveCount}`);
     }
     
     // 9. Save any changes
@@ -135,7 +135,7 @@ export const validateAndCorrectStreak = async (): Promise<{
       
       // Ensure streak manager cache is updated
       streakManager.streakCache.currentStreak = correctedStreak;
-      streakManager.streakCache.freezesAvailable = correctedFreezeCount;
+      streakManager.streakCache.flexSavesAvailable = correctedFlexSaveCount;
     } else {
       console.log('[VALIDATOR DEBUG] No corrections needed, streak data is consistent');
     }
@@ -147,10 +147,10 @@ export const validateAndCorrectStreak = async (): Promise<{
         storedStreak,
         managerStreak,
         calculatedStreak,
-        freezeCount: storedFreezeCount
+        flexSaveCount: storedFlexSaveCount
       },
       correctedStreak,
-      correctedFreezeCount,
+      correctedFlexSaveCount,
       corrections
     };
   } catch (error) {
@@ -161,10 +161,10 @@ export const validateAndCorrectStreak = async (): Promise<{
         storedStreak: 0,
         managerStreak: 0,
         calculatedStreak: 0,
-        freezeCount: 0
+        flexSaveCount: 0
       },
       correctedStreak: 0,
-      correctedFreezeCount: 0,
+      correctedFlexSaveCount: 0,
       corrections: ['Validation failed due to error']
     };
   }
@@ -186,13 +186,13 @@ export const runStartupStreakValidation = async (): Promise<void> => {
       console.log('[VALIDATOR DEBUG] Streak validation completed: No streak corrections needed');
     }
     
-    // Then fix freeze count based on actual usage
-    const freezeResult = await fixFreezeCountBasedOnUsage();
+    // Then fix flexSave count based on actual usage
+    const flexSaveResult = await fixFlexSaveCountBasedOnUsage();
     
-    if (freezeResult.originalCount !== freezeResult.correctedCount) {
-      console.log(`[VALIDATOR DEBUG] Corrected freeze count: ${freezeResult.originalCount} → ${freezeResult.correctedCount}`);
+    if (flexSaveResult.originalCount !== flexSaveResult.correctedCount) {
+      console.log(`[VALIDATOR DEBUG] Corrected flexSave count: ${flexSaveResult.originalCount} → ${flexSaveResult.correctedCount}`);
     } else {
-      console.log(`[VALIDATOR DEBUG] Freeze count validation completed: Count is correct (${freezeResult.correctedCount})`);
+      console.log(`[VALIDATOR DEBUG] FlexSave count validation completed: Count is correct (${flexSaveResult.correctedCount})`);
     }
     
     // Check if streak is actually broken (missed multiple days)
@@ -238,33 +238,33 @@ export const forceStreakRefresh = async (): Promise<void> => {
 };
 
 /**
- * Manually set the streak freeze count
+ * Manually set the streak flexSave count
  * This is useful for recovery situations where the count is wrong
  * 
  * @param count The count to set
  * @returns Whether the operation was successful
  */
-export const setFreezeCount = async (count: number): Promise<boolean> => {
+export const setFlexSaveCount = async (count: number): Promise<boolean> => {
   try {
-    console.log(`[VALIDATOR DEBUG] Manually setting freeze count to ${count}`);
+    console.log(`[VALIDATOR DEBUG] Manually setting flexSave count to ${count}`);
     
     // Validate the count
-    const MAX_FREEZES = 2;
-    const validCount = Math.max(0, Math.min(count, MAX_FREEZES));
+    const MAX_FLEX_SAVES = 2;
+    const validCount = Math.max(0, Math.min(count, MAX_FLEX_SAVES));
     
     // Get user progress
     const userProgress = await storageService.getUserProgress();
     
     // Update in UserProgress
-    if (userProgress.rewards?.streak_freezes) {
-      userProgress.rewards.streak_freezes.uses = validCount;
+    if (userProgress.rewards?.flex_saves) {
+      userProgress.rewards.flex_saves.uses = validCount;
     } else {
       // Initialize reward if it doesn't exist
-      console.log('[VALIDATOR DEBUG] Creating streak_freezes reward in UserProgress');
-      userProgress.rewards['streak_freezes'] = {
-        id: 'streak_freezes',
-        title: "Streak Freezes",
-        description: "Freeze your streak to protect it when you miss a day",
+      console.log('[VALIDATOR DEBUG] Creating flex_saves reward in UserProgress');
+      userProgress.rewards['flex_saves'] = {
+        id: 'flex_saves',
+        title: "Flex Saves",
+        description: "FlexSave your streak to protect it when you miss a day",
         icon: "snow",
         unlocked: true,
         levelRequired: 6,
@@ -279,91 +279,91 @@ export const setFreezeCount = async (count: number): Promise<boolean> => {
     await storageService.saveUserProgress(userProgress);
     
     // Update streak manager cache
-    streakManager.streakCache.freezesAvailable = validCount;
+    streakManager.streakCache.flexSavesAvailable = validCount;
     
-    console.log(`[VALIDATOR DEBUG] Successfully set freeze count to ${validCount}`);
+    console.log(`[VALIDATOR DEBUG] Successfully set flexSave count to ${validCount}`);
     return true;
   } catch (error) {
-    console.error('[VALIDATOR ERROR] Error setting freeze count:', error);
+    console.error('[VALIDATOR ERROR] Error setting flexSave count:', error);
     return false;
   }
 };
 
 /**
- * Fix the streak freeze count based on the number of applied dates
- * This is useful in cases where the freeze count is inconsistent with applied dates
+ * Fix the streak flexSave count based on the number of applied dates
+ * This is useful in cases where the flexSave count is inconsistent with applied dates
  */
-export const fixFreezeCountBasedOnUsage = async (): Promise<{
+export const fixFlexSaveCountBasedOnUsage = async (): Promise<{
   success: boolean;
   originalCount: number;
   correctedCount: number;
 }> => {
   try {
-    console.log('[VALIDATOR DEBUG] Checking freeze count based on usage');
+    console.log('[VALIDATOR DEBUG] Checking flexSave count based on usage');
     
     // Get user progress
     const userProgress = await storageService.getUserProgress();
     
     // Get current data
-    const MAX_FREEZES = 2;
-    const currentCount = userProgress.rewards?.streak_freezes?.uses || 0;
-    const appliedDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+    const MAX_FLEX_SAVES = 2;
+    const currentCount = userProgress.rewards?.flex_saves?.uses || 0;
+    const appliedDates = userProgress.rewards?.flex_saves?.appliedDates || [];
     
     // IMPORTANT: Always respect the current usage count in storage
-    // This prevents overriding user-applied freezes that haven't been accounted for yet
-    // Only refill freezes if we've changed months or if there's a major discrepancy
+    // This prevents overriding user-applied flexSaves that haven't been accounted for yet
+    // Only refill flexSaves if we've changed months or if there's a major discrepancy
     
     // Check if we need to do a month refill
     const today = new Date();
-    const lastRefillDate = userProgress.rewards?.streak_freezes?.lastRefill 
-      ? new Date(userProgress.rewards?.streak_freezes?.lastRefill)
+    const lastRefillDate = userProgress.rewards?.flex_saves?.lastRefill 
+      ? new Date(userProgress.rewards?.flex_saves?.lastRefill)
       : new Date(0);
     
     const isNewMonth = 
       lastRefillDate.getMonth() !== today.getMonth() || 
       lastRefillDate.getFullYear() !== today.getFullYear();
     
-    console.log(`[VALIDATOR DEBUG] Freeze count: current=${currentCount}, applied dates=${appliedDates.length}, is new month=${isNewMonth}`);
+    console.log(`[VALIDATOR DEBUG] FlexSave count: current=${currentCount}, applied dates=${appliedDates.length}, is new month=${isNewMonth}`);
     
-    // If it's a new month, reset to max freezes
+    // If it's a new month, reset to max flexSaves
     if (isNewMonth) {
-      console.log(`[VALIDATOR DEBUG] New month detected - resetting freezes to ${MAX_FREEZES}`);
-      await setFreezeCount(MAX_FREEZES);
+      console.log(`[VALIDATOR DEBUG] New month detected - resetting flexSaves to ${MAX_FLEX_SAVES}`);
+      await setFlexSaveCount(MAX_FLEX_SAVES);
       
       // Update the lastRefill date
-      if (userProgress.rewards?.streak_freezes) {
-        userProgress.rewards.streak_freezes.lastRefill = today.toISOString();
+      if (userProgress.rewards?.flex_saves) {
+        userProgress.rewards.flex_saves.lastRefill = today.toISOString();
         await storageService.saveUserProgress(userProgress);
       }
       
       return {
         success: true,
         originalCount: currentCount,
-        correctedCount: MAX_FREEZES
+        correctedCount: MAX_FLEX_SAVES
       };
     }
     
     // Not a new month - only correct if there's a major discrepancy
-    // specifically if currentCount > MAX_FREEZES
-    if (currentCount > MAX_FREEZES) {
-      console.log(`[VALIDATOR DEBUG] Freeze count exceeds maximum (${currentCount} > ${MAX_FREEZES}), capping to ${MAX_FREEZES}`);
-      await setFreezeCount(MAX_FREEZES);
+    // specifically if currentCount > MAX_FLEX_SAVES
+    if (currentCount > MAX_FLEX_SAVES) {
+      console.log(`[VALIDATOR DEBUG] FlexSave count exceeds maximum (${currentCount} > ${MAX_FLEX_SAVES}), capping to ${MAX_FLEX_SAVES}`);
+      await setFlexSaveCount(MAX_FLEX_SAVES);
       return {
         success: true,
         originalCount: currentCount,
-        correctedCount: MAX_FREEZES
+        correctedCount: MAX_FLEX_SAVES
       };
     }
     
     // Otherwise, respect the current count
-    console.log(`[VALIDATOR DEBUG] Current freeze count (${currentCount}) is valid, no correction needed`);
+    console.log(`[VALIDATOR DEBUG] Current flexSave count (${currentCount}) is valid, no correction needed`);
     return {
       success: true,
       originalCount: currentCount,
       correctedCount: currentCount
     };
   } catch (error) {
-    console.error('[VALIDATOR ERROR] Error fixing freeze count:', error);
+    console.error('[VALIDATOR ERROR] Error fixing flexSave count:', error);
     return {
       success: false,
       originalCount: 0,

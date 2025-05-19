@@ -2,7 +2,7 @@ import { Achievement, UserProgress } from '../types';
 import { CORE_ACHIEVEMENTS } from '../constants';
 import * as storageService from '../../../services/storageService';
 import * as streakManager from './streakManager';
-import { calculateStreakWithFreezes } from './progressTracker';
+import { calculateStreakWithFlexSaves } from './progressTracker';
 import * as dateUtils from './utils/dateUtils';
 import { gamificationEvents } from '../../../hooks/progress/useGamification';
 
@@ -68,17 +68,17 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
         const streakStatus = await streakManager.getStreakStatus();
         achievement.progress = streakStatus.currentStreak;
         
-        // Double check with calculateStreakWithFreezes
+        // Double check with calculateStreakWithFlexSaves
         const routines = await storageService.getAllRoutines();
-        const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+        const flexSaveDates = userProgress.rewards?.flex_saves?.appliedDates || [];
         
         // Extract routine dates
         const routineDates = routines
           .filter(r => r.date)
           .map(r => dateUtils.toDateString(r.date));
         
-        // Calculate streak with freezes
-        const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
+        // Calculate streak with flexSaves
+        const calculatedStreak = calculateStreakWithFlexSaves(routineDates, flexSaveDates);
         
         if (calculatedStreak !== achievement.progress) {
           console.log(`Streak discrepancy in achievement: ${achievement.progress} vs ${calculatedStreak}. Using calculated value.`);

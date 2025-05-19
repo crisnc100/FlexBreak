@@ -21,9 +21,9 @@ import { RefreshProvider } from './src/context/RefreshContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { AchievementProvider, useAchievements } from './src/context/AchievementContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as streakFreezeManager from './src/utils/progress/modules/streakFreezeManager';
+import * as flexSaveManager from './src/utils/progress/modules/flexSaveManager';
 import * as streakManager from './src/utils/progress/modules/streakManager';
-import StreakFreezePrompt from './src/components/notifications/StreakFreezePrompt';
+import FlexSavePrompt from './src/components/notifications/FlexSavePrompt';
 import * as rewardManager from './src/utils/progress/modules/rewardManager';
 import { useFeatureAccess } from './src/hooks/progress/useFeatureAccess';
 import { useGamification, gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT } from './src/hooks/progress/useGamification';
@@ -403,8 +403,8 @@ function MainApp() {
         // Check if streak is broken and should be reset to 0 in the UI
         const isStreakBroken = await streakManager.isStreakBroken();
         
-        // Check for streak freezes to refill monthly
-        await streakFreezeManager.refillMonthlyStreakFreezes();
+        // Check for streak flexSaves to refill monthly
+        await flexSaveManager.refillMonthlyFlexSaves();
         
         // Force streak manager to emit an update event to refresh all UI components
         streakManager.streakEvents.emit('streak_updated');
@@ -492,8 +492,8 @@ function MainApp() {
         </Stack.Navigator>
       </NavigationContainer>
       
-      {/* Streak Freeze Prompt */}
-      <StreakFreezePrompt />
+      {/* Flex Save Prompt */}
+      <FlexSavePrompt />
       
     
     </Animated.View>

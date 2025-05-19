@@ -56,17 +56,17 @@ const darkTheme: ThemeColors = {
 
 // Sunset theme colors - improved version
 const sunsetTheme: ThemeColors = {
-  background: '#1E1229',      // Deeper purple for background - better readability
-  backgroundLight: '#2A1B36', // Lighter purple but still dark enough for contrast
-  cardBackground: '#321E40',  // Richer card background for better content separation
-  text: '#FFF1E6',           // Warmer, brighter text for better readability
-  textSecondary: '#FFBEA0',   // Slightly muted but still visible secondary text
-  accent: '#FF7B5A',         // Vibrant orange-coral that pops against the purple
-  accentLight: '#FF9E7A',     // Lighter version of accent
-  border: '#4A2945',         // More visible borders for better UI distinction
-  success: '#FF9248',        // Orange-amber success color
-  successLight: '#FFAD7F',    // Lighter success variant
-  error: '#FF5252'           // Keeping the same error color as it works well
+  background: '#2A2118',      // Warm dark brown background - feels like end of sunset
+  backgroundLight: '#382D22', // Lighter warm brown for contrast
+  cardBackground: '#3D3023',  // Rich warm card background
+  text: '#FFF6EC',           // Soft warm white text for readability
+  textSecondary: '#FFD7B5',   // Warm peach secondary text
+  accent: '#FF8E3C',         // Vibrant sunset orange that pops
+  accentLight: '#FFA964',     // Lighter version of accent
+  border: '#4D3C2A',         // Warm visible borders
+  success: '#FFA03C',        // Golden orange success color
+  successLight: '#FFBC7A',    // Lighter success variant
+  error: '#FF6347'           // Tomato-colored error
 };
 
 // Update the ThemeContextType to include a safe toggle method
@@ -405,14 +405,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     actualTheme = sunsetTheme;
     isSunset = true;
   } else if (themeType === 'system') {
-    // For system preference, prioritize sunset if available
-    if (canUseSunsetTheme) {
-      actualTheme = sunsetTheme;
-      isSunset = true;
-    } else if (systemColorScheme === 'dark' && canUseDarkTheme) {
+    // Follow the device colour scheme only. Do NOT switch to the sunset theme automatically –
+    // users should opt-in from Settings after it has been unlocked.
+    if (systemColorScheme === 'dark' && canUseDarkTheme) {
       actualTheme = darkTheme;
       isDark = true;
     }
+    // For light system preference we keep the default lightTheme that was already assigned
   }
   
   // For logging/debugging

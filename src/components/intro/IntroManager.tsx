@@ -110,14 +110,14 @@ const IntroManager: React.FC<IntroManagerProps> = ({ onComplete }) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
       // Call the streak manager to save the streak
-      const result = await streakManager.applyFreeze();
+      const result = await streakManager.applyFlexSave();
       
       if (result.success) {
         console.log('Streak saved successfully');
         
         // Show platform-specific notification
         if (Platform.OS === 'android') {
-          ToastAndroid.show('Streak saved with freeze!', ToastAndroid.SHORT);
+          ToastAndroid.show('Streak saved with flexSave!', ToastAndroid.SHORT);
         } else {
           // iOS doesn't have Toast, so use Alert instead
           Alert.alert('Streak Saved', 'Your streak has been protected!', 
@@ -138,9 +138,9 @@ const IntroManager: React.FC<IntroManagerProps> = ({ onComplete }) => {
         
         // Show error notification
         if (Platform.OS === 'android') {
-          ToastAndroid.show('Could not apply freeze', ToastAndroid.SHORT);
+          ToastAndroid.show('Could not apply flexSave', ToastAndroid.SHORT);
         } else {
-          Alert.alert('Error', 'Could not apply streak freeze', [{ text: 'OK' }]);
+          Alert.alert('Error', 'Could not apply streak flexSave', [{ text: 'OK' }]);
         }
       }
     } catch (error) {

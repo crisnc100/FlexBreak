@@ -3,14 +3,14 @@ import { StreakState as StreakStateType } from '../../utils/progress/types';
 import * as storageService from '../../services/storageService';
 import * as dateUtils from '../../utils/progress/modules/utils/dateUtils';
 import * as streakManager from '../../utils/progress/modules/streakManager';
-import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import * as flexSaveManager from '../../utils/progress/modules/flexSaveManager';
 
 // Define the state structure for the streak feature
 interface StreakSliceState {
   streak: number;
   streakState: 'ACTIVE' | 'FROZEN' | 'BROKEN';
   routineDates: string[];
-  streakFreezeDates: string[];
+  flexSaveDates: string[];
   processedToday: boolean;
   lastProcessedDate: string;
   isLoading: boolean;
@@ -22,7 +22,7 @@ const initialState: StreakSliceState = {
   streak: 0,
   streakState: 'BROKEN',
   routineDates: [],
-  streakFreezeDates: [],
+  flexSaveDates: [],
   processedToday: false,
   lastProcessedDate: '',
   isLoading: false,
@@ -45,9 +45,9 @@ export const initializeStreakState = createAsyncThunk(
       // Determine streak state based on current activity
       let streakState: 'ACTIVE' | 'FROZEN' | 'BROKEN' = 'BROKEN';
       if (streakStatus.currentStreak > 0) {
-        // Check if there's a freeze applied recently
-        const hasFreezeYesterday = await streakManager.hasFreezeYesterday();
-        streakState = hasFreezeYesterday ? 'FROZEN' : 'ACTIVE';
+        // Check if there's a flexSave applied recently
+        const hasFlexSaveYesterday = await streakManager.hasFlexSaveYesterday();
+        streakState = hasFlexSaveYesterday ? 'FROZEN' : 'ACTIVE';
       }
       
       // Get current date
@@ -58,7 +58,7 @@ export const initializeStreakState = createAsyncThunk(
         streak: streakStatus.currentStreak,
         streakState: streakState,
         routineDates: streakManager.streakCache.routineDates,
-        streakFreezeDates: streakManager.streakCache.freezeDates,
+        flexSaveDates: streakManager.streakCache.flexSaveDates,
         processedToday: streakStatus.maintainedToday,
         lastProcessedDate: todayStr
       };
@@ -89,23 +89,23 @@ export const updateStreakStatus = createAsyncThunk(
         return {
           streak: result.currentStreak,
           streakState: streakState,
-          freezesAvailable: streakManager.streakCache.freezesAvailable
+          flexSavesAvailable: streakManager.streakCache.flexSavesAvailable
         };
       }
       
       // Otherwise just get the current status
       const streakStatus = await streakManager.getStreakStatus();
-      const hasFreezeYesterday = await streakManager.hasFreezeYesterday();
+      const hasFlexSaveYesterday = await streakManager.hasFlexSaveYesterday();
       
       let streakState: 'ACTIVE' | 'FROZEN' | 'BROKEN' = 'BROKEN';
       if (streakStatus.currentStreak > 0) {
-        streakState = hasFreezeYesterday ? 'FROZEN' : 'ACTIVE';
+        streakState = hasFlexSaveYesterday ? 'FROZEN' : 'ACTIVE';
       }
       
       return {
         streak: streakStatus.currentStreak,
         streakState: streakState,
-        freezesAvailable: streakStatus.freezesAvailable
+        flexSavesAvailable: streakStatus.flexSavesAvailable
       };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to update streak status');
@@ -113,27 +113,27 @@ export const updateStreakStatus = createAsyncThunk(
   }
 );
 
-export const applyStreakFreeze = createAsyncThunk(
-  'streak/applyFreeze',
+export const applyFlexSave = createAsyncThunk(
+  'streak/applyFlexSave',
   async (_, { getState, rejectWithValue }) => {
     try {
-      // Use the new streakManager to apply a freeze
-      const result = await streakManager.applyFreeze();
+      // Use the new streakManager to apply a flexSave
+      const result = await streakManager.applyFlexSave();
       
       if (result.success) {
-        // Determine streak state - after applying freeze it should be FROZEN
+        // Determine streak state - after applying flexSave it should be FROZEN
         const streakState = result.currentStreak > 0 ? 'FROZEN' : 'BROKEN';
         
         return {
           success: true,
           streakState: streakState,
-          streakFreezeDates: streakManager.streakCache.freezeDates
+          flexSaveDates: streakManager.streakCache.flexSaveDates
         };
       } else {
-        return rejectWithValue('Failed to apply streak freeze');
+        return rejectWithValue('Failed to apply streak flexSave');
       }
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to apply streak freeze');
+      return rejectWithValue(error.message || 'Failed to apply streak flexSave');
     }
   }
 );
@@ -157,12 +157,12 @@ const streakSlice = createSlice({
         state.routineDates.push(action.payload);
       }
     },
-    setStreakFreezeDates: (state, action: PayloadAction<string[]>) => {
-      state.streakFreezeDates = action.payload;
+    setFlexSaveDates: (state, action: PayloadAction<string[]>) => {
+      state.flexSaveDates = action.payload;
     },
-    addStreakFreezeDate: (state, action: PayloadAction<string>) => {
-      if (!state.streakFreezeDates.includes(action.payload)) {
-        state.streakFreezeDates.push(action.payload);
+    addFlexSaveDate: (state, action: PayloadAction<string>) => {
+      if (!state.flexSaveDates.includes(action.payload)) {
+        state.flexSaveDates.push(action.payload);
       }
     },
     setProcessedToday: (state, action: PayloadAction<boolean>) => {
@@ -192,7 +192,7 @@ const streakSlice = createSlice({
         state.streak = action.payload.streak;
         state.streakState = action.payload.streakState;
         state.routineDates = action.payload.routineDates;
-        state.streakFreezeDates = action.payload.streakFreezeDates;
+        state.flexSaveDates = action.payload.flexSaveDates;
         state.processedToday = action.payload.processedToday;
         state.lastProcessedDate = action.payload.lastProcessedDate;
       })
@@ -219,18 +219,18 @@ const streakSlice = createSlice({
         state.error = action.payload as string || 'An error occurred';
       });
       
-    // Handle applyStreakFreeze
+    // Handle applyFlexSave
     builder
-      .addCase(applyStreakFreeze.pending, (state) => {
+      .addCase(applyFlexSave.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(applyStreakFreeze.fulfilled, (state, action) => {
+      .addCase(applyFlexSave.fulfilled, (state, action) => {
         state.isLoading = false;
         state.streakState = action.payload.streakState as 'ACTIVE' | 'FROZEN' | 'BROKEN';
-        state.streakFreezeDates = action.payload.streakFreezeDates;
+        state.flexSaveDates = action.payload.flexSaveDates;
       })
-      .addCase(applyStreakFreeze.rejected, (state, action) => {
+      .addCase(applyFlexSave.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string || 'An error occurred';
       });
@@ -243,8 +243,8 @@ export const {
   setStreakState,
   setRoutineDates,
   addRoutineDate,
-  setStreakFreezeDates,
-  addStreakFreezeDate,
+  setFlexSaveDates,
+  addFlexSaveDate,
   setProcessedToday,
   setLastProcessedDate,
   resetStreak,

@@ -15,7 +15,7 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // The access code required to unlock the simulator
-const ACCESS_CODE = 'FlexTest2025!';
+const ACCESS_CODE = 'Flex';
 
 interface BobSimulatorAccessModalProps {
   visible: boolean;

@@ -2,7 +2,7 @@ import { LEVELS } from '../constants';
 import { UserProgress } from '../types';
 import * as storageService from '../../../services/storageService';
 import * as rewardManager from './rewardManager';
-import * as streakFreezeManager from './streakFreezeManager';
+import * as flexSaveManager from './flexSaveManager';
 
 // Memoization cache for level calculations
 const levelCache: Record<number, {
@@ -76,9 +76,9 @@ export const addXp = async (userProgress: UserProgress, amount: number, source: 
     // Update rewards for new level
     await rewardManager.updateRewards(userProgress);
     
-    // Check for streak freeze eligibility at certain levels
-    if (userProgress.rewards['streak_freezes']?.unlocked) {
-      await streakFreezeManager.refillMonthlyStreakFreezes();
+    // Check for streak flexSave eligibility at certain levels
+    if (userProgress.rewards['flex_saves']?.unlocked) {
+      await flexSaveManager.refillMonthlyFlexSaves();
     }
   }
   

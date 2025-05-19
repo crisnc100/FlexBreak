@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { useGamification } from './useGamification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as streakManager from '../../utils/progress/modules/streakManager';
-import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import * as flexSaveManager from '../../utils/progress/modules/flexSaveManager';
 import { useIsFocused } from '@react-navigation/native';
 
 /**
@@ -25,8 +25,8 @@ export function useStreakChecker() {
       try {
         console.log('Running streak check on app focus');
         
-        // Ensure streak freezes are properly initialized/refilled if needed
-        await streakFreezeManager.refillFreezes();
+        // Ensure streak flexSaves are properly initialized/refilled if needed
+        await flexSaveManager.refillFlexSaves();
         
         // Initialize streak if needed
         if (!streakManager.streakCache.initialized) {
@@ -39,7 +39,7 @@ export function useStreakChecker() {
         console.log('Streak status check result:', {
           currentStreak: streakStatus.currentStreak,
           maintainedToday: streakStatus.maintainedToday,
-          freezesAvailable: streakStatus.freezesAvailable
+          flexSavesAvailable: streakStatus.flexSavesAvailable
         });
         
         // Update streak challenges (now handled automatically by the streak manager)

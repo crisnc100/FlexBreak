@@ -30,7 +30,7 @@ import {
   ChallengesTab,
   RewardsTab
 } from '../components/progress';
-import * as streakFreezeManager from '../utils/progress/modules/streakFreezeManager';
+import * as flexSaveManager from '../utils/progress/modules/flexSaveManager';
 import * as streakManager from '../utils/progress/modules/streakManager';
 
 // Day names for labels
@@ -60,7 +60,7 @@ export default function ProgressScreen({ navigation }) {
     isRefreshing,
     handleRefresh,
     userProgress,
-    freezeCount 
+    flexSaveCount 
   } = useProgressData();
   
   // Use the centralized gamification hook for everything
@@ -147,8 +147,8 @@ export default function ProgressScreen({ navigation }) {
             hasUpdated.current = true;
           }
 
-          // Still keep streak-freeze status up-to-date
-          await checkStreakFreezeStatus();
+          // Still keep streak-flexSave status up-to-date
+          await checkFlexSaveStatus();
         } catch (error) {
           console.error('Error loading data in ProgressScreen:', error);
         }
@@ -162,52 +162,52 @@ export default function ProgressScreen({ navigation }) {
     }, [handleRefresh])
   );
   
-  // Add state for streak freeze activity
-  const [streakFreezeActive, setStreakFreezeActive] = useState(false);
+  // Add state for streak flexSave activity
+  const [flexSaveActive, setFlexSaveActive] = useState(false);
 
-  // Cache the results of checkStreakFreezeStatus to prevent repeated calls
-  const [streakFreezeStatus, setStreakFreezeStatus] = useState({
+  // Cache the results of checkFlexSaveStatus to prevent repeated calls
+  const [flexSaveStatus, setFlexSaveStatus] = useState({
     streakBroken: false,
     canSaveYesterdayStreak: false,
-    freezesAvailable: 0
+    flexSavesAvailable: 0
   });
   
   // Keep track of the last check time to throttle checks
   const lastCheckRef = useRef(0);
   
-  // Check streak and streak freeze status with throttling
-  const checkStreakFreezeStatus = useCallback(async () => {
+  // Check streak and streak flexSave status with throttling
+  const checkFlexSaveStatus = useCallback(async () => {
     try {
       const now = Date.now();
       // Only check if 300ms have passed since last check
       if (now - lastCheckRef.current < 300) {
-        console.log('Throttling streak freeze status check');
+        console.log('Throttling streak flexSave status check');
         return;
       }
       
       lastCheckRef.current = now;
       
-      console.log('Checking streak freeze status...');
+      console.log('Checking streak flexSave status...');
       const status = await streakManager.checkStreakStatus();
-      console.log('Streak freeze card - status check:', status);
+      console.log('Streak flexSave card - status check:', status);
       
-      setStreakFreezeStatus(status);
+      setFlexSaveStatus(status);
       
-      // Check if a streak freeze is active for today
-      const wasFreezedUsed = await streakFreezeManager.wasStreakFreezeUsedForCurrentDay();
-      setStreakFreezeActive(wasFreezedUsed);
-      console.log('Streak freeze active:', wasFreezedUsed);
+      // Check if a streak flexSave is active for today
+      const wasFlexSavedUsed = await flexSaveManager.wasFlexSaveUsedForCurrentDay();
+      setFlexSaveActive(wasFlexSavedUsed);
+      console.log('Streak flexSave active:', wasFlexSavedUsed);
       
       // Start button animation if applicable
       if (status.canSaveYesterdayStreak) {
         console.log('Streak can be saved, starting button animation');
       }
     } catch (error) {
-      console.error('Error checking streak freeze status:', error);
+      console.error('Error checking streak flexSave status:', error);
     }
   }, []);
   
-  // Listen for streak events from StreakFreezePrompt
+  // Listen for streak events from FlexSavePrompt
   useEffect(() => {
     // Function to handle streak saved event
     const handleStreakSaved = async (data: any) => {
@@ -218,11 +218,11 @@ export default function ProgressScreen({ navigation }) {
         // Force a refresh of all data
         await handleRefresh();
         
-        // Update streak freeze status
-        await checkStreakFreezeStatus();
+        // Update streak flexSave status
+        await checkFlexSaveStatus();
         
-        // Update streakFreezeActive state
-        setStreakFreezeActive(true);
+        // Update flexSaveActive state
+        setFlexSaveActive(true);
       }, 300);
     };
     
@@ -235,8 +235,8 @@ export default function ProgressScreen({ navigation }) {
         // Force a refresh of all data
         await handleRefresh();
         
-        // Update streak freeze status
-        await checkStreakFreezeStatus();
+        // Update streak flexSave status
+        await checkFlexSaveStatus();
       }, 300);
     };
     
@@ -249,14 +249,14 @@ export default function ProgressScreen({ navigation }) {
       streakManager.streakEvents.off(streakManager.STREAK_SAVED_EVENT, handleStreakSaved);
       streakManager.streakEvents.off(streakManager.STREAK_BROKEN_EVENT, handleStreakBroken);
     };
-  }, [handleRefresh, checkStreakFreezeStatus]);
+  }, [handleRefresh, checkFlexSaveStatus]);
   
   // Check streak status with less frequency
   useEffect(() => {
     if (!isLoading && userProgress) {
-      checkStreakFreezeStatus();
+      checkFlexSaveStatus();
     }
-  }, [isLoading, userProgress, checkStreakFreezeStatus]);
+  }, [isLoading, userProgress, checkFlexSaveStatus]);
   
   // Render actual content based on conditions
   const renderContent = () => {
@@ -339,7 +339,7 @@ export default function ProgressScreen({ navigation }) {
                 theme={theme}
                 isDark={isDark}
                 isSunset={isSunset}
-                streakFreezeActive={streakFreezeActive}
+                flexSaveActive={flexSaveActive}
                 userLevel={level}
               />
             )}

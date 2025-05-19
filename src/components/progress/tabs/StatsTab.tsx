@@ -8,7 +8,7 @@ import WeeklyActivity from '../WeeklyActivity';
 import FocusAreas from '../FocusAreas';
 import StretchingPatterns from '../StretchingPatterns';
 import TipSection from '../TipSection';
-import StreakFreezeCard from '../StreakFreezeCard';
+import FlexSaveCard from '../FlexSaveCard';
 
 interface StatsTabProps {
   hasHiddenRoutinesOnly: boolean;
@@ -20,7 +20,7 @@ interface StatsTabProps {
   theme: any;
   isDark: boolean;
   isSunset: boolean;
-  streakFreezeActive?: boolean;
+  flexSaveActive?: boolean;
   userLevel?: number;
 }
 
@@ -37,7 +37,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   theme,
   isDark,
   isSunset,
-  streakFreezeActive = false,
+  flexSaveActive = false,
   userLevel = 1
 }) => {
   return (
@@ -50,13 +50,13 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         theme={theme}
         isDark={isDark}
         isSunset={isSunset}
-        streakFreezeActive={streakFreezeActive}
+        flexSaveActive={flexSaveActive}
         userLevel={userLevel}
       />
       
-      {/* Only show streak freeze card for premium users with level 6+ */}
-      {isPremium && canAccessFeature('streak_freezes') && (
-        <StreakFreezeCard 
+      {/* Only show streak flexSave card for premium users with level 6+ */}
+      {isPremium && canAccessFeature('flex_saves') && (
+        <FlexSaveCard 
           currentStreak={stats.currentStreak} 
           isDark={isDark}
           isSunset={isSunset}

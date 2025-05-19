@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 
 // The access code required to unlock the simulator
-const ACCESS_CODE = 'FlexTest2025!';
+const ACCESS_CODE = 'Flex';
 
 interface AuthModalProps {
   visible: boolean;

@@ -12,7 +12,7 @@ import {
   DAILY_LIMITS
 } from './constants';
 import * as rewardManager from './modules/rewardManager';
-import * as streakFreezeManager from './modules/streakFreezeManager';
+import * as flexSaveManager from './modules/flexSaveManager';
 import * as xpBoostManager from './modules/xpBoostManager';
 import * as achievementManager from './modules/achievementManager';
 import * as challengeManager from './modules/challengeManager';
@@ -169,8 +169,8 @@ export const processCompletedRoutine = async (routine: ProgressEntry): Promise<{
     userProgress.level = newLevel;
     await rewardManager.updateRewards(userProgress);
     
-    if (userProgress.rewards['streak_freezes']?.unlocked) {
-      await streakFreezeManager.refillMonthlyStreakFreezes();
+    if (userProgress.rewards['flex_saves']?.unlocked) {
+      await flexSaveManager.refillMonthlyFlexSaves();
     }
   }
 

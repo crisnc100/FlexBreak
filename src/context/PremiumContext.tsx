@@ -167,6 +167,62 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
             console.log('Dark theme manually unlocked after premium status change');
           }
         }
+        
+        // Explicitly check and ensure streak flexSave availability for premium users
+        const requiredLevel = 6; // Level requirement for streak flexSaves
+        if (userProgress.level >= requiredLevel) {
+          console.log(`User is level ${userProgress.level}, ensuring streak flexSaves are available`);
+          
+          // Ensure rewards object exists
+          if (!userProgress.rewards) userProgress.rewards = {};
+          
+          // Check if flex_saves reward exists and is properly configured
+          if (!userProgress.rewards.flex_saves || 
+              typeof userProgress.rewards.flex_saves.uses === 'undefined') {
+            
+            console.log('Initializing streak flexSaves reward for premium user');
+            
+            // Find streak flexSaves reward in all rewards
+            const flexSaveReward = await rewardManager.getAllRewards()
+              .then(rewards => rewards.find(r => r.id === 'flex_saves'));
+            
+            if (flexSaveReward) {
+              // Use the reward template
+              userProgress.rewards.flex_saves = {
+                ...flexSaveReward,
+                unlocked: true,
+                uses: 2, // Start with 2 flexSaves
+                lastRefill: new Date().toISOString()
+              };
+            } else {
+              // Fallback if reward not found
+              userProgress.rewards.flex_saves = {
+                id: 'flex_saves',
+                title: 'Flex Saves',
+                description: 'Protect your streak when you miss a day',
+                icon: 'snow-outline',
+                levelRequired: requiredLevel,
+                unlocked: true,
+                uses: 2,
+                lastRefill: new Date().toISOString(),
+                type: 'consumable'
+              };
+            }
+            
+            // Save the updated user progress
+            await storageService.saveUserProgress(userProgress);
+            console.log('Flex saves initialized to 2 uses for premium user');
+          } else if (userProgress.rewards.flex_saves.uses < 2) {
+            // If user has fewer than 2 flexSaves, top up to 2
+            console.log(`User only has ${userProgress.rewards.flex_saves.uses} flexSaves, topping up to 2`);
+            userProgress.rewards.flex_saves.uses = 2;
+            userProgress.rewards.flex_saves.lastRefill = new Date().toISOString();
+            
+            // Save the updated user progress
+            await storageService.saveUserProgress(userProgress);
+            console.log('Flex saves topped up to 2 uses for premium user');
+          }
+        }
       } catch (error) {
         console.error('Error updating rewards after premium change:', error);
       }

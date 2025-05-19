@@ -21,7 +21,7 @@ export const getRequiredLevel = (featureId: string): number => {
       return 4;
     case 'custom_routines':
       return 5;
-    case 'streak_freezes':
+    case 'flex_saves':
       return 6;
     case 'premium_stretches':
       return 7;

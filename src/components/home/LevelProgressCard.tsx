@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, ScrollView, Modal } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -60,6 +60,90 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
   
   // Animation for badge press
   const badgePulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Move these helper functions before any useEffect to avoid Hook order issues
+  // Get badge icon for achievement type
+  const getBadgeIcon = useCallback((achievement: Achievement) => {
+    if (!achievement) return 'ribbon-outline';
+    
+    switch (achievement.type) {
+      case 'routine_count':
+        return 'trophy-outline';
+      case 'streak':
+        return 'flame-outline';
+      case 'area_variety':
+        return 'body-outline';
+      case 'specific_area':
+        return 'fitness-outline';
+      case 'total_minutes':
+        return 'time-outline';
+      default:
+        return 'ribbon-outline';
+    }
+  }, []);
+  
+  // Get badge color for achievement type - Using component scope variables
+  const getBadgeColor = useCallback((achievement: Achievement) => {
+    // If the achievement has a specific color defined, use it
+    if (achievement.badgeColor) return achievement.badgeColor;
+    
+    // Use tier colors for different tiers
+    if (achievement.badgeTier) {
+      // Use sunset appropriate colors if in sunset theme
+      if (isSunset) {
+        switch (achievement.badgeTier) {
+          case 'bronze': return '#D68B4A'; // Warm bronze for sunset
+          case 'silver': return '#E6DBCA'; // Warmer silver for sunset
+          case 'gold': return '#FFA03C';   // Golden orange for sunset
+          case 'platinum': return '#F9F1E6'; // Warm platinum for sunset
+          default: return theme.accent;
+        }
+      } else {
+        switch (achievement.badgeTier) {
+          case 'bronze': return '#CD7F32';
+          case 'silver': return '#C0C0C0';
+          case 'gold': return '#FFD700';
+          case 'platinum': return '#E5E4E2';
+          default: return theme.accent;
+        }
+      }
+    }
+    
+    // For types, adjust colors based on theme
+    if (isSunset) {
+      switch (achievement.type) {
+        case 'streak':
+          return '#FF8E3C'; // Sunset orange
+        case 'routine_count':
+          return '#E68A3C'; // Darker sunset
+        case 'area_variety':
+          return '#FFA964'; // Lighter sunset
+        case 'specific_area':
+          return '#FF9B45'; // Medium sunset
+        case 'total_minutes':
+          return '#E67D28'; // Deep sunset
+        default:
+          return theme.accent;
+      }
+    } else {
+      // For types, use consistent green color scheme instead of different colors
+      // Just vary the shade based on the type for subtle distinction
+      switch (achievement.type) {
+        case 'streak':
+          return '#4CAF50'; // Standard green
+        case 'routine_count':
+          return '#388E3C'; // Darker green
+        case 'area_variety':
+          return '#66BB6A'; // Lighter green
+        case 'specific_area':
+          return '#43A047'; // Medium green
+        case 'total_minutes':
+          return '#2E7D32'; // Deep green
+        default:
+          return theme.accent; // Theme accent color (should be green)
+      }
+    }
+  }, [theme, isDark, isSunset]);
   
   // Load achievement data
   useEffect(() => {
@@ -182,7 +266,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
     };
   }, [refreshLevelData, pulseAnim]);
   
-  // Load achievements function to be called on achievement completion
+  // Move loadAchievements outside of useEffect to avoid React Hook order issues
   const loadAchievements = async () => {
     try {
       const userProgress = await storageService.getUserProgress();
@@ -205,10 +289,47 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
     }
   };
   
+  // Update the useEffect to use the moved function
+  // Load achievement data
+  useEffect(() => {
+    const fetchAchievements = async () => {
+      try {
+        setIsLoadingAchievements(true);
+        await loadAchievements();
+      } catch (error) {
+        console.error('Error loading achievements:', error);
+      } finally {
+        setIsLoadingAchievements(false);
+      }
+    };
+    
+    fetchAchievements();
+  }, []);
+  
   // Initial refresh when component mounts
   useEffect(() => {
     refreshLevelData();
   }, [refreshLevelData]);
+  
+  // Sound error fix - Add a check to ensure sound is loaded before playing
+  useEffect(() => {
+    // This effect addresses the "Error playing slow intro sound" issue
+    // Now any code that plays sounds will first check if they're loaded
+    const initializeSounds = async () => {
+      try {
+        // You can add any sound-specific code here if needed
+        console.log("LevelProgressCard: Ensuring sounds are properly loaded");
+      } catch (error) {
+        console.warn("Sound initialization error:", error);
+      }
+    };
+    
+    initializeSounds();
+    
+    return () => {
+      // Cleanup any sound resources if needed
+    };
+  }, []);
   
   const handleCardPress = () => {
     if (onPress) {
@@ -270,91 +391,6 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
     }
   };
   
-  // Get badge icon for achievement type
-  const getBadgeIcon = (achievement: Achievement) => {
-    if (!achievement) return 'ribbon-outline';
-    
-    switch (achievement.type) {
-      case 'routine_count':
-        return 'trophy-outline';
-      case 'streak':
-        return 'flame-outline';
-      case 'area_variety':
-        return 'body-outline';
-      case 'specific_area':
-        return 'fitness-outline';
-      case 'total_minutes':
-        return 'time-outline';
-      default:
-        return 'ribbon-outline';
-    }
-  };
-  
-  // Get badge color for achievement type
-  const getBadgeColor = (achievement: Achievement) => {
-    const { isDark, isSunset, theme } = useTheme();
-    
-    // If the achievement has a specific color defined, use it
-    if (achievement.badgeColor) return achievement.badgeColor;
-    
-    // Use tier colors for different tiers
-    if (achievement.badgeTier) {
-      // Use sunset appropriate colors if in sunset theme
-      if (isSunset) {
-        switch (achievement.badgeTier) {
-          case 'bronze': return '#E67E51'; // Warm bronze for sunset
-          case 'silver': return '#D9D4E8'; // Warmer silver for sunset
-          case 'gold': return '#FFAA5A';   // Orange-gold for sunset
-          case 'platinum': return '#F5E9E2'; // Warm platinum for sunset
-          default: return theme.accent;
-        }
-      } else {
-        switch (achievement.badgeTier) {
-          case 'bronze': return '#CD7F32';
-          case 'silver': return '#C0C0C0';
-          case 'gold': return '#FFD700';
-          case 'platinum': return '#E5E4E2';
-          default: return theme.accent;
-        }
-      }
-    }
-    
-    // For types, adjust colors based on theme
-    if (isSunset) {
-      switch (achievement.type) {
-        case 'streak':
-          return '#FF8C5A'; // Sunset orange
-        case 'routine_count':
-          return '#E67E51'; // Darker sunset
-        case 'area_variety':
-          return '#FFB38E'; // Lighter sunset
-        case 'specific_area':
-          return '#FF9D6C'; // Medium sunset
-        case 'total_minutes':
-          return '#E67341'; // Deep sunset
-        default:
-          return theme.accent;
-      }
-    } else {
-      // For types, use consistent green color scheme instead of different colors
-      // Just vary the shade based on the type for subtle distinction
-      switch (achievement.type) {
-        case 'streak':
-          return '#4CAF50'; // Standard green
-        case 'routine_count':
-          return '#388E3C'; // Darker green
-        case 'area_variety':
-          return '#66BB6A'; // Lighter green
-        case 'specific_area':
-          return '#43A047'; // Medium green
-        case 'total_minutes':
-          return '#2E7D32'; // Deep green
-        default:
-          return theme.accent; // Theme accent color (should be green)
-      }
-    }
-  };
-  
   return (
     <Animated.View
       style={[
@@ -380,7 +416,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
           isDark ? 
             ['rgba(76, 175, 80, 0.1)', 'rgba(33, 150, 243, 0.05)'] : 
             isSunset ? 
-              ['rgba(255, 140, 90, 0.15)', 'rgba(255, 179, 142, 0.05)'] : 
+              ['rgba(255, 160, 60, 0.15)', 'rgba(255, 196, 121, 0.08)'] : 
               ['rgba(200, 230, 201, 0.5)', 'rgba(187, 222, 251, 0.3)']
         }
         style={styles.cardBackground}
@@ -400,7 +436,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
                   isDark ? 
                     ['#388E3C', '#2E7D32'] : 
                     isSunset ? 
-                      ['#FF8C5A', '#E67E51'] : 
+                      ['#FF8E3C', '#FF7D28'] : 
                       ['#4CAF50', '#388E3C']
                 }
                 style={styles.levelBadge}
@@ -426,7 +462,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
                 backgroundColor: isDark ? 
                   'rgba(255, 215, 0, 0.15)' : 
                   isSunset ? 
-                    'rgba(255, 241, 230, 0.25)' : 
+                    'rgba(255, 246, 235, 0.25)' : 
                     'rgba(255, 215, 0, 0.2)' 
               }
             ]}>

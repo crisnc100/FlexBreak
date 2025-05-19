@@ -143,9 +143,11 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
       >
         {/* Dropdown Header with Gradient Background */}
         <LinearGradient
-          colors={isDark || isSunset ? 
+          colors={isDark ? 
             ['rgba(66, 153, 225, 0.5)', 'rgba(99, 102, 241, 0.5)'] : 
-            ['rgba(66, 153, 225, 0.2)', 'rgba(99, 102, 241, 0.2)']}
+            isSunset ?
+              ['rgba(255, 142, 60, 0.7)', 'rgba(230, 125, 40, 0.5)'] : 
+              ['rgba(66, 153, 225, 0.2)', 'rgba(99, 102, 241, 0.2)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.dropdownHeader}
@@ -182,9 +184,11 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
                   { 
                     borderBottomColor: theme.border,
                     backgroundColor: isItemSelected
-                      ? `${theme.accent}15` 
+                      ? isDark ? `${theme.accent}15` :
+                        isSunset ? `rgba(255, 142, 60, 0.15)` : `${theme.accent}15` 
                       : pressed 
-                        ? `${theme.backgroundLight}` 
+                        ? isDark ? `${theme.backgroundLight}` :
+                          isSunset ? 'rgba(255,255,255,0.08)' : `${theme.backgroundLight}`
                         : 'transparent'
                   }
                 ]}
@@ -197,8 +201,10 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
                       styles.optionIconContainer, 
                       { 
                         backgroundColor: isItemSelected 
-                          ? `${theme.accent}20`
-                          : isDark || isSunset ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                          ? isDark ? `${theme.accent}20` :
+                            isSunset ? 'rgba(255, 142, 60, 0.25)' : `${theme.accent}20`
+                          : isDark ? 'rgba(255,255,255,0.1)' : 
+                            isSunset ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.05)'
                       }
                     ]}>
                       <Ionicons 
@@ -230,7 +236,13 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
                     </View>
                   </View>
                   {isItemSelected && (
-                    <View style={[styles.checkCircle, { backgroundColor: `${theme.accent}20` }]}>
+                    <View style={[
+                      styles.checkCircle, 
+                      { 
+                        backgroundColor: isDark ? `${theme.accent}20` :
+                                        isSunset ? 'rgba(255, 142, 60, 0.2)' : `${theme.accent}20` 
+                      }
+                    ]}>
                       <Ionicons name="checkmark" size={18} color={theme.accent} />
                     </View>
                   )}
@@ -243,7 +255,10 @@ const OptionDropdown: React.FC<OptionDropdownProps> = ({
         {/* Bottom action area */}
         <View style={[styles.bottomActions, { borderTopColor: theme.border }]}>
           <TouchableOpacity 
-            style={[styles.confirmButton, { backgroundColor: theme.accent }]}
+            style={[styles.confirmButton, { 
+              backgroundColor: isDark ? theme.accent : 
+                                isSunset ? '#FF8E3C' : theme.accent 
+            }]}
             onPress={onClose}
           >
             <Text style={styles.confirmButtonText}>Confirm</Text>

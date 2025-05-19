@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import { useStreak } from '../../hooks/progress/useStreak';
@@ -16,7 +16,7 @@ interface StatsOverviewProps {
   theme?: any;
   isDark?: boolean;
   isSunset?: boolean;
-  streakFreezeActive: boolean;
+  flexSaveActive: boolean;
   userLevel: number;
 }
 
@@ -28,7 +28,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   theme: propTheme,
   isDark: propIsDark,
   isSunset: propIsSunset,
-  streakFreezeActive,
+  flexSaveActive,
   userLevel = 1
 }) => {
   // Use theme from props if provided, otherwise use theme context
@@ -36,15 +36,15 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   const theme = propTheme || themeContext.theme;
   const isDark = propIsDark !== undefined ? propIsDark : themeContext.isDark;
   const isSunset = propIsSunset !== undefined ? propIsSunset : themeContext.isSunset;
-  // Track if streak can be saved with a freeze
+  // Track if streak can be saved with a flexSave
   const [streakAtRisk, setStreakAtRisk] = useState(false);
   const [isStreakBroken, setIsStreakBroken] = useState(false);
   
-  // Get required level for streak freezes from feature access utils
-  const requiredLevel = featureAccessUtils.getRequiredLevel('streak_freezes');
+  // Get required level for streak flexSaves from feature access utils
+  const requiredLevel = featureAccessUtils.getRequiredLevel('flex_saves');
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const meetsLevelRequirement = userLevel >= requiredLevel;
-  const canUseStreakFreeze = meetsLevelRequirement && isPremiumUser;
+  const canUseFlexSave = meetsLevelRequirement && isPremiumUser;
   
   // Add error handling for the streak hook
   let liveStreak = 0;
@@ -120,11 +120,11 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
     }
   }, [meetsLevelRequirement, streakAtRisk, pulseAnim]);
   
-  // Check if the streak is at risk and can be saved with a freeze
+  // Check if the streak is at risk and can be saved with a flexSave
   useEffect(() => {
     const checkStreakStatus = async () => {
       // Only check if streak is meaningful (5+ days), not protected, and not completed today
-      if (validatedStreak >= 5 && !streakFreezeActive && !isTodayComplete) {
+      if (validatedStreak >= 5 && !flexSaveActive && !isTodayComplete) {
         const status = await streakManager.checkStreakStatus();
         setStreakAtRisk(status.canSaveYesterdayStreak);
       } else {
@@ -133,10 +133,10 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
     };
     
     checkStreakStatus();
-  }, [validatedStreak, streakFreezeActive, isTodayComplete]);
+  }, [validatedStreak, flexSaveActive, isTodayComplete]);
 
   // For streak of 5+ days, show a warning indicator if today's activity isn't done
-  const showWarning = validatedStreak >= 5 && !isTodayComplete && !streakAtRisk && !streakFreezeActive;
+  const showWarning = validatedStreak >= 5 && !isTodayComplete && !streakAtRisk && !flexSaveActive;
 
   // Get the actual streak to display - use the validated streak value
   const displayStreak = isStreakBroken ? 0 : validatedStreak;
@@ -163,7 +163,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
           <View style={[styles.statIconContainer, { 
             backgroundColor: isDark || isSunset ? 'rgba(76, 175, 80, 0.2)' : '#F0F0F0'
           }]}>
-            <Ionicons name="time-outline" size={20} color="#4CAF50" />
+            <MaterialCommunityIcons name="clock-outline" size={20} color="#4CAF50" />
           </View>
           <Text style={[styles.statValue, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {totalMinutes}
@@ -184,25 +184,25 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
           
           <View style={[styles.statIconContainer, { 
             backgroundColor: isDark || isSunset ? 
-              (streakFreezeActive ? 'rgba(33, 150, 243, 0.2)' : 
+              (flexSaveActive ? 'rgba(33, 150, 243, 0.2)' : 
                 (streakAtRisk ? 'rgba(255, 193, 7, 0.2)' :
                   (showWarning ? 'rgba(255, 87, 34, 0.2)' : 
                     (isStreakBroken ? 'rgba(255, 87, 34, 0.1)' :
                       (meetsLevelRequirement ? 'rgba(159, 217, 255, 0.15)' : 'rgba(255, 152, 0, 0.2)'))))) 
-              : (streakFreezeActive ? 'rgba(33, 150, 243, 0.15)' : 
+              : (flexSaveActive ? 'rgba(33, 150, 243, 0.15)' : 
                  (streakAtRisk ? 'rgba(255, 193, 7, 0.15)' : 
                    (showWarning ? 'rgba(255, 87, 34, 0.1)' :
                      (isStreakBroken ? 'rgba(255, 87, 34, 0.05)' :
                        (meetsLevelRequirement ? 'rgba(159, 217, 255, 0.1)' : '#F0F0F0')))))
           }]}>
-            <Ionicons 
-              name={streakFreezeActive ? "snow" : 
-                    (streakAtRisk ? "shield-outline" : 
-                     (showWarning ? "warning-outline" : 
-                      (isStreakBroken ? "refresh-outline" :
-                        (meetsLevelRequirement && !streakAtRisk ? "flame" : "flame-outline"))))} 
+            <MaterialCommunityIcons 
+              name={flexSaveActive ? "timer-sand" : 
+                    (streakAtRisk ? "shield" : 
+                     (showWarning ? "alert" : 
+                      (isStreakBroken ? "refresh" :
+                        (meetsLevelRequirement && !streakAtRisk ? "fire" : "fire-outline"))))} 
               size={20} 
-              color={streakFreezeActive ? "#2196F3" : 
+              color={flexSaveActive ? "#2196F3" : 
                      (streakAtRisk ? "#FFC107" : 
                       (showWarning ? "#FF5722" : 
                        (isStreakBroken ? "#FF5722" :
@@ -240,42 +240,42 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
           }]}>
             {isStreakBroken ? "Streak Reset" :
              "Day Streak"
-             + (streakFreezeActive ? " (Protected)" : 
-                (streakAtRisk && canUseStreakFreeze ? " (At Risk)" : 
+             + (flexSaveActive ? " (Protected)" : 
+                (streakAtRisk && canUseFlexSave ? " (At Risk)" : 
                  (showWarning ? " (at risk)" : 
                   "")))}
           </Text>
           
           {isStreakBroken && (
             <View style={styles.streakResetIndicator}>
-              <Ionicons name="refresh-outline" size={14} color="#FF5722" />
+              <MaterialCommunityIcons name="refresh" size={14} color="#FF5722" />
               <Text style={[styles.streakResetText, { color: '#FF5722' }]}>
                 New streak starting today
               </Text>
             </View>
           )}
           
-          {streakAtRisk && canUseStreakFreeze && (
+          {streakAtRisk && canUseFlexSave && (
             <View style={styles.streakRiskIndicator}>
-              <Ionicons name="shield-outline" size={14} color="#FFC107" />
+              <MaterialCommunityIcons name="shield" size={14} color="#FFC107" />
               <Text style={[styles.streakRiskText, { color: '#FFC107' }]}>
-                Use Streak Freeze to save!
+                Use Flex Save to save!
               </Text>
             </View>
           )}
           
-          {meetsLevelRequirement && !streakFreezeActive && !streakAtRisk && !isStreakBroken && (
+          {meetsLevelRequirement && !flexSaveActive && !streakAtRisk && !isStreakBroken && (
             <View style={styles.frostReadyIndicator}>
-              <Ionicons name="snow" size={12} color="#2196F3" />
-              <Text style={styles.frostReadyText}>Streak Freeze Available</Text>
+              <MaterialCommunityIcons name="timer-sand" size={12} color="#2196F3" />
+              <Text style={styles.frostReadyText}>Flex Save Available</Text>
             </View>
           )}
           
-          {streakFreezeActive && (
-            <View style={styles.streakFreezeIndicator}>
-              <Ionicons name="snow-outline" size={14} color="#2196F3" />
-              <Text style={[styles.streakFreezeText, { color: '#2196F3' }]}>
-                Streak Freeze Applied
+          {flexSaveActive && (
+            <View style={styles.flexSaveIndicator}>
+              <MaterialCommunityIcons name="timer-sand" size={14} color="#2196F3" />
+              <Text style={[styles.flexSaveText, { color: '#2196F3' }]}>
+                Flex Save Applied
               </Text>
             </View>
           )}
@@ -291,7 +291,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
           <View style={[styles.statIconContainer, { 
             backgroundColor: isDark || isSunset ? 'rgba(33, 150, 243, 0.2)' : '#F0F0F0'
           }]}>
-            <Ionicons name="fitness-outline" size={20} color="#2196F3" />
+            <MaterialCommunityIcons name="weight-lifter" size={20} color="#2196F3" />
           </View>
           <Text style={[styles.statValue, { color: isDark || isSunset ? theme.text : '#333' }]}>
             {totalRoutines}
@@ -379,13 +379,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     zIndex: 2,
   },
-  streakFreezeIndicator: {
+  flexSaveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
     zIndex: 2,
   },
-  streakFreezeText: {
+  flexSaveText: {
     fontSize: 10,
     marginLeft: 4,
     fontWeight: '500',

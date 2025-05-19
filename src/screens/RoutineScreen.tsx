@@ -422,10 +422,10 @@ export default function RoutineScreen() {
                 type: 'feature'
               });
             } else if (newLevel === 6) {
-              console.log('Adding Streak Freeze reward for level 6');
+              console.log('Adding Flex Save reward for level 6');
               levelUpInfo.rewards.push({
-                id: 'streak_freeze',
-                name: 'Streak Freeze',
+                id: 'flex_save',
+                name: 'Flex Save',
                 description: 'Protect your streak on days you miss your stretching routine',
                 type: 'feature'
               });

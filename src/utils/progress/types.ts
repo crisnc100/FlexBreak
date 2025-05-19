@@ -89,10 +89,10 @@ export interface Reward {
   unlocked: boolean;
   levelRequired: number;
   type: string;
-  uses?: number; // Number of uses available (for streak freezes)
-  lastRefill?: string; // Date of last refill (for streak freezes)
-  lastUsed?: string; // Date when last used (for streak freezes)
-  appliedDates?: string[]; // Dates when streak freezes were applied
+  uses?: number; // Number of uses available (for streak flexSaves)
+  lastRefill?: string; // Date of last refill (for streak flexSaves)
+  lastUsed?: string; // Date when last used (for streak flexSaves)
+  appliedDates?: string[]; // Dates when streak flexSaves were applied
 }
 
 // Interface for level objects

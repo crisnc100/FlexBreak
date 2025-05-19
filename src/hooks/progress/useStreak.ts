@@ -40,7 +40,7 @@ export const useStreak = (opts: { forceRefresh?: boolean } = {}): number => {
       streakManager.STREAK_UPDATED_EVENT,
       handler
     );
-    // Also refresh when a streak freeze is applied and saved
+    // Also refresh when a streak flexSave is applied and saved
     streakManager.streakEvents.on(
       streakManager.STREAK_SAVED_EVENT,
       handler

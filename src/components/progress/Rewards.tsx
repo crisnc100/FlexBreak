@@ -147,11 +147,11 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
       console.error('Error getting user level in handleRewardPress:', error);
     }
     
-    // Special check for streak_freezes - always verify level 6 requirement
-    if (reward.id === 'streak_freezes' && currentLevel < 6) {
+    // Special check for flex_saves - always verify level 6 requirement
+    if (reward.id === 'flex_saves' && currentLevel < 6) {
       Alert.alert(
         'Reward Locked',
-        `You need to reach level 6 to unlock Streak Freezes. You're currently level ${currentLevel}.`,
+        `You need to reach level 6 to unlock Flex Saves. You're currently level ${currentLevel}.`,
         [{ text: 'OK' }]
       );
       return;
@@ -208,12 +208,12 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
         );
         break;
         
-      case 'streak_freezes':
+      case 'flex_saves':
         Alert.alert(
-          'Streak Freezes',
+          'Flex Saves',
           currentLevel >= 6 
-            ? 'You have 2 streak freezes available per month. These can be used when you miss a day to preserve your streak.'
-            : `Streak Freezes unlock at level 6. You're currently level ${currentLevel}.`,
+            ? 'You have 2 streak flexSaves available per month. These can be used when you miss a day to preserve your streak.'
+            : `Flex Saves unlock at level 6. You're currently level ${currentLevel}.`,
           [{ text: 'Awesome!' }]
         );
         break;

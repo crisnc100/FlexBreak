@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Reward } from '../../utils/progress/types';
 import { useTheme } from '../../context/ThemeContext';
 import * as storageService from '../../services/storageService';
@@ -47,7 +47,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
         return '#FF9800'; // Orange
       case 'custom_routines':
         return '#4CAF50'; // Green
-      case 'streak_freezes':
+      case 'flex_saves':
         return '#00BCD4'; // Cyan
       case 'premium_stretches':
         return '#F44336'; // Red
@@ -68,9 +68,9 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       return reward.unlocked ? 'moon-outline' : 'lock-closed-outline';
     }
     
-    // Special case for streak freezes
-    if (reward.id === 'streak_freezes') {
-      return realUserLevel >= 6 ? 'snow' : 'snow-outline';
+    // Special case for streak flexSaves
+    if (reward.id === 'flex_saves') {
+      return realUserLevel >= 6 ? 'timer-sand' : 'timer-sand-outline';
     }
     
     // Base icon from the reward data
@@ -89,8 +89,8 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   
   // Get reward status text
   const getStatusText = () => {
-    // Special case for streak_freezes
-    if (reward.id === 'streak_freezes') {
+    // Special case for flex_saves
+    if (reward.id === 'flex_saves') {
       return realUserLevel >= 6 ? 'Unlocked' : 'Unlocks at Level 6';
     }
     
@@ -101,8 +101,8 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
   
   // Get status color
   const getStatusColor = () => {
-    // Special case for streak_freezes
-    if (reward.id === 'streak_freezes') {
+    // Special case for flex_saves
+    if (reward.id === 'flex_saves') {
       return realUserLevel >= 6 ? '#4CAF50' : '#757575';
     }
     
@@ -122,18 +122,18 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
     return null;
   };
   
-  // Explicitly track if streak freezes should be shown as unlocked
-  const isStreakFreezeUnlocked = reward.id === 'streak_freezes' && realUserLevel >= 6;
+  // Explicitly track if streak flexSaves should be shown as unlocked
+  const isFlexSaveUnlocked = reward.id === 'flex_saves' && realUserLevel >= 6;
   
   // Determine if reward is enabled
-  const isEnabled = reward.id === 'streak_freezes'
-    ? isStreakFreezeUnlocked // Special case: streak freezes only needs level 6+
+  const isEnabled = reward.id === 'flex_saves'
+    ? isFlexSaveUnlocked // Special case: streak flexSaves only needs level 6+
     : (isPremium && (reward.unlocked || (isDarkThemeReward && realUserLevel >= reward.levelRequired)));
   
   // Direct handler for reward press - no unnecessary alerts
   const handleRewardPress = () => {
-    // Special check for streak_freezes (level 6 requirement)
-    if (reward.id === 'streak_freezes') {
+    // Special check for flex_saves (level 6 requirement)
+    if (reward.id === 'flex_saves') {
       if (realUserLevel < 6) {
         return; // Don't allow interaction if under level 6
       }
@@ -148,8 +148,8 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
     }
   };
   
-  // Force streak_freezes to have correct unlocked status based on user level
-  const effectiveUnlocked = reward.id === 'streak_freezes'
+  // Force flex_saves to have correct unlocked status based on user level
+  const effectiveUnlocked = reward.id === 'flex_saves'
     ? realUserLevel >= 6 
     : reward.unlocked;
   
@@ -171,11 +171,19 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
         styles.iconContainer, 
         { backgroundColor: isEnabled ? getIconColor() + '20' : theme.backgroundLight }
       ]}>
-        <Ionicons 
-          name={getIconName() as any} 
-          size={24} 
-          color={getIconColor()} 
-        />
+        {reward.id === 'flex_saves' ? (
+          <MaterialCommunityIcons 
+            name={getIconName() as any} 
+            size={24} 
+            color={getIconColor()} 
+          />
+        ) : (
+          <Ionicons 
+            name={getIconName() as any} 
+            size={24} 
+            color={getIconColor()} 
+          />
+        )}
       </View>
       
       <View style={styles.contentContainer}>
@@ -210,7 +218,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
             name={
               isDarkThemeReward 
                 ? (isDark || isSunset ? 'checkmark-circle' : 'chevron-forward') 
-                : isStreakFreezeUnlocked 
+                : isFlexSaveUnlocked 
                   ? 'chevron-forward'
                   : 'chevron-forward'
             } 
@@ -222,9 +230,9 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, onPress, isPremium, use
       
       {!isEnabled && (
         <View style={styles.lockContainer}>
-          {!isPremium && reward.id !== 'streak_freezes' ? (
+          {!isPremium && reward.id !== 'flex_saves' ? (
             <Text style={styles.premiumBadge}>Premium</Text>
-          ) : reward.id === 'streak_freezes' ? (
+          ) : reward.id === 'flex_saves' ? (
             realUserLevel < 6 ? <Text style={styles.levelBadge}>Level 6</Text> : null
           ) : !reward.unlocked ? (
             <Text style={styles.levelBadge}>Level {reward.levelRequired}</Text>

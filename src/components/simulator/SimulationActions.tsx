@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 interface SimulationActionsProps {
   onSimulate7Days: () => void;
   onSimulate3Days: () => void;
-  onStreakFreezeTest: (testId: string) => void;
+  onFlexSaveTest: (testId: string) => void;
   onReset: () => void;
   scenarioId?: string;
   simulate7DaysDateRange?: string;
@@ -16,7 +16,7 @@ interface SimulationActionsProps {
 const SimulationActions: React.FC<SimulationActionsProps> = ({
   onSimulate7Days,
   onSimulate3Days,
-  onStreakFreezeTest,
+  onFlexSaveTest,
   onReset,
   scenarioId,
   simulate7DaysDateRange,
@@ -24,7 +24,7 @@ const SimulationActions: React.FC<SimulationActionsProps> = ({
 }) => {
   const { theme, isDark } = useTheme();
   
-  const isStreakFreezeScenario = scenarioId === '4.1' || scenarioId === '4.2';
+  const isFlexSaveScenario = scenarioId === '4.1' || scenarioId === '4.2';
 
   // Calculate date ranges if not provided
   const get7DayDateRange = () => {
@@ -87,24 +87,24 @@ const SimulationActions: React.FC<SimulationActionsProps> = ({
         {/* Section Divider */}
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Streak Freeze Tests</Text>
+        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Flex Save Tests</Text>
         
-        {/* Streak Freeze Test 4.1 (1-day gap) */}
+        {/* Flex Save Test 4.1 (1-day gap) */}
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
-          onPress={() => onStreakFreezeTest('4.1')}
+          onPress={() => onFlexSaveTest('4.1')}
         >
           <Ionicons name="snow-outline" size={20} color="white" />
-          <Text style={styles.actionButtonText}>Streak Freeze Test 4.1</Text>
+          <Text style={styles.actionButtonText}>Flex Save Test 4.1</Text>
         </TouchableOpacity>
 
-        {/* Streak Freeze Test 4.2 (2-day gap) */}
+        {/* Flex Save Test 4.2 (2-day gap) */}
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: '#FF9800' }]}
-          onPress={() => onStreakFreezeTest('4.2')}
+          onPress={() => onFlexSaveTest('4.2')}
         >
           <Ionicons name="snow-outline" size={20} color="white" />
-          <Text style={styles.actionButtonText}>Streak Freeze Test 4.2</Text>
+          <Text style={styles.actionButtonText}>Flex Save Test 4.2</Text>
         </TouchableOpacity>
 
         {/* Reset Button */}

@@ -8,7 +8,7 @@ import * as rewardManager from './rewardManager';
 import * as levelManager from './levelManager';
 import * as xpBoostManager from './xpBoostManager';
 import * as streakManager from './streakManager';
-import { calculateStreakWithFreezes } from './progressTracker';
+import { calculateStreakWithFlexSaves } from './progressTracker';
 
 // Track recent challenges to avoid repetition
 let recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
@@ -316,10 +316,10 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         // For logging
         console.log(`Streak challenge updated from streak manager: ${challenge.progress}/${challenge.requirement}`);
         
-        // Double check with calculateStreakWithFreezes if there's a discrepancy
+        // Double check with calculateStreakWithFlexSaves if there's a discrepancy
         const routines = await storageService.getAllRoutines();
         const userProgress = await storageService.getUserProgress();
-        const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+        const flexSaveDates = userProgress.rewards?.flex_saves?.appliedDates || [];
         
         // Extract routine dates
         const routineDates = routines
@@ -327,7 +327,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
           .map(r => r.date.split('T')[0]);
         
         // Calculate with both methods
-        const calculatedStreak = calculateStreakWithFreezes(routineDates, freezeDates);
+        const calculatedStreak = calculateStreakWithFlexSaves(routineDates, flexSaveDates);
         
         if (calculatedStreak !== challenge.progress) {
           console.log(`Streak discrepancy in challenge: ${challenge.progress} vs ${calculatedStreak}. Using calculated value.`);

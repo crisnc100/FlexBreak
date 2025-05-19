@@ -9,16 +9,17 @@ import {
   Dimensions,
   Easing
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as haptics from '../../utils/haptics';
 import { useTheme } from '../../context/ThemeContext';
 import * as streakManager from '../../utils/progress/modules/streakManager';
-import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import * as flexSaveManager from '../../utils/progress/modules/flexSaveManager';
 import * as storageService from '../../services/storageService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePremium } from '../../context/PremiumContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as dateUtils from '../../utils/progress/modules/utils/dateUtils';
+import { TimeRewind, Vortex } from '../../components/home/TimeRewind';
 
 // Snowflake component that animates from a central source outward with various effects
 const Snowflake: React.FC<{
@@ -103,26 +104,27 @@ const Snowflake: React.FC<{
         ],
       }}
     >
-      <Ionicons name="snow-outline" size={Math.random() * 10 + 10} color="#2196F3" />
+      <MaterialCommunityIcons name="timer-sand" size={Math.random() * 10 + 10} color="#2196F3" />
     </Animated.View>
   );
 };
 
-interface StreakFreezePromptProps {
+interface FlexSavePromptProps {
   onClose?: () => void;
 }
 
-const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
+const FlexSavePrompt: React.FC<FlexSavePromptProps> = ({ onClose }) => {
   const { theme, isDark, isSunset } = useTheme();
   const { isPremium } = usePremium();
   const [visible, setVisible] = useState(false);
   const [streakData, setStreakData] = useState({
     currentStreak: 0,
-    freezesAvailable: 0
+    flexSavesAvailable: 0
   });
-  const [showSnowflakes, setShowSnowflakes] = useState(false);
+  const [showTimeRewindEffect, setShowTimeRewindEffect] = useState(false);
+  const [showVortex, setShowVortex] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [snowflakePositions, setSnowflakePositions] = useState<Array<{x: number, y: number, delay: number, duration: number, scale: number}>>([]);
+  const [timeRewindElements, setTimeRewindElements] = useState<Array<{id: number, x: number, y: number, size: number, duration: number, delay: number, rotation: number, maxY: number}>>([]);
   const [userProgress, setUserProgress] = useState<any>(null);
   const [hasTodayActivity, setHasTodayActivity] = useState(false);
   const [canSaveStreak, setCanSaveStreak] = useState(false);
@@ -134,6 +136,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   const successOpacityAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const backgroundFlashOpacity = useRef(new Animated.Value(0)).current;
   
   // Screen dimensions for positioning
   const { width, height } = Dimensions.get('window');
@@ -165,30 +168,75 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     loadUserProgressData();
   }, []);
   
-  // Snow sparkle effect
-  const createSnowflakeEffect = () => {
-    const positions = [];
-    const centerX = width / 2;
-    const centerY = height / 2 - 100; // Position based on modal center
+  // Create TimeRewind effect for a dramatic time-rewind animation
+  const createTimeRewindEffect = () => {
+    // Reset animation values
+    backgroundFlashOpacity.setValue(0);
     
-    // Create 24 random snowflakes
-    for (let i = 0; i < 24; i++) {
-      positions.push({
-        x: centerX - 50 + Math.random() * 100,
-        y: centerY - 50 + Math.random() * 100,
-        delay: Math.random() * 300,
-        duration: 1000 + Math.random() * 1500,
-        scale: 0.5 + Math.random() * 1.5
+    // Create rewind elements in a radial pattern
+    const newElements = [];
+    const screenWidth = width;
+    const screenHeight = height;
+    // Match the same vortex coordinates used in Vortex component (58% / 62%)
+    const centerX = screenWidth * 0.58;
+    const centerY = screenHeight * 0.62;
+    
+    // Number of elements to create
+    const numElements = 24;
+    
+    // Create elements in a circular pattern
+    for (let i = 0; i < numElements; i++) {
+      // Calculate position on a circle
+      const angle = (i / numElements) * Math.PI * 2;
+      const radius = Math.min(screenWidth, screenHeight) * 0.45;
+      
+      // Position elements around the edge in a circle
+      const startX = centerX + Math.cos(angle) * radius;
+      const startY = centerY + Math.sin(angle) * radius;
+      
+      // Create varying sizes
+      const sizeVariation = 0.7 + (Math.random() * 0.6);
+      const baseSize = 20;
+      
+      newElements.push({
+        id: i,
+        x: startX,
+        y: startY,
+        size: baseSize * sizeVariation,
+        duration: 2000 + Math.random() * 1500,
+        delay: Math.random() * 800,
+        rotation: 180 + Math.random() * 720,
+        maxY: height
       });
     }
     
-    setSnowflakePositions(positions);
-    setShowSnowflakes(true);
+    // Add a visual vortex effect at the center
+    setShowVortex(true);
     
-    // Hide snowflakes after animation completes
+    // Create a subtle background flash animation
+    Animated.sequence([
+      Animated.timing(backgroundFlashOpacity, {
+        toValue: 0.3,
+        duration: 400,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic)
+      }),
+      Animated.timing(backgroundFlashOpacity, {
+        toValue: 0,
+        duration: 1200,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.cubic)
+      })
+    ]).start();
+    
+    setTimeRewindElements(newElements);
+    setShowTimeRewindEffect(true);
+    
+    // Auto-hide after animation completes
     setTimeout(() => {
-      setShowSnowflakes(false);
-    }, 3000);
+      setShowTimeRewindEffect(false);
+      setShowVortex(false);
+    }, 4000);
   };
   
   // Format the time since last prompt in a more readable way
@@ -317,8 +365,8 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       // Get legacy streak status for backcompat/additional checks
       const legacyStatus = await streakManager.getLegacyStreakStatus();
       
-      // Get direct freeze availability
-      const freezeCount = status.freezesAvailable;
+      // Get direct flexSave availability
+      const flexSaveCount = await flexSaveManager.getFlexSaveCount();
       
       // Check if there's any recent activity within the past 2 weeks
       const twoWeeksAgo = new Date();
@@ -360,23 +408,23 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       
       // Allow fixing streak if:
       // 1. Streak is 0 but there's recent activity OR streak > 0
-      // 2. Yesterday doesn't have activity or freeze
+      // 2. Yesterday doesn't have activity or flexSave
       // 3. Not truly broken (hasn't missed 3+ days)
-      // 4. Freezes are available
+      // 4. Flex Saves are available
       const canSaveFromLegacy = legacyStatus.canSaveYesterdayStreak;
       
-      // Use matching logic from StreakFreezeCard
+      // Use matching logic from FlexSaveCard
       const canSave = canSaveFromLegacy && !isTrulyBroken;
       
       setCanSaveStreak(canSave);
       
       // PROMPT WILL APPEAR WHEN ALL THESE CONDITIONS ARE MET:
-      // 1. Freezes are available (freezeCount > 0)
+      // 1. Flex Saves are available (flexSaveCount > 0)
       // 2. User had a valuable streak/activity (meaningful streak or recent activity)
       // 3. Streak can be saved (only missed yesterday, not multiple days)
       // 4. User hasn't completed a routine today
       // 5. Rate limiting allows it (not shown too many times recently)
-      if (freezeCount > 0 && hasValuableActivity && canSave && !todayActivity) {
+      if (flexSaveCount > 0 && hasValuableActivity && canSave && !todayActivity) {
         // Check rate limiting
         const shouldShow = await canShowPrompt();
         
@@ -390,7 +438,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         // Set the streak data for display
         setStreakData({
           currentStreak: Math.max(status.currentStreak, freshUserProgress?.statistics?.bestStreak || 0),
-          freezesAvailable: freezeCount
+          flexSavesAvailable: flexSaveCount
         });
         
         // Start rotation animation for snowflake icon
@@ -471,10 +519,10 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     outputRange: ['0deg', '360deg']
   });
   
-  // Handle use streak freeze
-  const handleUseStreakFreeze = async () => {  
+  // Handle use streak flexSave
+  const handleUseflexSave = async () => {  
     // Create snowflake particle effect
-    createSnowflakeEffect();
+    createTimeRewindEffect();
     
     // Shake and pulse animation for feedback
     Animated.sequence([
@@ -512,21 +560,21 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     // Provide haptic feedback
     haptics.success();
     
-    // Call the newer API to apply freeze
-    const result = await streakManager.applyFreeze();
+    // Call the newer API to apply flexSave
+    const result = await streakManager.applyFlexSave();
     
     if (result.success) {
-      // Update the streakData with the new freeze count from the result
+      // Update the streakData with the new flexSave count from the result
       setStreakData(prevData => ({
         ...prevData,
-        freezesAvailable: result.remainingFreezes
+        flexSavesAvailable: result.remainingFlexSaves
       }));
       
       // Emit the streak saved event so other components can refresh
       streakManager.streakEvents.emit(streakManager.STREAK_SAVED_EVENT, {
         currentStreak: streakData.currentStreak,
-        freezeApplied: true,
-        remainingFreezes: result.remainingFreezes
+        flexSaveApplied: true,
+        remainingFlexSaves: result.remainingFlexSaves
       });
       
       // Show success message
@@ -551,7 +599,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         handleClose();
       }, 2500);
     } else {
-      console.error('Failed to save streak with freeze.');
+      console.error('Failed to save streak with flexSave.');
       
       // Provide error feedback
       haptics.error();
@@ -563,7 +611,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     }
   };
   
-  // Handle let streak break (user declines using a freeze)
+  // Handle let streak break (user declines using a flexSave)
   const handleLetStreakBreak = async () => {
     // Animate out
     Animated.parallel([
@@ -586,11 +634,8 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       // No need to call letStreakBreak anymore as we've optimized the flow
       // The streak is already broken if this prompt is shown
       
-      // Just emit an event for any listeners
-      streakManager.streakEvents.emit(streakManager.STREAK_BROKEN_EVENT, {
-        currentStreak: 0,
-        previousStreak: streakData.currentStreak
-      });
+      // IMPORTANT: DO NOT emit an event that marks the streak as permanently broken
+      // Just close the modal without affecting streak flexSave availability
       
       setTimeout(() => {
         setVisible(false);
@@ -607,6 +652,9 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
     // Reset animations
     successOpacityAnim.setValue(0);
     successSlideAnim.setValue(400);
+    
+    // IMPORTANT: Do NOT emit a streak broken event when dismissing
+    // This was causing streak flexSaves to become unavailable
     
     // Animate out
     Animated.parallel([
@@ -677,15 +725,15 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
       const canSave = legacyStatus.canSaveYesterdayStreak && !isTrulyBroken;
       
       // PROMPT CONDITIONS (same as normal check but bypassing rate limiting):
-      // 1. Freezes are available (status.freezesAvailable > 0)
+      // 1. Flex Saves are available (status.flexSavesAvailable > 0)
       // 2. User had a valuable streak/activity (meaningful streak or recent activity)
       // 3. Streak can be saved (only missed yesterday, not multiple days)
       // 4. User hasn't completed a routine today
-      if (status.freezesAvailable > 0 && hasValuableActivity && canSave && !status.maintainedToday) {
+      if (status.flexSavesAvailable > 0 && hasValuableActivity && canSave && !status.maintainedToday) {
         // Set the streak data
         setStreakData({
           currentStreak: status.currentStreak || 3,
-          freezesAvailable: status.freezesAvailable
+          flexSavesAvailable: status.flexSavesAvailable
         });
         
         // Start rotation animation for snowflake icon
@@ -742,7 +790,7 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
   
   // Expose testing functions globally
   if (typeof global !== 'undefined') {
-    (global as any).forceStreakFreezePrompt = forceCheckStreak;
+    (global as any).forceFlexSavePrompt = forceCheckStreak;
     (global as any).resetStreakPromptRateLimits = resetRateLimiting;
   };
   
@@ -759,17 +807,48 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
           { backgroundColor: isDark || isSunset ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)' }
         ]}
       >
-        {/* Snowflake particle effect */}
-        {showSnowflakes && snowflakePositions.map((pos, index) => (
-          <Snowflake 
-            key={index}
-            x={pos.x}
-            y={pos.y}
-            delay={pos.delay}
-            duration={pos.duration}
-            scale={pos.scale}
+        {/* Background flash effect */}
+        <Animated.View 
+          style={[
+            StyleSheet.absoluteFill, 
+            styles.backgroundFlash,
+            { 
+              opacity: backgroundFlashOpacity,
+              backgroundColor: isDark || isSunset ? '#6C63FF' : '#2196F3'
+            }
+          ]} 
+        />
+        
+        {/* TimeRewind particle effect */}
+        {showTimeRewindEffect && (
+          <View style={styles.timeRewindContainer} pointerEvents="none">
+            {timeRewindElements.map(element => (
+              <TimeRewind
+                key={element.id}
+                x={element.x}
+                y={element.y}
+                size={element.size}
+                duration={element.duration}
+                delay={element.delay}
+                rotation={element.rotation}
+                maxY={element.maxY}
+                color={isDark || isSunset ? '#6C63FF' : '#2196F3'}
+                targetX={width * 0.50}
+                targetY={height * 0.58}
+              />
+            ))}
+          </View>
+        )}
+        
+        {/* Center vortex effect */}
+        {showVortex && (
+          <Vortex
+            visible={showVortex}
+            size={120}
+            color={isDark || isSunset ? '#6C63FF' : '#2196F3'}
+            duration={3000}
           />
-        ))}
+        )}
         
         {/* Success message */}
         {showSuccess && (
@@ -813,26 +892,26 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
         >
           <View style={styles.header}>
             <Animated.View style={{ transform: [{ rotate }] }}>
-              <Ionicons 
-                name="snow" 
+              <MaterialCommunityIcons 
+                name="timer-sand" 
                 size={28} 
                 color={'#2196F3'} 
               />
             </Animated.View>
-            <Text style={[styles.title, { color: theme.text }]}>Streak Freeze</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Flex Save</Text>
           </View>
           
           <View style={styles.content}>
             <Text style={[styles.message, { color: theme.text }]}>
               {canSaveStreak ? (
-                `You missed yesterday's stretch and your streak is at risk. Use a streak freeze to preserve it!`
+                `You missed yesterday's stretch and your streak is at risk. Use a Flex Save to preserve it!`
               ) : (
                 `Your ${streakData.currentStreak}-day streak can't be saved because you've missed more than one day.`
               )}
             </Text>
             
             <View style={[
-              styles.freezeInfo, 
+              styles.flexSaveInfo, 
               { 
                 backgroundColor: isDark || isSunset 
                   ? 'rgba(33, 150, 243, 0.1)' 
@@ -844,11 +923,11 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                 size={20} 
                 color={'#2196F3'} 
               />
-              <Text style={[styles.freezeText, { color: theme.text }]}>
+              <Text style={[styles.flexSaveText, { color: theme.text }]}>
                 {canSaveStreak ? (
-                  `You have ${streakData.freezesAvailable} streak ${streakData.freezesAvailable === 1 ? 'freeze' : 'freezes'} available.`
+                  `You have ${streakData.flexSavesAvailable} ${streakData.flexSavesAvailable === 1 ? 'Flex Save' : 'Flex Saves'} available.`
                 ) : (
-                  "Streak freezes only work for 1-day gaps. Complete a routine today to start fresh!"
+                  "Flex saves only work for 1-day gaps. Complete a routine today to start fresh!"
                 )}
               </Text>
             </View>
@@ -878,14 +957,14 @@ const StreakFreezePrompt: React.FC<StreakFreezePromptProps> = ({ onClose }) => {
                   styles.acceptButton,
                   { backgroundColor: '#2196F3' }
                 ]}
-                onPress={handleUseStreakFreeze}
+                onPress={handleUseflexSave}
               >
                 <Text style={styles.buttonText}>
-                  Use Freeze
+                  Use FlexSave
                 </Text>
                 <View style={styles.buttonBadgeContainer}>
                   <Text style={styles.buttonBadge}>
-                    {streakData.freezesAvailable}
+                    {streakData.flexSavesAvailable}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -940,14 +1019,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  freezeInfo: {
+  flexSaveInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
   },
-  freezeText: {
+  flexSaveText: {
     marginLeft: 10,
     fontSize: 15,
     flex: 1,
@@ -1029,7 +1108,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.95,
     lineHeight: 24,
-  }
+  },
+  backgroundFlash: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none',
+  },
+  timeRewindContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99,
+    pointerEvents: 'none',
+  },
 });
 
-export default StreakFreezePrompt; 
+export default FlexSavePrompt; 

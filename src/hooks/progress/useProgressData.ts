@@ -5,7 +5,7 @@ import { useRefresh } from '../../context/RefreshContext';
 import { useGamification } from './useGamification';
 import {
   calculateStreak,
-  calculateStreakWithFreezes,
+  calculateStreakWithFlexSaves,
   calculateWeeklyActivity,
   calculateDayOfWeekActivity,
   calculateActiveDays
@@ -13,7 +13,7 @@ import {
 import * as storageService from '../../services/storageService';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import { UserProgress } from '../../utils/progress/types';
-import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import * as flexSaveManager from '../../utils/progress/modules/flexSaveManager';
 import * as streakValidator from '../../utils/progress/modules/streakValidator';
 import * as dateUtils from '../../utils/progress/modules/utils/dateUtils';
 
@@ -33,8 +33,8 @@ export interface ProgressStats {
 const dataCache = {
   userProgress: null as UserProgress | null,
   lastUpdated: 0,
-  freezeCount: 0,
-  freezeLastUpdated: 0,
+  flexSaveCount: 0,
+  flexSaveLastUpdated: 0,
   // Cooldown period in ms (300ms)
   cooldownPeriod: 300
 };
@@ -61,7 +61,7 @@ export function useProgressData() {
     isTodayComplete: false
   });
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
-  const [freezeCount, setFreezeCount] = useState(0);
+  const [flexSaveCount, setFlexSaveCount] = useState(0);
 
   // Check if user has completed routines but they're all hidden
   const hasHiddenRoutinesOnly = allProgressData.length > 0 && progressData.length === 0;
@@ -76,8 +76,8 @@ export function useProgressData() {
     const userProgress = await storageService.getUserProgress();
     const storedStreak = userProgress.statistics.currentStreak;
     
-    // Get the freeze dates to include in streak calculation
-    const freezeDates = userProgress.rewards?.streak_freezes?.appliedDates || [];
+    // Get the flexSave dates to include in streak calculation
+    const flexSaveDates = userProgress.rewards?.flex_saves?.appliedDates || [];
     
     // Total routines
     const totalRoutines = data.length;
@@ -106,14 +106,14 @@ export function useProgressData() {
     
     const hasToday = routineDates.includes(todayStr);
     const hasYesterday = routineDates.includes(yesterdayStr);
-    const hasFreezeYesterday = freezeDates.includes(yesterdayStr);
+    const hasFlexSaveYesterday = flexSaveDates.includes(yesterdayStr);
     
-    // Calculate current streak with and without freezes to compare
+    // Calculate current streak with and without flexSaves to compare
     const calculatedStreakBasic = calculateStreak(data);
-    const calculatedStreakWithFreezes = calculateStreakWithFreezes(routineDates, freezeDates);
+    const calculatedStreakWithFlexSaves = calculateStreakWithFlexSaves(routineDates, flexSaveDates);
     
     // IMPORTANT: To avoid streak switching between 0 and 1, explicitly validate with streakValidator
-    let displayStreak = calculatedStreakWithFreezes;
+    let displayStreak = calculatedStreakWithFlexSaves;
     
     try {
       // Validate through the streak validator which is the most reliable source of truth
@@ -127,7 +127,7 @@ export function useProgressData() {
     }
     
     // Make sure we never flip-flop between 0 and 1 for single day activity
-    if (calculatedStreakWithFreezes === 1 && displayStreak === 0) {
+    if (calculatedStreakWithFlexSaves === 1 && displayStreak === 0) {
       // If there's activity today, a streak of 1 is more accurate than 0
       const hasTodayActivity = routineDates.includes(todayStr);
       
@@ -199,29 +199,29 @@ export function useProgressData() {
         setUserProgress(progress);
       }
       
-      // Check streak freeze count with caching
-      const freezeCacheValid = !forceRefresh && 
-                              (now - dataCache.freezeLastUpdated < dataCache.cooldownPeriod);
+      // Check streak flexSave count with caching
+      const flexSaveCacheValid = !forceRefresh && 
+                              (now - dataCache.flexSaveLastUpdated < dataCache.cooldownPeriod);
       
-      if (freezeCacheValid) {
-        setFreezeCount(dataCache.freezeCount);
+      if (flexSaveCacheValid) {
+        setFlexSaveCount(dataCache.flexSaveCount);
       } else {
-        // Check if user is premium before getting freeze count
+        // Check if user is premium before getting flexSave count
         const isPremium = await storageService.getIsPremium();
         
         if (isPremium) {
-          const count = await streakFreezeManager.getFreezesAvailable();
+          const count = await flexSaveManager.getFlexSavesAvailable();
           
-          // Update freeze cache
-          dataCache.freezeCount = count;
-          dataCache.freezeLastUpdated = now;
+          // Update flexSave cache
+          dataCache.flexSaveCount = count;
+          dataCache.flexSaveLastUpdated = now;
           
-          setFreezeCount(count);
+          setFlexSaveCount(count);
         } else {
           // Set to 0 for non-premium users
-          dataCache.freezeCount = 0;
-          dataCache.freezeLastUpdated = now;
-          setFreezeCount(0);
+          dataCache.flexSaveCount = 0;
+          dataCache.flexSaveLastUpdated = now;
+          setFlexSaveCount(0);
         }
       }
     } catch (error) {
@@ -324,7 +324,7 @@ export function useProgressData() {
     handleRefresh,
     calculateStats,
     userProgress,
-    freezeCount,
+    flexSaveCount,
     loadUserProgress,
     forceRefresh
   };

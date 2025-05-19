@@ -9,7 +9,9 @@ import {
   Platform,
   Animated,
   Dimensions,
-  StyleSheet
+  StyleSheet,
+  Vibration,
+  Easing
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +26,7 @@ import { RefreshableScrollView } from '../components/common';
 import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
 import { useTheme } from '../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as haptics from '../utils/haptics';
 import { 
   HomeHeader, 
   DailyTip, 
@@ -37,7 +40,11 @@ import {
   LevelProgressCard,
   CustomRoutineModal,
   StreakDisplay,
-  DeskBreakBoost
+  DeskBreakBoost,
+  streakFlexSaveEvents,
+  STREAK_FLEX_SAVE_APPLIED,
+  TimeRewind,
+  Vortex
 } from '../components/home';
 import * as notifications from '../utils/notifications';
 import * as firebaseReminders from '../utils/firebaseReminders';
@@ -89,6 +96,12 @@ export default function HomeScreen() {
 
   // User level for custom reminders
   const [userLevel, setUserLevel] = useState(0);
+
+  // TimeRewind animation state
+  const [showTimeRewindEffect, setShowTimeRewindEffect] = useState(false);
+  const [timeRewindElements, setTimeRewindElements] = useState<{ id: number, x: number, y: number, size: number, duration: number, delay: number, rotation: number, maxY: number }[]>([]);
+  const [showVortex, setShowVortex] = useState(false);
+  const backgroundFlashOpacity = useRef(new Animated.Value(0)).current;
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -700,6 +713,116 @@ export default function HomeScreen() {
     });
   }, [navigation, canAccessFeature, getRequiredLevel, userLevel, getUserLevel, handleStartStretching]);
 
+  // Listen for streak flexSave events
+  useEffect(() => {
+    // Handler for streak flexSave applied event
+    const handleStreakFlexSaveApplied = (data: any) => {
+      console.log('HomeScreen: Streak flexSave applied', data);
+      createTimeRewindEffect();
+    };
+    
+    // Subscribe to the streak flexSave events
+    streakFlexSaveEvents.on(STREAK_FLEX_SAVE_APPLIED, handleStreakFlexSaveApplied);
+    
+    // Cleanup
+    return () => {
+      streakFlexSaveEvents.off(STREAK_FLEX_SAVE_APPLIED, handleStreakFlexSaveApplied);
+    };
+  }, []);
+
+  // Create TimeRewind effect
+  const createTimeRewindEffect = () => {
+    // Reset animation values
+    backgroundFlashOpacity.setValue(0);
+    
+    // Create time rewind elements in a radial pattern around the screen
+    const newElements = [];
+    const screenWidth = width;
+    const screenHeight = height;
+    const centerX = screenWidth / 2;
+    const centerY = screenHeight / 2;
+    
+    // Number of elements to create
+    const numElements = 30;
+    
+    // Create elements in a circular pattern around the screen edges
+    for (let i = 0; i < numElements; i++) {
+      // Calculate position on a circle or slightly inside from the edges
+      const angle = (i / numElements) * Math.PI * 2;
+      const radius = Math.min(screenWidth, screenHeight) * 0.45;  // 90% of the smaller dimension
+      
+      // Position elements around the edge in a circle
+      const startX = centerX + Math.cos(angle) * radius;
+      const startY = centerY + Math.sin(angle) * radius;
+      
+      // Create varying sizes based on position 
+      const sizeVariation = 0.7 + (Math.random() * 0.6); // 70% to 130% of base size
+      const baseSize = 20; // Base icon size
+      
+      newElements.push({
+        id: i,
+        x: startX,
+        y: startY,
+        size: baseSize * sizeVariation,
+        duration: 2000 + Math.random() * 1500, // Varying durations for natural feel
+        delay: Math.random() * 800, // Stagger the start time
+        rotation: 180 + Math.random() * 720, // 0.5 to 2 full rotations
+        maxY: height
+      });
+    }
+    
+    // Add a visual vortex effect at the center
+    addVortexEffect();
+    
+    // Create a subtle background flash animation
+    Animated.sequence([
+      Animated.timing(backgroundFlashOpacity, {
+        toValue: 0.3,
+        duration: 400,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic)
+      }),
+      Animated.timing(backgroundFlashOpacity, {
+        toValue: 0,
+        duration: 1200,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.cubic)
+      })
+    ]).start();
+    
+    setTimeRewindElements(newElements);
+    setShowTimeRewindEffect(true);
+    
+    // Auto-hide after animation completes
+    setTimeout(() => {
+      setShowTimeRewindEffect(false);
+      setShowVortex(false);
+    }, 4000); // Match the new animation timing
+  };
+  
+  // Create a visual center "vortex" effect
+  const addVortexEffect = () => {
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      haptics.medium();
+      
+      // Second pulse after a slight delay
+      setTimeout(() => {
+        haptics.heavy();
+      }, 300);
+    }
+    
+    // Show the vortex component
+    setShowVortex(true);
+  };
+
+  // Handle flexSave applied callback
+  const handleFlexSaveApplied = (data: { success: boolean, streakValue: number, flexSavesRemaining: number }) => {
+    if (data.success) {
+      // If needed, additional actions beyond createTimeRewindEffect
+      setCurrentStreak(data.streakValue);
+    }
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -708,7 +831,7 @@ export default function HomeScreen() {
           colors={isDark ? 
             ['rgba(18, 18, 18, 1)', 'rgba(30, 30, 30, 1)'] : 
             isSunset ?
-              ['rgba(50, 30, 64, 0.95)', 'rgba(32, 18, 41, 1)'] :
+              ['rgba(42, 33, 24, 0.95)', 'rgba(61, 48, 35, 1)'] :
               ['rgba(240, 240, 240, 1)', 'rgba(255, 255, 255, 1)']}
           style={StyleSheet.absoluteFill}
         />
@@ -729,7 +852,7 @@ export default function HomeScreen() {
         colors={isDark ? 
           ['rgba(18, 18, 18, 1)', 'rgba(30, 30, 30, 1)'] : 
           isSunset ?
-            ['rgba(50, 30, 64, 0.95)', 'rgba(32, 18, 41, 1)'] :
+            ['rgba(42, 33, 24, 0.95)', 'rgba(61, 48, 35, 1)'] :
             ['rgba(245, 245, 250, 1)', 'rgba(255, 255, 255, 1)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -753,6 +876,7 @@ export default function HomeScreen() {
         <StreakDisplay 
           currentStreak={currentStreak} 
           onPremiumPress={showPremiumModal}
+          onFlexSaveApplied={handleFlexSaveApplied}
         />
 
         {/* Level Progress Card - shows for all users */}
@@ -903,6 +1027,46 @@ export default function HomeScreen() {
         onClose={() => setCustomRoutineModalVisible(false)}
         onStartRoutine={handleStartCustomRoutine}
       />
+
+      {/* Time Rewind Animation Layer */}
+      {showTimeRewindEffect && (
+        <View style={[StyleSheet.absoluteFill, styles.timeRewindContainer]}>
+          {/* Background flash effect */}
+          <Animated.View 
+            style={[
+              StyleSheet.absoluteFill, 
+              styles.backgroundFlash,
+              { 
+                opacity: backgroundFlashOpacity,
+                backgroundColor: theme.accent 
+              }
+            ]} 
+          />
+          
+          {/* Central vortex effect */}
+          <Vortex 
+            visible={showVortex}
+            size={120}
+            color={theme.accent}
+            duration={3000}
+          />
+        
+          {/* Time rewind elements that spiral in */}
+          {timeRewindElements.map(element => (
+            <TimeRewind
+              key={element.id}
+              x={element.x}
+              y={element.y}
+              size={element.size}
+              duration={element.duration}
+              delay={element.delay}
+              rotation={element.rotation}
+              maxY={element.maxY}
+              color={theme.accent}
+            />
+          ))}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -920,5 +1084,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+  },
+  timeRewindContainer: {
+    pointerEvents: 'none', // Allow touches to pass through to components underneath
+    zIndex: 99, // High z-index to ensure time rewind elements appear on top
+  },
+  backgroundFlash: {
+    backgroundColor: '#2196F3', // Blue flash color
+    zIndex: 98, // Below the time rewind elements but above the app
   }
 });

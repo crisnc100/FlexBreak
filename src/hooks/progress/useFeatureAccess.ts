@@ -21,7 +21,7 @@ export function useFeatureAccess() {
     customReminders: false,
     xpBoost: false,
     customRoutines: false,
-    streakFreezes: false,
+    flexSaves: false,
     premiumStretches: false,
     deskBreakBoost: false,
     focusAreaMastery: false
@@ -37,7 +37,7 @@ export function useFeatureAccess() {
         customReminders: false,
         xpBoost: false,
         customRoutines: false,
-        streakFreezes: false,
+        flexSaves: false,
         premiumStretches: false,
         deskBreakBoost: false,
         focusAreaMastery: false
@@ -53,7 +53,7 @@ export function useFeatureAccess() {
       const customRemindersAccess = await rewardManager.isRewardUnlocked('custom_reminders');
       const xpBoostAccess = await rewardManager.isRewardUnlocked('xp_boost');
       const customRoutinesAccess = await rewardManager.isRewardUnlocked('custom_routines');
-      const streakFreezesAccess = await rewardManager.isRewardUnlocked('streak_freezes');
+      const flexSavesAccess = await rewardManager.isRewardUnlocked('flex_saves');
       const premiumStretchesAccess = await rewardManager.isRewardUnlocked('premium_stretches');
       const deskBreakBoostAccess = await rewardManager.isRewardUnlocked('desk_break_boost');
       const focusAreaMasteryAccess = await rewardManager.isRewardUnlocked('focus_area_mastery');
@@ -63,7 +63,7 @@ export function useFeatureAccess() {
         customReminders: customRemindersAccess,
         xpBoost: xpBoostAccess,
         customRoutines: customRoutinesAccess,
-        streakFreezes: streakFreezesAccess,
+        flexSaves: flexSavesAccess,
         premiumStretches: premiumStretchesAccess,
         deskBreakBoost: deskBreakBoostAccess,
         focusAreaMastery: focusAreaMasteryAccess
@@ -74,7 +74,7 @@ export function useFeatureAccess() {
         customReminders: customRemindersAccess,
         xpBoost: xpBoostAccess,
         customRoutines: customRoutinesAccess,
-        streakFreezes: streakFreezesAccess,
+        flexSaves: flexSavesAccess,
         premiumStretches: premiumStretchesAccess,
         deskBreakBoost: deskBreakBoostAccess,
         focusAreaMastery: focusAreaMasteryAccess
@@ -135,7 +135,7 @@ export function useFeatureAccess() {
         return 4;
       case 'custom_routines':
         return 5;
-      case 'streak_freezes':
+      case 'flex_saves':
         return 6;
       case 'premium_stretches':
         return 7;
@@ -178,8 +178,8 @@ export function useFeatureAccess() {
       case 'custom_routines':
         return features.customRoutines || meetsLevelRequirement('custom_routines');
         
-      case 'streak_freezes':
-        return features.streakFreezes || meetsLevelRequirement('streak_freezes');
+      case 'flex_saves':
+        return features.flexSaves || meetsLevelRequirement('flex_saves');
         
       case 'premium_stretches':
         return features.premiumStretches || meetsLevelRequirement('premium_stretches');

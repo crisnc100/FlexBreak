@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   Dimensions
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as streakFreezeManager from '../../utils/progress/modules/streakFreezeManager';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as flexSaveManager from '../../utils/progress/modules/flexSaveManager';
 import * as streakManager from '../../utils/progress/modules/streakManager';
 import { useFeatureAccess } from '../../hooks/progress/useFeatureAccess';
 import { usePremium } from '../../context/PremiumContext';
 import { useTheme } from '../../context/ThemeContext';
-import * as haptics from '../../utils/haptics';
+import * as Haptics from 'expo-haptics';
 import * as featureAccessUtils from '../../utils/featureAccessUtils';
 import * as dateUtils from '../../utils/progress/modules/utils/dateUtils'
 
@@ -85,18 +85,18 @@ const Snowflake = ({ x, y, size, duration, delay, rotation }) => {
         ]
       }}
     >
-      <Ionicons name="snow-outline" size={size} color="#90CAF9" />
+      <MaterialCommunityIcons name="timer-sand" size={size} color="#90CAF9" />
     </Animated.View>
   );
 };
 
-interface StreakFreezeCardProps {
+interface FlexSaveCardProps {
   currentStreak: number;
   isDark?: boolean;
   isSunset?: boolean;
 }
 
-const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({ 
+const FlexSaveCard: React.FC<FlexSaveCardProps> = ({ 
   currentStreak,
   isDark: propIsDark,
   isSunset: propIsSunset
@@ -106,7 +106,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   const isDark = propIsDark !== undefined ? propIsDark : contextIsDark;
   const isSunset = propIsSunset !== undefined ? propIsSunset : contextIsSunset;
   const [isLoading, setIsLoading] = useState(true);
-  const [freezeCount, setFreezeCount] = useState(0);
+  const [flexSaveCount, setFlexSaveCount] = useState(0);
   const [isStreakBroken, setIsStreakBroken] = useState(false);
   const [recentlySaved, setRecentlySaved] = useState(false);
   const [canSaveStreak, setCanSaveStreak] = useState(false);
@@ -121,7 +121,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const buttonScaleAnim = useRef(new Animated.Value(1)).current;
-  const freezeCounterAnim = useRef(new Animated.Value(1)).current;
+  const flexSaveCounterAnim = useRef(new Animated.Value(1)).current;
   
   // Screen dimensions for animations
   const { width } = Dimensions.get('window');
@@ -133,44 +133,43 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     ttl: 10000 // 10 seconds cache TTL
   });
   
-  // Check freeze data on mount
+  // Check flexSave data on mount
   useEffect(() => {
-    loadFreezeData();
+    loadFlexSaveData();
   }, []);
   
   // Update when streak changes
   useEffect(() => {
     console.log('Current streak changed to:', currentStreak);
     // Force a complete reload of data when streak changes
-    loadFreezeData(true);
+    loadFlexSaveData(true);
   }, [currentStreak]);
   
-  // Listen for streak events from other components (like the StreakFreezePrompt)
+  // Listen for streak events from other components (like the FlexSavePrompt)
   useEffect(() => {
     // When a streak is saved via the prompt, update our local state
     const handleStreakSaved = (data: any) => {
-      console.log('StreakFreezeCard received streak saved event:', data);
+      console.log('FlexSaveCard received streak saved event:', data);
       
       // Update our state to reflect the saved streak
       setRecentlySaved(true);
       setCanSaveStreak(false);
       
       // This was from another component, so show the snowflake effect for consistency
-      if (data.freezeApplied) {
+      if (data.flexSaveApplied) {
         createSnowflakeEffect();
       }
       
-      // Refresh our data to get the latest streak freeze count
-      loadFreezeData(true);
+      // Refresh our data to get the latest streak flexSave count
+      loadFlexSaveData(true);
     };
     
     // When a streak is intentionally broken, update our state
     const handleStreakBroken = (data: any) => {
       // Only handle user initiated resets (like from the prompt)
       if (data.userReset) {
-        console.log('StreakFreezeCard received user streak reset event');
-        setCanSaveStreak(false);
-        loadFreezeData(true);
+        console.log('FlexSaveCard received user streak reset event');
+        loadFlexSaveData(true);
       }
     };
     
@@ -212,15 +211,15 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     }, 3500); // Give more time for animations to complete
   };
   
-  // Load freeze data
-  const loadFreezeData = async (forceRefresh = false) => {
+  // Load flexSave data
+  const loadFlexSaveData = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      console.log('Loading streak freeze data...', forceRefresh ? '(force refresh)' : '');
+      console.log('Loading streak flexSave data...', forceRefresh ? '(force refresh)' : '');
       
-      // If this is an initial load (not after using a streak freeze), check for monthly refill
-      if (canAccessFeature('streak_freezes') && !forceRefresh) {
-        await streakFreezeManager.refillFreezes();
+      // If this is an initial load (not after using a streak flexSave), check for monthly refill
+      if (canAccessFeature('flex_saves') && !forceRefresh) {
+        await flexSaveManager.refillFlexSaves();
       }
       
       // If we recently saved a streak, never load the data again 
@@ -233,30 +232,30 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       
       // Get direct confirmation from storage for current state
       const streakStatus = await streakManager.getStreakStatus();
-      const count = streakStatus.freezesAvailable;
+      const count = streakStatus.flexSavesAvailable;
       
       // For additional validation, get the direct count from storage as well
-      const directCount = await streakFreezeManager.getFreezesAvailable();
+      const directCount = await flexSaveManager.getFlexSavesAvailable();
       
       // If there's a mismatch, log it for debugging but use the streakManager's value
       if (count !== directCount) {
-        console.log(`[FREEZE DEBUG] Mismatch in freeze counts: streakManager=${count}, direct=${directCount}, using streakManager value`);
+        console.log(`[FLEXSAVE DEBUG] Mismatch in flexSave counts: streakManager=${count}, direct=${directCount}, using streakManager value`);
       }
       
       // Only update the UI if we're not in a recently saved state
       if (!recentlySaved) {
-        console.log(`Loaded freeze count: ${count}/2`);
-        setFreezeCount(count);
+        console.log(`Loaded flexSave count: ${count}/2`);
+        setFlexSaveCount(count);
       } else {
-        console.log(`Skipping UI update for streak freeze count: ${count}/2`);
+        console.log(`Skipping UI update for streak flexSave count: ${count}/2`);
       }
       
       // Start animation
       startPulseAnimation();
       
-      // Check if a streak freeze was recently applied
-      const wasUsedToday = await streakFreezeManager.wasStreakFreezeAppliedRecently();
-      console.log('Was streak freeze used recently?', wasUsedToday);
+      // Check if a streak flexSave was recently applied
+      const wasUsedToday = await flexSaveManager.wasFlexSaveAppliedRecently();
+      console.log('Was streak flexSave used recently?', wasUsedToday);
       
       // Only update recentlySaved if it's not already true
       if (!recentlySaved) {
@@ -266,7 +265,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       // Check if streak needs saving
       await checkStreakStatus();
     } catch (error) {
-      console.error('Error loading streak freeze data:', error);
+      console.error('Error loading streak flexSaveveveveveve data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -299,7 +298,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       
       // Check if streak is truly broken by checking the last 3 days
       const isTrulyBroken = await streakManager.isStreakBroken();
-      console.log('Streak freeze card - isTrulyBroken check:', isTrulyBroken);
+      console.log('Streak flexSaveveveve card - isTrulyBroken check:', isTrulyBroken);
       
       // CHECK FOR SPECIFIC MULTI-DAY GAP ISSUE
       // Get dates to check recent activity
@@ -315,9 +314,9 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       
       // Check for activity on yesterday and two days ago
       const hasYesterdayActivity = routineDates.includes(yesterdayStr) || 
-                                 streakManager.streakCache.freezeDates.includes(yesterdayStr);
+                                 streakManager.streakCache.flexSaveDates.includes(yesterdayStr);
       const hasTwoDaysAgoActivity = routineDates.includes(twoDaysAgoStr) || 
-                                  streakManager.streakCache.freezeDates.includes(twoDaysAgoStr);
+                                  streakManager.streakCache.flexSaveDates.includes(twoDaysAgoStr);
       
       // If there's no activity for yesterday AND no activity for two days ago, it's a multi-day gap
       const hasMultiDayGap = !hasYesterdayActivity && !hasTwoDaysAgoActivity;
@@ -343,7 +342,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       // Current logic - prevents showing apply button if user did activity today
       const originalCanSave = status.canSaveYesterdayStreak && !isTrulyBroken && !todayActivity;
       
-      // New logic - would allow applying freeze even if there's activity today
+      // New logic - would allow applying flexSave even if there's activity today
       const newLogicCanSave = status.canSaveYesterdayStreak && !isTrulyBroken;
       
 
@@ -369,9 +368,9 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         startRotateAnimation();
       }
       
-      console.log(`StreakFreezeCard: Retrieved streak status: ${status.streakBroken ? 'BROKEN' : 'ACTIVE'}, streak=${newStatus.currentStreak}, truly broken=${isTrulyBroken}, today activity=${todayActivity}`);
+      console.log(`FlexSaveCard: Retrieved streak status: ${status.streakBroken ? 'BROKEN' : 'ACTIVE'}, streak=${newStatus.currentStreak}, truly broken=${isTrulyBroken}, today activity=${todayActivity}`);
     } catch (error) {
-      console.error('Error checking streak status in StreakFreezeCard:', error);
+      console.error('Error checking streak status in FlexSaveCard:', error);
     }
   };
   
@@ -428,21 +427,21 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     ]).start();
   };
   
-  // Animate the freeze counter change
-  const animateFreezeCountChange = (oldCount, newCount) => {
+  // Animate the flexSave counter change
+  const animateFlexSaveCountChange = (oldCount, newCount) => {
     // Scale down and up animation
     Animated.sequence([
-      Animated.timing(freezeCounterAnim, {
+      Animated.timing(flexSaveCounterAnim, {
         toValue: 0.7,
         duration: 150,
         useNativeDriver: true
       }),
-      Animated.timing(freezeCounterAnim, {
+      Animated.timing(flexSaveCounterAnim, {
         toValue: 1.2,
         duration: 200,
         useNativeDriver: true
       }),
-      Animated.timing(freezeCounterAnim, {
+      Animated.timing(flexSaveCounterAnim, {
         toValue: 1,
         duration: 150,
         useNativeDriver: true
@@ -468,24 +467,24 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     ).start();
   };
   
-  // Handle applying a streak freeze
-  const handleApplyStreakFreeze = async () => {
+  // Handle applying a streak flexSave
+  const handleApplyFlexSave = async () => {
     if (!canSaveStreak) {
-      console.log('Cannot apply streak freeze because canSaveStreak is false. Current conditions:', {
+      console.log('Cannot apply streak flexSave because canSaveStreak is false. Current conditions:', {
         streakBroken: isStreakBroken,
         hasTodayActivity,
         recentlySaved,
-        freezeCount,
+        flexSaveCount,
         currentStreak
       });
       return;
     }
     
-    console.log('Applying streak freeze with conditions:', {
+    console.log('Applying streak flexSave with conditions:', {
       streakBroken: isStreakBroken,
       hasTodayActivity,
       recentlySaved,
-      freezeCount,
+      flexSaveCount,
       currentStreak
     });
     
@@ -513,34 +512,34 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         })
       ]).start();
       
-      // Apply the streak freeze with a small artificial delay
+      // Apply the streak flexSave with a small artificial delay
       // to ensure animations have time to play smoothly
       setTimeout(async () => {
-        console.log('Calling applyFreeze() from handleApplyStreakFreeze...');
-        const result = await streakManager.applyFreeze();
+        console.log('Calling applyFlexSave() from handleApplyFlexSave...');
+        const result = await streakManager.applyFlexSave();
         
-        console.log('Apply freeze result:', result);
+        console.log('Apply flexSave result:', result);
         
         if (result.success) {
           // Apply quick haptic feedback on success
-          haptics.success();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           
-          // Update the freeze count immediately with the result
-          setFreezeCount(result.remainingFreezes);
+          // Update the flexSave count immediately with the result
+          setFlexSaveCount(result.remainingFlexSaves);
           
-          // Animate the freeze counter to show it decreased
+          // Animate the flexSave counter to show it decreased
           Animated.sequence([
-            Animated.timing(freezeCounterAnim, {
+            Animated.timing(flexSaveCounterAnim, {
               toValue: 0.5,
               duration: 300,
               useNativeDriver: true
             }),
-            Animated.timing(freezeCounterAnim, {
+            Animated.timing(flexSaveCounterAnim, {
               toValue: 1.2,
               duration: 400,
               useNativeDriver: true
             }),
-            Animated.timing(freezeCounterAnim, {
+            Animated.timing(flexSaveCounterAnim, {
               toValue: 1,
               duration: 300,
               useNativeDriver: true
@@ -551,14 +550,14 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
           setRecentlySaved(true);
           setIsLoading(false);
         } else {
-          console.error('Failed to apply streak freeze');
-          console.log('Freeze apply failure details:', {
+          console.error('Failed to apply streak flexSave');
+          console.log('FlexSave apply failure details:', {
             currentStreak,
-            freezeCount,
-            remainingFreezes: result.remainingFreezes
+            flexSaveCount,
+            remainingFlexSaves: result.remainingFlexSaves
           });
           // Show error feedback
-          haptics.error();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           setIsLoading(false);
         }
         
@@ -567,7 +566,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
       }, 400); // Small delay for smoother animation sequence
       
     } catch (error) {
-      console.error('Error applying streak freeze:', error);
+      console.error('Error applying streak flexSave:', error);
       setIsLoading(false);
     }
   };
@@ -602,14 +601,14 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
   );
   
   // Render locked state for non-premium users or users below required level
-  if (!isPremium || !meetsLevelRequirement('streak_freezes')) {
+  if (!isPremium || !meetsLevelRequirement('flex_saves')) {
     // Double-check premium status using the more reliable method
     const checkFeatureAccess = async () => {
-      const hasPremium = await featureAccessUtils.canAccessFeature('streak_freezes');
-      if (hasPremium && meetsLevelRequirement('streak_freezes') && !isLoading) {
+      const hasPremium = await featureAccessUtils.canAccessFeature('flex_saves');
+      if (hasPremium && meetsLevelRequirement('flex_saves') && !isLoading) {
         // Force reload data with the correct premium status
-        console.log('Premium status corrected, reloading streak freeze data');
-        loadFreezeData(true);
+        console.log('Premium status corrected, reloading streak flexSave data');
+        loadFlexSaveData(true);
       }
     };
     
@@ -619,14 +618,14 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     return (
       <View style={[styles.container, { backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF' }]}>
         <View style={[styles.iconContainer, { backgroundColor: isDark || isSunset ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD' }]}>
-          <Ionicons name="snow" size={24} color={isDark || isSunset ? '#90CAF9' : '#BDBDBD'} />
+          <MaterialCommunityIcons name="timer-sand" size={24} color={isDark ? '#90CAF9' : '#BDBDBD'} />
         </View>
         <View style={styles.contentContainer}>
-          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Streak Freezes</Text>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Flex Saves</Text>
           <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
             {!isPremium 
               ? 'Premium Feature' 
-              : `Unlocks at Level ${getRequiredLevel('streak_freezes')}`}
+              : `Unlocks at Level ${getRequiredLevel('flex_saves')}`}
           </Text>
         </View>
         <View style={styles.lockedContainer}>
@@ -641,10 +640,10 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
     return (
       <View style={[styles.container, { backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF' }]}>
         <View style={[styles.iconContainer, { backgroundColor: isDark || isSunset ? 'rgba(144, 202, 249, 0.1)' : '#E3F2FD' }]}>
-          <Ionicons name="snow" size={24} color={isDark || isSunset ? '#90CAF9' : '#2196F3'} />
+          <MaterialCommunityIcons name="timer-sand" size={24} color={isDark ? '#90CAF9' : '#2196F3'} />
         </View>
         <View style={styles.contentContainer}>
-          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Streak Freezes</Text>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Flex Saves</Text>
           <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>Loading data...</Text>
         </View>
         <ActivityIndicator size="small" color={isDark || isSunset ? '#90CAF9' : '#2196F3'} />
@@ -688,33 +687,33 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
           }
         ]}
       >
-        <Ionicons name="snow" size={24} color={isDark || isSunset ? '#90CAF9' : '#2196F3'} />
+        <MaterialCommunityIcons name="timer-sand" size={24} color={isDark ? '#90CAF9' : '#2196F3'} />
       </Animated.View>
       
       <View style={styles.contentContainer}>
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Streak Freezes</Text>
+          <Text style={[styles.title, { color: isDark || isSunset ? theme.text : '#333' }]}>Flex Saves</Text>
           
-          {/* Updated freezes counter with clear indicator */}
+          {/* Updated flexSaves counter with clear indicator */}
           <Animated.View style={[
-            styles.freezeCounterContainer,
+            styles.flexSaveCounterContainer,
             { 
               backgroundColor: isDark || isSunset ? 'rgba(144, 202, 249, 0.2)' : '#E3F2FD',
-              transform: [{ scale: freezeCounterAnim }]
+              transform: [{ scale: flexSaveCounterAnim }]
             }
           ]}>
-            <Ionicons 
-              name="snow" 
+            <MaterialCommunityIcons 
+              name="timer-sand" 
               size={16} 
               color={isDark || isSunset ? '#90CAF9' : '#2196F3'} 
-              style={styles.freezeIcon}
+              style={styles.flexSaveIcon}
             />
             <Text style={[
-              styles.freezeCount, 
+              styles.flexSaveCount, 
               { color: isDark || isSunset ? '#90CAF9' : '#2196F3' }
             ]}>
-              {freezeCount}
-              <Text style={styles.freezeCountMax}></Text>
+              {flexSaveCount}
+              <Text style={styles.flexSaveCountMax}></Text>
             </Text>
           </Animated.View>
         </View>
@@ -722,14 +721,14 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
         {recentlySaved ? (
           <>
             <SavedMessage />
-            <Text style={[styles.freezeInfoText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
-              You have {freezeCount} streak {freezeCount === 1 ? 'freeze' : 'freezes'} remaining.
+            <Text style={[styles.flexSaveInfoText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
+              You have {flexSaveCount} Flex Save {flexSaveCount === 1 ? 'remaining' : 'remaining'}.
             </Text>
           </>
         ) : (
           <>
             <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
-              Missing a day won't break your streak! Your streak freezes reset at the beginning of each month.
+              Missing a day won't break your streak! Your FlexSaves reset at the beginning of each month.
             </Text>
             
             {currentStreak >= 1 && !isStreakBroken && (
@@ -744,14 +743,14 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
               </Text>
             )}
             
-            {canSaveStreak && freezeCount > 0 && (
+            {canSaveStreak && flexSaveCount > 0 && (
               <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
                 <TouchableOpacity
                   style={[
                     styles.applyButton,
                     { backgroundColor: isDark || isSunset ? '#90CAF9' : '#2196F3' }
                   ]}
-                  onPress={handleApplyStreakFreeze}
+                  onPress={handleApplyFlexSave}
                   activeOpacity={0.7}
                 >
                   <Ionicons 
@@ -760,7 +759,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
                     color="#FFF" 
                     style={{ marginRight: 6 }}
                   />
-                  <Text style={styles.applyButtonText}>Apply Streak Freeze</Text>
+                  <Text style={styles.applyButtonText}>Apply Flex Save</Text>
                 </TouchableOpacity>
               </Animated.View>
             )}
@@ -769,7 +768,7 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
               <View style={styles.warningContainer}>
                 <Ionicons name="alert-circle-outline" size={18} color={isDark || isSunset ? '#FFB74D' : '#FF9800'} style={{ marginRight: 6 }} />
                 <Text style={[styles.warningText, { color: isDark || isSunset ? '#FFB74D' : '#FF9800' }]}>
-                  Streak reset: You missed 2+ days. Streak freezes only work for 1-day gaps.
+                  Streak reset: You missed 2+ days. Flex saves only work for 1-day gaps.
                 </Text>
               </View>
             )}
@@ -787,26 +786,26 @@ const StreakFreezeCard: React.FC<StreakFreezeCardProps> = ({
             
             {!canSaveStreak && !isStreakBroken && !hasTodayActivity && currentStreak > 0 && (
               <Text style={[styles.explainerText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
-                Streak freezes apply when you've missed a day of activity.
+                Flex saves apply when you've missed a day of activity.
               </Text>
             )}
           </>
         )}
         
-        {/* Freeze count indicator pills at the bottom */}
-        <View style={styles.freezeCounterPills}>
+        {/* FlexSave count indicator pills at the bottom */}
+        <View style={styles.flexSaveCounterPills}>
           <View style={[
-            styles.freezePill, 
+            styles.flexSavePill, 
             { 
-              backgroundColor: freezeCount >= 1 
+              backgroundColor: flexSaveCount >= 1 
                 ? (isDark || isSunset ? 'rgba(144, 202, 249, 0.5)' : '#2196F3') 
                 : (isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : '#E0E0E0') 
             }
           ]} />
           <View style={[
-            styles.freezePill, 
+            styles.flexSavePill, 
             { 
-              backgroundColor: freezeCount >= 2 
+              backgroundColor: flexSaveCount >= 2 
                 ? (isDark || isSunset ? 'rgba(144, 202, 249, 0.5)' : '#2196F3') 
                 : (isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : '#E0E0E0') 
             }
@@ -862,21 +861,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '500',
   },
-  freezeCounterContainer: {
+  flexSaveCounterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  freezeIcon: {
+  flexSaveIcon: {
     marginRight: 4,
   },
-  freezeCount: {
+  flexSaveCount: {
     fontWeight: 'bold',
     fontSize: 14,
   },
-  freezeCountMax: {
+  flexSaveCountMax: {
     fontWeight: 'normal',
     opacity: 0.7,
   },
@@ -934,18 +933,18 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
-  freezeInfoText: {
+  flexSaveInfoText: {
     fontSize: 13,
     marginTop: 4,
     fontStyle: 'italic',
   },
-  freezeCounterPills: {
+  flexSaveCounterPills: {
     flexDirection: 'row',
     marginTop: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  freezePill: {
+  flexSavePill: {
     width: 26,
     height: 6,
     borderRadius: 3,
@@ -971,4 +970,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StreakFreezeCard; 
+export default FlexSaveCard; 

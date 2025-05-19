@@ -1140,24 +1140,24 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     }
   };
   
-  // Handle streak freeze tests
-  const handleStreakFreezeTest = async (testId: string): Promise<void> => {
-    logWithTimestamp(`Starting streak freeze test ${testId}`);
+  // Handle streak flexSave tests
+  const handleFlexSaveTest = async (testId: string): Promise<void> => {
+    logWithTimestamp(`Starting streak flexSave test ${testId}`);
     setIsLoading(true);
     
     try {
       // First, reset simulation data to start fresh
       await resetSimulationData();
-      logWithTimestamp('Reset simulation data for streak freeze test');
-      addLog(`Reset data for streak freeze test ${testId}`);
+      logWithTimestamp('Reset simulation data for streak flexSave test');
+      addLog(`Reset data for streak flexSave test ${testId}`);
       
-      // Set XP to 1800 to reach Level 6 (when streak freeze unlocks)
+      // Set XP to 1800 to reach Level 6 (when streak flexSave unlocks)
       let progress = await storageService.getUserProgress();
       progress.totalXP = 1800;
       progress.level = 6; // Ensure level is set correctly
       await storageService.saveUserProgress(progress);
-      logWithTimestamp('Set XP to 1800 (Level 6) for streak freeze test');
-      addLog(`Set XP to 1800 (Level 6) for streak freeze test`);
+      logWithTimestamp('Set XP to 1800 (Level 6) for streak flexSave test');
+      addLog(`Set XP to 1800 (Level 6) for streak flexSave test`);
       
       // Number of days to simulate a streak
       const streakDays = 14;
@@ -1177,7 +1177,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - (streakDays - 1));
       
-      logWithTimestamp(`Streak freeze test ${testId}: simulating from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()} with ${gapDays}-day gap`);
+      logWithTimestamp(`Streak flexSave test ${testId}: simulating from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()} with ${gapDays}-day gap`);
       addLog(`Starting streak simulation for ${streakDays} days ending ${gapDays} days ago`);
       
       // Default config for all simulated days
@@ -1257,28 +1257,28 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
       // Add a summary message based on the test
       if (testId === '4.1') {
-        addLog(`✅ Streak Freeze Test 4.1 (1-day gap) completed`);
-        addLog(`Current streak is ${currentStreak}. Check if streak freeze option is available in Progress tab.`);
+        addLog(`✅ Flex Save Test 4.1 (1-day gap) completed`);
+        addLog(`Current streak is ${currentStreak}. Check if streak flexSave option is available in Progress tab.`);
         Alert.alert(
-          'Streak Freeze Test 4.1 Complete',
-          `Set up a ${streakDays}-day streak ending 2 days ago with 1-day gap (yesterday).\n\nCurrent streak: ${currentStreak}\n\nNow:\n1. Close the simulator\n2. Restart the app\n3. Go to Progress tab\n4. Check if streak freeze option is available\n5. Apply streak freeze\n6. Verify streak is restored +1 day.`,
+          'Flex Save Test 4.1 Complete',
+          `Set up a ${streakDays}-day streak ending 2 days ago with 1-day gap (yesterday).\n\nCurrent streak: ${currentStreak}\n\nNow:\n1. Close the simulator\n2. Restart the app\n3. Go to Progress tab\n4. Check if streak flexSave option is available\n5. Apply streak flexSave\n6. Verify streak is restored +1 day.`,
           [{ text: 'OK', style: 'default' }]
         );
       } else { // 4.2
-        addLog(`✅ Streak Freeze Test 4.2 (2-day gap) completed`);
-        addLog(`Current streak is ${currentStreak}. Check that streak freeze option is NOT available in Progress tab.`);
+        addLog(`✅ Flex Save Test 4.2 (2-day gap) completed`);
+        addLog(`Current streak is ${currentStreak}. Check that streak flexSave option is NOT available in Progress tab.`);
         Alert.alert(
-          'Streak Freeze Test 4.2 Complete',
-          `Set up a ${streakDays}-day streak ending 3 days ago with 2-day gap (yesterday and day before).\n\nCurrent streak: ${currentStreak}\n\nNow:\n1. Close the simulator\n2. Restart the app\n3. Go to Progress tab\n4. Verify streak freeze option is NOT available\n5. Confirm streak has reset (should be 0).`,
+          'Flex Save Test 4.2 Complete',
+          `Set up a ${streakDays}-day streak ending 3 days ago with 2-day gap (yesterday and day before).\n\nCurrent streak: ${currentStreak}\n\nNow:\n1. Close the simulator\n2. Restart the app\n3. Go to Progress tab\n4. Verify streak flexSave option is NOT available\n5. Confirm streak has reset (should be 0).`,
           [{ text: 'OK', style: 'default' }]
         );
       }
       
       return Promise.resolve();
     } catch (error) {
-      logWithTimestamp(`Error in streak freeze test ${testId}: ${error}`);
-      console.error(`Error in streak freeze test ${testId}:`, error);
-      Alert.alert('Streak Freeze Test Error', 'An error occurred during the streak freeze test setup.');
+      logWithTimestamp(`Error in streak flexSave test ${testId}: ${error}`);
+      console.error(`Error in streak flexSave test ${testId}:`, error);
+      Alert.alert('Flex Save Test Error', 'An error occurred during the streak flexSave test setup.');
       
       // Ensure we restore the original Date object
       restoreOriginalDate();
@@ -1446,7 +1446,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
               <SimulationActions
                 onSimulate7Days={onSimulate7Days}
                 onSimulate3Days={onSimulate3Days}
-                onStreakFreezeTest={handleStreakFreezeTest}
+                onFlexSaveTest={handleFlexSaveTest}
                 onReset={handleReset}
                 scenarioId={scenarioInstructions?.id}
                 simulate7DaysDateRange={simulate7DaysDateRange}

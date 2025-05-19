@@ -2,7 +2,7 @@ import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types
-type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'streakFreeze' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 'transition1' | 'transition2' | 'halfway';
+type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'flexSave' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 'transition1' | 'transition2' | 'halfway';
 
 // Define the cache to store loaded sounds
 const soundCache: Record<SoundEffect, Audio.Sound | null> = {
@@ -10,7 +10,7 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   levelUp: null,
   click: null,
   timerTick: null,
-  streakFreeze: null,
+  flexSave: null,
   xpBoost: null,
   intro: null,
   premiumUnlocked: null,
@@ -28,7 +28,7 @@ const soundDebounceMap: Record<SoundEffect, number> = {
   levelUp: 0,
   click: 0,
   timerTick: 0,
-  streakFreeze: 0,
+  flexSave: 0,
   xpBoost: 0,
   intro: 0,
   premiumUnlocked: 0,
@@ -59,8 +59,8 @@ const soundUris: Record<SoundEffect, any> = {
   levelUp: require('../../assets/sounds/levelUP.mp3'),
   click: require('../../assets/sounds/normalClick.mp3'),
   timerTick: require('../../assets/sounds/normalClick.mp3'),
-  streakFreeze: require('../../assets/sounds/freeze_xboost.mp3'),
-  xpBoost: require('../../assets/sounds/freeze_xboost.mp3'),
+  flexSave: require('../../assets/sounds/flexSave_xboost.mp3'),
+  xpBoost: require('../../assets/sounds/flexSave_xboost.mp3'),
   intro: require('../../assets/sounds/intro2.mp3'),
   premiumUnlocked: require('../../assets/sounds/unlockedPremium.mp3'),
   redeemingChallenge: require('../../assets/sounds/redeemingChallenge.mp3'),
@@ -263,10 +263,10 @@ export const playTransition2Sound = async (): Promise<void> => {
  */
 
 /**
- * Play streak freeze sound
+ * Play streak flexSave sound
  */
-export const playStreakFreezeSound = async (): Promise<void> => {
-  await playSound('streakFreeze');
+export const playFlexSaveSound = async (): Promise<void> => {
+  await playSound('flexSave');
 };
 
 /**

@@ -15,7 +15,7 @@ The gamification system has been refactored into a modular structure to improve 
 - **achievementManager.ts**: Tracks user achievements and handles unlocking new achievements.
 - **progressTracker.ts**: Handles user statistics, progress tracking, and data visualization helpers.
 - **streakManager.ts**: Manages user streaks, including updates and resets.
-- **streakFreezeManager.ts**: Handles streak freeze functionality that allows users to preserve streaks when missing days.
+- **flexSaveManager.ts**: Handles streak flexSave functionality that allows users to preserve streaks when missing days.
 - **rewardManager.ts**: Manages user rewards and unlocking new rewards based on level progression.
 - **xpBoostManager.ts**: Handles temporary XP boosts that can be applied to increase XP gain.
 

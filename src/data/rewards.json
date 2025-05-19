@@ -36,13 +36,14 @@
       "type": "app_feature"
     },
     {
-      "id": "streak_freezes",
-      "title": "Streak Freezes",
-      "description": "Miss a day, keep your streak—perfect for busy schedules",
-      "icon": "snow",
+      "id": "flex_saves",
+      "title": "Flex Saves",
+      "description": "Save your progress when you miss a day—perfect for busy schedules",
+      "icon": "shield",
       "unlocked": false,
       "levelRequired": 6,
-      "type": "app_feature"
+      "type": "app_feature",
+      "initialUses": 2
     },
     {
       "id": "premium_stretches",
