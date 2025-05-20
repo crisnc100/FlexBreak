@@ -196,17 +196,21 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
                        (meetsLevelRequirement ? 'rgba(159, 217, 255, 0.1)' : '#F0F0F0')))))
           }]}>
             <MaterialCommunityIcons 
-              name={flexSaveActive ? "timer-sand" : 
-                    (streakAtRisk ? "shield" : 
-                     (showWarning ? "alert" : 
-                      (isStreakBroken ? "refresh" :
-                        (meetsLevelRequirement && !streakAtRisk ? "fire" : "fire-outline"))))} 
+              name={
+                flexSaveActive ? "timer-sand" : 
+                streakAtRisk ? "shield" : 
+                showWarning ? "alert" : 
+                isStreakBroken ? "refresh" :
+                meetsLevelRequirement ? "star" : "star-outline"
+              } 
               size={20} 
-              color={flexSaveActive ? "#2196F3" : 
-                     (streakAtRisk ? "#FFC107" : 
-                      (showWarning ? "#FF5722" : 
-                       (isStreakBroken ? "#FF5722" :
-                         (meetsLevelRequirement ? "#2196F3" : "#FF9800"))))} 
+              color={
+                flexSaveActive ? "#2196F3" : 
+                streakAtRisk ? "#FFC107" : 
+                showWarning ? "#FF5722" : 
+                isStreakBroken ? "#FF5722" :
+                meetsLevelRequirement ? "#2196F3" : "#FF9800"
+              } 
             />
           </View>
           

@@ -212,7 +212,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
         Alert.alert(
           'Flex Saves',
           currentLevel >= 6 
-            ? 'You have 2 streak flexSaves available per month. These can be used when you miss a day to preserve your streak.'
+            ? 'You have 2 Flex Saves available per month. These can be used when you miss a day to preserve your streak.'
             : `Flex Saves unlock at level 6. You're currently level ${currentLevel}.`,
           [{ text: 'Awesome!' }]
         );

@@ -888,7 +888,11 @@ export default function RoutineScreen() {
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => setSubscriptionModalVisible(true)}
+          onUpgrade={() => {
+            // Just show the subscription modal without closing the smart pick modal
+            // This ensures the subscription modal appears on top
+            setSubscriptionModalVisible(true);
+          }}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}
@@ -925,7 +929,11 @@ export default function RoutineScreen() {
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => setSubscriptionModalVisible(true)}
+          onUpgrade={() => {
+            // Just show the subscription modal without closing the smart pick modal
+            // This ensures the subscription modal appears on top
+            setSubscriptionModalVisible(true);
+          }}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}
@@ -960,7 +968,11 @@ export default function RoutineScreen() {
         <SmartPickModal
           visible={smartPickModalVisible}
           onClose={() => setSmartPickModalVisible(false)}
-          onUpgrade={() => setSubscriptionModalVisible(true)}
+          onUpgrade={() => {
+            // Just show the subscription modal without closing the smart pick modal
+            // This ensures the subscription modal appears on top
+            setSubscriptionModalVisible(true);
+          }}
           isPremium={isPremium}
           recommendation={smartPickRecommendation || undefined}
           onStartRecommendation={handleStartRecommendation}

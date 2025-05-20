@@ -82,7 +82,7 @@ const XpNotification: React.FC<XpNotificationProps> = ({
       case 'challenge':
       case 'challenge_claim':
         return wasXpBoosted 
-          ? `From completing a challenge (2x XP Boost)`
+          ? `From completing a challenge`
           : 'From completing a challenge';
       case 'streak':
         return 'From maintaining your streak';

@@ -820,30 +820,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                   <Text style={[styles.settingTitle, {color: theme.text}]}>Diagnostics</Text>
                   <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Storage and performance monitoring</Text>
                 </View>
+            
               </View>
               <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
-            
-          </View>
-        )}
-        
-        {/* Add testing section at the end of the ScrollView */}
-        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
-          <TouchableOpacity 
-            style={styles.sectionHeader}
-            onPress={() => setShowTestingSection(!showTestingSection)}
-          >
-            <Text style={[styles.sectionTitle, {color: theme.text}]}>Testing & Development</Text>
-            <Text style={[styles.sectionToggle, {color: theme.textSecondary}]}>{showTestingSection ? '▼' : '►'}</Text>
-          </TouchableOpacity>
-          
-          {showTestingSection && (
-            <View style={styles.testingContainer}>
-              <Text style={[styles.sectionDescription, {color: theme.textSecondary}]}>
-                Use these tools to test app features and provide feedback to our development team.
-              </Text>
-              
-              <TouchableOpacity 
+            <TouchableOpacity 
                 style={[
                   styles.testingButton,
                   {backgroundColor: '#4A90E2', marginTop: 16}
@@ -853,13 +834,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                 <Ionicons name="flask-outline" size={20} color="#FFF" style={styles.buttonIcon} />
                 <Text style={styles.buttonText}>Access Bob Simulator</Text>
               </TouchableOpacity>
-              
-              <Text style={[styles.testDescription, {color: theme.textSecondary}]}>
-                Simulate user progress and test features with the Bob Simulator tool.
-              </Text>
-              
-              {/* Premium Status Management */}
-              <View style={[styles.premiumStatusContainer, {marginTop: 16, marginBottom: 8}]}>
+               {/* Premium Status Management */}
+               <View style={[styles.premiumStatusContainer, {marginTop: 16, marginBottom: 8}]}>
                 <Text style={[styles.settingTitle, {color: theme.text, marginBottom: 8}]}>Premium Status Management</Text>
                 <Text style={[styles.settingDescription, {color: theme.textSecondary, marginBottom: 12}]}>
                   Control premium status for testing subscription features
@@ -929,6 +905,36 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
                   </View>
                 </View>
               </TouchableOpacity>
+          </View>
+        )}
+        
+        {/* Add testing section at the end of the ScrollView */}
+        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
+          <TouchableOpacity 
+            style={styles.sectionHeader}
+            onPress={() => setShowTestingSection(!showTestingSection)}
+          >
+            <Text style={[styles.sectionTitle, {color: theme.text}]}>Data Management</Text>
+            <Text style={[styles.sectionToggle, {color: theme.textSecondary}]}>{showTestingSection ? '▼' : '►'}</Text>
+          </TouchableOpacity>
+          
+          {showTestingSection && (
+            <View style={styles.testingContainer}>
+              <TouchableOpacity 
+                style={styles.settingItem}
+                onPress={handleResetData}
+              >
+                <View style={styles.settingContent}>
+                  <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#3B2E2E' : '#FFEBEE'}]}>
+                    <Ionicons name="trash-outline" size={22} color="#F44336" />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
+                    <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+             
             </View>
           )}
         </View>

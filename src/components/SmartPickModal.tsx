@@ -64,84 +64,6 @@ export default function SmartPickModal({
     );
   };
 
-  // For premium users with a recommendation
-  if (isPremium && recommendation) {
-    return (
-      <Modal
-        visible={visible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={onClose}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[
-            styles.modalContent,
-            { backgroundColor: isDark ? theme.cardBackground : '#fff' }
-          ]}>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color={isDark ? theme.text : '#333'} />
-            </TouchableOpacity>
-            
-            <Ionicons name="bulb" size={60} color="#4CAF50" style={styles.featureIcon} />
-            
-            <Text style={[
-              styles.modalHeader,
-              { color: isDark ? theme.text : '#333' }
-            ]}>Smart Pick</Text>
-            
-            <View style={styles.recommendationBox}>
-              <Text style={[
-                styles.recommendationTitle,
-                { color: isDark ? theme.text : '#333' }
-              ]}>
-                {recommendation.area} - {recommendation.duration} min
-              </Text>
-              
-              {renderModeBadge()}
-              
-              <Text style={[
-                styles.recommendationReason,
-                { color: isDark ? theme.textSecondary : '#666' }
-              ]}>
-                {recommendation.reason}
-              </Text>
-              
-              {recommendation.isPremiumEnabled && (
-                <View style={styles.premiumBadgeContainer}>
-                  <Ionicons name="star" size={16} color="#FF9800" />
-                  <Text style={[
-                    styles.premiumBadgeText,
-                    { color: isDark ? '#FFC107' : '#FF9800' }
-                  ]}>
-                    Includes premium stretches
-                  </Text>
-                </View>
-              )}
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.startButton} 
-              onPress={() => {
-                onStartRecommendation && onStartRecommendation(recommendation);
-                onClose();
-              }}
-            >
-              <Text style={styles.startButtonText}>Start Routine</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.skipButton} onPress={onClose}>
-              <Text style={[
-                styles.skipButtonText,
-                { color: isDark ? theme.textSecondary : '#666' }
-              ]}>Maybe Later</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
-  
-  // For non-premium users (upgrade prompt)
   return (
     <Modal
       visible={visible}
@@ -158,59 +80,121 @@ export default function SmartPickModal({
             <Ionicons name="close" size={24} color={isDark ? theme.text : '#333'} />
           </TouchableOpacity>
           
-          <Ionicons name="analytics" size={60} color="#FF9800" style={styles.featureIcon} />
+          <Ionicons 
+            name="bulb" 
+            size={60} 
+            color={isPremium ? "#4CAF50" : "#9E9E9E"} 
+            style={styles.featureIcon} 
+          />
           
           <Text style={[
             styles.modalHeader,
             { color: isDark ? theme.text : '#333' }
           ]}>Smart Pick</Text>
           
-          <Text style={[
-            styles.modalDescription,
-            { color: isDark ? theme.textSecondary : '#666' }
-          ]}>
-            Smart Pick analyzes your stretching history to suggest personalized routines based on your patterns and needs.
-          </Text>
-          
-          <View style={styles.benefitsList}>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#FF9800" />
+          {isPremium && recommendation ? (
+            // Premium user with recommendation
+            <>
+              <View style={styles.recommendationBox}>
+                <Text style={[
+                  styles.recommendationTitle,
+                  { color: isDark ? theme.text : '#333' }
+                ]}>
+                  {recommendation.area} - {recommendation.duration} min
+                </Text>
+                
+                {renderModeBadge()}
+                
+                <Text style={[
+                  styles.recommendationReason,
+                  { color: isDark ? theme.textSecondary : '#666' }
+                ]}>
+                  {recommendation.reason}
+                </Text>
+                
+                {recommendation.isPremiumEnabled && (
+                  <View style={styles.premiumBadgeContainer}>
+                    <Ionicons name="star" size={16} color="#FF9800" />
+                    <Text style={[
+                      styles.premiumBadgeText,
+                      { color: isDark ? '#FFC107' : '#FF9800' }
+                    ]}>
+                      Includes premium stretches
+                    </Text>
+                  </View>
+                )}
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.startButton} 
+                onPress={() => {
+                  onStartRecommendation && onStartRecommendation(recommendation);
+                  onClose();
+                }}
+              >
+                <Text style={styles.startButtonText}>Start Routine</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            // Non-premium user or premium user without recommendation
+            <>
               <Text style={[
-                styles.benefitText,
-                { color: isDark ? theme.text : '#333' }
-              ]}>Personalized recommendations</Text>
-            </View>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#FF9800" />
-              <Text style={[
-                styles.benefitText,
-                { color: isDark ? theme.text : '#333' }
-              ]}>Based on your stretching history</Text>
-            </View>
-            <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color="#FF9800" />
-              <Text style={[
-                styles.benefitText,
-                { color: isDark ? theme.text : '#333' }
-              ]}>Targets neglected body areas</Text>
-            </View>
-          </View>
+                styles.modalDescription,
+                { color: isDark ? theme.textSecondary : '#666' }
+              ]}>
+                {isPremium 
+                  ? "We couldn't generate a recommendation at this time. Please try again later." 
+                  : "Smart Pick is a premium feature that analyzes your stretching history to suggest personalized routines based on your patterns and needs."}
+              </Text>
+              
+              {!isPremium && (
+                <View style={styles.disabledFeatureBox}>
+                  <Ionicons name="lock-closed" size={24} color="#9E9E9E" />
+                  <Text style={styles.disabledFeatureText}>
+                    This feature requires premium to unlock
+                  </Text>
+                </View>
+              )}
+
+              {!isPremium && (
+                <View style={styles.benefitsList}>
+                  <View style={styles.benefitItem}>
+                    <Ionicons name="checkmark-circle" size={24} color="#9E9E9E" />
+                    <Text style={[
+                      styles.benefitText,
+                      { color: isDark ? theme.text : '#333', opacity: 0.6 }
+                    ]}>Personalized recommendations</Text>
+                  </View>
+                  <View style={styles.benefitItem}>
+                    <Ionicons name="checkmark-circle" size={24} color="#9E9E9E" />
+                    <Text style={[
+                      styles.benefitText,
+                      { color: isDark ? theme.text : '#333', opacity: 0.6 }
+                    ]}>Based on your stretching history</Text>
+                  </View>
+                  <View style={styles.benefitItem}>
+                    <Ionicons name="checkmark-circle" size={24} color="#9E9E9E" />
+                    <Text style={[
+                      styles.benefitText,
+                      { color: isDark ? theme.text : '#333', opacity: 0.6 }
+                    ]}>Targets neglected body areas</Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
           
           <TouchableOpacity 
-            style={styles.upgradeButton} 
-            onPress={() => {
-              onUpgrade && onUpgrade();
-              onClose();
-            }}
+            style={[
+              isPremium ? styles.skipButton : styles.closeButton2, 
+              !isPremium && { marginTop: 20 }
+            ]} 
+            onPress={onClose}
           >
-            <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.skipButton} onPress={onClose}>
             <Text style={[
               styles.skipButtonText,
               { color: isDark ? theme.textSecondary : '#666' }
-            ]}>Maybe Later</Text>
+            ]}>{isPremium ? "Maybe Later" : "Close"}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -236,6 +220,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
+  },
+  closeButton2: {
+    padding: 12,
+    width: '100%',
+    alignItems: 'center',
   },
   featureIcon: {
     marginBottom: 16,
@@ -349,4 +338,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 4,
   },
+  disabledFeatureBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 16,
+    width: '100%',
+  },
+  disabledFeatureText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#757575',
+    fontWeight: '500'
+  }
 }); 

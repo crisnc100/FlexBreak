@@ -200,7 +200,9 @@ export default function SubscriptionModal({ visible, onClose }){
         <View style={styles.sheet}>
           <View style={styles.headerRow}>
             <Text style={styles.header}>Go Premium</Text>
-            <Ionicons name="close" size={26} color="#555" onPress={onClose}/>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={26} color="#555" />
+            </TouchableOpacity>
           </View>
 
           {products===null ? (
@@ -250,7 +252,7 @@ export default function SubscriptionModal({ visible, onClose }){
 
 /* ---- styles (reuse from mock) ---- */
 const styles = StyleSheet.create({
-  overlay:{flex:1,backgroundColor:'rgba(0,0,0,0.55)',justifyContent:'center',padding:16},
+  overlay:{flex:1,backgroundColor:'rgba(0,0,0,0.55)',justifyContent:'center',padding:16, zIndex:9999},
   sheet:{backgroundColor:'#fff',borderRadius:18,padding:24},
   headerRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
   header:{fontSize:28,fontWeight:'700',color:'#111'},
