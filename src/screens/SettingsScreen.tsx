@@ -157,12 +157,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   
   // Function to send email to support
   const handleContactSupport = () => {
-    Linking.openURL('mailto:flexbreak-support-hub.com?subject=FlexBreak%20Support%20Request');
+    Linking.openURL('mailto:flexbreakapp@gmail.com?subject=FlexBreak%20Support%20Request');
   };
 
   // Function to open website
   const handleOpenWebsite = () => {
-    Linking.openURL('https://ortegafit.com');
+    Linking.openURL('https://flexbreak-support-hub.com');
   };
 
   // Handle reset data

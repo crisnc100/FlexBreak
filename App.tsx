@@ -35,6 +35,8 @@ import * as performance from './src/utils/performance/performance';
 import * as storageService from './src/services/storageService';
 import * as notifications from './src/utils/notifications';
 import * as firebaseReminders from './src/utils/firebaseReminders';
+// Import the console log disabler
+import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsInProduction';
 
 // Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
@@ -125,6 +127,9 @@ function navigate(name: keyof RootStackParamList, params?: any) {
 
 // Main entry point for the app
 export default function App() {
+  // Disable console logs in production
+  disableConsoleLogsInProduction();
+  
   // Mark app start time for performance measurement
   performance.markAppStart();
   
