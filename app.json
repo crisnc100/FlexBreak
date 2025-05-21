@@ -19,6 +19,9 @@
       },
       "splash": {
         "xib": "./ios/FlexBreak/SplashScreen.storyboard"
+      },
+      "config": {
+        "usesGameCenter": true
       }
     },
     "android": {

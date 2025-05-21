@@ -157,7 +157,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   
   // Function to send email to support
   const handleContactSupport = () => {
-    Linking.openURL('mailto:support@flexbreak.com?subject=FlexBreak%20Support%20Request');
+    Linking.openURL('mailto:flexbreak-support-hub.com?subject=FlexBreak%20Support%20Request');
   };
 
   // Function to open website
@@ -187,8 +187,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   // Handle reset data
   const handleResetSimulationData = async () => {
     Alert.alert(
-      'Reset Simulation Data',
-      'This will delete all simulation data only, for testers, please use this to reset the simulator data.',
+      'Reset All Data',
+      'This will delete all app data, including your progress, routines, and settings. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Reset', style: 'destructive', onPress: async () => {
@@ -922,7 +922,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             <View style={styles.testingContainer}>
               <TouchableOpacity 
                 style={styles.settingItem}
-                onPress={handleResetData}
+                onPress={handleResetSimulationData}
               >
                 <View style={styles.settingContent}>
                   <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#3B2E2E' : '#FFEBEE'}]}>

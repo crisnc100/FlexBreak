@@ -250,9 +250,9 @@ const stretches: Stretch[] = [
     premium: false,
     tags: ["Hips & Legs"],
     position: 'Sitting',
-    image: markAsVideo(require('../../assets/stretchData/id18_seated_piriformis_office/image.mp4')),
+    image: markAsVideo(require('../../assets/stretchData/id18_seated_piriformis_office/image.mov')),
     hasDemo: true,
-    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id18_seated_piriformis_office/video.mp4' },
+    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id18_seated_piriformis_office/video.mov' },
     demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id18_seated_piriformis_office/audio.mp3' },
   },
   {
@@ -1432,9 +1432,9 @@ const stretches: Stretch[] = [
     premium: false,
     tags: ["Dynamic Flow"],
     position: 'All',
-    image: markAsVideo(require('../../assets/stretchData/id99_standing_side_bend_office/image.mp4')),
+    image: markAsVideo(require('../../assets/stretchData/id99_standing_side_bend_office/image.mov')),
     hasDemo: true,
-    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id99_standing_side_bend_office/video.mp4' },
+    demoVideo: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id99_standing_side_bend_office/video.mov' },
     demoAudio: { uri: 'https://raw.githubusercontent.com/crisnc100/flexbreak-media2/main/stretchData/id99_standing_side_bend_office/audio.mp3' },
   },
   {
