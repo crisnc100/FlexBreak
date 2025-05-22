@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  SafeAreaView, FlatList, ScrollView, ActivityIndicator, AppState
+  SafeAreaView, FlatList, ScrollView, ActivityIndicator, AppState, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -32,6 +32,10 @@ const createInitialRewards = () =>
     ...r, unlocked:false,
     ...(r.id==='xp_boost'?{initialUses:2}:{})
   }]));
+
+// Links to legal documents
+const PRIVACY_POLICY_URL = "https://flexbreak-privacy-app.netlify.app/";
+const TERMS_URL = "https://flexbreak-support-hub.com/";
 
 /* --- component --- */
 export default function SubscriptionModal({ visible, onClose }){
@@ -178,11 +182,18 @@ export default function SubscriptionModal({ visible, onClose }){
   const discount=()=>!monthly||!yearly?'Save 20 %':
       `Save ${Math.round(100-(yearly.priceAmountMicros/12)/(monthly.priceAmountMicros)*100)} %`;
 
+  // Get readable display names based on product ID
+  const getProductDisplayName = (productId: string) => {
+    if (productId === PRODUCTS.MONTHLY_SUB) return "FlexBreak Monthly";
+    if (productId === PRODUCTS.YEARLY_SUB) return "FlexBreak Yearly";
+    return "Premium Subscription";
+  };
+
   const Plan=({item,highlight}:{item:any;highlight?:boolean})=>(
     <TouchableOpacity disabled={isCurrent(item.productId)||busy}
       style={[styles.card,highlight&&styles.cardHighlight,isCurrent(item.productId)&&styles.cardDisabled]}
       onPress={()=>onBuy(item.productId)}>
-      <Text style={styles.cardTitle}>{item.title}</Text>
+      <Text style={styles.cardTitle}>{getProductDisplayName(item.productId)}</Text>
       <Text style={styles.cardPrice}>{item.price}</Text>
       {highlight&&<Text style={styles.cardBadge}>{discount()}</Text>}
       {item===yearly&&monthly&&(
@@ -224,6 +235,38 @@ export default function SubscriptionModal({ visible, onClose }){
                     <Ionicons name="checkmark-circle" size={18} color="#4CAF50"/>
                     <Text style={styles.benefit}>{b}</Text>
                   </View>))}
+
+                {/* Subscription Info - Required by App Store */}
+                <View style={styles.subscriptionInfo}>
+                  <Text style={styles.subscriptionInfoTitle}>Subscription Information:</Text>
+                  <Text style={styles.subscriptionInfoText}>
+                    • Monthly subscription renews monthly
+                  </Text>
+                  <Text style={styles.subscriptionInfoText}>
+                    • Yearly subscription renews yearly
+                  </Text>
+                  <Text style={styles.subscriptionInfoText}>
+                    • Payment will be charged to your Apple ID account at confirmation of purchase
+                  </Text>
+                  <Text style={styles.subscriptionInfoText}>
+                    • Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period
+                  </Text>
+                  <Text style={styles.subscriptionInfoText}>
+                    • Account will be charged for renewal within 24 hours prior to the end of the current period
+                  </Text>
+                  <Text style={styles.subscriptionInfoText}>
+                    • You can manage and cancel your subscriptions by going to your account settings on the App Store after purchase
+                  </Text>
+                  <View style={styles.legalLinks}>
+                    <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                      <Text style={styles.legalLink}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.legalText}> • </Text>
+                    <TouchableOpacity onPress={() => Linking.openURL(TERMS_URL)}>
+                      <Text style={styles.legalLink}>Terms of Use</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </ScrollView>
               <TouchableOpacity onPress={onRestore} disabled={busy} style={{marginTop:18}}>
                 <Text style={styles.restore}>Restore purchase</Text>
@@ -264,5 +307,37 @@ const styles = StyleSheet.create({
   cardSub:{fontSize:12,color:'#555',marginTop:2},
   cardCurrent:{marginTop:6,fontSize:12,color:'#4CAF50'},
   benefits:{gap:12}, row:{flexDirection:'row',alignItems:'center',gap:6}, benefit:{fontSize:14},
-  restore:{fontSize:13,color:'#666',textAlign:'center'}
+  restore:{fontSize:13,color:'#666',textAlign:'center'},
+  // New subscription info styles
+  subscriptionInfo: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  subscriptionInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  subscriptionInfoText: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 4,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    marginTop: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legalLink: {
+    fontSize: 12,
+    color: '#4CAF50',
+    textDecorationLine: 'underline',
+  },
+  legalText: {
+    fontSize: 12,
+    color: '#666',
+  },
 });
