@@ -16,6 +16,7 @@ import * as storageDiagnostics from '../utils/performance/storageDiagnostics';
 import * as performance from '../utils/performance/performance';
 import * as appHealthCheck from '../utils/performance/appHealthCheck';
 import { AppHealthScore, AppHealthIssue } from '../utils/performance/appHealthCheck';
+import * as firebaseReminders from '../utils/firebaseReminders';
 
 interface StorageStats {
   totalSize: number;
@@ -31,6 +32,7 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
   const [optimizationResults, setOptimizationResults] = useState<any>(null);
   const [appHealth, setAppHealth] = useState<AppHealthScore | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [notificationStats, setNotificationStats] = useState<any>(null);
   
   // Animated values for score display
   const scoreAnim = useState(new Animated.Value(0))[0];
@@ -68,6 +70,10 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
       // Get app health score
       const health = await appHealthCheck.getAppHealthScore();
       setAppHealth(health);
+      
+      // Get notification stats
+      const notifStats = await firebaseReminders.getScheduledNotificationsSummary();
+      setNotificationStats(notifStats);
     } catch (error) {
       console.error('Error loading diagnostics data:', error);
       Alert.alert('Error', 'Failed to load diagnostics data');
@@ -450,6 +456,71 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
                   </Text>
                 </View>
               </View>
+              
+              {/* Notification Diagnostics Section */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Notification Status</Text>
+                
+                {notificationStats ? (
+                  <>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Total Scheduled:</Text>
+                      <Text style={styles.statValue}>{notificationStats.total}</Text>
+                    </View>
+                    
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Motivational Messages:</Text>
+                      <Text style={styles.statValue}>{notificationStats.motivational}</Text>
+                    </View>
+                    
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Reminders:</Text>
+                      <Text style={styles.statValue}>{notificationStats.reminders}</Text>
+                    </View>
+                    
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Other:</Text>
+                      <Text style={styles.statValue}>{notificationStats.other}</Text>
+                    </View>
+                    
+                    {showAdvanced && notificationStats.details.length > 0 && (
+                      <View style={styles.subsection}>
+                        <Text style={styles.subsectionTitle}>Scheduled Notifications</Text>
+                        {notificationStats.details.slice(0, 10).map((notif: any, index: number) => (
+                          <View key={index} style={styles.detailRow}>
+                            <Text style={styles.detailText}>
+                              {notif.type}: {notif.title}
+                            </Text>
+                            {notif.scheduledFor && (
+                              <Text style={styles.detailSubtext}>
+                                {new Date(notif.scheduledFor).toLocaleString()}
+                              </Text>
+                            )}
+                          </View>
+                        ))}
+                        {notificationStats.details.length > 10 && (
+                          <Text style={styles.detailSubtext}>
+                            ...and {notificationStats.details.length - 10} more
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                    
+                    <TouchableOpacity 
+                      style={[styles.button, styles.refreshButton]}
+                      onPress={async () => {
+                        const stats = await firebaseReminders.getScheduledNotificationsSummary();
+                        setNotificationStats(stats);
+                      }}
+                    >
+                      <Ionicons name="refresh" size={16} color="#FFF" />
+                      <Text style={styles.buttonText}>Refresh Notification Status</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <Text style={styles.noDataText}>Loading notification data...</Text>
+                )}
+              </View>
             </>
           )}
         </ScrollView>
@@ -757,6 +828,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     marginTop: 16,
+  },
+  detailRow: {
+    marginVertical: 8,
+    paddingLeft: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  detailSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  refreshButton: {
+    backgroundColor: '#2E7D32',
   },
 });
 

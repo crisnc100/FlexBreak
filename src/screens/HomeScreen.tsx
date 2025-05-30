@@ -47,7 +47,6 @@ import {
   Vortex
 } from '../components/home';
 import DiscountBanner from '../components/DiscountBanner';
-import VerificationModal from '../components/VerificationModal';
 import * as notifications from '../utils/notifications';
 import * as firebaseReminders from '../utils/firebaseReminders';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
@@ -113,8 +112,6 @@ export default function HomeScreen() {
   const [showVortex, setShowVortex] = useState(false);
   const backgroundFlashOpacity = useRef(new Animated.Value(0)).current;
 
-  // Verification modal state
-  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -887,7 +884,7 @@ export default function HomeScreen() {
 
         {/* Discount Banner for Office Workers & Students */}
         <DiscountBanner 
-          onPress={() => setVerificationModalVisible(true)}
+          onPress={() => setSubscriptionModalVisible(true)}
           onDismiss={() => {
             // Optional: track dismissal
             AsyncStorage.setItem('@flexbreak:discount_banner_dismissed', 'true');
@@ -1041,24 +1038,9 @@ export default function HomeScreen() {
       <SubscriptionModal
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
-        onOpenVerification={() => setVerificationModalVisible(true)}
+        onOpenVerification={() => setSubscriptionModalVisible(true)}
       />
 
-      {/* Verification Modal */}
-      <VerificationModal
-        visible={verificationModalVisible}
-        onClose={() => setVerificationModalVisible(false)}
-        onVerificationComplete={(success) => {
-          if (success) {
-            // Show success message and refresh subscription modal
-            Alert.alert(
-              '✅ Verification Successful!',
-              'Your 60% discount is now active. You can access discounted pricing in the subscription section.',
-              [{ text: 'View Pricing', onPress: () => setSubscriptionModalVisible(true) }]
-            );
-          }
-        }}
-      />
 
       {/* Custom Routine Modal */}
       <CustomRoutineModal

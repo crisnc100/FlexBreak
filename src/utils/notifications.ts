@@ -500,9 +500,19 @@ export async function cancelReminders(): Promise<void> {
       }
     }
 
-    // Cancel all notifications (as a fallback)
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('Cancelled all notifications as fallback');
+    // As a fallback, cancel any remaining reminder notifications that weren't tracked
+    const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const untracked = allScheduled.filter(notification => {
+      const type = notification.content.data?.type;
+      return type === 'reminder' || type === 'scheduled_reminder' || type === 'premium_reminder';
+    });
+    
+    if (untracked.length > 0) {
+      console.log(`Found ${untracked.length} untracked reminder notifications, cancelling...`);
+      for (const notification of untracked) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
 
     // Clear the stored identifiers
     await saveReminderIdentifiers([]);

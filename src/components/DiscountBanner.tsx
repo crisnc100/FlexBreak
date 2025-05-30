@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { usePremium } from '../context/PremiumContext';
 
@@ -24,7 +25,7 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
   const { isPremium } = usePremium();
   const [isVisible, setIsVisible] = useState(false);
   const [bannerText, setBannerText] = useState('');
-  const fadeAnim = new Animated.Value(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     checkBannerVisibility();
@@ -38,7 +39,15 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
         return;
       }
 
-      // Check if user has dismissed the banner
+      // Check if user has dismissed the banner today (reset daily)
+      const dismissedDate = await AsyncStorage.getItem('@flexbreak:discount_banner_dismissed_date');
+      const today = new Date().toDateString();
+      
+      // Reset dismissal if it's a new day
+      if (dismissedDate && dismissedDate !== today) {
+        await AsyncStorage.removeItem('@flexbreak:discount_banner_dismissed');
+      }
+      
       const dismissed = await AsyncStorage.getItem('@flexbreak:discount_banner_dismissed');
       if (dismissed === 'true') {
         setIsVisible(false);
@@ -60,25 +69,28 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
         // Try to detect user type from email or show general promotion
         const detectedType = await detectUserType();
         if (detectedType) {
-          setBannerText(`${detectedType === 'office' ? '💼' : '🎓'} ${detectedType === 'office' ? 'Office worker' : 'Student'}? Get 60% off Premium!`);
+          setBannerText(`${detectedType === 'office' ? '💼' : '🎓'} ${detectedType === 'office' ? 'Office worker' : 'Student'}? Get 60% off premium features!`);
           setIsVisible(true);
         } else {
-          setBannerText('💼🎓 Office worker or student? Get 60% off Premium!');
+          setBannerText('💼 Office worker or student? Get 60% off!');
           setIsVisible(true);
         }
       }
 
-      if (isVisible) {
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      }
     } catch (error) {
       console.error('Error checking banner visibility:', error);
     }
   };
+  
+  useEffect(() => {
+    if (isVisible) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isVisible]);
 
   const detectUserType = async (): Promise<'office' | 'student' | null> => {
     try {
@@ -110,9 +122,10 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
       toValue: 0,
       duration: 200,
       useNativeDriver: true,
-    }).start(() => {
+    }).start(async () => {
       setIsVisible(false);
-      AsyncStorage.setItem('@flexbreak:discount_banner_dismissed', 'true');
+      await AsyncStorage.setItem('@flexbreak:discount_banner_dismissed', 'true');
+      await AsyncStorage.setItem('@flexbreak:discount_banner_dismissed_date', new Date().toDateString());
       onDismiss?.();
     });
   };
@@ -120,25 +133,48 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
   if (!isVisible) return null;
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+    <Animated.View style={[styles.container, { 
+      opacity: fadeAnim,
+      transform: [{
+        translateY: fadeAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-20, 0]
+        })
+      }]
+    }]}>
       <TouchableOpacity
-        style={[styles.banner, { backgroundColor: theme.accent }]}
+        style={styles.banner}
         onPress={onPress}
-        activeOpacity={0.8}
+        activeOpacity={0.9}
       >
-        <View style={styles.content}>
-          <Text style={[styles.text, { color: '#fff' }]}>
-            {bannerText}
-          </Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
-        </View>
-        <TouchableOpacity
-          style={styles.dismissButton}
-          onPress={handleDismiss}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        <LinearGradient
+          colors={['#2563eb', '#3b82f6', '#60a5fa']}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 1}}
+          style={styles.gradient}
         >
-          <Ionicons name="close" size={18} color="#fff" />
-        </TouchableOpacity>
+          <View style={styles.bannerContent}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="flash" size={22} color="#fff" />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={styles.mainText}>
+                {bannerText}
+              </Text>
+              <View style={styles.ctaRow}>
+                <Text style={styles.ctaText}>Tap to verify</Text>
+                <Ionicons name="chevron-forward-circle" size={16} color="#fff" />
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.dismissButton}
+            onPress={handleDismiss}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={16} color="#fff" style={{ opacity: 0.8 }} />
+          </TouchableOpacity>
+        </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -147,34 +183,67 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
-    marginVertical: 8,
+    marginTop: 12,
+    marginBottom: 8,
   },
   banner: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  gradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: 16,
   },
-  content: {
+  bannerContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  text: {
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  textContainer: {
+    flex: 1,
+  },
+  mainText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+    lineHeight: 21,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  ctaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  ctaText: {
     fontSize: 14,
+    color: 'rgba(255,255,255,0.95)',
     fontWeight: '600',
-    flex: 1,
+    letterSpacing: 0.3,
   },
   dismissButton: {
-    padding: 4,
-    marginLeft: 8,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
 });
 

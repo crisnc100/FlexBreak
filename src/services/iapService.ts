@@ -16,27 +16,16 @@ export const PRODUCTS = {
     android: 'flexbreak_yearly_44.99',
     default: 'flexbreak_yearly_44.99',
   }),
-  // Discounted products for verified office workers (60% off)
-  MONTHLY_OFFICE: Platform.select({
-    ios: 'flexbreak_monthly_office_1.99',
-    android: 'flexbreak_monthly_office_1.99',
-    default: 'flexbreak_monthly_office_1.99',
+  // Discounted products for verified users (students OR office workers) - 60% off
+  MONTHLY_VERIFIED: Platform.select({
+    ios: 'flexbreak_monthly_verified',
+    android: 'flexbreak_monthly_verified',
+    default: 'flexbreak_monthly_verified',
   }),
-  YEARLY_OFFICE: Platform.select({
-    ios: 'flexbreak_yearly_office_17.99',
-    android: 'flexbreak_yearly_office_17.99',
-    default: 'flexbreak_yearly_office_17.99',
-  }),
-  // Discounted products for verified students (60% off)
-  MONTHLY_STUDENT: Platform.select({
-    ios: 'flexbreak_monthly_student_1.99',
-    android: 'flexbreak_monthly_student_1.99',
-    default: 'flexbreak_monthly_student_1.99',
-  }),
-  YEARLY_STUDENT: Platform.select({
-    ios: 'flexbreak_yearly_student_17.99',
-    android: 'flexbreak_yearly_student_17.99',
-    default: 'flexbreak_yearly_student_17.99',
+  YEARLY_VERIFIED: Platform.select({
+    ios: 'flexbreak_yearly_verified',
+    android: 'flexbreak_yearly_verified',
+    default: 'flexbreak_yearly_verified',
   }),
 };
 
@@ -151,15 +140,11 @@ export const getProducts = async () => {
 
 // Helper function to get appropriate products based on verification status
 export const getProductsForUser = (verificationType?: 'office' | 'student' | null) => {
-  if (verificationType === 'office') {
+  if (verificationType === 'office' || verificationType === 'student') {
+    // Both students and office workers use the same verified products
     return {
-      monthly: PRODUCTS.MONTHLY_OFFICE,
-      yearly: PRODUCTS.YEARLY_OFFICE,
-    };
-  } else if (verificationType === 'student') {
-    return {
-      monthly: PRODUCTS.MONTHLY_STUDENT,
-      yearly: PRODUCTS.YEARLY_STUDENT,
+      monthly: PRODUCTS.MONTHLY_VERIFIED,
+      yearly: PRODUCTS.YEARLY_VERIFIED,
     };
   } else {
     return {
@@ -184,13 +169,11 @@ const formatSubscriptionDetails = (purchase: any): SubscriptionDetails => {
   // Check if it's a monthly or yearly subscription (including discounted versions)
   const monthlyProducts = [
     PRODUCTS.MONTHLY_SUB, 
-    PRODUCTS.MONTHLY_OFFICE, 
-    PRODUCTS.MONTHLY_STUDENT
+    PRODUCTS.MONTHLY_VERIFIED
   ];
   const yearlyProducts = [
     PRODUCTS.YEARLY_SUB, 
-    PRODUCTS.YEARLY_OFFICE, 
-    PRODUCTS.YEARLY_STUDENT
+    PRODUCTS.YEARLY_VERIFIED
   ];
   
   if (monthlyProducts.includes(purchase.productId)) {

@@ -28,6 +28,11 @@ const UPDATE_CHECK_INTERVAL = 1000 * 60 * 60 * 6; // 6 hours
 const GITHUB_REPO_OWNER = 'crisnc100'; // TODO: Replace with your GitHub username
 const GITHUB_REPO_NAME = 'FlexBreak'; // Your repo name
 
+// NOTE: The update service checks GitHub releases API for new versions.
+// If you haven't created any releases on GitHub yet, you'll see 404 errors
+// in development. This is normal and won't affect the app's functionality.
+// To create a release: https://github.com/crisnc100/FlexBreak/releases/new
+
 class UpdateService {
   private static instance: UpdateService;
   
@@ -44,7 +49,7 @@ class UpdateService {
    * Get the current app version
    */
   getCurrentVersion(): string {
-    return Constants.expoConfig?.version || Constants.manifest?.version || '1.0.0';
+    return (Constants as any).expoConfig?.version || Constants.manifest?.version || '1.0.0';
   }
 
   /**
@@ -134,7 +139,14 @@ class UpdateService {
       );
 
       if (!response.ok) {
-        console.error('Failed to fetch latest release:', response.status);
+        // 404 means no releases exist yet, which is fine for a new app
+        if (response.status === 404) {
+          if (__DEV__) {
+            console.log('No releases found on GitHub (this is normal for apps without published releases)');
+          }
+        } else {
+          console.error('Failed to fetch latest release:', response.status);
+        }
         return null;
       }
 
@@ -188,7 +200,12 @@ class UpdateService {
       // Fetch latest release from GitHub
       const latestRelease = await this.fetchLatestRelease();
       if (!latestRelease) {
-        console.log('No valid release found');
+        // Don't log in production if no release is found
+        if (__DEV__) {
+          console.log('No valid release found');
+        }
+        // Save last check time even if no release found
+        await this.saveLastCheckTime();
         return defaultResponse;
       }
 
