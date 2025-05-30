@@ -6,8 +6,8 @@
 .git/
 **/.git/
 .github/
-**/.gitignore
-**/.gitattributes
+.gitignore
+.gitattributes
 
 # node / expo caches
 node_modules/
@@ -21,28 +21,35 @@ metro-cache*/
 android/
 ios/
 
-# videos & other large binaries
-assets/**/*.mkv
-assets/**/*.avi
-assets/**/*.webm
-assets/**/*.flac
-assets/**/*.wav
-assets/**/*.gif
-assets/**/*.GIF
+# VIDEO FILES - EXPLICITLY EXCLUDE ALL VIDEO FILES
+# This is the main source of large files
+**/video.mp4
+**/video.mov
+**/video.MOV
+**/video.MP4
+**/*.mp4
+!**/image.mp4
+!**/image1.mp4
+!**/image2.mp4
+!**/image.mov
+!**/image1.mov
+!**/image2.mov
+!**/image.MOV
+!**/image1.MOV
+!**/image2.MOV
+**/*.mov
+**/*.MOV
+**/*.avi
+**/*.mkv
+**/*.webm
+**/*.flac
+**/*.wav
+**/*.gif
+**/*.GIF
 
-# Exclude video.mp4 and video.mov files but keep image files
-assets/stretchData/**/video.mp4
-assets/stretchData/**/video.mov
-assets/stretchData/**/video.MOV
-
-# Keep image files and audio files
-!assets/stretchData/**/image.mp4
-!assets/stretchData/**/image.mov
-!assets/stretchData/**/image.MOV
-!assets/stretchData/**/image1.mp4
-!assets/stretchData/**/image2.mp4
-!assets/stretchData/**/audio.mp3
+# Keep only audio files we need
 !assets/sounds/*.mp3
+!assets/stretchData/**/audio.mp3
 
 *.aab
 *.apk
@@ -103,52 +110,142 @@ android/build/
 android/app/build/
 ios/Pods/
 
-# Node modules that aren't needed for builds
-node_modules/react-native/ReactAndroid
-node_modules/react-native/android
-node_modules/**/android/build/
-node_modules/**/*.android.js
-node_modules/**/*.android.ts
-node_modules/**/*.android.tsx
+# AGGRESSIVE NODE_MODULES EXCLUSIONS
+# We only need the runtime code, not dev tools
+node_modules/**/.bin/
+node_modules/**/.cache/
+node_modules/**/test/
+node_modules/**/tests/
+node_modules/**/__tests__/
+node_modules/**/examples/
+node_modules/**/example/
+node_modules/**/demos/
+node_modules/**/demo/
+node_modules/**/docs/
+node_modules/**/documentation/
+node_modules/**/*.md
+node_modules/**/*.MD
+node_modules/**/*.markdown
+node_modules/**/README*
+node_modules/**/readme*
+node_modules/**/CHANGELOG*
+node_modules/**/changelog*
+node_modules/**/HISTORY*
+node_modules/**/history*
+node_modules/**/LICENSE*
+node_modules/**/license*
+node_modules/**/LICENCE*
+node_modules/**/licence*
+node_modules/**/*.txt
+node_modules/**/*.html
+node_modules/**/*.htm
+node_modules/**/*.map
+node_modules/**/*.ts
+!node_modules/**/*.d.ts
+node_modules/**/*.flow
+node_modules/**/dist/
+node_modules/**/build/
+node_modules/**/coverage/
+node_modules/**/.github/
+node_modules/**/.vscode/
+node_modules/**/.idea/
 
-# Large directories in node_modules that aren't needed for iOS builds
+# Heavy dependencies not needed for iOS builds
+node_modules/react-native/android/
+node_modules/react-native/ReactAndroid/
+node_modules/react-native/template/
+node_modules/react-native/scripts/
+node_modules/react-native/Libraries/*/android/
 node_modules/hermes-engine/android/
 node_modules/@react-native/gradle-plugin/
 node_modules/metro-hermes-compiler/
+node_modules/metro-cache/
+node_modules/metro-transform-worker/
+node_modules/**/*.jar
+node_modules/**/*.aar
+node_modules/**/*.so
+node_modules/**/*.dll
+node_modules/**/*.dylib
+node_modules/**/*.exe
 
-# Debug and test files
-__tests__
-*.test.js
-*.test.ts
-*.test.tsx
+# TypeScript source files (we only need compiled JS)
+node_modules/**/src/
+!node_modules/**/src/*.js
+!node_modules/**/src/**/*.js
 
-# TypeScript cache
-*.tsbuildinfo
-tsconfig.tsbuildinfo
+# Large optional dependencies
+node_modules/sharp/
+node_modules/canvas/
+node_modules/puppeteer/
+node_modules/chromium/
+node_modules/electron/
+node_modules/nodemon/
+node_modules/concurrently/
+node_modules/cross-env/
+node_modules/@babel/
+node_modules/babel-*/
+node_modules/typescript/
+node_modules/webpack/
+node_modules/@types/
+node_modules/eslint/
+node_modules/prettier/
+node_modules/@typescript-eslint/
+node_modules/jest/
+node_modules/@jest/
+node_modules/@expo/cli/
+node_modules/@expo/webpack-config/
+node_modules/expo-modules-core/android/
+node_modules/expo-modules-core/ios/build/
 
-# Package manager files (only need package.json and lock files)
-.npmrc
-.yarnrc
-yarn-error.log
-npm-debug.log*
+# Documentation and planning files
+*.md
+**/*.md
+!README.md
+!package.json
+VERIFICATION_STRATEGY.md
+SMALL_COMPANY_SOLUTION.md
+OFFICE_VERIFICATION_EXPLAINED.md
+SUPABASE_MIGRATION_PLAN.md
+CI_CD_SETUP_GUIDE.md
+APP_SIZE_OPTIMIZATION.md
+GET_EXPO_TOKEN.md
 
-# Editor directories and files
-.idea
-.vscode
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Backup and development files
+**/*.backup
+**/*.bak
+**/*.old
+src/**/*.backup.ts
+src/**/*.backup.tsx
 
 # Temporary files
 *.tmp
 *.temp
 *.log
+npm-debug.log*
+yarn-error.log*
+
+# Package manager files (only need package.json and lock files)
+.npmrc
+.yarnrc
+
+# Editor directories and files
+*.swp
+*.swo
+*~
+
+# OS files
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Firebase local emulator
+.firebase/
+firebase-debug.log
+
+# Misc large files that might exist
+*.sketch
+*.fig
+*.xd
+*.pdf
+!assets/**/*.pdf
