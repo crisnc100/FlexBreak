@@ -1,0 +1,286 @@
+name: Production Release
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  quality:
+    name: Code Quality & Security Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧹 Lint code
+        run: npm run lint
+
+      - name: 🔍 Type check
+        run: npm run type-check
+
+      - name: 🧪 Run tests with coverage
+        run: npm run test:coverage
+
+      - name: 🔒 Security audit
+        run: npm audit --production
+
+  version:
+    name: Auto Version Bump (Minor)
+    needs: quality
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔢 Bump version
+        id: version
+        run: |
+          # Get current version from app.json
+          CURRENT_VERSION=$(node -p "require('./app.json').expo.version")
+          
+          # Increment minor version (e.g., 1.0.1 -> 1.1.0)
+          IFS='.' read -r -a version_parts <<< "$CURRENT_VERSION"
+          version_parts[1]=$((version_parts[1] + 1))
+          version_parts[2]=0
+          NEW_VERSION="${version_parts[0]}.${version_parts[1]}.${version_parts[2]}"
+          
+          # Update app.json with new version
+          npm pkg set expo.version=$NEW_VERSION
+          
+          # Update buildNumber for iOS
+          CURRENT_BUILD=$(node -p "require('./app.json').expo.ios.buildNumber")
+          NEW_BUILD=$((CURRENT_BUILD + 1))
+          npm pkg set expo.ios.buildNumber="$NEW_BUILD"
+          
+          # Update versionCode for Android
+          CURRENT_CODE=$(node -p "require('./app.json').expo.android.versionCode")
+          NEW_CODE=$((CURRENT_CODE + 1))
+          npm pkg set expo.android.versionCode=$NEW_CODE
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Updated version: $CURRENT_VERSION -> $NEW_VERSION"
+
+      - name: 📋 Generate changelog
+        id: changelog
+        run: |
+          # Get the last production tag
+          LAST_TAG=$(git tag -l "v*" --sort=-version:refname | grep -v beta | head -n 1)
+          
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous production release found"
+            COMMITS=$(git log --pretty=format:"- %s" -n 50)
+          else
+            echo "Changes since $LAST_TAG"
+            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"- %s")
+          fi
+          
+          # Categorize commits
+          FEATURES=$(echo "$COMMITS" | grep -E "^- feat:" | sed 's/^- feat: //' || true)
+          FIXES=$(echo "$COMMITS" | grep -E "^- fix:" | sed 's/^- fix: //' || true)
+          OTHERS=$(echo "$COMMITS" | grep -vE "^- (feat|fix):" || true)
+          
+          # Build changelog
+          CHANGELOG="# 📱 FlexBreak v${{ steps.version.outputs.new_version }}\\n\\n"
+          
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG+="## ✨ New Features\\n"
+            echo "$FEATURES" | while read -r line; do
+              CHANGELOG+="- $line\\n"
+            done
+            CHANGELOG+="\\n"
+          fi
+          
+          if [ -n "$FIXES" ]; then
+            CHANGELOG+="## 🐛 Bug Fixes\\n"
+            echo "$FIXES" | while read -r line; do
+              CHANGELOG+="- $line\\n"
+            done
+            CHANGELOG+="\\n"
+          fi
+          
+          if [ -n "$OTHERS" ]; then
+            CHANGELOG+="## 🔧 Other Changes\\n"
+            echo "$OTHERS" | while read -r line; do
+              CHANGELOG+="- $line\\n"
+            done
+            CHANGELOG+="\\n"
+          fi
+          
+          CHANGELOG+="## 📊 Release Info\\n"
+          CHANGELOG+="- Release Date: $(date +'%Y-%m-%d')\\n"
+          CHANGELOG+="- Platforms: iOS & Android\\n"
+          
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 💾 Commit version bump
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add app.json
+          git commit -m "chore: release v${{ steps.version.outputs.new_version }} [skip ci]"
+          git push
+
+  build:
+    name: Production Build & Deploy
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ios, android]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🏗️ Build for Production
+        run: |
+          eas build \
+            --platform ${{ matrix.platform }} \
+            --profile production \
+            --non-interactive \
+            --no-wait \
+            --auto-submit \
+            --message "Production Release v${{ needs.version.outputs.new_version }}"
+
+      - name: 📊 Build Status
+        run: |
+          echo "✅ Production build submitted for ${{ matrix.platform }}"
+          echo "📱 Version: ${{ needs.version.outputs.new_version }}"
+          echo "🚀 Auto-submission to stores: ENABLED"
+
+  release:
+    name: Create Release & Tag
+    needs: [build, version]
+    runs-on: ubuntu-latest
+    if: needs.build.result == 'success'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🏷️ Create Git Tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -a "v${{ needs.version.outputs.new_version }}" -m "Production Release v${{ needs.version.outputs.new_version }}"
+          git push origin "v${{ needs.version.outputs.new_version }}"
+
+      - name: 📝 Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.version.outputs.new_version }}
+          release_name: Production Release v${{ needs.version.outputs.new_version }}
+          body: ${{ needs.version.outputs.changelog }}
+          draft: false
+          prerelease: false
+
+  notify:
+    name: Production Notifications
+    needs: [build, version, release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: 📢 Notify Slack - Production Release
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            MESSAGE="🎉 Production Release v${{ needs.version.outputs.new_version }} deployed successfully!"
+            COLOR="good"
+            EMOJI="🚀"
+          else
+            MESSAGE="❌ Production Release failed"
+            COLOR="danger"
+            EMOJI="⚠️"
+          fi
+          
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H 'Content-type: application/json' \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"$COLOR\",
+                \"title\": \"$EMOJI FlexBreak Production Release\",
+                \"text\": \"$MESSAGE\",
+                \"fields\": [
+                  {
+                    \"title\": \"Version\",
+                    \"value\": \"${{ needs.version.outputs.new_version }}\",
+                    \"short\": true
+                  },
+                  {
+                    \"title\": \"Platforms\",
+                    \"value\": \"iOS & Android\",
+                    \"short\": true
+                  },
+                  {
+                    \"title\": \"App Store Status\",
+                    \"value\": \"Submitted for Review\",
+                    \"short\": true
+                  },
+                  {
+                    \"title\": \"Play Store Status\",
+                    \"value\": \"Submitted for Review\",
+                    \"short\": true
+                  }
+                ],
+                \"footer\": \"Production Deploy\",
+                \"ts\": \"$(date +%s)\"
+              }]
+            }"
+
+      - name: 📧 Send Email Notification
+        if: needs.build.result == 'success'
+        run: |
+          echo "Production release v${{ needs.version.outputs.new_version }} has been submitted to app stores!"
+          echo "Monitor the review process in App Store Connect and Google Play Console."

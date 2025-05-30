@@ -1,0 +1,232 @@
+name: TestFlight & Staging Build
+
+on:
+  push:
+    branches: [ staging ]
+
+jobs:
+  quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧹 Lint code
+        run: npm run lint
+
+      - name: 🔍 Type check
+        run: npm run type-check
+
+      - name: 🧪 Run tests
+        run: npm test
+
+  version:
+    name: Auto Version Bump
+    needs: quality
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔢 Bump version
+        id: version
+        run: |
+          # Get current version from app.json
+          CURRENT_VERSION=$(node -p "require('./app.json').expo.version")
+          
+          # Increment patch version (e.g., 1.0.0 -> 1.0.1)
+          NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+          
+          # Update app.json with new version
+          npm pkg set expo.version=$NEW_VERSION
+          
+          # Update buildNumber for iOS
+          CURRENT_BUILD=$(node -p "require('./app.json').expo.ios.buildNumber")
+          NEW_BUILD=$((CURRENT_BUILD + 1))
+          npm pkg set expo.ios.buildNumber="$NEW_BUILD"
+          
+          # Update versionCode for Android
+          CURRENT_CODE=$(node -p "require('./app.json').expo.android.versionCode")
+          NEW_CODE=$((CURRENT_CODE + 1))
+          npm pkg set expo.android.versionCode=$NEW_CODE
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Updated version: $CURRENT_VERSION -> $NEW_VERSION"
+          echo "iOS buildNumber: $NEW_BUILD"
+          echo "Android versionCode: $NEW_CODE"
+
+      - name: 💾 Commit version bump
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add app.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          git push
+
+  release-notes:
+    name: Generate Release Notes
+    needs: version
+    runs-on: ubuntu-latest
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📝 Generate release notes
+        id: notes
+        run: |
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" -n 20)
+          else
+            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"- %s")
+          fi
+          
+          # Format release notes
+          NOTES="## 🚀 TestFlight Release v${{ needs.version.outputs.new_version }}\\n\\n"
+          NOTES+="### 📝 Changes:\\n"
+          NOTES+="$COMMITS\\n\\n"
+          NOTES+="### 📱 Testing Instructions:\\n"
+          NOTES+="- Test all new features thoroughly\\n"
+          NOTES+="- Report any bugs or issues\\n"
+          NOTES+="- Check performance on different devices\\n"
+          
+          # Save notes for later use
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build for TestFlight
+    needs: [version, release-notes]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: ios
+            profile: testflight
+          - platform: android
+            profile: preview
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🏗️ Build on EAS
+        run: |
+          eas build \
+            --platform ${{ matrix.platform }} \
+            --profile ${{ matrix.profile }} \
+            --non-interactive \
+            --no-wait \
+            --message "TestFlight v${{ needs.version.outputs.new_version }}"
+
+      - name: 📤 Submit to TestFlight (iOS only)
+        if: matrix.platform == 'ios'
+        run: |
+          # Wait for build to complete and submit
+          echo "iOS build will be automatically submitted to TestFlight by EAS"
+          echo "Check EAS dashboard for submission status"
+
+  notify:
+    name: Send Notifications
+    needs: [build, version, release-notes]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: 📢 Notify Slack
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            MESSAGE="✅ TestFlight build v${{ needs.version.outputs.new_version }} submitted successfully!"
+            COLOR="good"
+          else
+            MESSAGE="❌ TestFlight build failed"
+            COLOR="danger"
+          fi
+          
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H 'Content-type: application/json' \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"$COLOR\",
+                \"title\": \"FlexBreak TestFlight Release\",
+                \"text\": \"$MESSAGE\",
+                \"fields\": [
+                  {
+                    \"title\": \"Version\",
+                    \"value\": \"${{ needs.version.outputs.new_version }}\",
+                    \"short\": true
+                  },
+                  {
+                    \"title\": \"Branch\",
+                    \"value\": \"staging\",
+                    \"short\": true
+                  }
+                ],
+                \"footer\": \"EAS Build\",
+                \"ts\": \"$(date +%s)\"
+              }]
+            }"
+
+      - name: 📝 Create GitHub Release
+        if: needs.build.result == 'success'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.version.outputs.new_version }}-beta
+          release_name: TestFlight v${{ needs.version.outputs.new_version }}
+          body: ${{ needs.release-notes.outputs.notes }}
+          draft: false
+          prerelease: true

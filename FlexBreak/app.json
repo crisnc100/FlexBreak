@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "FlexBreak",
+    "slug": "flexbreak",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/potentialLogo2.png",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cristianortega.flexbreak",
+      "buildNumber": "3",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"],
+        "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested."
+      },
+      "splash": {
+        "xib": "./ios/FlexBreak/SplashScreen.storyboard"
+      }
+    },
+    "android": {
+      "package": "com.cristianortega.flexbreak",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "versionCode": 3,
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true
+    },
+    "web": {},
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/potentialLogo2.png",
+          "color": "#ffffff"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e2f2f0ca-229d-4469-9de8-9f69b7f7a724"
+      }
+    },
+    "owner": "crisnc100",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e2f2f0ca-229d-4469-9de8-9f69b7f7a724"
+    },
+    "scheme": "flexbreak-app",
+    "jsEngine": "hermes"
+  }
+}

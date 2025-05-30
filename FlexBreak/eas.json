@@ -1,0 +1,82 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "resourceClass": "m-medium",
+        "buildConfiguration": "Debug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
+    "internal": {
+      "android": {
+        "buildType": "apk",
+        "resourceClass": "medium",
+        "autoIncrement": true
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "ios": {
+        "buildConfiguration": "Release",
+        "resourceClass": "m-medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENABLE_PROGUARD": "true",
+        "EXPO_PUBLIC_ENABLE_HERMES": "true"
+      }
+    },
+    "testflight": {
+      "extends": "production",
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_SKIP_SPLASH_SCREEN_GENERATION": "1"
+      },
+      "ios": {
+        "buildConfiguration": "Release",
+        "resourceClass": "m-medium"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "cristianortegaapps@gmail.com",
+        "ascAppId": "6738905173",
+        "appleTeamId": "K9X8R2S6CD"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
+      }
+    },
+    "testflight": {
+      "ios": {
+        "appleId": "crisnc100@gmail.com",
+        "ascAppId": "6728844881",
+        "appleTeamId": "7LHNAAUJQ6"
+      }
+    }
+  }
+}

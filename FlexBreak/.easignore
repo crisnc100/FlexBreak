@@ -1,0 +1,154 @@
+###############################################################################
+#  universal ignore – managed workflow, proven small                          #
+###############################################################################
+
+# source control
+.git/
+**/.git/
+.github/
+**/.gitignore
+**/.gitattributes
+
+# node / expo caches
+node_modules/
+.cache/
+.expo/
+.expo-shared/
+metro-cache/
+metro-cache*/
+
+# native folders (managed workflow uses cloud workers, so we skip them)
+android/
+ios/
+
+# videos & other large binaries
+assets/**/*.mkv
+assets/**/*.avi
+assets/**/*.webm
+assets/**/*.flac
+assets/**/*.wav
+assets/**/*.gif
+assets/**/*.GIF
+
+# Exclude video.mp4 and video.mov files but keep image files
+assets/stretchData/**/video.mp4
+assets/stretchData/**/video.mov
+assets/stretchData/**/video.MOV
+
+# Keep image files and audio files
+!assets/stretchData/**/image.mp4
+!assets/stretchData/**/image.mov
+!assets/stretchData/**/image.MOV
+!assets/stretchData/**/image1.mp4
+!assets/stretchData/**/image2.mp4
+!assets/stretchData/**/audio.mp3
+!assets/sounds/*.mp3
+
+*.aab
+*.apk
+*.ipa
+*.zip
+*.tar
+*.gz
+*.7z
+*.dmg
+*.psd
+*.ai
+*.sketch
+
+# build artifacts and temporary files
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+build/
+dist/
+web-build/
+**/*.orig
+**/.log/
+**/logs/
+**/coverage/
+**/.nyc_output/
+
+# testing and documentation
+__tests__/
+__mocks__/
+docs/
+test/
+tests/
+*.test.js
+*.spec.js
+*.test.tsx
+*.spec.tsx
+
+# large data files
+**/*.csv
+**/*.json.backup
+**/*.sql
+**/*.sqlite
+**/*.db
+
+# development-only files
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+
+# EAS Build specific ignores
+.eas/
+
+# Build artifacts
+ios/build/
+android/build/
+android/app/build/
+ios/Pods/
+
+# Node modules that aren't needed for builds
+node_modules/react-native/ReactAndroid
+node_modules/react-native/android
+node_modules/**/android/build/
+node_modules/**/*.android.js
+node_modules/**/*.android.ts
+node_modules/**/*.android.tsx
+
+# Large directories in node_modules that aren't needed for iOS builds
+node_modules/hermes-engine/android/
+node_modules/@react-native/gradle-plugin/
+node_modules/metro-hermes-compiler/
+
+# Debug and test files
+__tests__
+*.test.js
+*.test.ts
+*.test.tsx
+
+# TypeScript cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Package manager files (only need package.json and lock files)
+.npmrc
+.yarnrc
+yarn-error.log
+npm-debug.log*
+
+# Editor directories and files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log

@@ -1,0 +1,106 @@
+name: Development Build
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+
+jobs:
+  quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧹 Lint code
+        run: npm run lint
+
+      - name: 🔍 Type check
+        run: npm run type-check
+
+      - name: 🧪 Run tests
+        run: npm test
+
+  build:
+    name: Development Build
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ios, android]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🏗️ Build on EAS
+        run: |
+          eas build \
+            --platform ${{ matrix.platform }} \
+            --profile development \
+            --non-interactive \
+            --no-wait
+
+      - name: 📊 Get build status
+        run: |
+          echo "Build submitted for ${{ matrix.platform }}"
+          echo "Check EAS dashboard for build progress"
+
+  notify:
+    name: Send Notification
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: 📢 Notify Slack
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            MESSAGE="✅ Development build submitted successfully for iOS and Android"
+            COLOR="good"
+          else
+            MESSAGE="❌ Development build failed"
+            COLOR="danger"
+          fi
+          
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H 'Content-type: application/json' \
+            -d "{
+              \"attachments\": [{
+                \"color\": \"$COLOR\",
+                \"title\": \"FlexBreak Development Build\",
+                \"text\": \"$MESSAGE\",
+                \"footer\": \"Branch: develop\",
+                \"ts\": \"$(date +%s)\"
+              }]
+            }"
