@@ -30,6 +30,7 @@ export const SuperSimpleVerificationModal: React.FC<SuperSimpleVerificationModal
   onClose,
   onVerificationComplete
 }) => {
+  console.log('[SuperSimpleVerificationModal] Rendered with visible:', visible);
   const [step, setStep] = useState<'type' | 'email' | 'confirm' | 'email_verification' | 'manual_code'>('type');
   const [userType, setUserType] = useState<'student' | 'office' | null>(null);
   const [email, setEmail] = useState('');
@@ -197,16 +198,7 @@ export const SuperSimpleVerificationModal: React.FC<SuperSimpleVerificationModal
     }
   };
 
-  const showNotQualifiedMessage = () => {
-    Alert.alert(
-      '❌ Not Eligible for Automatic Verification',
-      'This discount is for students and office/hybrid workers.\n\n🤔 Think you should qualify?\nSome users need manual verification due to:\n• Non-standard email domains\n• International schools/companies\n• Technical issues\n\n📧 Contact: flexbreakapp@gmail.com\nInclude your user type (student/office worker) and we\'ll verify you manually within 24 hours!',
-      [
-        { text: 'Contact Support', onPress: onClose },
-        { text: 'OK', onPress: onClose }
-      ]
-    );
-  };
+ 
 
   const showTechnicalIssueHelp = () => {
     Alert.alert(
@@ -336,17 +328,7 @@ export const SuperSimpleVerificationModal: React.FC<SuperSimpleVerificationModal
               <Ionicons name="arrow-forward" size={20} color="#666" />
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.optionButton, styles.notEligibleButton]}
-              onPress={showNotQualifiedMessage}
-            >
-              <Ionicons name="close-circle" size={24} color="#FF3B30" />
-              <View style={styles.optionText}>
-                <Text style={styles.optionTitle}>I don't qualify</Text>
-                <Text style={styles.optionDesc}>Remote worker or other</Text>
-              </View>
-              <Ionicons name="information-circle" size={20} color="#666" />
-            </TouchableOpacity>
+        
 
             {/* Verification Code Option */}
             <View style={styles.divider}>
@@ -363,6 +345,15 @@ export const SuperSimpleVerificationModal: React.FC<SuperSimpleVerificationModal
                 <Text style={styles.optionDesc}>From flexbreakapp@gmail.com</Text>
               </View>
               <Ionicons name="arrow-forward" size={20} color="#666" />
+            </TouchableOpacity>
+            
+            {/* Back to Subscription Button */}
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={onClose}
+            >
+              <Ionicons name="arrow-back" size={18} color="#666" />
+              <Text style={styles.backButtonText}>Back to Subscription</Text>
             </TouchableOpacity>
           </View>
         );
@@ -395,6 +386,14 @@ export const SuperSimpleVerificationModal: React.FC<SuperSimpleVerificationModal
               disabled={!email.trim()}
             >
               <Text style={styles.continueButtonText}>Continue</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => setStep('type')}
+            >
+              <Ionicons name="arrow-back" size={18} color="#666" />
+              <Text style={styles.backButtonText}>Back</Text>
             </TouchableOpacity>
           </View>
         );
@@ -440,6 +439,14 @@ export const SuperSimpleVerificationModal: React.FC<SuperSimpleVerificationModal
                 <Text style={styles.helpButtonText}>Contact Support</Text>
               </TouchableOpacity>
             </View>
+            
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => setStep('email')}
+            >
+              <Ionicons name="arrow-back" size={18} color="#666" />
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
           </View>
         );
 
@@ -529,9 +536,25 @@ export const SuperSimpleVerificationModal: React.FC<SuperSimpleVerificationModal
     }
   };
 
+  // Add debug to check if modal is actually visible
+  if (visible) {
+    console.log('[SuperSimpleVerificationModal] Modal should be visible, current step:', step);
+  }
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      transparent
+      onRequestClose={onClose}
+      onShow={() => console.log('[SuperSimpleVerificationModal] Modal onShow called')}
+    >
       <SafeAreaView style={styles.overlay}>
+        <TouchableOpacity 
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} 
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View style={styles.modal}>
           <View style={styles.headerRow}>
             <View style={styles.progress}>
@@ -563,6 +586,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     maxHeight: '80%',
+    minHeight: 400,
   },
   headerRow: {
     flexDirection: 'row',
@@ -730,6 +754,18 @@ const styles = StyleSheet.create({
   codeButton: {
     borderColor: '#E3F2FD',
     backgroundColor: '#F3F9FF',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    padding: 12,
+  },
+  backButtonText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
   },
   backToOptions: {
     marginTop: 16,

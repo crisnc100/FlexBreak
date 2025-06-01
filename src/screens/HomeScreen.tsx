@@ -89,6 +89,7 @@ export default function HomeScreen() {
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [daySelectorVisible, setDaySelectorVisible] = useState(false);
   
+  
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
   const { canAccessFeature, meetsLevelRequirement, getRequiredLevel, getUserLevel, refreshAccess } = useFeatureAccess();
@@ -881,10 +882,13 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <HomeHeader />
-
         {/* Discount Banner for Office Workers & Students */}
         <DiscountBanner 
-          onPress={() => setSubscriptionModalVisible(true)}
+          onPress={() => {
+            // Clear verification status for testing
+            AsyncStorage.removeItem('@flexbreak:verification_status');
+            setSubscriptionModalVisible(true);
+          }}
           onDismiss={() => {
             // Optional: track dismissal
             AsyncStorage.setItem('@flexbreak:discount_banner_dismissed', 'true');
@@ -1038,7 +1042,6 @@ export default function HomeScreen() {
       <SubscriptionModal
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
-        onOpenVerification={() => setSubscriptionModalVisible(true)}
       />
 
 

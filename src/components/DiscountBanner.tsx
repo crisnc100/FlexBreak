@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { usePremium } from '../context/PremiumContext';
+import { diffInMs, MS_PER_DAY } from '../utils/progress/modules/utils/dateUtils';
 
 interface DiscountBannerProps {
   onPress: () => void;
@@ -39,19 +40,15 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
         return;
       }
 
-      // Check if user has dismissed the banner today (reset daily)
-      const dismissedDate = await AsyncStorage.getItem('@flexbreak:discount_banner_dismissed_date');
-      const today = new Date().toDateString();
+      // Check if user has dismissed the banner within the last 24 hours
+      const dismissedTimestamp = await AsyncStorage.getItem('@flexbreak:discount_banner_dismissed_timestamp');
       
-      // Reset dismissal if it's a new day
-      if (dismissedDate && dismissedDate !== today) {
-        await AsyncStorage.removeItem('@flexbreak:discount_banner_dismissed');
-      }
-      
-      const dismissed = await AsyncStorage.getItem('@flexbreak:discount_banner_dismissed');
-      if (dismissed === 'true') {
-        setIsVisible(false);
-        return;
+      if (dismissedTimestamp) {
+        const timeSinceDismissal = diffInMs(new Date(), new Date(dismissedTimestamp));
+        if (timeSinceDismissal < MS_PER_DAY) {
+          setIsVisible(false);
+          return;
+        }
       }
 
       // Check verification status
@@ -76,7 +73,6 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
           setIsVisible(true);
         }
       }
-
     } catch (error) {
       console.error('Error checking banner visibility:', error);
     }
@@ -124,8 +120,8 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
       useNativeDriver: true,
     }).start(async () => {
       setIsVisible(false);
-      await AsyncStorage.setItem('@flexbreak:discount_banner_dismissed', 'true');
-      await AsyncStorage.setItem('@flexbreak:discount_banner_dismissed_date', new Date().toDateString());
+      // Store current timestamp when banner is dismissed
+      await AsyncStorage.setItem('@flexbreak:discount_banner_dismissed_timestamp', new Date().toISOString());
       onDismiss?.();
     });
   };
