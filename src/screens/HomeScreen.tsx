@@ -47,6 +47,7 @@ import {
   Vortex
 } from '../components/home';
 import DiscountBanner from '../components/DiscountBanner';
+import TryPremiumBanner from '../components/TryPremiumBanner';
 import * as notifications from '../utils/notifications';
 import * as firebaseReminders from '../utils/firebaseReminders';
 import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_EVENT } from '../hooks/progress/useGamification';
@@ -113,6 +114,8 @@ export default function HomeScreen() {
   const [showVortex, setShowVortex] = useState(false);
   const backgroundFlashOpacity = useRef(new Animated.Value(0)).current;
 
+  // Add debounce ref at the top with other refs
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -220,10 +223,6 @@ export default function HomeScreen() {
     };
   }, []);
   
-  // Initialize notifications system
-  useEffect(() => {
-    notifications.configureNotifications();
-  }, []);
   
   // Load data
   useEffect(() => {
@@ -340,58 +339,66 @@ export default function HomeScreen() {
   const handleToggleReminders = async (value: boolean) => {
     console.log(`Setting reminders enabled to: ${value}`);
     
+    // Clear any pending debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
     try {
       if (value) {
-        // If enabling reminders, ensure we initialize Firebase
-        console.log('Enabling reminders, initializing Firebase...');
-        const hasPermission = await firebaseReminders.initializeFirebaseReminders();
-        console.log('Firebase permission status:', hasPermission);
+        // If enabling reminders, ensure we have notification permissions
+        console.log('Enabling reminders, checking permissions...');
+        const hasPermission = await notifications.requestNotificationsPermissions();
+        console.log('Notification permission status:', hasPermission);
         
         if (hasPermission) {
           // Update state
           setReminderEnabled(true);
           
-          // Save to Firebase with current settings
-          const settings = {
-            enabled: true,
-            time: reminderTime,
-            frequency: reminderFrequency,
-            days: reminderDays,
-            message: reminderMessage || 'Time for your daily stretch!'
-          };
-          
-          console.log('Saving reminder settings to Firebase:', settings);
-          const success = await firebaseReminders.saveReminderSettings(settings);
-          
-          if (success) {
-            Alert.alert(
-              'Reminders Enabled',
-              `You will receive reminders at ${reminderTime} ${reminderFrequency === 'daily' ? 'every day' : reminderFrequency === 'weekdays' ? 'on weekdays' : 'on selected days'}.`,
-              [{ text: 'OK' }]
-            );
-          } else {
-            Alert.alert(
-              'Reminders Partially Enabled',
-              'Your reminders were set up, but you may only receive them when the app is open. For reliable background notifications, please try again later.',
-              [{ text: 'OK' }]
-            );
-          }
+          // Save settings with local notifications (debounced)
+          debounceTimeoutRef.current = setTimeout(async () => {
+            const settings = {
+              enabled: true,
+              time: reminderTime,
+              frequency: reminderFrequency,
+              days: reminderDays,
+              message: reminderMessage
+            };
+            
+            const success = await firebaseReminders.saveReminderSettings(settings);
+            
+            if (success) {
+              Alert.alert(
+                'Reminders Enabled', 
+                'Local notifications scheduled for the next 30 days. Open the app periodically to keep them active.',
+                [{ text: 'OK' }]
+              );
+            } else {
+              Alert.alert('Error', 'Failed to schedule reminders. Please try again.');
+              setReminderEnabled(false);
+            }
+          }, 500); // 500ms debounce
         } else {
-          // If permissions were denied, revert the switch
-          console.log('Firebase permissions denied, not enabling reminders');
+          // No permission, keep reminders off
+          console.log('Notification permission denied');
           setReminderEnabled(false);
           Alert.alert(
-            'Permission Required',
-            'Please enable notifications in your device settings to use this feature.',
+            'Notification Permission Required',
+            'Please enable notifications in your device settings to use reminders.',
             [{ text: 'OK' }]
           );
         }
       } else {
-        // If disabling reminders, update Firebase settings
-        console.log('Disabling reminders on Firebase');
+        // Disabling reminders
+        console.log('Disabling reminders');
         setReminderEnabled(false);
         
-        // Set enabled to false but keep other settings
+        // Cancel the debounce if disabling
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+          debounceTimeoutRef.current = null;
+        }
+        
         const settings = {
           enabled: false,
           time: reminderTime,
@@ -401,20 +408,12 @@ export default function HomeScreen() {
         };
         
         await firebaseReminders.saveReminderSettings(settings);
+        Alert.alert('Reminders Disabled', 'All scheduled notifications have been cancelled.');
       }
     } catch (error) {
       console.error('Error toggling reminders:', error);
-      
-      // If we were trying to enable, revert the UI state
-      if (value) {
-        setReminderEnabled(false);
-      }
-      
-      Alert.alert(
-        'Error',
-        'Could not set reminder. Please try again later.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to update reminder settings');
+      setReminderEnabled(!value);
     }
   };
 
@@ -893,6 +892,12 @@ export default function HomeScreen() {
             // Optional: track dismissal
             AsyncStorage.setItem('@flexbreak:discount_banner_dismissed', 'true');
           }}
+        />
+
+        {/* Try Premium Banner */}
+        <TryPremiumBanner 
+          context="home"
+          onPress={() => setSubscriptionModalVisible(true)}
         />
 
         {/* Streak Display */}

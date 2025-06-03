@@ -23,12 +23,6 @@ import { createThemedStyles } from '../../utils/themeUtils';
 import { useRefresh } from '../../context/RefreshContext';
 import { Toast } from 'react-native-toast-notifications';
 
-import LevelUpDisplay from './tabs/LevelUpDisplay';
-import XpBreakdown from './tabs/XpBreakdown';
-import SimpleXpDisplay from './tabs/SimpleXpDisplay';
-import RoutineStats from './tabs/RoutineStats';
-import ActionButtons from './tabs/ActionButtons';
-
 import {
   CompletedRoutineProps as CompletedRoutinePropsType,
 } from './types/completedRoutine.types';
@@ -46,6 +40,9 @@ import { useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as achievementService from '../../utils/progress/modules/achievementManager';
 import * as storageService from '../../services/storageService';
+
+// Import the new completion flow
+import RoutineCompletionFlow from './RoutineCompletionFlow';
 
 /* ───────────── types ───────────── */
 type CompletedRoutineProps = CompletedRoutinePropsType;
@@ -278,79 +275,32 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         </Animated.View>
       )}
 
+      {/* Enhanced Completion Flow */}
       <TouchableOpacity
-        style={[styles.completedContainer, showAnyLevelUp && styles.completedContainerWithLevelUp]}
+        style={styles.completedContainer}
         activeOpacity={1}
         onPress={() => {
           triggerRefresh();
           onShowDashboard();
-        }}>
-        <Ionicons name="checkmark-circle" size={showAnyLevelUp ? 60 : 80} color={theme.success} />
-        <Text style={styles.completedTitle}>Routine Complete!</Text>
-        <Text style={[styles.completedSubtitle, showAnyLevelUp && styles.reducedMargin]}>
-          Great job on your stretching routine
-        </Text>
-
-        {showAnyLevelUp && (
-          <LevelUpDisplay
-            oldLevel={displayOldLevel}
-            newLevel={displayNewLevel}
-            isDark={isDark}
-            isSunset={isSunset}
-            isSimulated={false}
-            rewards={levelUp?.rewards || []}
-            animValues={{ levelUpAnim, levelUpScale }}
-          />
-        )}
-
-        {xpBreakdown.length ? (
-          <XpBreakdown
-            xpBreakdown={xpBreakdown}
-            unlockedAchievements={unlockedAchievements}
-            hasXpBoost={hasXpBoost}
-            showAnyLevelUp={showAnyLevelUp}
-            theme={theme}
-            isDark={isDark}
-            isSunset={isSunset}
-            animValues={{ shineAnim }}
-          />
-        ) : (
-          <SimpleXpDisplay
-            xpEarned={xpEarned}
-            originalXpEarned={originalXpEarned}
-            hasXpBoost={hasXpBoost}
-            showAnyLevelUp={showAnyLevelUp}
-            theme={theme}
-            animValues={{ boostPulseAnim }}
-          />
-        )}
-
-        <RoutineStats
+        }}
+      >
+        <RoutineCompletionFlow
           area={area}
           duration={duration}
-          numStretches={routineLength}
-          showAnyLevelUp={showAnyLevelUp}
-          theme={theme}
-        />
-
-        <Text style={[styles.nextStepsText, showAnyLevelUp && styles.nextStepsTextCompact]}>
-          What would you like to do next?
-        </Text>
-
-        <ActionButtons
           isPremium={isPremium}
-          showAnyLevelUp={showAnyLevelUp}
-          theme={theme}
+          xpEarned={xpEarned}
+          xpBreakdown={xpBreakdown}
+          levelUp={levelUp}
+          isXpBoosted={hasXpBoost}
+          savedStretches={savedStretches}
+          unlockedAchievements={unlockedAchievements}
+          onShowDashboard={onShowDashboard}
+          onNavigateHome={onNavigateHome}
+          onOpenSubscription={onOpenSubscription}
           onSaveToFavorites={saveToFavorites}
           onSmartPick={startSmartPick}
           onNewRoutine={handleNewRoutine}
-          onOpenSubscription={onOpenSubscription}
         />
-
-        <View style={styles.tapIndicatorContainer}>
-          <Ionicons name="finger-print-outline" size={16} color={theme.textSecondary} />
-          <Text style={styles.tapIndicatorText}>Tap anywhere to continue</Text>
-        </View>
       </TouchableOpacity>
     </View>
   );
@@ -364,7 +314,7 @@ const themedStyles = createThemedStyles(theme =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 20,
+      padding: 0,
       backgroundColor: theme.cardBackground,
     },
     completedContainerWithLevelUp: { paddingTop: 15, paddingBottom: 15 },

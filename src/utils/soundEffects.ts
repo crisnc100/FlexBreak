@@ -19,7 +19,7 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   timerTheme1: null,
   transition1: null,
   transition2: null,
-  halfway: null
+  halfway: null,
 };
 
 // Add debounce tracking for sounds that are frequently played
@@ -37,7 +37,7 @@ const soundDebounceMap: Record<SoundEffect, number> = {
   timerTheme1: 0,
   transition1: 0,
   transition2: 0,
-  halfway: 0
+  halfway: 0,
 };
 
 // Minimum time between playing the same sound (in milliseconds)
@@ -68,7 +68,7 @@ const soundUris: Record<SoundEffect, any> = {
   timerTheme1: require('../../assets/sounds/timerTheme1.mp3'),
   transition1: require('../../assets/sounds/transition1.mp3'),
   transition2: require('../../assets/sounds/transition2.mp3'),
-  halfway: require('../../assets/sounds/unlockedPremium.mp3')
+  halfway: require('../../assets/sounds/unlockedPremium.mp3'),
 };
 
 /**
@@ -282,6 +282,9 @@ export const playXpBoostSound = async (): Promise<void> => {
 export const playIntroSound = async (): Promise<void> => {
   await playSound('intro');
 };
+
+/**
+ * Play summary theme sound
 
 /**
  * Play halfway sound

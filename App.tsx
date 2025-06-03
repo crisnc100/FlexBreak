@@ -89,14 +89,7 @@ type RootStackParamList = {
 // Create a navigation ref that can be used outside of React components
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
-// Configure notification behavior when app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// Note: Notification handler is configured in src/utils/notifications.ts
 
 // Function to navigate from anywhere
 export function navigateFromAnywhere(name: keyof RootStackParamList, params?: any) {

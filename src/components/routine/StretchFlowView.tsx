@@ -519,7 +519,10 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             {stretchObj.bilateral && (
               <View style={[styles.badgeItem, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
                 <Ionicons name="swap-horizontal" size={16} color="#FFF" />
-                <Text style={styles.badgeText}>Both Sides</Text>
+                <View style={styles.bilateralTextContainer}>
+                  <Text style={styles.badgeText}>Both Sides</Text>
+                  <Text style={styles.timingHint}>30s hold</Text>
+                </View>
               </View>
             )}
             
@@ -623,7 +626,10 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             {stretchObj.bilateral && (
               <View style={[styles.badgeItem, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
                 <Ionicons name="swap-horizontal" size={16} color="#FFF" />
-                <Text style={styles.badgeText}>Both Sides</Text>
+                <View style={styles.bilateralTextContainer}>
+                  <Text style={styles.badgeText}>Both Sides</Text>
+                  <Text style={styles.timingHint}>30s hold</Text>
+                </View>
               </View>
             )}
             
@@ -1006,7 +1012,10 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             {nextStretch.bilateral && (
               <View style={[styles.nextStretchBilateralBadge, { backgroundColor: isDark || isSunset ? theme.accent : '#4CAF50' }]}>
                 <Ionicons name="swap-horizontal" size={14} color="#FFF" />
-                <Text style={styles.nextStretchBadgeText}>Both Sides</Text>
+                <View style={styles.nextStretchBilateralTextContainer}>
+                  <Text style={styles.nextStretchBadgeText}>Both Sides</Text>
+                  <Text style={styles.nextStretchTimingHint}>30s hold</Text>
+                </View>
               </View>
             )}
           </View>
@@ -1252,6 +1261,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 5,
     fontWeight: '600',
+  },
+  bilateralTextContainer: {
+    marginLeft: 5,
+    alignItems: 'flex-start',
+  },
+  timingHint: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  nextStretchBilateralTextContainer: {
+    marginLeft: 4,
+    alignItems: 'flex-start',
+  },
+  nextStretchTimingHint: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 9,
+    fontWeight: '500',
+    marginTop: 1,
   },
   imageContainer: {
     height: height * 0.25,

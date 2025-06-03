@@ -206,9 +206,6 @@ export function useGamification() {
       if (result.levelUp) {
         setLevel(result.newLevel);
         
-        // Play level up sound
-        soundEffects.playLevelUpSound();
-        
         // Emit level up event to notify other components
         gamificationEvents.emit(LEVEL_UP_EVENT, {
           oldLevel: prevLevel,
@@ -285,9 +282,6 @@ export function useGamification() {
         // Update level if needed
         if (result.levelUp) {
           setLevel(result.newLevel);
-          
-          // Play level up sound
-          soundEffects.playLevelUpSound();
           
           // Emit level up event with detailed challenge source information
           gamificationEvents.emit(LEVEL_UP_EVENT, {
@@ -469,9 +463,6 @@ export function useGamification() {
       
       if (levelUp) {
         setLevel(newLevelInfo.level);
-        
-        // Play level up sound
-        soundEffects.playLevelUpSound();
         
         // Emit level up event with source information
         gamificationEvents.emit(LEVEL_UP_EVENT, {

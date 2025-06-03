@@ -51,8 +51,7 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
     console.log(`Rendering LevelUpNotification: ${oldLevel} → ${newLevel}`);
     console.log(`Source: ${source}, Challenge: ${challengeTitle || 'None'}`);
     
-    // Play level up sound when component mounts
-    soundEffects.playLevelUpSound();
+    // Sound is now handled by RoutineCompletionFlow
     
     // First mark as fully mounted (layout complete)
     // This ensures all styles are properly applied before animation
