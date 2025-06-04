@@ -37,6 +37,8 @@ import * as notifications from './src/utils/notifications';
 import * as firebaseReminders from './src/utils/firebaseReminders';
 // Import the console log disabler
 import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsInProduction';
+// Import video loader service
+import { videoLoaderService } from './src/services/videoLoaderService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 
 // Initialize Firebase with Firebase JS SDK
@@ -142,6 +144,20 @@ export default function App() {
     return () => {
       subscription.remove();
     };
+  }, []);
+
+  // Initialize video loader service
+  useEffect(() => {
+    const initializeVideoLoader = async () => {
+      try {
+        await videoLoaderService.initialize();
+        console.log('✅ Video loader service initialized');
+      } catch (error) {
+        console.error('❌ Failed to initialize video loader service:', error);
+      }
+    };
+
+    initializeVideoLoader();
   }, []);
   
   return (

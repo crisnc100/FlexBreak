@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import DemoVideoPlayer from './DemoVideoPlayer';
 import * as soundEffects from '../../utils/soundEffects';
+import { videoLoaderService } from '../../services/videoLoaderService';
 import * as Haptics from 'expo-haptics';
 import { Stretch, RestPeriod, TransitionPeriod } from '../../types';
 import { NavigationButtons } from './utils';
@@ -75,6 +76,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   const [displayedTime, setDisplayedTime] = useState(timeRemaining);
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
+  const [videoSource, setVideoSource] = useState<any>(null);
+  const [isVideoLocal, setIsVideoLocal] = useState(false);
   const [transitionVideoOpacity, setTransitionVideoOpacity] = useState(0.6);
   
   // Animation values
@@ -103,6 +106,60 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   
   // Track current stretch ID for detecting changes
   const currentStretchId = stretch.id;
+
+  // Load video source when stretch changes
+  useEffect(() => {
+    const loadVideoSource = async () => {
+      if (!stretchObj || !isVideoSource(stretchObj)) {
+        setVideoSource(null);
+        return;
+      }
+
+      try {
+        setIsImageLoading(true);
+        
+        // Check if it's a Firebase URL
+        const imageSource = stretchObj.image;
+        if (typeof imageSource === 'object' && imageSource && 'uri' in imageSource) {
+          const firebaseUrl = imageSource.uri;
+          
+          console.log(`🔍 Processing video source for ${stretchObj.name}:`, firebaseUrl.substring(0, 100) + '...');
+          
+          if (firebaseUrl.includes('storage.googleapis.com') || firebaseUrl.includes('firebase')) {
+            // Use video loader service for Firebase URLs
+            console.log(`📥 Using video loader service for ${stretchObj.name}`);
+            const result = await videoLoaderService.getVideoSource(firebaseUrl);
+            setVideoSource({ uri: result.uri });
+            setIsVideoLocal(result.isLocal);
+            
+            console.log(`📺 Loaded video source for ${stretchObj.name}: ${result.isLocal ? 'cached' : 'streaming'}`);
+          } else {
+            // Direct URL or other source
+            console.log(`🔗 Using direct URL for ${stretchObj.name}`);
+            setVideoSource(imageSource);
+            setIsVideoLocal(false);
+          }
+        } else if ((imageSource as any).__asset) {
+          // Asset reference
+          console.log(`📦 Using asset reference for ${stretchObj.name}`);
+          setVideoSource((imageSource as any).__asset);
+          setIsVideoLocal(true);
+        } else {
+          // Other format
+          console.log(`❓ Using unknown format for ${stretchObj.name}:`, typeof imageSource);
+          setVideoSource(imageSource);
+          setIsVideoLocal(false);
+        }
+      } catch (error) {
+        console.error('❌ Failed to load video source:', error);
+        // Fallback to original source
+        setVideoSource(stretchObj.image);
+        setIsVideoLocal(false);
+      }
+    };
+
+    loadVideoSource();
+  }, [currentStretchId, stretchObj]);
   
   // Effect to handle stretch changes
   useEffect(() => {
@@ -306,21 +363,24 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       return false;
     }
 
-    // Case 1: Check for the __video flag
+    // Case 1: Check for the __video flag (legacy format)
     if (typeof stretchToCheck.image === 'object' && 
         stretchToCheck.image !== null && 
         (stretchToCheck.image as any).__video === true) {
       return true;
     }
     
-    // Case 2: Check for .mp4 extension in uri
+    // Case 2: Check for .mp4/.mov extension in uri (Firebase URLs)
     if (typeof stretchToCheck.image === 'object' && 
         stretchToCheck.image !== null && 
         'uri' in stretchToCheck.image && 
-        typeof stretchToCheck.image.uri === 'string' && 
-        (stretchToCheck.image.uri.toLowerCase().endsWith('.mp4') || 
-         stretchToCheck.image.uri.toLowerCase().endsWith('.mov'))) {
-      return true;
+        typeof stretchToCheck.image.uri === 'string') {
+      const uri = stretchToCheck.image.uri.toLowerCase();
+      // Check for video extensions in the URL path (before query parameters)
+      const urlPath = uri.split('?')[0]; // Remove query parameters
+      if (urlPath.includes('.mp4') || urlPath.includes('.mov')) {
+        return true;
+      }
     }
 
     // Case 3: Check for require asset with MP4 reference
@@ -397,13 +457,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     
     const shouldRenderVideo = isVideoSource(stretchObj);
     
-    if (shouldRenderVideo) {
-      let videoSource = stretchObj.image;
-      // If we have an __asset field, use the asset reference directly
-      if ((stretchObj.image as any).__asset) {
-        videoSource = (stretchObj.image as any).__asset;
-      }
-      
+    if (shouldRenderVideo && videoSource) {
       return (
         <Animated.View style={[styles.imageWrapper, { opacity: imageOpacity }]}>
           <Video 

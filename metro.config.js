@@ -27,6 +27,16 @@ config.resolver.extraNodeModules = new Proxy(
   },
 );
 
+// Exclude firebase-admin from Metro file watching (dev dependency only)
+config.watchFolders = [
+  path.resolve(__dirname, 'src'),
+  path.resolve(__dirname, 'assets'),
+];
+
+config.resolver.blockList = [
+  /node_modules\/firebase-admin\/.*/,
+];
+
 // Clear cache on each run in development
 if (process.env.NODE_ENV !== 'production') {
   config.resetCache = true;

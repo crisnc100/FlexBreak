@@ -38,10 +38,11 @@ export const saveDisclaimerAcceptance = async () => {
 interface FitnessDisclaimerProps {
   visible: boolean;
   onAccept: () => void;
+  onCancel?: () => void;
   viewOnly?: boolean;
 }
 
-const FitnessDisclaimer: React.FC<FitnessDisclaimerProps> = ({ visible, onAccept, viewOnly = false }) => {
+const FitnessDisclaimer: React.FC<FitnessDisclaimerProps> = ({ visible, onAccept, onCancel, viewOnly = false }) => {
   const { isDark, isSunset, theme } = useTheme();
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
@@ -69,15 +70,30 @@ const FitnessDisclaimer: React.FC<FitnessDisclaimerProps> = ({ visible, onAccept
           { backgroundColor: isDark || isSunset ? theme.cardBackground : theme.background }
         ]}>
           <View style={styles.headerContainer}>
-            <Ionicons 
-              name="fitness" 
-              size={24} 
-              color={isDark || isSunset ? theme.accent : theme.accent}
-              style={styles.icon}
-            />
-            <Text style={[styles.headerText, { color: theme.text }]}>
-              Fitness Disclaimer
-            </Text>
+            <View style={styles.headerLeft}>
+              <Ionicons 
+                name="fitness" 
+                size={24} 
+                color={isDark || isSunset ? theme.accent : theme.accent}
+                style={styles.icon}
+              />
+              <Text style={[styles.headerText, { color: theme.text }]}>
+                Fitness Disclaimer
+              </Text>
+            </View>
+            {!viewOnly && onCancel && (
+              <TouchableOpacity
+                onPress={onCancel}
+                style={styles.closeButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons 
+                  name="close" 
+                  size={24} 
+                  color={theme.textSecondary || theme.text}
+                />
+              </TouchableOpacity>
+            )}
           </View>
           
           <ScrollView style={styles.contentScrollView}>
@@ -169,9 +185,14 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   icon: {
     marginRight: 10,
@@ -179,6 +200,9 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
   },
   contentScrollView: {
     maxHeight: 400,

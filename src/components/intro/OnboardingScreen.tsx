@@ -8,10 +8,8 @@ import {
   Dimensions,
   StatusBar,
   Platform,
-  GestureResponderEvent,
-  PanResponder,
   Easing,
-  Vibration
+  Vibration,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,13 +40,13 @@ const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           break;
         case 'success':
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           break;
         case 'warning':
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           break;
         case 'error':
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           break;
       }
     } else if (Platform.OS === 'android') {
@@ -94,67 +92,59 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   
-  // Track touch position for swipe detection
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
+  // New animation values for enhanced experience
+  const iconScaleAnim = useRef(new Animated.Value(0)).current;
+  const iconRotateAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+  const leftArrowPulse = useRef(new Animated.Value(1)).current;
+  const rightArrowPulse = useRef(new Animated.Value(1)).current;
   
-  // Pan responder for swipe gestures
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        // Store the initial touch position
-        touchStartX.current = evt.nativeEvent.pageX;
-        
-        // Clear auto advance timer when user starts interacting
-        if (autoAdvanceTimer.current) {
-          clearTimeout(autoAdvanceTimer.current);
-          autoAdvanceTimer.current = null;
-        }
-      },
-      onPanResponderMove: (evt) => {
-        // Update the current touch position
-        touchEndX.current = evt.nativeEvent.pageX;
-      },
-      onPanResponderRelease: () => {
-        // Calculate the swipe distance
-        const swipeDistance = touchEndX.current - touchStartX.current;
-        const threshold = width * 0.2; // 20% of screen width
-        
-        if (swipeDistance < -threshold) {
-          // Swiped left -> go to next page
-          goToNextPage();
-        } else if (swipeDistance > threshold) {
-          // Swiped right -> go to previous page
-          goToPrevPage();
-        } else {
-          // Reset auto advance timer if swipe wasn't far enough
-          startAutoAdvanceTimer();
-        }
-      },
-    })
+  // Particle animations for visual interest
+  const particleAnims = useRef(
+    Array.from({ length: 6 }, () => ({
+      translateY: new Animated.Value(0),
+      translateX: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0)
+    }))
   ).current;
 
-  // Onboarding content
+  // Enhanced onboarding content with better messaging
   const pages = [
     {
-      title: 'Stretch smarter, feel better',
-      subtitle: 'Daily routines for your body.',
+      title: 'Welcome to FlexBreak',
+      subtitle: 'Your personal stretching companion',
+      description: 'Take quick breaks, stretch smart, and feel better throughout your day',
       icon: 'body-outline',
-      gradient: ['#4776E6', '#8E54E9']
+      gradient: ['#667eea', '#764ba2'],
+      features: ['100+ stretches', 'Smart reminders', 'Personalized routines']
     },
     {
-      title: 'Build streaks, unlock rewards',
-      subtitle: 'Over 100 stretches to explore.',
-      icon: 'trophy-outline',
-      gradient: ['#00B4DB', '#0083B0']
+      title: 'Build Healthy Habits',
+      subtitle: 'Track your progress daily',
+      description: 'Earn XP, unlock achievements, and watch your flexibility improve',
+      icon: 'trending-up-outline',
+      gradient: ['#f093fb', '#f5576c'],
+      features: ['Daily streaks', 'Level system', 'Achievement badges']
     },
     {
-      title: 'Ready?',
-      subtitle: 'Start your first stretch now!',
-      icon: 'fitness-outline',
-      gradient: ['#56ab2f', '#a8e063'],
-      showButton: true
+      title: 'Stretch Anywhere',
+      subtitle: 'Designed for your lifestyle',
+      description: 'Quick routines perfect for office, home, or on-the-go',
+      icon: 'location-outline',
+      gradient: ['#4facfe', '#00f2fe'],
+      features: ['5-15 min routines', 'Little to no equipment needed', 'All fitness levels']
+    },
+    {
+      title: 'Ready to Start?',
+      subtitle: 'Your journey begins now',
+      description: 'Join thousands improving their flexibility and wellbeing',
+      icon: 'rocket-outline',
+      gradient: ['#fa709a', '#fee140'],
+      showButton: true,
+      features: []
     }
   ];
 
@@ -169,10 +159,28 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     inputRange: [0, 1, 2, 3, 4],
     outputRange: ['0deg', '72deg', '144deg', '216deg', '288deg']
   });
+  
+  // Float animation for icons
+  const floatTranslate = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -10]
+  });
 
-  // Handle auto-advancing to next page
+  // Initialize page animations
   useEffect(() => {
+    startPageAnimations();
     startAutoAdvanceTimer();
+    
+    // Update progress bar
+    Animated.timing(progressAnim, {
+      toValue: (currentPage + 1) / pages.length,
+      duration: 300,
+      useNativeDriver: false,
+      easing: Easing.out(Easing.ease)
+    }).start();
+    
+    // Start arrow pulse animations
+    startArrowAnimations();
     
     return () => {
       if (autoAdvanceTimer.current) {
@@ -180,6 +188,119 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       }
     };
   }, [currentPage]);
+  
+  const startArrowAnimations = () => {
+    // Pulse animation for navigation arrows
+    const createPulseAnimation = (animValue: Animated.Value) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(animValue, {
+            toValue: 1.2,
+            duration: 1000,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.ease)
+          }),
+          Animated.timing(animValue, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.ease)
+          })
+        ])
+      );
+    };
+    
+    if (currentPage > 0) {
+      createPulseAnimation(leftArrowPulse).start();
+    }
+    
+    if (currentPage < pages.length - 1) {
+      createPulseAnimation(rightArrowPulse).start();
+    }
+  };
+  
+  const startPageAnimations = () => {
+    // Reset animations
+    iconScaleAnim.setValue(0);
+    iconRotateAnim.setValue(0);
+    
+    // Icon entrance animation
+    Animated.parallel([
+      Animated.spring(iconScaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 5,
+        useNativeDriver: true
+      }),
+      Animated.timing(iconRotateAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.back(1.5))
+      })
+    ]).start();
+    
+    // Floating animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin)
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin)
+        })
+      ])
+    ).start();
+    
+    // Particle animations
+    particleAnims.forEach((particle, index) => {
+      const delay = index * 200;
+      const angle = (index * 60) * Math.PI / 180;
+      const distance = 100 + Math.random() * 50;
+      
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(particle.opacity, {
+            toValue: 0.6,
+            duration: 400,
+            useNativeDriver: true
+          }),
+          Animated.spring(particle.scale, {
+            toValue: 1,
+            tension: 100,
+            friction: 5,
+            useNativeDriver: true
+          }),
+          Animated.timing(particle.translateX, {
+            toValue: Math.cos(angle) * distance,
+            duration: 1000,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.ease)
+          }),
+          Animated.timing(particle.translateY, {
+            toValue: Math.sin(angle) * distance,
+            duration: 1000,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.ease)
+          })
+        ]).start(() => {
+          // Fade out
+          Animated.timing(particle.opacity, {
+            toValue: 0,
+            duration: 800,
+            delay: 500,
+            useNativeDriver: true
+          }).start();
+        });
+      }, delay);
+    });
+  };
   
   // Starting loading animations
   const startLoadingAnimations = () => {
@@ -228,17 +349,23 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       clearTimeout(autoAdvanceTimer.current);
     }
     
-    // Set new timer (3 seconds per screen) but don't auto-advance on last screen
+    // Set new timer (5 seconds per screen for better reading) but don't auto-advance on last screen
     if (currentPage < pages.length - 1) {
       autoAdvanceTimer.current = setTimeout(() => {
         goToNextPage();
-      }, 3000);
+      }, 5000);
     }
   };
 
   const goToNextPage = () => {
     // Don't advance beyond the last page
     if (currentPage >= pages.length - 1) return;
+    
+    // Clear auto advance timer
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
     
     // Provide haptic feedback
     triggerHaptic('light');
@@ -254,30 +381,45 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         useNativeDriver: true
       }),
       Animated.timing(slideAnim, {
-        toValue: -width,
+        toValue: -width * 0.3,
         duration: 300,
-        useNativeDriver: true
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease)
       })
     ]).start(() => {
       // Update page index
       setCurrentPage(currentPage + 1);
       
       // Reset animations
-      slideAnim.setValue(0);
+      slideAnim.setValue(width * 0.3);
       fadeAnim.setValue(0);
       
       // Fade in new content
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true
-      }).start();
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease)
+        })
+      ]).start();
     });
   };
   
   const goToPrevPage = () => {
     // Don't go back from first page
     if (currentPage <= 0) return;
+    
+    // Clear auto advance timer
+    if (autoAdvanceTimer.current) {
+      clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
     
     // Provide haptic feedback
     triggerHaptic('light');
@@ -293,24 +435,33 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         useNativeDriver: true
       }),
       Animated.timing(slideAnim, {
-        toValue: width,
+        toValue: width * 0.3,
         duration: 300,
-        useNativeDriver: true
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease)
       })
     ]).start(() => {
       // Update page index
       setCurrentPage(currentPage - 1);
       
       // Reset animations
-      slideAnim.setValue(0);
+      slideAnim.setValue(-width * 0.3);
       fadeAnim.setValue(0);
       
       // Fade in new content
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true
-      }).start();
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease)
+        })
+      ]).start();
     });
   };
 
@@ -345,6 +496,20 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   };
 
   const handleStartStretching = async () => {
+    // Animate button press
+    Animated.sequence([
+      Animated.timing(buttonScaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true
+      }),
+      Animated.timing(buttonScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true
+      })
+    ]).start();
+    
     // Provide haptic feedback - stronger for main action
     triggerHaptic('success');
     
@@ -397,7 +562,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     return (
       <View style={styles.loaderContainer}>
         <LinearGradient
-          colors={['#4776E6', '#8E54E9']}
+          colors={['#667eea', '#764ba2']}
           style={styles.background}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -463,6 +628,23 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         end={{ x: 1, y: 1 }}
       />
       
+      {/* Progress bar */}
+      <View style={[styles.progressContainer, { top: insets.top + 10 }]}>
+        <View style={styles.progressBar}>
+          <Animated.View 
+            style={[
+              styles.progressFill,
+              {
+                width: progressAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%']
+                })
+              }
+            ]}
+          />
+        </View>
+      </View>
+      
       {/* Skip button */}
       <TouchableOpacity 
         style={[styles.skipButton, { top: insets.top + 10 }]} 
@@ -471,29 +653,28 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
       
-      {/* Left tap area for going back */}
-      {currentPage > 0 && (
-        <TouchableOpacity 
-          style={styles.leftTapArea}
-          activeOpacity={0.7}
-          onPress={goToPrevPage}
-        />
-      )}
-      
-      {/* Right tap area for going forward */}
-      {currentPage < pages.length - 1 && (
-        <TouchableOpacity 
-          style={styles.rightTapArea}
-          activeOpacity={0.7}
-          onPress={goToNextPage}
-        />
-      )}
-      
-      {/* Swipeable content area */}
-      <View 
-        style={styles.swipeContainer}
-        {...panResponder.panHandlers}
-      >
+      {/* Main content area - no swipe/tap handling */}
+      <View style={styles.contentWrapper}>
+        {/* Floating particles */}
+        <View style={styles.particlesContainer}>
+          {particleAnims.map((particle, index) => (
+            <Animated.View
+              key={index}
+              style={[
+                styles.particle,
+                {
+                  opacity: particle.opacity,
+                  transform: [
+                    { translateX: particle.translateX },
+                    { translateY: particle.translateY },
+                    { scale: particle.scale }
+                  ]
+                }
+              ]}
+            />
+          ))}
+        </View>
+        
         {/* Page content */}
         <Animated.View 
           style={[
@@ -504,26 +685,66 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             }
           ]}
         >
-          <View style={styles.iconContainer}>
+          <Animated.View 
+            style={[
+              styles.iconContainer,
+              {
+                transform: [
+                  { scale: iconScaleAnim },
+                  { 
+                    rotate: iconRotateAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg']
+                    })
+                  },
+                  { translateY: floatTranslate }
+                ]
+              }
+            ]}
+          >
             <Ionicons name={currentPageData.icon as any} size={80} color="#FFFFFF" />
-          </View>
+          </Animated.View>
           
           <Text style={styles.title}>{currentPageData.title}</Text>
           <Text style={styles.subtitle}>{currentPageData.subtitle}</Text>
+          <Text style={styles.description}>{currentPageData.description}</Text>
+          
+          {/* Feature list */}
+          {currentPageData.features.length > 0 && (
+            <View style={styles.featuresContainer}>
+              {currentPageData.features.map((feature, index) => (
+                <View key={index} style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.featureText}>{feature}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           
           {currentPageData.showButton && (
-            <TouchableOpacity 
-              style={styles.startButton}
-              onPress={handleStartStretching}
-            >
-              <Text style={styles.startButtonText}>Start Stretching</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <TouchableOpacity 
+                style={styles.startButton}
+                onPress={handleStartStretching}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#FFFFFF', '#F0F0F0']}
+                  style={styles.startButtonGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                >
+                  <Text style={styles.startButtonText}>Start Stretching</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#667eea" style={{ marginLeft: 8 }} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
           )}
         </Animated.View>
       </View>
       
-      {/* Page indicators */}
-      <View style={styles.paginationContainer}>
+      {/* Page indicators with tap navigation */}
+      <View style={[styles.paginationContainer, { bottom: insets.bottom + 30 }]}>
         {pages.map((_, index) => (
           <TouchableOpacity 
             key={index}
@@ -533,11 +754,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             ]}
             onPress={() => {
               // Allow direct navigation to specific pages by tapping dots
-              if (index > currentPage) {
-                // Navigate forward
-                setCurrentPage(index);
-              } else if (index < currentPage) {
-                // Navigate backward
+              if (index !== currentPage) {
+                triggerHaptic('light');
                 setCurrentPage(index);
               }
             }}
@@ -545,10 +763,65 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         ))}
       </View>
       
+      {/* Navigation arrows - more prominent */}
+      {currentPage > 0 && (
+        <Animated.View 
+          style={[
+            styles.navArrowContainer, 
+            styles.navArrowLeft,
+            { transform: [{ scale: leftArrowPulse }] }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.navArrowButton}
+            onPress={goToPrevPage}
+            activeOpacity={0.7}
+          >
+            <LinearGradient
+              colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+              style={styles.navArrowGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+      
+      {currentPage < pages.length - 1 && (
+        <Animated.View 
+          style={[
+            styles.navArrowContainer, 
+            styles.navArrowRight,
+            { transform: [{ scale: rightArrowPulse }] }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.navArrowButton}
+            onPress={goToNextPage}
+            activeOpacity={0.7}
+          >
+            <LinearGradient
+              colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+              style={styles.navArrowGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+      
       {/* Fitness Disclaimer Modal */}
       <FitnessDisclaimer
         visible={showDisclaimerModal}
         onAccept={handleDisclaimerAccepted}
+        onCancel={() => {
+          setShowDisclaimerModal(false);
+          triggerHaptic('light');
+        }}
       />
     </View>
   );
@@ -567,6 +840,24 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
   },
+  progressContainer: {
+    position: 'absolute',
+    left: 20,
+    right: 80,
+    height: 4,
+    zIndex: 10,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 2,
+  },
   skipButton: {
     position: 'absolute',
     right: 20,
@@ -578,94 +869,154 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  swipeContainer: {
+  contentWrapper: {
     flex: 1,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  contentContainer: {
-    width: width * 0.8,
+  particlesContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  particle: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  contentContainer: {
+    width: width * 0.85,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
   iconContainer: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 30,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   subtitle: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 20,
+    color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 12,
+    fontWeight: '600',
+  },
+  description: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+    paddingHorizontal: 20,
+  },
+  featuresContainer: {
+    marginBottom: 30,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  featureText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    marginLeft: 10,
   },
   startButton: {
-    backgroundColor: 'white',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 30,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  startButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 30,
   },
   startButtonText: {
-    color: '#4776E6',
+    color: '#667eea',
     fontSize: 18,
     fontWeight: 'bold',
   },
   paginationContainer: {
     flexDirection: 'row',
     position: 'absolute',
-    bottom: 50,
+    alignItems: 'center',
   },
   paginationDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 6,
   },
   paginationDotActive: {
     backgroundColor: 'white',
-    width: 20,
-    borderRadius: 10,
+    width: 24,
+    borderRadius: 12,
   },
-  leftTapArea: {
+  navArrowContainer: {
     position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: width * 0.15, // 15% of screen width
-    zIndex: 5,
+    top: '50%',
+    marginTop: -25,
+    zIndex: 10,
   },
-  rightTapArea: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: width * 0.15, // 15% of screen width
-    zIndex: 5,
+  navArrowLeft: {
+    left: 20,
+  },
+  navArrowRight: {
+    right: 20,
+  },
+  navArrowButton: {
+    width: 50,
+    height: 50,
+  },
+  navArrowGradient: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   // Loader styles
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#4776E6',
+    backgroundColor: '#667eea',
     width: '100%',
     height: '100%',
   },
