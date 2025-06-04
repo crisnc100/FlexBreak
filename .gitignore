@@ -37,3 +37,6 @@ yarn-error.*
 
 app-example
 ~/.claude.json
+
+# Service account keys and sensitive files
+scripts/serviceAccountKey.json
