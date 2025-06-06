@@ -11,7 +11,7 @@ import * as haptics from '../../utils/haptics';
 import { useTheme } from '../../context/ThemeContext';
 import { usePremium } from '../../context/PremiumContext';
 import { playCompletionSound, playLevelUpSound } from '../../utils/soundEffects';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getData, setData, KEYS } from '../../services/storageService';
 import ActionButtons from './tabs/ActionButtons';
 
 // Import new micro-interaction components
@@ -81,33 +81,39 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
   // Play completion sound on mount
   useEffect(() => {
     playCompletionSound();
-    
-    // TEST: Force show popup after 5 seconds for debugging
-    setTimeout(() => {
-      console.log('🎮 TEST: Forcing popup to show for debugging');
-      setShowMiniGamePopup(true);
-    }, 5000);
   }, []);
+
+  // Trigger mini-game popup when summary step is reached
+  useEffect(() => {
+    if (currentStep === 'summary') {
+      console.log('🎮 POPUP: Summary step reached, showing popup in 1 second');
+      const timer = setTimeout(() => {
+        checkAndShowMiniGamePopup();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
 
   // Check if user can access mini-games and show popup after flow completes
   const checkAndShowMiniGamePopup = async () => {
     try {
       console.log('🎮 POPUP: checkAndShowMiniGamePopup called');
       const today = new Date().toDateString();
-      const lastPlayDate = await AsyncStorage.getItem('@flexbreak:last_minigame_date');
+      const lastPlayDate = await getData(KEYS.MINIGAMES.LAST_PLAYED_DATE, '');
       const playedToday = lastPlayDate === today;
       
       console.log('🎮 POPUP: isPremium:', isPremium);
       console.log('🎮 POPUP: playedToday:', playedToday);
       console.log('🎮 POPUP: lastPlayDate:', lastPlayDate);
       
-      // Premium users: Always show popup
-      // Free users: Only if haven't played today (2 games max per day)
+      // Premium users: Always show popup after routines
+      // Free users: Only 1 mini-game per day
       if (isPremium || !playedToday) {
         console.log('🎮 POPUP: Showing mini-game popup');
         setShowMiniGamePopup(true);
       } else {
-        console.log('🎮 POPUP: NOT showing mini-game popup');
+        console.log('🎮 POPUP: NOT showing mini-game popup - free user already played today');
       }
     } catch (error) {
       console.error('Error checking mini-game access:', error);

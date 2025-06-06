@@ -2,7 +2,7 @@ import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types
-type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'flexSave' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 'transition1' | 'transition2' | 'halfway';
+type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'flexSave' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 'transition1' | 'transition2' | 'halfway' | 'correct' | 'incorrect';
 
 // Define the cache to store loaded sounds
 const soundCache: Record<SoundEffect, Audio.Sound | null> = {
@@ -20,6 +20,8 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   transition1: null,
   transition2: null,
   halfway: null,
+  correct: null,
+  incorrect: null,
 };
 
 // Add debounce tracking for sounds that are frequently played
@@ -38,6 +40,8 @@ const soundDebounceMap: Record<SoundEffect, number> = {
   transition1: 0,
   transition2: 0,
   halfway: 0,
+  correct: 0,
+  incorrect: 0,
 };
 
 // Minimum time between playing the same sound (in milliseconds)
@@ -69,6 +73,8 @@ const soundUris: Record<SoundEffect, any> = {
   transition1: require('../../assets/sounds/transition1.mp3'),
   transition2: require('../../assets/sounds/transition2.mp3'),
   halfway: require('../../assets/sounds/unlockedPremium.mp3'),
+  correct: require('../../assets/sounds/correctTheme.mp3'),
+  incorrect: require('../../assets/sounds/incorrectTheme.mp3'),
 };
 
 /**
@@ -339,6 +345,20 @@ export const playPremiumUnlockedSound = async (): Promise<void> => {
  */
 export const playRedeemingChallengeSound = async (): Promise<void> => {
   await playSound('redeemingChallenge', 0.4); // Use lower volume (40%)
+};
+
+/**
+ * Play correct sound
+ */
+export const playCorrectSound = async (): Promise<void> => {
+  await playSound('correct', 1.0);
+};
+
+/**
+ * Play incorrect sound
+ */
+export const playIncorrectSound = async (): Promise<void> => {
+  await playSound('incorrect', 1.0);
 };
 
 /**

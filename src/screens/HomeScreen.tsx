@@ -42,6 +42,7 @@ import {
   CustomRoutineModal,
   StreakDisplay,
   DeskBreakBoost,
+  MiniGamesCard,
   streakFlexSaveEvents,
   STREAK_FLEX_SAVE_APPLIED,
   TimeRewind,
@@ -946,6 +947,11 @@ export default function HomeScreen() {
           requiredLevel={getRequiredLevel('desk_break_boost')}
           userLevel={userLevel}
           isPremium={isPremium}
+        />
+
+        {/* Mini-Games Card */}
+        <MiniGamesCard 
+          onOpenSubscription={() => openModal('subscription')}
         />
 
         {/* Daily Tip */}

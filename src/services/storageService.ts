@@ -36,6 +36,15 @@ export const KEYS = {
     LAST_REFRESH_TIME: '@lastRefreshTime',
     SYNC_TIMESTAMP: '@syncTimestamp',
   },
+  MINIGAMES: {
+    LAST_PLAYED_DATE: '@minigame_last_played_date',
+    GAMES_PLAYED_TODAY: '@minigame_games_played_today',
+    TOTAL_GAMES_PLAYED: '@minigame_total_games_played',
+    PERFECT_SCORES: '@minigame_perfect_scores',
+    CONSECUTIVE_DAYS: '@minigame_consecutive_days',
+    TRIVIA_CORRECT_COUNT: '@minigame_trivia_correct',
+    BEST_REACTION_TIME: '@minigame_best_reaction_time',
+  },
   CUSTOM: {
     USER_SETTINGS: '@userSettings',
     CUSTOM_ROUTINES: '@customRoutines',

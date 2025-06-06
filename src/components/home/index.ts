@@ -13,4 +13,5 @@ export { default as StreakDisplay } from './StreakDisplay';
 export { streakFlexSaveEvents, STREAK_FLEX_SAVE_APPLIED } from './StreakDisplay';
 export { default as StretchSelector } from './StretchSelector';
 export { default as DeskBreakBoost } from './DeskBreakBoost';
+export { MiniGamesCard } from './MiniGamesCard';
 export { TimeRewind, Vortex } from './TimeRewind';

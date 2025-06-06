@@ -197,13 +197,13 @@ export const triviaQuestions: TriviaQuestion[] = [
     category: 'stretching'
   },
 
-  // Additional Posture Questions
+  // Additional Simple & Engaging Questions
   {
     id: 26,
-    question: "Text neck is a real condition caused by looking down at phones.",
+    question: "Stretching for just 5 minutes can boost your energy.",
     answer: true,
-    explanation: "Repeatedly looking down strains neck muscles and can cause chronic pain.",
-    category: 'posture'
+    explanation: "Short stretching sessions increase blood flow and can make you feel more alert.",
+    category: 'stretching'
   },
   {
     id: 27,
@@ -231,6 +231,43 @@ export const triviaQuestions: TriviaQuestion[] = [
     question: "Core strength is important for maintaining good posture.",
     answer: true,
     explanation: "Strong core muscles support the spine and help maintain proper alignment.",
+    category: 'posture'
+  },
+
+  // More Simple & Fun Questions
+  {
+    id: 31,
+    question: "Yawning can be a sign you need to stretch.",
+    answer: true,
+    explanation: "Yawning often indicates fatigue or tension that stretching can help relieve.",
+    category: 'wellness'
+  },
+  {
+    id: 32,
+    question: "Smiling uses fewer muscles than frowning.",
+    answer: true,
+    explanation: "Smiling uses about 10 muscles while frowning uses around 40 muscles.",
+    category: 'wellness'
+  },
+  {
+    id: 33,
+    question: "Your brain works better when you change positions regularly.",
+    answer: true,
+    explanation: "Movement increases blood flow to the brain and improves cognitive function.",
+    category: 'productivity'
+  },
+  {
+    id: 34,
+    question: "Sitting burns the same calories as standing.",
+    answer: false,
+    explanation: "Standing burns about 50% more calories than sitting due to muscle engagement.",
+    category: 'wellness'
+  },
+  {
+    id: 35,
+    question: "Your spine has a natural S-curve shape.",
+    answer: true,
+    explanation: "The spine's S-curve helps distribute weight and absorb shock when moving.",
     category: 'posture'
   }
 ];

@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import * as haptics from '../../../utils/haptics';
+import { playCorrectSound, playIncorrectSound } from '../../../utils/soundEffects';
 import { getRandomTriviaQuestions, TriviaQuestion } from '../../../data/triviaQuestions';
 
 const { width, height } = Dimensions.get('window');
@@ -17,11 +18,13 @@ const { width, height } = Dimensions.get('window');
 interface WellnessTrueFalseProps {
   onGameComplete: (score: number, xpEarned: number) => void;
   onSkip: () => void;
+  context?: 'routine' | 'home'; // Add context prop
 }
 
 export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
   onGameComplete,
   onSkip,
+  context = 'routine', // Default to routine for backward compatibility
 }) => {
   const { theme, isDark } = useTheme();
   
@@ -34,6 +37,7 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60); // 60 seconds total
+  const [showExitAlert, setShowExitAlert] = useState(false);
   
   // Animation values
   const questionOpacity = useRef(new Animated.Value(1)).current;
@@ -73,6 +77,7 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
     if (isCorrect) {
       setScore(prev => prev + 1);
       haptics.success();
+      playCorrectSound();
       
       // Animate score increase
       Animated.spring(scoreAnimation, {
@@ -85,6 +90,7 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
       });
     } else {
       haptics.error();
+      playIncorrectSound();
     }
     
     // Show explanation briefly
@@ -123,6 +129,22 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
     });
   };
   
+  const handleSkipPress = () => {
+    setShowExitAlert(true);
+    haptics.light();
+  };
+
+  const confirmExit = () => {
+    setShowExitAlert(false);
+    haptics.medium();
+    onSkip();
+  };
+
+  const cancelExit = () => {
+    setShowExitAlert(false);
+    haptics.light();
+  };
+
   const completeGame = () => {
     setGameComplete(true);
     const finalScore = score;
@@ -217,41 +239,51 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
   
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Header */}
+      {/* Simplified Header */}
       <View style={styles.header}>
-        <View style={styles.progressContainer}>
-          <Text style={[styles.questionCounter, { color: theme.textSecondary }]}>
-            {currentQuestionIndex + 1} / {questions.length}
-          </Text>
-          <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { 
-                  backgroundColor: theme.accent,
-                  width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`
-                }
-              ]} 
-            />
+        <View style={styles.gameInfo}>
+          <View style={context === 'home' ? styles.progressContainerHome : styles.progressContainer}>
+            <Text style={[styles.questionCounter, { color: theme.textSecondary }]}>
+              Question {currentQuestionIndex + 1} of {questions.length}
+            </Text>
+            <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  { 
+                    backgroundColor: theme.accent,
+                    width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`
+                  }
+                ]} 
+              />
+            </View>
           </View>
-        </View>
-        
-        <View style={styles.timerContainer}>
-          <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
-          <Text style={[styles.timer, { color: timeLeft <= 10 ? '#FF4444' : theme.textSecondary }]}>
-            {timeLeft}s
-          </Text>
+          
+          <View style={styles.scoreAndTime}>
+            <View style={styles.statBox}>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Score</Text>
+              <Animated.View style={{ transform: [{ scale: scoreAnimation }] }}>
+                <Text style={[styles.statValue, { color: theme.accent }]}>
+                  {score}/{questions.length}
+                </Text>
+              </Animated.View>
+            </View>
+            
+            <View style={styles.statBox}>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Time</Text>
+              <Text style={[styles.statValue, { color: timeLeft <= 10 ? '#FF4444' : theme.accent }]}>
+                {timeLeft}s
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
       
-      {/* Score */}
-      <View style={styles.scoreContainer}>
-        <Text style={[styles.scoreLabel, { color: theme.textSecondary }]}>Score</Text>
-        <Animated.View style={{ transform: [{ scale: scoreAnimation }] }}>
-          <Text style={[styles.scoreValue, { color: theme.accent }]}>
-            {score}/{questions.length}
-          </Text>
-        </Animated.View>
+      {/* Simple Instructions */}
+      <View style={context === 'home' ? styles.instructionsContainerHome : styles.instructionsContainer}>
+        <Text style={[styles.instructions, { color: theme.text }]}>
+          Is this statement TRUE or FALSE?
+        </Text>
       </View>
       
       {/* Question */}
@@ -268,39 +300,59 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
         </View>
       </Animated.View>
       
-      {/* Answer Buttons */}
+      {/* Improved Answer Buttons */}
       <View style={styles.buttonsContainer}>
-        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+        <Animated.View style={[styles.buttonWrapper, { transform: [{ scale: buttonScale }] }]}>
           <TouchableOpacity
             style={[styles.answerButton, getButtonStyle(true)]}
             onPress={() => handleButtonPress(true)}
             disabled={answered}
+            activeOpacity={0.8}
           >
-            <Ionicons 
-              name="checkmark-circle" 
-              size={32} 
-              color={getButtonTextStyle(true).color} 
-            />
-            <Text style={[styles.answerButtonText, getButtonTextStyle(true)]}>
-              TRUE
-            </Text>
+            <View style={styles.buttonContent}>
+              <View style={[styles.iconContainer, { backgroundColor: getButtonStyle(true).backgroundColor }]}>
+                <Ionicons 
+                  name="checkmark" 
+                  size={28} 
+                  color="#FFFFFF" 
+                />
+              </View>
+              <Text style={[styles.answerButtonText, getButtonTextStyle(true)]}>
+                TRUE
+              </Text>
+              {!answered && (
+                <Text style={[styles.buttonHint, getButtonTextStyle(true)]}>
+                  Tap if correct
+                </Text>
+              )}
+            </View>
           </TouchableOpacity>
         </Animated.View>
         
-        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+        <Animated.View style={[styles.buttonWrapper, { transform: [{ scale: buttonScale }] }]}>
           <TouchableOpacity
             style={[styles.answerButton, getButtonStyle(false)]}
             onPress={() => handleButtonPress(false)}
             disabled={answered}
+            activeOpacity={0.8}
           >
-            <Ionicons 
-              name="close-circle" 
-              size={32} 
-              color={getButtonTextStyle(false).color} 
-            />
-            <Text style={[styles.answerButtonText, getButtonTextStyle(false)]}>
-              FALSE
-            </Text>
+            <View style={styles.buttonContent}>
+              <View style={[styles.iconContainer, { backgroundColor: getButtonStyle(false).backgroundColor }]}>
+                <Ionicons 
+                  name="close" 
+                  size={28} 
+                  color="#FFFFFF" 
+                />
+              </View>
+              <Text style={[styles.answerButtonText, getButtonTextStyle(false)]}>
+                FALSE
+              </Text>
+              {!answered && (
+                <Text style={[styles.buttonHint, getButtonTextStyle(false)]}>
+                  Tap if incorrect
+                </Text>
+              )}
+            </View>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -318,11 +370,43 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
       )}
       
       {/* Skip Button */}
-      <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
+      <TouchableOpacity style={styles.skipButton} onPress={handleSkipPress}>
         <Text style={[styles.skipText, { color: theme.textSecondary }]}>
           Skip Mini-Game
         </Text>
       </TouchableOpacity>
+
+      {/* Exit Confirmation Alert */}
+      {showExitAlert && (
+        <View style={styles.alertOverlay}>
+          <View style={[styles.alertContainer, { backgroundColor: theme.cardBackground }]}>
+            <Text style={[styles.alertTitle, { color: theme.text }]}>
+              Exit Game?
+            </Text>
+            <Text style={[styles.alertMessage, { color: theme.textSecondary }]}>
+              You'll lose your current progress and miss out on bonus XP.
+            </Text>
+            <View style={styles.alertButtons}>
+              <TouchableOpacity 
+                style={[styles.alertButton, styles.cancelButton]} 
+                onPress={cancelExit}
+              >
+                <Text style={[styles.alertButtonText, { color: theme.text }]}>
+                  Continue Playing
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.alertButton, styles.confirmButton]} 
+                onPress={confirmExit}
+              >
+                <Text style={styles.confirmButtonText}>
+                  Exit Game
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -334,49 +418,63 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 20,
   },
+  gameInfo: {
+    gap: 16,
+  },
   progressContainer: {
-    flex: 1,
-    marginRight: 20,
+    alignItems: 'center',
+  },
+  progressContainerHome: {
+    alignItems: 'center',
+    marginTop: 50, // Extra margin for home context
   },
   questionCounter: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+    textAlign: 'center',
   },
   progressBar: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    width: '100%',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
   },
-  timerContainer: {
+  scoreAndTime: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statBox: {
     alignItems: 'center',
-    gap: 4,
   },
-  timer: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  scoreContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  scoreLabel: {
-    fontSize: 14,
+  statLabel: {
+    fontSize: 12,
     fontWeight: '500',
   },
-  scoreValue: {
-    fontSize: 32,
-    fontWeight: '800',
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  instructionsContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  instructionsContainerHome: {
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 10, // Extra spacing for home context
+  },
+  instructions: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   questionContainer: {
     flex: 1,
@@ -402,47 +500,80 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'row',
-    gap: 20,
+    gap: 16,
     marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  buttonWrapper: {
+    flex: 1,
   },
   answerButton: {
-    flex: 1,
+    borderRadius: 20,
     paddingVertical: 20,
-    paddingHorizontal: 15,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 3,
+    paddingHorizontal: 16,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  buttonContent: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
   },
   answerButtonText: {
     fontSize: 18,
-    fontWeight: '700',
-    marginTop: 8,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  buttonHint: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    opacity: 0.8,
   },
   trueButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
   },
   falseButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+    borderWidth: 2,
+    borderColor: '#F44336',
   },
   correctButton: {
     backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
   },
   incorrectButton: {
     backgroundColor: '#F44336',
+    borderWidth: 2,
+    borderColor: '#F44336',
   },
   neutralButton: {
-    backgroundColor: '#9E9E9E',
+    backgroundColor: 'rgba(158, 158, 158, 0.3)',
+    borderWidth: 2,
+    borderColor: '#9E9E9E',
   },
   trueButtonText: {
-    color: '#FFFFFF',
+    color: '#4CAF50',
   },
   falseButtonText: {
-    color: '#FFFFFF',
+    color: '#F44336',
   },
   correctButtonText: {
     color: '#FFFFFF',
@@ -451,7 +582,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   neutralButtonText: {
-    color: '#FFFFFF',
+    color: '#9E9E9E',
   },
   explanationContainer: {
     padding: 16,
@@ -495,5 +626,62 @@ const styles = StyleSheet.create({
   completionPercentage: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  // Alert overlay styles
+  alertOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  alertContainer: {
+    width: width * 0.85,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  alertTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  alertMessage: {
+    fontSize: 16,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  alertButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  alertButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  confirmButton: {
+    backgroundColor: '#F44336',
+  },
+  alertButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  confirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

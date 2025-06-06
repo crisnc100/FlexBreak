@@ -1230,7 +1230,7 @@ const scheduleProductionMotivationalMessages = async () => {
           },
         });
         
-        console.log(`Scheduled morning message for ${morningDate.toLocaleString()} with ID ${morningId}`);
+        //console.log(`Scheduled morning message for ${morningDate.toLocaleString()} with ID ${morningId}`);
       }
       
       // Second message: Afternoon (2pm-4pm)
@@ -1267,7 +1267,7 @@ const scheduleProductionMotivationalMessages = async () => {
           },
         });
         
-        console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId}`);
+        //console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId}`);
       }
     }
     
