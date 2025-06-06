@@ -40,21 +40,43 @@ export interface SubscriptionDetails {
   purchaseToken: string;
 }
 
+// Track initialization state
+let isInitialized = false;
+let isInitializing = false;
+let initializationPromise: Promise<boolean> | null = null;
+
 // Initialize IAP module
 export const initializeIAP = async () => {
-  try {
-    // First disconnect to ensure we don't have an existing connection
-    try {
-      await InAppPurchases.disconnectAsync();
-      console.log('Disconnected existing IAP connection');
-    } catch (disconnectError) {
-      // Ignore any disconnect errors, just continue
-      console.log('No existing IAP connection to disconnect');
-    }
+  // If already initialized, return immediately
+  if (isInitialized) {
+    console.log('IAP already initialized');
+    return true;
+  }
 
-    // Now we can safely connect
-    await InAppPurchases.connectAsync();
-    console.log('IAP connection established');
+  // If initialization is in progress, wait for it
+  if (isInitializing && initializationPromise) {
+    console.log('IAP initialization already in progress, waiting...');
+    return initializationPromise;
+  }
+
+  // Start initialization
+  isInitializing = true;
+  
+  initializationPromise = (async () => {
+    try {
+      // First disconnect to ensure we don't have an existing connection
+      try {
+        await InAppPurchases.disconnectAsync();
+        console.log('Disconnected existing IAP connection');
+      } catch (disconnectError) {
+        // Ignore any disconnect errors, just continue
+        console.log('No existing IAP connection to disconnect');
+      }
+
+      // Now we can safely connect
+      await InAppPurchases.connectAsync();
+      console.log('IAP connection established');
+      isInitialized = true;
     
     // Set up purchase listener
     InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
@@ -103,11 +125,17 @@ export const initializeIAP = async () => {
       }
     });
     
-    return true;
-  } catch (error) {
-    console.error('Failed to establish IAP connection:', error);
-    return false;
-  }
+      return true;
+    } catch (error) {
+      console.error('Failed to establish IAP connection:', error);
+      isInitialized = false;
+      return false;
+    } finally {
+      isInitializing = false;
+    }
+  })();
+
+  return initializationPromise;
 };
 
 // Disconnect IAP
@@ -115,27 +143,59 @@ export const disconnectIAP = async () => {
   try {
     await InAppPurchases.disconnectAsync();
     console.log('IAP connection closed');
+    isInitialized = false;
+    isInitializing = false;
+    initializationPromise = null;
   } catch (error) {
     console.error('Failed to disconnect IAP:', error);
   }
 };
 
+// Track product fetching state
+let isFetchingProducts = false;
+let productsFetchPromise: Promise<any[]> | null = null;
+
 // Get products info
 export const getProducts = async () => {
-  try {
-    const productIDs = Object.values(PRODUCTS);
-    console.log('Requesting products with IDs:', productIDs);
-    
-    // Add a small delay before getProductsAsync to ensure connection is ready
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const { results } = await InAppPurchases.getProductsAsync(productIDs);
-    console.log('IAP products loaded:', results);
-    return results;
-  } catch (error) {
-    console.error('Failed to get products:', error);
-    return [];
+  // If already fetching products, wait for the existing request
+  if (isFetchingProducts && productsFetchPromise) {
+    console.log('Product fetch already in progress, waiting...');
+    return productsFetchPromise;
   }
+
+  // Start fetching products
+  isFetchingProducts = true;
+  
+  productsFetchPromise = (async () => {
+    try {
+      // Ensure IAP is initialized first
+      if (!isInitialized) {
+        console.log('IAP not initialized, initializing first...');
+        await initializeIAP();
+      }
+
+      const productIDs = Object.values(PRODUCTS);
+      console.log('Requesting products with IDs:', productIDs);
+      
+      // Add a small delay before getProductsAsync to ensure connection is ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { results } = await InAppPurchases.getProductsAsync(productIDs);
+      console.log('IAP products loaded:', results);
+      return results;
+    } catch (error) {
+      console.error('Failed to get products:', error);
+      return [];
+    } finally {
+      isFetchingProducts = false;
+      // Clear the promise after a delay to allow future fetches
+      setTimeout(() => {
+        productsFetchPromise = null;
+      }, 1000);
+    }
+  })();
+
+  return productsFetchPromise;
 };
 
 // Helper function to get appropriate products based on verification status

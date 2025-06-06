@@ -9,7 +9,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as haptics from '../../utils/haptics';
 import { useTheme } from '../../context/ThemeContext';
+import { usePremium } from '../../context/PremiumContext';
 import { playCompletionSound, playLevelUpSound } from '../../utils/soundEffects';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionButtons from './tabs/ActionButtons';
 
 // Import new micro-interaction components
@@ -17,7 +19,7 @@ import { CompletionCelebration } from './flow/CompletionCelebration';
 import { XPRevealCard } from './flow/XPRevealCard';
 import { AchievementMoments } from './flow/AchievementMoments';
 import { SummaryTransition } from './flow/SummaryTransition';
-import TryPremiumBanner from '../TryPremiumBanner';
+import { MiniGamePopup } from './MiniGamePopup';
 
 interface RoutineCompletionFlowProps {
   // Existing props from CompletedRoutine
@@ -60,6 +62,10 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
   const { theme, isDark, isSunset } = useTheme();
   const [currentStep, setCurrentStep] = useState<FlowStep>('celebration');
   const [isFlowComplete, setIsFlowComplete] = useState(false);
+  
+  // Mini-game popup state
+  const [showMiniGamePopup, setShowMiniGamePopup] = useState(false);
+  const [miniGameXp, setMiniGameXp] = useState(0);
 
   // Animation values for step transitions
   const stepOpacity = useRef(new Animated.Value(1)).current;
@@ -72,10 +78,41 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
   const hasAchievements = unlockedAchievements.length > 0 || showLevelUp;
 
 
-  // Play completion sound immediately when component mounts
+  // Play completion sound on mount
   useEffect(() => {
     playCompletionSound();
+    
+    // TEST: Force show popup after 5 seconds for debugging
+    setTimeout(() => {
+      console.log('🎮 TEST: Forcing popup to show for debugging');
+      setShowMiniGamePopup(true);
+    }, 5000);
   }, []);
+
+  // Check if user can access mini-games and show popup after flow completes
+  const checkAndShowMiniGamePopup = async () => {
+    try {
+      console.log('🎮 POPUP: checkAndShowMiniGamePopup called');
+      const today = new Date().toDateString();
+      const lastPlayDate = await AsyncStorage.getItem('@flexbreak:last_minigame_date');
+      const playedToday = lastPlayDate === today;
+      
+      console.log('🎮 POPUP: isPremium:', isPremium);
+      console.log('🎮 POPUP: playedToday:', playedToday);
+      console.log('🎮 POPUP: lastPlayDate:', lastPlayDate);
+      
+      // Premium users: Always show popup
+      // Free users: Only if haven't played today (2 games max per day)
+      if (isPremium || !playedToday) {
+        console.log('🎮 POPUP: Showing mini-game popup');
+        setShowMiniGamePopup(true);
+      } else {
+        console.log('🎮 POPUP: NOT showing mini-game popup');
+      }
+    } catch (error) {
+      console.error('Error checking mini-game access:', error);
+    }
+  };
 
   // Step timing configuration
   const stepTimings = {
@@ -96,21 +133,25 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
     return () => clearTimeout(timer);
   }, [currentStep]);
 
+  // Simple step order
+  const getStepOrder = (): FlowStep[] => {
+    return ['celebration', 'xp-reveal', 'achievements', 'summary'];
+  };
+
   const transitionToNextStep = () => {
     Animated.parallel([
       Animated.timing(stepOpacity, {
         toValue: 0,
-        duration: 400,     // Increased from 300 for more deliberate transitions
+        duration: 400,
         useNativeDriver: true,
       }),
       Animated.timing(stepTranslateY, {
-        toValue: -30,      
-        duration: 400,     // Match opacity timing
+        toValue: -30,
+        duration: 400,
         useNativeDriver: true,
       })
     ]).start(() => {
-      // Move to next step
-      const stepOrder: FlowStep[] = ['celebration', 'xp-reveal', 'achievements', 'summary'];
+      const stepOrder = getStepOrder();
       const currentIndex = stepOrder.indexOf(currentStep);
       const nextStep = stepOrder[currentIndex + 1];
       
@@ -122,26 +163,34 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
           playLevelUpSound();
         }
         
-        // Reset animation values and animate in with better entrance
-        stepTranslateY.setValue(40);  
+        // Trigger mini-game popup when reaching summary
+        if (nextStep === 'summary') {
+          console.log('🎮 POPUP: Reached summary, will show mini-game popup in 1 second');
+          setTimeout(() => {
+            console.log('🎮 POPUP: Calling checkAndShowMiniGamePopup()');
+            checkAndShowMiniGamePopup();
+          }, 1000); // Show popup 1 second after summary appears
+        }
+        
+        // Reset animation values and animate in
+        stepTranslateY.setValue(40);
         stepOpacity.setValue(0);
         
-        // Longer delay for more deliberate pacing
         setTimeout(() => {
           Animated.parallel([
             Animated.timing(stepOpacity, {
               toValue: 1,
-              duration: 500,     // Increased from 400 for smoother entrance
+              duration: 500,
               useNativeDriver: true,
             }),
-            Animated.spring(stepTranslateY, {  
+            Animated.spring(stepTranslateY, {
               toValue: 0,
-              tension: 70,      // Slower spring for more elegance
+              tension: 70,
               friction: 8,
               useNativeDriver: true,
             })
           ]).start();
-        }, 150);              // Increased pause from 100ms
+        }, 150);
       }
     });
   };
@@ -151,6 +200,21 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
     setIsFlowComplete(true);
     stepOpacity.setValue(1);
     stepTranslateY.setValue(0);
+    
+    // Show mini-game popup after a brief delay
+    setTimeout(() => {
+      checkAndShowMiniGamePopup();
+    }, 500);
+  };
+
+  const handleMiniGameXpEarned = (xp: number) => {
+    setMiniGameXp(xp);
+    console.log(`Mini-game XP earned: ${xp}`);
+    // TODO: Add XP to user's total (integrate with XP system)
+  };
+
+  const handleCloseMiniGamePopup = () => {
+    setShowMiniGamePopup(false);
   };
 
   const renderCurrentStep = () => {
@@ -225,7 +289,7 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
               area={area}
               duration={duration}
               routineLength={routineLength}
-              xpEarned={xpEarned}
+              xpEarned={xpEarned + miniGameXp}
               hasXpBoost={hasXpBoost}
               theme={theme}
               onTransitionComplete={() => {
@@ -233,12 +297,7 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
               }}
             />
             
-            {/* Try Premium Banner - integrated into flow */}
-            <TryPremiumBanner 
-              context="completion"
-              onPress={onOpenSubscription}
-            />
-            
+       
             {/* Action Buttons - reuse existing component */}
             <ActionButtons
               isPremium={isPremium}
@@ -294,6 +353,14 @@ export const RoutineCompletionFlow: React.FC<RoutineCompletionFlowProps> = ({
           />
         </View>
       )}
+
+      {/* Mini-game popup */}
+      <MiniGamePopup
+        visible={showMiniGamePopup}
+        onClose={handleCloseMiniGamePopup}
+        onXpEarned={handleMiniGameXpEarned}
+        isPremium={isPremium}
+      />
     </View>
   );
 };

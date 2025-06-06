@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, BodyArea, Duration, RoutineParams, Position, Stretch, RestPeriod, TransitionPeriod } from '../types';
 import tips from '../data/tips';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { tw } from '../utils/tw';
 import { usePremium } from '../context/PremiumContext';
@@ -54,7 +55,6 @@ import { gamificationEvents, LEVEL_UP_EVENT, REWARD_UNLOCKED_EVENT, XP_UPDATED_E
 import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
 import { generateDeskBreakBoostRoutine, isDeskBreakBoostAvailable } from '../utils/generators/deskBreakBoostGenerator';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
@@ -83,12 +83,9 @@ export default function HomeScreen() {
   const [reminderFrequency, setReminderFrequency] = useState<notifications.ReminderFrequency>('daily');
   const [reminderMessage, setReminderMessage] = useState('');
   
-  // Modal visibility states
-  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
-  const [customReminderModalVisible, setCustomReminderModalVisible] = useState(false);
-  const [customRoutineModalVisible, setCustomRoutineModalVisible] = useState(false);
-  const [timePickerVisible, setTimePickerVisible] = useState(false);
-  const [daySelectorVisible, setDaySelectorVisible] = useState(false);
+  // Modal visibility states - only one modal can be visible at a time
+  const [activeModal, setActiveModal] = useState<'none' | 'subscription' | 'customReminder' | 'customRoutine' | 'timePicker' | 'daySelector'>('none');
+  const [pendingSubscriptionOpen, setPendingSubscriptionOpen] = useState(false);
   
   
   const [isLoading, setIsLoading] = useState(true);
@@ -116,6 +113,24 @@ export default function HomeScreen() {
 
   // Add debounce ref at the top with other refs
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Modal management functions
+  const openModal = (modalType: typeof activeModal) => {
+    setActiveModal(modalType);
+  };
+
+  const closeModal = () => {
+    setActiveModal('none');
+  };
+
+  const switchModal = (fromModal: typeof activeModal, toModal: typeof activeModal, delay: number = 100) => {
+    if (activeModal === fromModal) {
+      setActiveModal('none');
+      setTimeout(() => {
+        setActiveModal(toModal);
+      }, delay);
+    }
+  };
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -421,7 +436,7 @@ export default function HomeScreen() {
   const handleTimeChange = async (time: string) => {
     console.log(`Setting reminder time to: ${time}`);
     setReminderTime(time);
-    setTimePickerVisible(false);
+    closeModal();
 
     if (reminderEnabled) {
       // Update Firebase settings with new time
@@ -445,17 +460,17 @@ export default function HomeScreen() {
   // Handle time picker
   const handleTimePress = () => {
     if (!isPremium) {
-      setSubscriptionModalVisible(true);
+      openModal('subscription');
       return;
     }
 
-    setTimePickerVisible(true);
+    openModal('timePicker');
   };
 
   // Handle days selection
   const handleDaysSelected = async (days: string[]) => {
     setReminderDays(days);
-    setDaySelectorVisible(false);
+    closeModal();
 
     if (reminderEnabled) {
       // Update Firebase settings with new days
@@ -481,7 +496,7 @@ export default function HomeScreen() {
       return;
     }
 
-    setDaySelectorVisible(true);
+    openModal('daySelector');
   };
 
   // Handle frequency change
@@ -541,7 +556,7 @@ export default function HomeScreen() {
           onPress: () => {
             handleFrequencyChange('custom');
             // Then show day selector after a brief delay
-            setTimeout(() => setDaySelectorVisible(true), 500);
+            setTimeout(() => openModal('daySelector'), 500);
           },
         },
         {
@@ -560,7 +575,7 @@ export default function HomeScreen() {
       : message;
     
     setReminderMessage(finalMessage);
-    setCustomReminderModalVisible(false);
+    closeModal();
 
     if (reminderEnabled) {
       // Update Firebase settings with new message
@@ -586,13 +601,13 @@ export default function HomeScreen() {
       return;
     }
     
-    setCustomReminderModalVisible(true);
+    openModal('customReminder');
   };
 
   // Show premium modal or level requirement alert
   const showPremiumOrLevelAlert = (featureName: string) => {
     if (!isPremium) {
-      setSubscriptionModalVisible(true);
+      openModal('subscription');
     } else {
       Alert.alert(
         'Feature Locked',
@@ -604,7 +619,7 @@ export default function HomeScreen() {
 
   // Show premium modal
   const showPremiumModal = () => {
-    setSubscriptionModalVisible(true);
+    openModal('subscription');
   };
 
   // Handle test notification
@@ -656,7 +671,7 @@ export default function HomeScreen() {
       return;
     }
     
-    setCustomRoutineModalVisible(true);
+    openModal('customRoutine');
   };
   
   // Handle starting a custom routine
@@ -884,9 +899,7 @@ export default function HomeScreen() {
         {/* Discount Banner for Office Workers & Students */}
         <DiscountBanner 
           onPress={() => {
-            // Clear verification status for testing
-            AsyncStorage.removeItem('@flexbreak:verification_status');
-            setSubscriptionModalVisible(true);
+            openModal('subscription');
           }}
           onDismiss={() => {
             // Optional: track dismissal
@@ -897,7 +910,7 @@ export default function HomeScreen() {
         {/* Try Premium Banner */}
         <TryPremiumBanner 
           context="home"
-          onPress={() => setSubscriptionModalVisible(true)}
+          onPress={() => openModal('subscription')}
         />
 
         {/* Streak Display */}
@@ -908,7 +921,7 @@ export default function HomeScreen() {
         />
 
         {/* Level Progress Card - shows for all users */}
-        <LevelProgressCard onOpenSubscription={() => setSubscriptionModalVisible(true)} />
+        <LevelProgressCard onOpenSubscription={() => openModal('subscription')} />
 
         {/* Routine Picker */}
         <RoutinePicker
@@ -964,23 +977,23 @@ export default function HomeScreen() {
 
       {/* Time Picker Modal */}
       <TimePicker
-        visible={timePickerVisible}
+        visible={activeModal === 'timePicker'}
         selectedTime={reminderTime}
         onTimeSelected={handleTimeChange}
-        onCancel={() => setTimePickerVisible(false)}
+        onCancel={closeModal}
       />
 
       {/* Day Selector Modal */}
       <DaySelector
-        visible={daySelectorVisible}
+        visible={activeModal === 'daySelector'}
         selectedDays={reminderDays}
         onDaysSelected={handleDaysSelected}
-        onCancel={() => setDaySelectorVisible(false)}
+        onCancel={closeModal}
       />
 
       {/* Custom Reminder Modal */}
       <CustomReminderModal
-        visible={customReminderModalVisible}
+        visible={activeModal === 'customReminder'}
         message={reminderMessage}
         days={reminderDays}
         frequency={reminderFrequency}
@@ -988,7 +1001,7 @@ export default function HomeScreen() {
         onDaysChange={setReminderDays}
         onFrequencyChange={setReminderFrequency}
         onSave={saveCustomReminderMessage}
-        onCancel={() => setCustomReminderModalVisible(false)}
+        onCancel={closeModal}
         maxLength={80}
         isCustomFrequencyEnabled={canAccessFeature('custom_reminders')}
       />
@@ -1045,15 +1058,14 @@ export default function HomeScreen() {
 
       {/* Subscription Modal */}
       <SubscriptionModal
-        visible={subscriptionModalVisible}
-        onClose={() => setSubscriptionModalVisible(false)}
+        visible={activeModal === 'subscription'}
+        onClose={closeModal}
       />
-
 
       {/* Custom Routine Modal */}
       <CustomRoutineModal
-        visible={customRoutineModalVisible}
-        onClose={() => setCustomRoutineModalVisible(false)}
+        visible={activeModal === 'customRoutine'}
+        onClose={closeModal}
         onStartRoutine={handleStartCustomRoutine}
       />
 

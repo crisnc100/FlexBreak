@@ -25,8 +25,9 @@ import { useFeatureAccess, PREMIUM_STATUS_CHANGED } from '../hooks/progress/useF
 import { useGamification } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
 import { gamificationEvents } from '../hooks/progress/useGamification';
-import { EmailVerificationService } from '../services/emailVerificationService';
-import { PreGeneratedCodes } from '../services/preGeneratedCodes';
+import { ZeroBounceVerificationService } from '../services/zeroBounceVerificationService';
+import { oneTimeCodeService } from '../services/oneTimeCodeService';
+
 
 /* --- helpers (benefits + reward init) --- */
 const BENEFITS = ['Track your progress','Custom routines','Dark mode',
@@ -44,14 +45,12 @@ const TERMS_URL = "https://flexbreak-support-hub.com/";
 interface SubscriptionModalProps {
   visible: boolean;
   onClose: () => void;
-  onOpenVerification?: () => void;
 }
 
 /* --- component --- */
 export default function SubscriptionModal({ 
   visible, 
-  onClose, 
-  onOpenVerification 
+  onClose 
 }: SubscriptionModalProps) {
   const {subscriptionDetails,updateSubscription,setPremiumStatus,refreshPremiumStatus,isPremium}=usePremium();
   const {refreshAccess}=useFeatureAccess();
@@ -65,12 +64,11 @@ export default function SubscriptionModal({
   const [showVerificationPromo, setShowVerificationPromo] = useState(false);
   
   // Verification flow state
-  const [currentView, setCurrentView] = useState<'subscription' | 'verification'>('subscription');
-  const [verificationStep, setVerificationStep] = useState<'type' | 'email' | 'confirm' | 'email_verification' | 'manual_code'>('type');
-  const [email, setEmail] = useState('');
-  const [emailVerificationCode, setEmailVerificationCode] = useState('');
-  const [manualCode, setManualCode] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showVerificationForm, setShowVerificationForm] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [oneTimeCode, setOneTimeCode] = useState('');
 
   /* Check verification status */
   useEffect(() => {
@@ -78,24 +76,20 @@ export default function SubscriptionModal({
     
     const checkVerificationStatus = async () => {
       try {
-        const status = await AsyncStorage.getItem('@flexbreak:verification_status');
-        const type = await AsyncStorage.getItem('@flexbreak:user_type');
-        const detectedType = await AsyncStorage.getItem('@flexbreak:detected_user_type');
+        const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
         
-        setVerificationStatus(status);
-        setUserType(type || detectedType);
+        setVerificationStatus(verificationData.isVerified ? 'verified' : null);
+        setUserType(verificationData.userType || null);
         
         // Show verification promo if not verified and not premium
-        // TEMPORARY: Force show for testing
-        const shouldShowPromo = true; // (!status || status === 'none') && !isPremium;
+        const shouldShowPromo = !verificationData.isVerified && !isPremium;
         setShowVerificationPromo(shouldShowPromo);
         
         console.log('[SubscriptionModal] Verification check:', {
-          status,
-          userType: type || detectedType,
+          isVerified: verificationData.isVerified,
+          userType: verificationData.userType,
           isPremium,
-          showVerificationPromo: shouldShowPromo,
-          onOpenVerification: !!onOpenVerification
+          showVerificationPromo: shouldShowPromo
         });
       } catch (error) {
         console.error('Error checking verification status:', error);
@@ -103,7 +97,7 @@ export default function SubscriptionModal({
     };
     
     checkVerificationStatus();
-  }, [visible, onOpenVerification, isPremium]);
+  }, [visible, isPremium]);
 
   /* fetch live prices */
   useEffect(()=>{ if(!visible) return;
@@ -234,6 +228,177 @@ export default function SubscriptionModal({
     setBusy(false); onClose();
   };
 
+  // Handle verification submission
+  const handleVerificationSubmit = async () => {
+    if (!verificationEmail.trim()) {
+      Alert.alert('Missing Email', 'Please enter your work email address.');
+      return;
+    }
+
+    if (!verificationEmail.includes('@') || !verificationEmail.includes('.')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    setIsVerifying(true);
+    console.log('[SubscriptionModal] Starting verification for:', verificationEmail);
+
+    try {
+      const result = await ZeroBounceVerificationService.verifyOfficeWorkerEmail(verificationEmail.trim());
+      console.log('[SubscriptionModal] Verification result received:', result);
+      
+      setIsVerifying(false);
+
+      switch (result.status) {
+        case 'approved':
+          console.log('[SubscriptionModal] Processing approved verification');
+          Alert.alert(
+            '✅ Verification Successful!',
+            result.message + '\n\nYour 60% discount is now active!',
+            [{ 
+              text: 'Great!', 
+              onPress: () => {
+                console.log('[SubscriptionModal] User acknowledged verification success');
+                setShowVerificationForm(false);
+                setVerificationEmail('');
+                // Refresh verification status to show discount
+                const refreshVerification = async () => {
+                  console.log('[SubscriptionModal] Refreshing verification status...');
+                  const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
+                  setVerificationStatus(verificationData.isVerified ? 'verified' : null);
+                  setUserType(verificationData.userType || null);
+                  setShowVerificationPromo(false);
+                  console.log('[SubscriptionModal] Verification status refreshed:', verificationData);
+                };
+                refreshVerification();
+              }
+            }]
+          );
+          break;
+
+        case 'already_used':
+          Alert.alert(
+            '⚠️ Email Already Used',
+            result.message + '\n\nIf this is your email and you\'re having issues, contact: flexbreakapp@gmail.com',
+            [{ text: 'OK' }]
+          );
+          break;
+
+        case 'rejected':
+          const isPersonalEmail = result.message.includes('Personal email') || result.message.includes('work email');
+          Alert.alert(
+            '❌ Verification Failed',
+            result.message + (isPersonalEmail 
+              ? '\n\nIf this IS your work email, please contact us for manual verification and we\'ll send you a verification code.' 
+              : '\n\nFor manual verification, email flexbreakapp@gmail.com with your work details to receive a verification code.'),
+            [
+              { text: 'Try Again', style: 'cancel' },
+              { 
+                text: isPersonalEmail ? 'Contact Support' : 'Email Support', 
+                onPress: () => {
+                  const subject = 'FlexBreak Office Worker Verification Request - Code Needed';
+                  const body = isPersonalEmail 
+                    ? `Hi FlexBreak Team,\n\nI tried to verify my work email (${verificationEmail}) but it was rejected as a personal email. However, this IS my work email address.\n\nPlease send me a verification code for the 60% office worker discount.\n\nThank you!`
+                    : `Hi FlexBreak Team,\n\nI need a verification code for the 60% office worker discount.\n\nMy work email: ${verificationEmail}\nCompany: [Please fill in your company name]\nJob title: [Please fill in your job title]\n\nThank you!`;
+                  
+                  const mailto = `mailto:flexbreakapp@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                  Linking.openURL(mailto).catch(err => {
+                    console.error('Error opening email client:', err);
+                    Alert.alert('Error', 'Could not open email client. Please manually email flexbreakapp@gmail.com');
+                  });
+                }
+              }
+            ]
+          );
+          break;
+
+        case 'error':
+          Alert.alert(
+            '⚠️ Service Unavailable',
+            result.message,
+            [{ text: 'Try Again' }]
+          );
+          break;
+
+        default:
+          console.warn('[SubscriptionModal] Unexpected verification result status:', result.status);
+          Alert.alert(
+            'Unexpected Result',
+            'Verification completed but with unexpected status. Please contact support.',
+            [{ text: 'OK' }]
+          );
+          break;
+      }
+    } catch (error) {
+      console.error('[SubscriptionModal] Verification error:', error);
+      setIsVerifying(false);
+      Alert.alert(
+        'Error',
+        'Something went wrong during verification. Please try again.',
+        [{ text: 'Try Again' }]
+      );
+    }
+  };
+
+  // Handle one-time code submission
+  const handleCodeSubmit = async () => {
+    if (!oneTimeCode.trim()) {
+      Alert.alert('Missing Code', 'Please enter your verification code.');
+      return;
+    }
+
+    if (!verificationEmail.trim() || !verificationEmail.includes('@')) {
+      Alert.alert('Missing Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    setIsVerifying(true);
+    console.log('[SubscriptionModal] Attempting one-time code verification');
+
+    try {
+      const result = await oneTimeCodeService.redeemCode(oneTimeCode.trim(), verificationEmail.trim());
+      
+      setIsVerifying(false);
+
+      if (result.success) {
+        Alert.alert(
+          '✅ Verification Successful!',
+          result.message,
+          [{ 
+            text: 'Great!', 
+            onPress: async () => {
+              console.log('[SubscriptionModal] Code verification successful');
+              setShowCodeInput(false);
+              setShowVerificationForm(false);
+              setOneTimeCode('');
+              setVerificationEmail('');
+              
+              // Refresh verification status
+              const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
+              setVerificationStatus(verificationData.isVerified ? 'verified' : null);
+              setUserType(verificationData.userType || null);
+              setShowVerificationPromo(false);
+            }
+          }]
+        );
+      } else {
+        Alert.alert(
+          '❌ Verification Failed',
+          result.message,
+          [{ text: 'Try Again' }]
+        );
+      }
+    } catch (error) {
+      console.error('[SubscriptionModal] Code verification error:', error);
+      setIsVerifying(false);
+      Alert.alert(
+        'Error',
+        'Something went wrong. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   // Get the correct product IDs based on verification status
   const productIds = verificationStatus === 'verified' 
     ? getProductsForUser(userType as 'office' | 'student')
@@ -245,118 +410,6 @@ export default function SubscriptionModal({
   const discount=()=>!monthly||!yearly?'Save 20 %':
       `Save ${Math.round(100-(yearly.priceAmountMicros/12)/(monthly.priceAmountMicros)*100)} %`;
   
-  // Verification functions
-  const handleUserTypeSelect = (type: 'student' | 'office') => {
-    setUserType(type);
-    setVerificationStep('email');
-  };
-
-  const handleEmailSubmit = () => {
-    if (!email.trim()) {
-      Alert.alert('Please enter your email');
-      return;
-    }
-    setVerificationStep('confirm');
-  };
-  
-  const handleVerificationComplete = async (approved: boolean) => {
-    if (approved) {
-      // Update verification status
-      await AsyncStorage.setItem('@flexbreak:verification_status', 'verified');
-      // Refresh premium status to apply discount
-      await refreshPremiumStatus();
-      // Return to subscription view
-      setCurrentView('subscription');
-      setVerificationStep('type');
-      setEmail('');
-      setEmailVerificationCode('');
-      setManualCode('');
-    }
-  };
-
-  const handleFinalConfirm = async () => {
-    setIsSubmitting(true);
-    
-    try {
-      const domain = email.split('@')[1]?.toLowerCase();
-      if (!domain) {
-        Alert.alert('Invalid Email', 'Please enter a valid email address.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Check if email is already used by another verification
-      const existingUsers = await AsyncStorage.getItem('@flexbreak:verified_emails');
-      const usedEmails: string[] = existingUsers ? JSON.parse(existingUsers) : [];
-      
-      if (usedEmails.includes(email.toLowerCase())) {
-        Alert.alert(
-          '⚠️ Email Already Used',
-          'This email has already been verified by another user. Each email can only be used once.\n\nIf this is your email and you\'re having issues, contact:\nflexbreakapp@gmail.com',
-          [{ text: 'OK', onPress: () => setIsSubmitting(false) }]
-        );
-        return;
-      }
-
-      // SMART VERIFICATION LOGIC
-      const restrictedDomains = ['gmail.com', 'yahoo.com', 'icloud.com', 'aol.com'];
-      const businessPersonalDomains = ['outlook.com', 'hotmail.com']; // Outlook can be business
-      const isRestrictedEmail = restrictedDomains.includes(domain);
-      const isBusinessPersonal = businessPersonalDomains.includes(domain);
-      
-      // AUTO-APPROVE: Business/School domains
-      const autoApprovePatterns = [
-        /\.edu$/,           // Universities (.edu)
-        /\.ac\./,           // Academic institutions (.ac.uk, etc.)
-        /\.org$/,           // Organizations
-        /university/i,      // University in domain
-        /college/i,         // College in domain
-        /school/i,          // School in domain
-      ];
-      
-      const shouldAutoApprove = autoApprovePatterns.some(pattern => 
-        pattern.test(domain)
-      ) || (!isRestrictedEmail && !isBusinessPersonal && domain.length > 8); // Business domains are usually longer
-      
-      if (shouldAutoApprove || isBusinessPersonal) {
-        // AUTO-APPROVE: Clear business/school email
-        // Add email to used list
-        usedEmails.push(email.toLowerCase());
-        await AsyncStorage.setItem('@flexbreak:verified_emails', JSON.stringify(usedEmails));
-        
-        await AsyncStorage.setItem('@flexbreak:verification_status', 'verified');
-        await AsyncStorage.setItem('@flexbreak:user_type', userType!);
-        await AsyncStorage.setItem('@flexbreak:user_email', email);
-        await AsyncStorage.setItem('@flexbreak:verification_method', 'auto_approved');
-        
-        const message = userType === 'student' 
-          ? '🎓 Student verification successful! 60% discount activated.'
-          : '💼 Office worker verification successful! 60% discount activated.';
-        
-        Alert.alert('✅ Verified!', message, [
-          { text: 'Great!', onPress: () => handleVerificationComplete(true) }
-        ]);
-        
-      } else {
-        // Manual verification required
-        Alert.alert(
-          '📧 Manual Verification Required',
-          `Personal email addresses require manual verification.\n\nTo get your discount:\n\n1. Email: flexbreakapp@gmail.com\n2. Include your ${userType === 'student' ? 'school details' : 'work details'}\n3. You'll receive a verification code within 24 hours`,
-          [
-            { text: 'Got it', onPress: () => {
-              setCurrentView('subscription');
-              setVerificationStep('type');
-            }}
-          ]
-        );
-      }
-      
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Get readable display names based on product ID
   const getProductDisplayName = (productId: string) => {
@@ -390,7 +443,7 @@ export default function SubscriptionModal({
       return {
         icon: 'gift',
         color: '#007AFF',
-        title: 'Office Workers & Students',
+        title: 'Office Workers',
         subtitle: 'Get 60% off with quick verification!'
       };
     }
@@ -444,7 +497,7 @@ export default function SubscriptionModal({
           {isVerified && (
             <View style={styles.featureRow}>
               <Ionicons name="pricetag" size={16} color="#4CAF50" />
-              <Text style={styles.featureText}>60% Student & Office Worker Discount Applied!</Text>
+              <Text style={styles.featureText}>60% Office Worker Discount Applied!</Text>
             </View>
           )}
           <View style={styles.featureRow}>
@@ -462,135 +515,6 @@ export default function SubscriptionModal({
     );
   };
   
-  // Render verification view
-  const renderVerificationView = () => {
-    switch (verificationStep) {
-      case 'type':
-        return (
-          <View style={styles.verificationContainer}>
-            <View style={styles.verificationHeader}>
-              <Ionicons name="gift" size={48} color="#4CAF50" />
-              <Text style={styles.verificationStepTitle}>Get 60% Off Premium!</Text>
-              <Text style={styles.verificationStepSubtitle}>Quick verification for students & office workers</Text>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.optionButton}
-              onPress={() => handleUserTypeSelect('student')}
-            >
-              <Ionicons name="school" size={24} color="#2196F3" />
-              <View style={styles.optionText}>
-                <Text style={styles.optionTitle}>I'm a Student</Text>
-                <Text style={styles.optionDesc}>Currently enrolled in education</Text>
-              </View>
-              <Ionicons name="arrow-forward" size={20} color="#666" />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.optionButton}
-              onPress={() => handleUserTypeSelect('office')}
-            >
-              <Ionicons name="business" size={24} color="#FF9500" />
-              <View style={styles.optionText}>
-                <Text style={styles.optionTitle}>I'm an Office Worker</Text>
-                <Text style={styles.optionDesc}>Work in office or hybrid</Text>
-              </View>
-              <Ionicons name="arrow-forward" size={20} color="#666" />
-            </TouchableOpacity>
-            
-            {/* Back to Subscription Button */}
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => setCurrentView('subscription')}
-            >
-              <Ionicons name="arrow-back" size={18} color="#666" />
-              <Text style={styles.backButtonText}>Back to Subscription</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'email':
-        return (
-          <View style={styles.verificationContainer}>
-            <Text style={styles.verificationStepTitle}>
-              {userType === 'student' ? '🎓 Student Email' : '💼 Work Email'}
-            </Text>
-            <Text style={styles.verificationStepSubtitle}>
-              {userType === 'student' 
-                ? 'Enter your school email address'
-                : 'Enter your work email address'
-              }
-            </Text>
-
-            <TextInput
-              style={styles.emailInput}
-              placeholder={userType === 'student' ? 'you@university.edu' : 'you@company.com'}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-
-            <TouchableOpacity 
-              style={[styles.continueButton, !email.trim() && styles.disabledButton]}
-              onPress={handleEmailSubmit}
-              disabled={!email.trim()}
-            >
-              <Text style={styles.continueButtonText}>Continue</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => setVerificationStep('type')}
-            >
-              <Ionicons name="arrow-back" size={18} color="#666" />
-              <Text style={styles.backButtonText}>Back</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'confirm':
-        return (
-          <View style={styles.verificationContainer}>
-            <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
-            <Text style={styles.verificationStepTitle}>Almost Done!</Text>
-            <Text style={styles.verificationStepSubtitle}>
-              Confirm you're eligible for the {userType} discount
-            </Text>
-
-            <View style={styles.confirmBox}>
-              <Text style={styles.confirmText}>
-                ✓ I am a {userType === 'student' ? 'current student' : 'office/hybrid worker'}
-              </Text>
-              <Text style={styles.confirmText}>
-                ✓ I understand this discount is for {userType === 'student' ? 'students' : 'office workers'}
-              </Text>
-              <Text style={styles.confirmSubtext}>
-                By continuing, you confirm your eligibility for this special pricing.
-              </Text>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.confirmButton}
-              onPress={handleFinalConfirm}
-              disabled={isSubmitting}
-            >
-              <Text style={styles.confirmButtonText}>
-                {isSubmitting ? 'Verifying...' : 'Activate 60% Discount'}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => setVerificationStep('email')}
-            >
-              <Ionicons name="arrow-back" size={18} color="#666" />
-              <Text style={styles.backButtonText}>Back</Text>
-            </TouchableOpacity>
-          </View>
-        );
-    }
-  };
 
   return(
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -598,20 +522,10 @@ export default function SubscriptionModal({
         <View style={styles.sheet}>
           <View style={styles.headerRow}>
             <View>
-              <Text style={styles.header}>
-                {currentView === 'subscription' ? 'Go Premium' : 'Verify for 60% Off'}
-              </Text>
-              <Text style={styles.headerSubtitle}>
-                {currentView === 'subscription' ? 'Unlock all features and stretches' : 'Students & office workers discount'}
-              </Text>
+              <Text style={styles.header}>Go Premium</Text>
+              <Text style={styles.headerSubtitle}>Unlock all features and stretches</Text>
             </View>
-            <TouchableOpacity onPress={() => {
-              // Reset to subscription view when closing
-              setCurrentView('subscription');
-              setVerificationStep('type');
-              setEmail('');
-              onClose();
-            }} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
@@ -621,12 +535,6 @@ export default function SubscriptionModal({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {currentView === 'verification' ? (
-              renderVerificationView()
-            ) : (
-              <>
-          
-
             {/* Verification Message */}
             {getVerificationMessage() && (
               <View style={styles.verificationMessage}>
@@ -646,16 +554,177 @@ export default function SubscriptionModal({
                 {showVerificationPromo && (
                   <TouchableOpacity 
                     style={[styles.verifyButton, { borderColor: getVerificationMessage()!.color }]}
-                    onPress={() => {
-                      console.log('[SubscriptionModal] Verify button pressed, showing verification view');
-                      setCurrentView('verification');
-                    }}
+                    onPress={() => setShowVerificationForm(true)}
                   >
                     <Text style={[styles.verifyButtonText, { color: getVerificationMessage()!.color }]}>
                       Verify
                     </Text>
                   </TouchableOpacity>
                 )}
+              </View>
+            )}
+
+            {/* Verification Form */}
+            {showVerificationForm && (
+              <View style={styles.verificationForm}>
+                <View style={styles.verificationFormHeader}>
+                  <Ionicons name="mail" size={24} color="#2196F3" />
+                  <Text style={styles.verificationFormTitle}>Enter Work Email</Text>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setShowVerificationForm(false);
+                      setVerificationEmail('');
+                      setIsVerifying(false);
+                    }}
+                    style={styles.verificationFormClose}
+                  >
+                    <Ionicons name="close" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.verificationFormSubtitle}>
+                  Use your official company or business email address
+                </Text>
+
+                <TextInput
+                  style={styles.verificationEmailInput}
+                  placeholder="john@company.com"
+                  value={verificationEmail}
+                  onChangeText={setVerificationEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus={true}
+                  editable={!isVerifying}
+                />
+
+                <View style={styles.verificationFormInfo}>
+                  <Text style={styles.verificationInfoText}>✓ Personal emails (Gmail, Yahoo) are not eligible</Text>
+                  <Text style={styles.verificationInfoText}>✓ Each email can only be used once</Text>
+                  <Text style={styles.verificationInfoText}>✓ Instant verification for most business domains</Text>
+                </View>
+
+                <TouchableOpacity 
+                  style={[
+                    styles.verificationSubmitButton, 
+                    (!verificationEmail.trim() || isVerifying) && styles.verificationSubmitButtonDisabled
+                  ]}
+                  onPress={handleVerificationSubmit}
+                  disabled={!verificationEmail.trim() || isVerifying}
+                >
+                  {isVerifying ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.verificationSubmitButtonText}>
+                      Verify Email
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Add "Have a code?" link */}
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowCodeInput(true);
+                    setShowVerificationForm(false);
+                  }}
+                  style={styles.codeLink}
+                >
+                  <Text style={styles.codeLinkText}>Have a verification code?</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* One-Time Code Input Form */}
+            {showCodeInput && (
+              <View style={styles.verificationForm}>
+                <View style={styles.verificationFormHeader}>
+                  <Ionicons name="key" size={24} color="#4CAF50" />
+                  <Text style={styles.verificationFormTitle}>Enter Verification Code</Text>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setShowCodeInput(false);
+                      setOneTimeCode('');
+                      setVerificationEmail('');
+                      setIsVerifying(false);
+                    }}
+                    style={styles.verificationFormClose}
+                  >
+                    <Ionicons name="close" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.verificationFormSubtitle}>
+                  Enter the verification code provided by FlexBreak support
+                </Text>
+
+                <TextInput
+                  style={styles.verificationEmailInput}
+                  placeholder="Your email address"
+                  value={verificationEmail}
+                  onChangeText={setVerificationEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isVerifying}
+                />
+
+                <TextInput
+                  style={[styles.verificationEmailInput, styles.codeInput]}
+                  placeholder="FLEX-XXXXXXXX"
+                  value={oneTimeCode}
+                  onChangeText={(text) => {
+                    // Auto-format code as FLEX-XXXXXXXX
+                    const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    
+                    if (cleaned.startsWith('FLEX')) {
+                      // If they typed FLEX, add the dash and remaining characters
+                      const remaining = cleaned.slice(4, 12); // Take next 8 characters
+                      setOneTimeCode(remaining.length > 0 ? `FLEX-${remaining}` : 'FLEX-');
+                    } else {
+                      // If they didn't type FLEX, assume they're entering just the numbers
+                      const numbers = cleaned.slice(0, 8);
+                      setOneTimeCode(numbers.length > 0 ? `FLEX-${numbers}` : '');
+                    }
+                  }}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={13} // FLEX-XXXXXXXX
+                  editable={!isVerifying}
+                />
+
+                <View style={styles.verificationFormInfo}>
+                  <Text style={styles.verificationInfoText}>✓ Codes are valid for 7 days</Text>
+                  <Text style={styles.verificationInfoText}>✓ Each code can only be used once</Text>
+                  <Text style={styles.verificationInfoText}>✓ Contact support if you need a new code</Text>
+                </View>
+
+                <TouchableOpacity 
+                  style={[
+                    styles.verificationSubmitButton, 
+                    (!oneTimeCode.trim() || !verificationEmail.trim() || isVerifying) && styles.verificationSubmitButtonDisabled
+                  ]}
+                  onPress={handleCodeSubmit}
+                  disabled={!oneTimeCode.trim() || !verificationEmail.trim() || isVerifying}
+                >
+                  {isVerifying ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.verificationSubmitButtonText}>
+                      Verify Code
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Link back to email verification */}
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowCodeInput(false);
+                    setShowVerificationForm(true);
+                  }}
+                  style={styles.codeLink}
+                >
+                  <Text style={styles.codeLinkText}>Try email verification instead</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -738,8 +807,6 @@ export default function SubscriptionModal({
                   </TouchableOpacity>
                 )}
               </>
-            )}
-            </>
             )}
           </ScrollView>
         </View>
@@ -1087,121 +1154,86 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#333',
   },
-  // Verification styles
-  verificationContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  verificationHeader: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  verificationStepTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  verificationStepSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    marginBottom: 12,
-    width: '100%',
-  },
-  optionText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111',
-  },
-  optionDesc: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    padding: 12,
-  },
-  backButtonText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 6,
-  },
-  emailInput: {
-    width: '100%',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    fontSize: 16,
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  continueButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    width: '100%',
-  },
-  continueButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  disabledButton: {
-    backgroundColor: '#E0E0E0',
-  },
-  confirmBox: {
-    backgroundColor: '#F5F5F5',
+  // Verification form styles
+  verificationForm: {
+    backgroundColor: '#f8f9fa',
     padding: 20,
     borderRadius: 12,
-    width: '100%',
-    marginTop: 20,
-    marginBottom: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
-  confirmText: {
+  verificationFormHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  verificationFormTitle: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#111',
-    marginBottom: 8,
+    marginLeft: 8,
+    flex: 1,
   },
-  confirmSubtext: {
+  verificationFormClose: {
+    padding: 4,
+  },
+  verificationFormSubtitle: {
     fontSize: 14,
     color: '#666',
-    marginTop: 8,
-    fontStyle: 'italic',
+    marginBottom: 16,
+    lineHeight: 20,
   },
-  confirmButton: {
+  verificationEmailInput: {
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    marginBottom: 16,
+  },
+  verificationFormInfo: {
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  verificationInfoText: {
+    fontSize: 12,
+    color: '#1976d2',
+    marginBottom: 4,
+  },
+  verificationSubmitButton: {
     backgroundColor: '#4CAF50',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    width: '100%',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
   },
-  confirmButtonText: {
+  verificationSubmitButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  verificationSubmitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  codeLink: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  codeLinkText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  codeInput: {
+    marginTop: 8,
+    fontSize: 18,
+    letterSpacing: 2,
     textAlign: 'center',
+    fontWeight: '600',
   },
 });

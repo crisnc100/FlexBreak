@@ -69,7 +69,7 @@ export const DiscountBanner: React.FC<DiscountBannerProps> = ({
           setBannerText(`${detectedType === 'office' ? '💼' : '🎓'} ${detectedType === 'office' ? 'Office worker' : 'Student'}? Get 60% off premium features!`);
           setIsVisible(true);
         } else {
-          setBannerText('💼 Office worker or student? Get 60% off!');
+          setBannerText('💼 Office workers? Get 60% off!');
           setIsVisible(true);
         }
       }

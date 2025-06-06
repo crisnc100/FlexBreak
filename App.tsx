@@ -54,22 +54,8 @@ import firebaseConfig from './firebase.config';
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
   
-  // Set up app check with a more compatible approach
-  try {
-    // For development, use debug mode
-    if (__DEV__) {
-      // @ts-ignore - Debug tokens are not in the type definitions
-      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-    }
-    
-    // Initialize app check with a simpler configuration
-    firebase.appCheck().activate({
-      provider: 'debug', // This works in both debug and production with proper setup
-      isTokenAutoRefreshEnabled: true
-    });
-  } catch (error) {
-    console.error('Error initializing App Check:', error);
-  }
+  // App Check is completely disabled for now
+  // To re-enable, uncomment the code below and configure properly
 }
 
 // Avoid playing intro sound twice

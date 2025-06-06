@@ -11,6 +11,16 @@ service cloud.firestore {
       allow read, write: if true;  // Allow all operations for reminders
     }
     
+    // Allow access to verifiedEmails collection for email verification
+    match /verifiedEmails/{emailId} {
+      allow read, write: if true;  // Allow all operations for email verification
+    }
+    
+    // Allow access to oneTimeCodes collection for code-based verification
+    match /oneTimeCodes/{codeId} {
+      allow read, write: if true;  // Allow all operations for one-time codes
+    }
+    
     // Default rule - deny access to other collections
     match /{document=**} {
       allow read, write: if false;

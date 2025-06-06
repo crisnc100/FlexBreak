@@ -157,7 +157,7 @@ export class VideoCacheService {
       if (downloadResult.status === 200) {
         // Get file size
         const fileInfo = await FileSystem.getInfoAsync(localPath);
-        const fileSize = fileInfo.size || 0;
+        const fileSize = fileInfo.exists ? fileInfo.size : 0;
 
         // Update cache index
         const cacheEntry: CacheEntry = {
