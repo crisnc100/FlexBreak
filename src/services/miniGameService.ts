@@ -4,7 +4,7 @@ import { getData, setData, KEYS } from './storageService';
 export enum MiniGameType {
   WELLNESS_TRIVIA = 'wellness_trivia',
   STRESS_BUSTER = 'stress_buster',
-  DESK_BALANCE = 'desk_balance',
+  POSTURE_PATROL = 'desk_balance',
   STRETCH_SEQUENCE = 'stretch_sequence',
 }
 
@@ -36,10 +36,10 @@ export const MINI_GAMES: Record<MiniGameType, MiniGameInfo> = {
     minXP: 25,
     maxXP: 100,
   },
-  [MiniGameType.DESK_BALANCE]: {
-    id: MiniGameType.DESK_BALANCE,
-    name: 'Mindful Flow',
-    description: 'Guide your inner light through mindful movement',
+  [MiniGameType.POSTURE_PATROL]: {
+    id: MiniGameType.POSTURE_PATROL,
+    name: 'Posture Patrol',
+    description: 'Protect your desk from bad posture monsters',
     duration: 60,
     minXP: 25,
     maxXP: 100,
@@ -83,7 +83,7 @@ export async function getAvailableGames(isPremium: boolean): Promise<MiniGameInf
     const availableFreeGames = [
       MINI_GAMES[MiniGameType.WELLNESS_TRIVIA],
       MINI_GAMES[MiniGameType.STRESS_BUSTER],
-      MINI_GAMES[MiniGameType.DESK_BALANCE],
+      MINI_GAMES[MiniGameType.POSTURE_PATROL],
     ];
     
     // Randomly shuffle and return 2 games

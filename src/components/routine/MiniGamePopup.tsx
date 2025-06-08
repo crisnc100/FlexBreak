@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { WellnessTrueFalse } from './minigames/WellnessTrueFalse';
 import { StressBuster } from './minigames/StressBuster';
-import { ZenBalance } from './minigames/ZenBalance';
+import { PosturePatrol } from './minigames/PosturePatrol';
 import * as haptics from '../../utils/haptics';
 import { 
   MiniGameType, 
@@ -84,7 +84,7 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
           // Perfect score if no misses and good accuracy
           isPerfectScore = score >= 10; // Adjust based on game balance
           break;
-        case MiniGameType.DESK_BALANCE:
+        case MiniGameType.POSTURE_PATROL:
           isPerfectScore = score >= 200; // High balance score threshold
           break;
         default:
@@ -119,8 +119,8 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
         return 'Test your workplace wellness knowledge';
       case MiniGameType.STRESS_BUSTER:
         return 'Recognize and tap workers with good posture';
-      case MiniGameType.DESK_BALANCE:
-        return 'Guide your inner light through mindful movement';
+      case MiniGameType.POSTURE_PATROL:
+        return 'Defend against bad posture with correct stretches';
       case MiniGameType.STRETCH_SEQUENCE:
         return 'Follow the stretch sequence';
       default:
@@ -144,9 +144,9 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
             onSkip={handleClose}
           />
         );
-      case MiniGameType.DESK_BALANCE:
+      case MiniGameType.POSTURE_PATROL:
         return (
-          <ZenBalance
+          <PosturePatrol
             onGameComplete={handleGameComplete}
             onSkip={handleClose}
           />

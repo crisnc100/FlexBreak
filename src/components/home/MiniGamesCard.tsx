@@ -14,7 +14,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { usePremium } from '../../context/PremiumContext';
 import { WellnessTrueFalse } from '../routine/minigames/WellnessTrueFalse';
 import { StressBuster } from '../routine/minigames/StressBuster';
-import { ZenBalance } from '../routine/minigames/ZenBalance';
+import { PosturePatrol } from '../routine/minigames/PosturePatrol';
 import { 
   MiniGameType, 
   MiniGameInfo, 
@@ -78,7 +78,7 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         case MiniGameType.STRESS_BUSTER:
           isPerfectScore = score >= 10; // Good accuracy threshold
           break;
-        case MiniGameType.DESK_BALANCE:
+        case MiniGameType.POSTURE_PATROL:
           isPerfectScore = score >= 200; // High balance score threshold
           break;
         default:
@@ -115,8 +115,8 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         return 'Test your workplace wellness knowledge';
       case MiniGameType.STRESS_BUSTER:
         return 'Recognize and tap workers with good posture';
-      case MiniGameType.DESK_BALANCE:
-        return 'Guide your inner light through mindful movement';
+      case MiniGameType.POSTURE_PATROL:
+        return 'Defend against bad posture with correct stretches';
       case MiniGameType.STRETCH_SEQUENCE:
         return 'Follow the stretch sequence (Coming Soon)';
       default:
@@ -130,8 +130,8 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         return 'school';
       case MiniGameType.STRESS_BUSTER:
         return 'people';
-      case MiniGameType.DESK_BALANCE:
-        return 'body';
+      case MiniGameType.POSTURE_PATROL:
+        return 'shield';
       case MiniGameType.STRETCH_SEQUENCE:
         return 'fitness';
       default:
@@ -143,7 +143,7 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
     // First 3 games are implemented
     return gameType === MiniGameType.WELLNESS_TRIVIA || 
            gameType === MiniGameType.STRESS_BUSTER || 
-           gameType === MiniGameType.DESK_BALANCE;
+           gameType === MiniGameType.POSTURE_PATROL;
   };
 
   const renderSelectedGame = () => {
@@ -173,10 +173,10 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
             context="home"
           />
         );
-      case MiniGameType.DESK_BALANCE:
-        console.log('🎮 Rendering ZenBalance');
+      case MiniGameType.POSTURE_PATROL:
+        console.log('🎮 Rendering PosturePatrol');
         return (
-          <ZenBalance
+          <PosturePatrol
             onGameComplete={handleGameComplete}
             onSkip={handleCloseGame}
             context="home"
@@ -214,8 +214,8 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           return 'Wellness Trivia';
         case MiniGameType.STRESS_BUSTER:
           return 'Stress Buster';
-        case MiniGameType.DESK_BALANCE:
-          return 'Mindful Flow';
+        case MiniGameType.POSTURE_PATROL:
+          return 'Posture Patrol';
         default:
           return 'Mini-Game';
       }
