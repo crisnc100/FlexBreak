@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Dimensions, Text, Image } from 'react-native';
 import { useTheme } from '../../../../context/ThemeContext';
-import { PATH_WAYPOINTS, BUILD_SLOTS, GAME_GRID } from './constants';
+import { PATH_WAYPOINTS, GAME_GRID } from './constants';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -16,7 +16,7 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
   const gameWidth = GAME_GRID.COLS * GAME_GRID.CELL_SIZE;
   const gameHeight = GAME_GRID.ROWS * GAME_GRID.CELL_SIZE;
   const offsetX = (screenWidth - gameWidth) / 2;
-  const offsetY = 170; // Move game area much lower for better positioning
+  const offsetY = 120; // Match main game positioning
   
   // Create path segments with direction
   const renderPathSegments = () => {
@@ -81,43 +81,8 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
     return segments;
   };
   
-  // Render build slot indicators
-  const renderBuildSlots = () => {
-    const slotIcons = ['🏗️', '⚡', '🛡️', '🎯']; // Icons representing strategic positions
-    const slotNames = [
-      'First Line',
-      'Corner Guard', 
-      'Mid Defense',
-      'Last Stand'
-    ];
-    
-    return BUILD_SLOTS.map((slot, index) => {
-      const slotX = slot.gridX * GAME_GRID.CELL_SIZE + GAME_GRID.CELL_SIZE / 2 - 30;
-      const slotY = slot.gridY * GAME_GRID.CELL_SIZE + GAME_GRID.CELL_SIZE / 2 - 30;
-      
-      return (
-        <View
-          key={`build-slot-${slot.id}`}
-          style={[
-            styles.buildSlotIndicator,
-            {
-              left: slotX,
-              top: slotY,
-              borderColor: theme.accent + '80',
-              backgroundColor: theme.cardBackground + '20',
-            }
-          ]}
-        >
-          <Text style={styles.buildSlotIcon}>
-            {slotIcons[index]}
-          </Text>
-          <Text style={[styles.buildSlotName, { color: theme.accent }]}>
-            {slotNames[index]}
-          </Text>
-        </View>
-      );
-    });
-  };
+  // Build slots are now rendered by the main game component (BuildSlotComponent)
+  // No need to render them here to avoid duplicates
   
   return (
     <View style={[
@@ -171,8 +136,7 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
         {/* Path segments with direction */}
         {renderPathSegments()}
         
-        {/* Build slot indicators */}
-        {renderBuildSlots()}
+        {/* Build slot indicators removed - handled by main game component */}
         
         {/* Spawn indicator */}
         <View style={[
@@ -191,7 +155,6 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
           }
         ]}>
           <Text style={styles.spawnText}>⚠️ SPAWN</Text>
-          <Text style={styles.spawnSubtext}>Monsters Enter</Text>
         </View>
         
         {/* Defender position with actual image */}
@@ -256,30 +219,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  buildSlotIndicator: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderWidth: 2,
-    borderRadius: 12,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  buildSlotIcon: {
-    fontSize: 20,
-    marginBottom: 2,
-  },
-  buildSlotName: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
   spawnPoint: {
     position: 'absolute',
     width: 50,
@@ -294,11 +233,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  spawnSubtext: {
-    color: 'white',
-    fontSize: 8,
-    textAlign: 'center',
-  },
   defenderPoint: {
     position: 'absolute',
     width: 60,
@@ -307,8 +241,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   defenderImage: {
-    width: 50,
-    height: 50,
+    width: 75,
+    height: 75,
   },
   defenderLabel: {
     fontSize: 10,

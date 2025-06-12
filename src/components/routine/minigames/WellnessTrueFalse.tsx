@@ -392,7 +392,7 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
                 onPress={cancelExit}
               >
                 <Text style={[styles.alertButtonText, { color: theme.text }]}>
-                  Continue Playing
+                  Continue
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 

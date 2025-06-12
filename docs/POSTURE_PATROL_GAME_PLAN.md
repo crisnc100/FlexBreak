@@ -2,7 +2,7 @@
 
 ## 🎮 Game Overview
 
-**Name:** Posture Patrol  
+**Name:** Postu 
 **Duration:** 60-90 seconds  
 **Type:** Educational Tower Defense  
 **Target:** Office workers learning posture correction  

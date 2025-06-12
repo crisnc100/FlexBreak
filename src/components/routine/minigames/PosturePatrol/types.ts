@@ -4,6 +4,29 @@ export type MonsterType = 'tech_neck' | 'desk_hunch' | 'slouch_slump' | 'lean_tw
 
 export type PadType = 'neck_relief_pad' | 'hip_hop_platform' | 'chest_quest_pad' | 'armory_arc';
 
+// Enhanced pad configuration interface with optional special abilities
+export interface PadConfig {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  cost: number;
+  damage: number;
+  range: number;
+  fireRate: number;
+  description: string;
+  image: any;
+  // Special abilities (optional)
+  techNeckBonus?: number;
+  splashRadius?: number;
+  splashDamage?: number;
+  armorPiercing?: boolean;
+  dotDamage?: number;
+  dotDuration?: number;
+  piercing?: boolean;
+  undodgeable?: boolean;
+}
+
 // Removed StretchId - no longer needed for tower defense
 
 export interface Monster {

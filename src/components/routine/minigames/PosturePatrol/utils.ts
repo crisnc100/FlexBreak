@@ -7,7 +7,8 @@ import {
   GAME_GRID,
   BUILD_SLOTS,
   MONSTER_RESISTANCES,
-  DAMAGE_COLORS
+  DAMAGE_COLORS,
+  UPGRADE_CONFIG
 } from './constants';
 
 /**
@@ -77,8 +78,13 @@ export const findMonstersInRange = (pad: PlacedPad, monsters: Monster[]): Monste
   if (!slot) return [];
   
   const padConfig = PAD_CONFIG[pad.padType];
+  const upgradeConfig = UPGRADE_CONFIG[pad.padType];
+  const levelConfig = upgradeConfig.levels[pad.level];
   const padPos = { x: slot.gridX, y: slot.gridY };
-  const range = (padConfig.range / GAME_GRID.CELL_SIZE) * (1 + (pad.level - 1) * 0.25); // +25% per level
+  
+  // Apply upgrade range multiplier
+  const rangeMultiplier = levelConfig.rangeMultiplier || 1.0;
+  const range = (padConfig.range / GAME_GRID.CELL_SIZE) * rangeMultiplier;
   
   return monsters.filter(monster => {
     if (monster.hp <= 0) return false;
@@ -92,7 +98,12 @@ export const findMonstersInRange = (pad: PlacedPad, monsters: Monster[]): Monste
  */
 export const calculateDamage = (pad: PlacedPad, targetMonster: Monster): { damage: number; effectiveness: 'super' | 'effective' | 'normal' | 'resisted' | 'heavy_resisted' } => {
   const padConfig = PAD_CONFIG[pad.padType];
-  const baseDamage = padConfig.damage * (1 + (pad.level - 1) * 0.25); // +25% per level
+  const upgradeConfig = UPGRADE_CONFIG[pad.padType];
+  const levelConfig = upgradeConfig.levels[pad.level];
+  
+  // Apply upgrade damage multiplier
+  const damageMultiplier = levelConfig.damageMultiplier || 1.0;
+  const baseDamage = padConfig.damage * damageMultiplier;
   
   // Get resistance multiplier
   const resistances = MONSTER_RESISTANCES[targetMonster.type];

@@ -5,7 +5,7 @@ export enum MiniGameType {
   WELLNESS_TRIVIA = 'wellness_trivia',
   STRESS_BUSTER = 'stress_buster',
   POSTURE_PATROL = 'desk_balance',
-  STRETCH_SEQUENCE = 'stretch_sequence',
+  BALANCE_DROP = 'balance_drop',
 }
 
 // Mini-game info
@@ -44,11 +44,11 @@ export const MINI_GAMES: Record<MiniGameType, MiniGameInfo> = {
     minXP: 25,
     maxXP: 100,
   },
-  [MiniGameType.STRETCH_SEQUENCE]: {
-    id: MiniGameType.STRETCH_SEQUENCE,
-    name: 'Stretch Sequence',
-    description: 'Follow the stretch sequence',
-    duration: 75,
+  [MiniGameType.BALANCE_DROP]: {
+    id: MiniGameType.BALANCE_DROP,
+    name: 'Balance Drop',
+    description: 'Drag falling work and wellness items to the correct sides of the scale.',
+    duration: 90,
     minXP: 25,
     maxXP: 100,
   },

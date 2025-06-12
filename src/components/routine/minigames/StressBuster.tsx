@@ -155,9 +155,28 @@ export const StressBuster: React.FC<StressBusterProps> = ({
   const spawnWorker = () => {
     const id = (workerId.current++).toString();
     
+    // Improve randomization - track recent postures to ensure variety
+    const currentWorkers = workers.slice(-3); // Look at last 3 workers
+    const recentGoodPostureCount = currentWorkers.filter(w => w.hasGoodPosture).length;
+    const recentBadPostureCount = currentWorkers.length - recentGoodPostureCount;
+    
+    // Adjust probability based on recent history to ensure better distribution
+    let goodPostureChance = 0.5; // Default 50/50 chance
+    
+    // If we've seen too many of one type recently, adjust probability
+    if (recentGoodPostureCount >= 2) {
+      // Too many good postures recently, increase chance of bad posture
+      goodPostureChance = 0.3;
+    } else if (recentBadPostureCount >= 2) {
+      // Too many bad postures recently, increase chance of good posture
+      goodPostureChance = 0.7;
+    }
+    
     // Make it more challenging as time decreases
     const timeProgress = (45 - timeLeft) / 45; // 0 to 1 as time progresses
-    const goodPostureChance = 0.4 + (timeProgress * 0.3); // 40% to 70% good posture as game progresses
+    // Adjust base probability slightly based on game progress
+    goodPostureChance = goodPostureChance + (timeProgress * 0.2); // Increase good posture chance slightly over time
+    
     const hasGoodPosture = Math.random() < goodPostureChance;
     
     // Larger sizes for better visibility, less variation for consistency
@@ -223,7 +242,7 @@ export const StressBuster: React.FC<StressBusterProps> = ({
       haptics.success();
       playCorrectSound(); // Good posture = correct sound
       
-      // Positive feedback animation
+      // Enhanced positive feedback animation with burst effect
       Animated.sequence([
         Animated.timing(worker.scale, {
           toValue: 1.3,
@@ -232,17 +251,20 @@ export const StressBuster: React.FC<StressBusterProps> = ({
         }),
         Animated.timing(worker.scale, {
           toValue: 0,
-          duration: 200,
+          duration: 300,
           useNativeDriver: true,
         }),
       ]).start();
+      
+      // Create burst effect at the tapped location
+      createBurstEffect(worker, true);
     } else {
       // Wrong tap - poor posture worker
       setMisses(prev => prev + 1);
       haptics.error();
       playIncorrectSound(); // Poor posture = incorrect sound
       
-      // Negative feedback animation
+      // Enhanced negative feedback animation with "X" effect
       Animated.sequence([
         Animated.timing(worker.scale, {
           toValue: 0.7,
@@ -251,14 +273,65 @@ export const StressBuster: React.FC<StressBusterProps> = ({
         }),
         Animated.timing(worker.scale, {
           toValue: 0,
-          duration: 200,
+          duration: 300,
           useNativeDriver: true,
         }),
       ]).start();
+      
+      // Create X-mark effect at the tapped location
+      createBurstEffect(worker, false);
     }
     
     // Remove worker from list
     setWorkers(prev => prev.filter(w => w.id !== worker.id));
+  };
+  
+  // Add this new effect system
+  const [burstEffects, setBurstEffects] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    size: number;
+    isGood: boolean;
+    opacity: Animated.Value;
+    scale: Animated.Value;
+  }[]>([]);
+  
+  const createBurstEffect = (worker: Worker, isGood: boolean) => {
+    const effectId = `effect-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const effectOpacity = new Animated.Value(1);
+    const effectScale = new Animated.Value(0.5);
+    
+    // Add effect to state
+    setBurstEffects(prev => [
+      ...prev, 
+      {
+        id: effectId,
+        x: worker.x + worker.size/2 - 30, // Center the effect
+        y: worker.y + worker.size/2 - 30, // Center the effect
+        size: 60, // Fixed size for effect
+        isGood,
+        opacity: effectOpacity,
+        scale: effectScale,
+      }
+    ]);
+    
+    // Animate the effect
+    Animated.parallel([
+      Animated.timing(effectOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(effectScale, {
+        toValue: 1.5,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Remove effect from state after animation
+      setBurstEffects(prev => prev.filter(effect => effect.id !== effectId));
+    });
   };
   
   const startGame = () => {
@@ -483,6 +556,34 @@ export const StressBuster: React.FC<StressBusterProps> = ({
       
       {/* Game Area */}
       <View style={[styles.gameArea, { borderColor: theme.border }]}>
+        {/* Render burst effects */}
+        {burstEffects.map(effect => (
+          <Animated.View
+            key={effect.id}
+            style={[
+              styles.burstEffect,
+              {
+                left: effect.x,
+                top: effect.y,
+                width: effect.size,
+                height: effect.size,
+                opacity: effect.opacity,
+                transform: [{ scale: effect.scale }],
+              }
+            ]}
+          >
+            {effect.isGood ? (
+              <View style={styles.goodBurst}>
+                <Ionicons name="checkmark-circle" size={effect.size} color="#4CAF50" />
+              </View>
+            ) : (
+              <View style={styles.badBurst}>
+                <Ionicons name="close-circle" size={effect.size} color="#F44336" />
+              </View>
+            )}
+          </Animated.View>
+        ))}
+        
         {workers.map(worker => (
           <TouchableOpacity
             key={worker.id}
@@ -561,7 +662,7 @@ export const StressBuster: React.FC<StressBusterProps> = ({
                 onPress={cancelExit}
               >
                 <Text style={[styles.alertButtonText, { color: theme.text }]}>
-                  Continue Playing
+                  Continue
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -860,5 +961,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  burstEffect: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  goodBurst: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badBurst: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

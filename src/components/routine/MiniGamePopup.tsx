@@ -14,6 +14,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { WellnessTrueFalse } from './minigames/WellnessTrueFalse';
 import { StressBuster } from './minigames/StressBuster';
 import { PosturePatrol } from './minigames/PosturePatrol';
+import { BalanceDrop } from './minigames/BalanceDrop';
 import * as haptics from '../../utils/haptics';
 import { 
   MiniGameType, 
@@ -87,6 +88,9 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
         case MiniGameType.POSTURE_PATROL:
           isPerfectScore = score >= 200; // High balance score threshold
           break;
+        case MiniGameType.BALANCE_DROP:
+          isPerfectScore = score >= 100; // Balance drop perfect score
+          break;
         default:
           isPerfectScore = false;
       }
@@ -121,8 +125,8 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
         return 'Recognize and tap workers with good posture';
       case MiniGameType.POSTURE_PATROL:
         return 'Defend against bad posture with correct stretches';
-      case MiniGameType.STRETCH_SEQUENCE:
-        return 'Follow the stretch sequence';
+      case MiniGameType.BALANCE_DROP:
+        return 'Drag falling work and wellness items to the correct sides of the scale.';
       default:
         return 'Play a quick mini-game for extra XP';
     }
@@ -147,6 +151,13 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
       case MiniGameType.POSTURE_PATROL:
         return (
           <PosturePatrol
+            onGameComplete={handleGameComplete}
+            onSkip={handleClose}
+          />
+        );
+      case MiniGameType.BALANCE_DROP:
+        return (
+          <BalanceDrop
             onGameComplete={handleGameComplete}
             onSkip={handleClose}
           />

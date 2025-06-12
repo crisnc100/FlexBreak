@@ -15,6 +15,7 @@ import { usePremium } from '../../context/PremiumContext';
 import { WellnessTrueFalse } from '../routine/minigames/WellnessTrueFalse';
 import { StressBuster } from '../routine/minigames/StressBuster';
 import { PosturePatrol } from '../routine/minigames/PosturePatrol';
+import { BalanceDrop } from '../routine/minigames/BalanceDrop';
 import { 
   MiniGameType, 
   MiniGameInfo, 
@@ -81,6 +82,9 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         case MiniGameType.POSTURE_PATROL:
           isPerfectScore = score >= 200; // High balance score threshold
           break;
+        case MiniGameType.BALANCE_DROP:
+          isPerfectScore = score >= 100; // Unknown threshold
+          break;
         default:
           isPerfectScore = false;
       }
@@ -117,8 +121,8 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         return 'Recognize and tap workers with good posture';
       case MiniGameType.POSTURE_PATROL:
         return 'Defend against bad posture with correct stretches';
-      case MiniGameType.STRETCH_SEQUENCE:
-        return 'Follow the stretch sequence (Coming Soon)';
+      case MiniGameType.BALANCE_DROP:
+        return 'Drag falling work and wellness items to the correct sides of the scale.';
       default:
         return 'Fun mini-game for extra XP';
     }
@@ -132,18 +136,19 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         return 'people';
       case MiniGameType.POSTURE_PATROL:
         return 'shield';
-      case MiniGameType.STRETCH_SEQUENCE:
-        return 'fitness';
+      case MiniGameType.BALANCE_DROP:
+        return 'balance';
       default:
         return 'game-controller';
     }
   };
 
   const isGameAvailable = (gameType: MiniGameType): boolean => {
-    // First 3 games are implemented
+    // All 4 games are implemented
     return gameType === MiniGameType.WELLNESS_TRIVIA || 
            gameType === MiniGameType.STRESS_BUSTER || 
-           gameType === MiniGameType.POSTURE_PATROL;
+           gameType === MiniGameType.POSTURE_PATROL ||
+           gameType === MiniGameType.BALANCE_DROP;
   };
 
   const renderSelectedGame = () => {
@@ -182,6 +187,15 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
             context="home"
           />
         );
+      case MiniGameType.BALANCE_DROP:
+        console.log('🎮 Rendering BalanceDrop');
+        return (
+          <BalanceDrop
+            onGameComplete={handleGameComplete}
+            onSkip={handleCloseGame}
+            context="home"
+          />
+        );
       default:
         console.log('🎮 Game not available:', selectedGame);
         return (
@@ -203,6 +217,10 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           return 'school';
         case MiniGameType.STRESS_BUSTER:
           return 'people';
+        case MiniGameType.POSTURE_PATROL:
+          return 'shield';
+        case MiniGameType.BALANCE_DROP:
+          return 'balance';
         default:
           return 'game-controller';
       }
@@ -216,6 +234,8 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           return 'Stress Buster';
         case MiniGameType.POSTURE_PATROL:
           return 'Posture Patrol';
+        case MiniGameType.BALANCE_DROP:
+          return 'Balance Drop';
         default:
           return 'Mini-Game';
       }
