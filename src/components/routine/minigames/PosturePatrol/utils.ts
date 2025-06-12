@@ -1,217 +1,321 @@
-import { MonsterType, StretchId, WaveConfig, MovementPattern, StretchCard } from './types';
+import { MonsterType, Monster, PlacedPad, DamageNumber } from './types';
 import { 
-  WAVE_MONSTERS, 
-  SPAWN_RATES, 
-  FAST_MONSTER_CHANCE, 
-  CORE_STRETCHES,
-  SPAWN_VARIANCE,
-  MONSTER_SPEEDS,
-  MOVEMENT_PATTERNS,
-  CARD_SYSTEM
+  WAVE_CONFIG,
+  MONSTER_CONFIG,
+  PAD_CONFIG,
+  PATH_WAYPOINTS,
+  GAME_GRID,
+  BUILD_SLOTS,
+  MONSTER_RESISTANCES,
+  DAMAGE_COLORS
 } from './constants';
 
 /**
- * Get wave configuration for a specific wave number
+ * Convert grid coordinates to pixel coordinates
  */
-export const getWaveConfig = (waveNumber: number): WaveConfig => {
-  const monsters = WAVE_MONSTERS[waveNumber as keyof typeof WAVE_MONSTERS] || WAVE_MONSTERS[3];
+export const gridToPixel = (gridX: number, gridY: number) => ({
+  x: gridX * GAME_GRID.CELL_SIZE + GAME_GRID.CELL_SIZE / 2,
+  y: gridY * GAME_GRID.CELL_SIZE + GAME_GRID.CELL_SIZE / 2,
+});
+
+/**
+ * Get monster position along path based on progress (0-1)
+ */
+export const getPositionAlongPath = (progress: number): { x: number; y: number; waypointIndex: number } => {
+  const totalWaypoints = PATH_WAYPOINTS.length - 1;
+  const exactIndex = progress * totalWaypoints;
+  const currentIndex = Math.floor(exactIndex);
+  const nextIndex = Math.min(currentIndex + 1, totalWaypoints);
+  const segmentProgress = exactIndex - currentIndex;
   
-  let spawnRate: number;
-  switch (waveNumber) {
-    case 1: spawnRate = SPAWN_RATES.WAVE_1; break;
-    case 2: spawnRate = SPAWN_RATES.WAVE_2; break;
-    case 3: spawnRate = SPAWN_RATES.WAVE_3; break;
-    default: spawnRate = SPAWN_RATES.WAVE_3; break;
-  }
-
-  return {
-    monsters,
-    spawnRate,
-    fastMonsterChance: waveNumber === 3 ? FAST_MONSTER_CHANCE : 0,
-  };
-};
-
-/**
- * Get random monster type for current wave
- */
-export const getRandomMonsterType = (waveNumber: number): MonsterType => {
-  const config = getWaveConfig(waveNumber);
-  const randomIndex = Math.floor(Math.random() * config.monsters.length);
-  return config.monsters[randomIndex];
-};
-
-/**
- * Check if a stretch is effective against a monster type
- */
-export const isStretchEffective = (stretchId: StretchId, monsterType: MonsterType): boolean => {
-  const stretch = CORE_STRETCHES.find(s => s.id === stretchId);
-  return stretch ? stretch.effectiveAgainst.includes(monsterType) : false;
-};
-
-/**
- * Get all stretches effective against a monster type
- */
-export const getEffectiveStretches = (monsterType: MonsterType): StretchId[] => {
-  return CORE_STRETCHES
-    .filter(stretch => stretch.effectiveAgainst.includes(monsterType))
-    .map(stretch => stretch.id);
-};
-
-/**
- * Calculate speed bonus based on reaction time
- */
-export const calculateSpeedBonus = (spawnTime: number, selectionTime: number): number => {
-  const reactionTime = selectionTime - spawnTime;
-  
-  // Speed bonus for selections under 2 seconds
-  if (reactionTime < 2000) {
-    return 5; // Quick reaction bonus
-  }
-  
-  return 0;
-};
-
-/**
- * Get monster speed based on wave and random chance
- */
-export const getMonsterSpeed = (waveNumber: number): { speed: number; isFast: boolean } => {
-  const config = getWaveConfig(waveNumber);
-  const isFast = Math.random() < config.fastMonsterChance;
+  const current = PATH_WAYPOINTS[currentIndex];
+  const next = PATH_WAYPOINTS[nextIndex];
   
   return {
-    speed: isFast ? MONSTER_SPEEDS.FAST : MONSTER_SPEEDS.NORMAL,
-    isFast,
+    x: current.x + (next.x - current.x) * segmentProgress,
+    y: current.y + (next.y - current.y) * segmentProgress,
+    waypointIndex: currentIndex
   };
 };
 
 /**
- * Add randomization to spawn timing
+ * Create a monster for the current wave
  */
-export const getRandomizedSpawnDelay = (baseDelay: number): number => {
-  const variance = (Math.random() - 0.5) * 2 * SPAWN_VARIANCE; // ±500ms
-  return Math.max(100, baseDelay + variance); // Minimum 100ms delay
-};
-
-/**
- * Calculate final score with bonuses
- */
-export const calculateFinalScore = (
-  baseScore: number,
-  perfectWaves: number,
-  speedBonuses: number
-): number => {
-  const perfectWaveBonus = perfectWaves * 25;
-  const speedBonusPoints = speedBonuses * 5;
+export const createMonster = (type: MonsterType, waveNumber: number): Monster => {
+  const config = MONSTER_CONFIG[type];
+  const id = `monster_${Date.now()}_${Math.random()}`;
   
-  return baseScore + perfectWaveBonus + speedBonusPoints;
-};
-
-/**
- * Get stretch name by ID
- */
-export const getStretchName = (stretchId: StretchId): string => {
-  const stretch = CORE_STRETCHES.find(s => s.id === stretchId);
-  return stretch ? stretch.name : 'Unknown Stretch';
-};
-
-/**
- * Get stretch icon by ID
- */
-export const getStretchIcon = (stretchId: StretchId): string => {
-  const stretch = CORE_STRETCHES.find(s => s.id === stretchId);
-  return stretch ? stretch.icon : 'help-outline';
-};
-
-/**
- * Generate educational tip based on missed stretches
- */
-export const generateEducationalTip = (missedMonsters: MonsterType[]): string => {
-  const monsterTips = {
-    tech_neck: "Try neck stretches to combat forward head posture from screen time!",
-    desk_hunch: "Chest and shoulder stretches help open up rounded shoulders.",
-    slouch_slump: "Back extension stretches counteract slouching and poor posture.",
-    lean_twist: "Spinal twists help realign twisted sitting positions.",
-  };
-
-  if (missedMonsters.length === 0) {
-    return "Great job! You correctly identified all posture problems.";
-  }
-
-  const mostMissed = missedMonsters[0];
-  return monsterTips[mostMissed];
-};
-
-/**
- * Check if wave was completed perfectly (no monsters reached desk)
- */
-export const isWavePerfect = (waveStartTension: number, currentTension: number): boolean => {
-  return waveStartTension === currentTension;
-};
-
-/**
- * Get movement pattern for a monster type
- */
-export const getMovementPattern = (monsterType: MonsterType): MovementPattern => {
-  return MOVEMENT_PATTERNS[monsterType];
-};
-
-/**
- * Initialize stretch cards deck
- */
-export const initializeStretchCards = (): StretchCard[] => {
-  // Select a random subset of stretches for the deck
-  const shuffled = [...CORE_STRETCHES].sort(() => Math.random() - 0.5);
-  const selectedCards = shuffled.slice(0, CARD_SYSTEM.DECK_SIZE);
-  
-  return selectedCards.map(stretch => ({
-    id: stretch.id,
-    name: stretch.name,
-    icon: stretch.icon,
-    effectiveAgainst: stretch.effectiveAgainst,
-    cooldown: stretch.cooldown,
-    charges: stretch.maxCharges,
-    maxCharges: stretch.maxCharges,
-    lastUsed: 0,
-  }));
-};
-
-/**
- * Check if a card is available (not on cooldown and has charges)
- */
-export const isCardAvailable = (card: StretchCard, currentTime: number): boolean => {
-  if (card.charges <= 0) return false;
-  
-  const timeSinceLastUse = (currentTime - card.lastUsed) / 1000; // Convert to seconds
-  return timeSinceLastUse >= card.cooldown;
-};
-
-/**
- * Use a stretch card
- */
-export const useStretchCard = (card: StretchCard, currentTime: number): StretchCard => {
   return {
-    ...card,
-    charges: card.charges - 1,
-    lastUsed: currentTime,
+    id,
+    type,
+    hp: config.hp,
+    maxHp: config.hp,
+    speed: config.speed,
+    value: config.value,
+    currentWaypointIndex: 0,
+    pathProgress: 0,
+    position: { x: PATH_WAYPOINTS[0].x, y: PATH_WAYPOINTS[0].y },
+    pixelPosition: null as any, // Will be set in component
+    isBoss: type === 'boss_posture'
   };
 };
 
 /**
- * Get remaining cooldown time for a card
+ * Calculate distance between two points
  */
-export const getCardCooldownRemaining = (card: StretchCard, currentTime: number): number => {
-  if (card.charges <= 0) return Infinity; // No charges left
-  
-  const timeSinceLastUse = (currentTime - card.lastUsed) / 1000;
-  const remaining = card.cooldown - timeSinceLastUse;
-  return Math.max(0, remaining);
+export const calculateDistance = (p1: { x: number; y: number }, p2: { x: number; y: number }): number => {
+  const dx = p1.x - p2.x;
+  const dy = p1.y - p2.y;
+  return Math.sqrt(dx * dx + dy * dy);
 };
 
 /**
- * Recharge all cards (restore charges over time)
+ * Find monsters in range of a pad
  */
-export const rechargeCards = (cards: StretchCard[], deltaTime: number): StretchCard[] => {
-  // This could be expanded to gradually restore charges over time
-  // For now, we just handle cooldowns in the main component
-  return cards;
+export const findMonstersInRange = (pad: PlacedPad, monsters: Monster[]): Monster[] => {
+  const slot = BUILD_SLOTS.find(s => s.id === pad.slotId);
+  if (!slot) return [];
+  
+  const padConfig = PAD_CONFIG[pad.padType];
+  const padPos = { x: slot.gridX, y: slot.gridY };
+  const range = (padConfig.range / GAME_GRID.CELL_SIZE) * (1 + (pad.level - 1) * 0.25); // +25% per level
+  
+  return monsters.filter(monster => {
+    if (monster.hp <= 0) return false;
+    const distance = calculateDistance(padPos, monster.position);
+    return distance <= range;
+  });
+};
+
+/**
+ * Calculate damage with upgrades and type advantages
+ */
+export const calculateDamage = (pad: PlacedPad, targetMonster: Monster): { damage: number; effectiveness: 'super' | 'effective' | 'normal' | 'resisted' | 'heavy_resisted' } => {
+  const padConfig = PAD_CONFIG[pad.padType];
+  const baseDamage = padConfig.damage * (1 + (pad.level - 1) * 0.25); // +25% per level
+  
+  // Get resistance multiplier
+  const resistances = MONSTER_RESISTANCES[targetMonster.type];
+  const resistanceMultiplier = resistances[pad.padType] || 1.0;
+  
+  // Apply special bonuses
+  let finalMultiplier = resistanceMultiplier;
+  
+  // Tech Neck bonus for Neck Relief Pad
+  if (pad.padType === 'neck_relief_pad' && targetMonster.type === 'tech_neck' && padConfig.techNeckBonus) {
+    finalMultiplier = padConfig.techNeckBonus;
+  }
+  
+  // Apply dodge chance for Lean Twist (except for undodgeable attacks)
+  if (targetMonster.type === 'lean_twist' && !padConfig.undodgeable) {
+    // 30% chance to dodge
+    if (Math.random() < 0.3) {
+      return { damage: 0, effectiveness: 'resisted' };
+    }
+  }
+  
+  const finalDamage = Math.floor(baseDamage * finalMultiplier);
+  
+  // Determine effectiveness for color coding
+  let effectiveness: 'super' | 'effective' | 'normal' | 'resisted' | 'heavy_resisted';
+  if (finalMultiplier >= 2.0) effectiveness = 'super';
+  else if (finalMultiplier >= 1.5) effectiveness = 'effective';
+  else if (finalMultiplier >= 0.8) effectiveness = 'normal';
+  else if (finalMultiplier >= 0.5) effectiveness = 'resisted';
+  else effectiveness = 'heavy_resisted';
+  
+  return { damage: finalDamage, effectiveness };
+};
+
+/**
+ * Apply slow effect to monster
+ */
+export const applySlowEffect = (monster: Monster, slowEffect: number): Monster => {
+  return {
+    ...monster,
+    slowEffect: Math.max(monster.slowEffect || 0, slowEffect)
+  };
+};
+
+/**
+ * Apply damage over time effect
+ */
+export const applyDotEffect = (monster: Monster, dotDamage: number, duration: number): Monster => {
+  return {
+    ...monster,
+    dotDamage: dotDamage,
+    dotDuration: duration,
+    dotAppliedTime: Date.now()
+  };
+};
+
+/**
+ * Process damage over time effects
+ */
+export const processDotEffects = (monster: Monster, deltaTime: number): { monster: Monster; dotDamage: number } => {
+  if (!monster.dotDuration || monster.dotDuration <= 0) {
+    return { monster, dotDamage: 0 };
+  }
+  
+  const dotDamageThisTick = (monster.dotDamage || 0) * (deltaTime / 1000);
+  const newDuration = Math.max(0, monster.dotDuration - deltaTime / 1000);
+  
+  return {
+    monster: {
+      ...monster,
+      hp: Math.max(0, monster.hp - dotDamageThisTick),
+      dotDuration: newDuration
+    },
+    dotDamage: dotDamageThisTick
+  };
+};
+
+/**
+ * Get damage color based on effectiveness
+ */
+export const getDamageColor = (effectiveness: string): string => {
+  switch (effectiveness) {
+    case 'super': return DAMAGE_COLORS.SUPER_EFFECTIVE;
+    case 'effective': return DAMAGE_COLORS.EFFECTIVE;
+    case 'normal': return DAMAGE_COLORS.NORMAL;
+    case 'resisted': return DAMAGE_COLORS.RESISTED;
+    case 'heavy_resisted': return DAMAGE_COLORS.HEAVILY_RESISTED;
+    default: return DAMAGE_COLORS.NORMAL;
+  }
+};
+
+/**
+ * Find monsters in splash radius
+ */
+export const findMonstersInSplashRadius = (
+  center: Monster,
+  allMonsters: Monster[],
+  splashRadius: number
+): Monster[] => {
+  const radiusInGrid = splashRadius / GAME_GRID.CELL_SIZE;
+  
+  return allMonsters.filter(monster => {
+    if (monster.id === center.id || monster.hp <= 0) return false;
+    const distance = calculateDistance(center.position, monster.position);
+    return distance <= radiusInGrid;
+  });
+};
+
+/**
+ * Find all monsters in a line from pad
+ */
+export const findMonstersInLine = (
+  pad: PlacedPad,
+  monsters: Monster[],
+  direction: { x: number; y: number }
+): Monster[] => {
+  const slot = BUILD_SLOTS.find(s => s.id === pad.slotId);
+  if (!slot) return [];
+  
+  const padPos = { x: slot.gridX, y: slot.gridY };
+  const padConfig = PAD_CONFIG[pad.padType];
+  const maxRange = padConfig.range / GAME_GRID.CELL_SIZE;
+  
+  return monsters.filter(monster => {
+    if (monster.hp <= 0) return false;
+    
+    // Check if monster is roughly in line
+    const toMonster = {
+      x: monster.position.x - padPos.x,
+      y: monster.position.y - padPos.y
+    };
+    
+    const distance = calculateDistance(padPos, monster.position);
+    if (distance > maxRange) return false;
+    
+    // Check angle alignment (within 15 degrees)
+    const dot = (toMonster.x * direction.x + toMonster.y * direction.y) / 
+                (Math.sqrt(toMonster.x * toMonster.x + toMonster.y * toMonster.y) * 
+                 Math.sqrt(direction.x * direction.x + direction.y * direction.y));
+    
+    return dot > 0.96; // cos(15°) ≈ 0.96
+  }).sort((a, b) => {
+    // Sort by distance from pad
+    const distA = calculateDistance(padPos, a.position);
+    const distB = calculateDistance(padPos, b.position);
+    return distA - distB;
+  });
+};
+
+/**
+ * Check if pad can fire (based on fire rate)
+ */
+export const canPadFire = (pad: PlacedPad, currentTime: number): boolean => {
+  const padConfig = PAD_CONFIG[pad.padType];
+  const fireRate = padConfig.fireRate * (1 + (pad.level - 1) * 0.25); // +25% per level
+  const cooldown = 1000 / fireRate; // Convert to milliseconds between shots
+  
+  return currentTime - pad.lastFired >= cooldown;
+};
+
+/**
+ * Get upgrade cost for a pad
+ */
+export const getUpgradeCost = (level: number): number => {
+  return 2; // Fixed cost of 2 energy per upgrade
+};
+
+/**
+ * Get sell refund amount
+ */
+export const getSellRefund = (pad: PlacedPad): number => {
+  const padConfig = PAD_CONFIG[pad.padType];
+  const totalInvested = padConfig.cost + (pad.level - 1) * 2;
+  return Math.floor(totalInvested * 0.5); // 50% refund
+};
+
+/**
+ * Update monster position based on time and speed
+ */
+export const updateMonsterPosition = (monster: Monster, deltaTime: number): Monster => {
+  if (monster.hp <= 0) return monster;
+  
+  const speedMultiplier = 1 - (monster.slowEffect || 0);
+  const progress = deltaTime / (monster.speed * speedMultiplier);
+  const newProgress = Math.min(1, monster.pathProgress + progress);
+  const newPosition = getPositionAlongPath(newProgress);
+  
+  return {
+    ...monster,
+    pathProgress: newProgress,
+    position: { x: newPosition.x, y: newPosition.y },
+    currentWaypointIndex: newPosition.waypointIndex,
+    slowEffect: Math.max(0, (monster.slowEffect || 0) - deltaTime / 1000) // Decay slow effect
+  };
+};
+
+/**
+ * Check if monster has reached the defender
+ */
+export const hasMonsterReachedDefender = (monster: Monster): boolean => {
+  return monster.pathProgress >= 1;
+};
+
+/**
+ * Calculate final score
+ */
+export const calculateFinalScore = (baseScore: number, heartsRemaining: number): number => {
+  return baseScore + (heartsRemaining * 100); // Bonus for hearts preserved
+};
+
+/**
+ * Get spawn point position
+ */
+export const getSpawnPosition = () => PATH_WAYPOINTS[0];
+
+/**
+ * Get defender position  
+ */
+export const getDefenderPosition = () => PATH_WAYPOINTS[PATH_WAYPOINTS.length - 1];
+
+/**
+ * Check if position is valid for building
+ */
+export const isValidBuildPosition = (slotId: number): boolean => {
+  return BUILD_SLOTS.some(slot => slot.id === slotId);
 };

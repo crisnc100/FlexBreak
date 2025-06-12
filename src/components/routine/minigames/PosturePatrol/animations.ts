@@ -151,5 +151,24 @@ export const startFigureAnimation = (
   onReachDesk: (figure: PostureFigure) => void
 ) => {
   const animation = createFigureMovementAnimation(figure, onReachDesk);
+  figure.animation = animation; // Store reference for pausing
   animation.start(() => onReachDesk(figure));
+};
+
+export const pauseFigureAnimation = (figure: PostureFigure) => {
+  if (figure.animation) {
+    figure.animation.stop();
+  }
+};
+
+export const resumeFigureAnimation = (
+  figure: PostureFigure,
+  onReachDesk: (figure: PostureFigure) => void
+) => {
+  if (figure.isActive) {
+    // Create new animation from current position
+    const animation = createFigureMovementAnimation(figure, onReachDesk);
+    figure.animation = animation;
+    animation.start(() => onReachDesk(figure));
+  }
 };

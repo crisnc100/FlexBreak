@@ -430,17 +430,10 @@ export const PosturePatrol: React.FC<PosturePatrolProps> = ({
       // Show upgrade/sell menu
       setSelectedSlot(slotId);
       setShowUpgradeMenu(true);
-      setRangeIndicator(null); // Clear range indicator
       return;
     }
 
-    if (!selectedPadType) {
-      // Show range indicator when clicking empty slot with no pad selected
-      if (rangeIndicator?.slotId === slotId) {
-        setRangeIndicator(null);
-      }
-      return;
-    }
+    if (!selectedPadType) return;
     
     const padConfig = PAD_CONFIG[selectedPadType];
     if (!padConfig || gameState.energy < padConfig.cost) return;
@@ -468,7 +461,6 @@ export const PosturePatrol: React.FC<PosturePatrolProps> = ({
     }));
 
     setSelectedPadType(null);
-    setRangeIndicator(null); // Clear range indicator
   };
 
   // Handle pad selection from inventory
@@ -477,13 +469,7 @@ export const PosturePatrol: React.FC<PosturePatrolProps> = ({
     if (!padConfig || gameState.energy < padConfig.cost) return;
     if (!unlockedPads.has(padType)) return;
     
-    if (selectedPadType === padType) {
-      setSelectedPadType(null);
-      setRangeIndicator(null);
-    } else {
-      setSelectedPadType(padType);
-      setRangeIndicator(null); // Clear any existing range indicator
-    }
+    setSelectedPadType(selectedPadType === padType ? null : padType);
     haptics.light();
   };
 

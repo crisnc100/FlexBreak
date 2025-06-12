@@ -1,55 +1,46 @@
 import { Animated } from 'react-native';
 
-export type MonsterType = 'tech_neck' | 'desk_hunch' | 'slouch_slump' | 'lean_twist';
+export type MonsterType = 'tech_neck' | 'desk_hunch' | 'slouch_slump' | 'lean_twist' | 'boss_posture';
 
-export type StretchId = 
-  | 'neck_side_stretch'
-  | 'chin_tucks'
-  | 'doorway_chest_stretch' 
-  | 'chest_opener'
-  | 'upper_back_extension'
-  | 'seated_upper_back_stretch'
-  | 'seated_spinal_twist'
-  | 'standing_torso_twist';
+export type PadType = 'neck_relief_pad' | 'hip_hop_platform' | 'chest_quest_pad' | 'armory_arc';
 
-export interface PostureFigure {
+// Removed StretchId - no longer needed for tower defense
+
+export interface Monster {
   id: string;
   type: MonsterType;
+  hp: number;
+  maxHp: number;
+  speed: number; // milliseconds to complete path
+  value: number; // energy reward when killed
+  currentWaypointIndex: number;
+  pathProgress: number; // 0 to 1
+  position: { x: number; y: number };
+  pixelPosition: Animated.ValueXY;
+  animation?: Animated.CompositeAnimation;
+  slowEffect?: number; // 0 to 1 (percentage slow)
+  isBoss?: boolean;
+  // DoT effects
+  dotDamage?: number;
+  dotDuration?: number;
+  dotAppliedTime?: number;
+}
+
+// Removed MovementPattern - monsters follow fixed path
+
+export interface PlacedPad {
+  slotId: number;
+  padType: PadType;
+  level: number;
+  lastFired: number;
+}
+
+export interface Projectile {
+  id: string;
+  fromPad: number; // slot id
+  target: string; // monster id
   position: Animated.ValueXY;
-  speed: number;
-  isActive: boolean;
-  isFast: boolean;
-  spawnTime: number; // For speed bonus calculation
-  movementPattern: MovementPattern;
-}
-
-export interface MovementPattern {
-  type: 'straight' | 'wobble' | 'pause' | 'zigzag';
-  speed: number;
-  wobble?: number;
-  pauseCount?: number;
-  pauseDuration?: number;
-  zigzagAmplitude?: number;
-  zigzagFrequency?: number;
-}
-
-export interface StretchOption {
-  id: StretchId;
-  name: string;
-  icon: string;
-  effectiveAgainst: MonsterType[];
-  stretchId: number; // ID from stretches.ts
-}
-
-export interface StretchCard {
-  id: StretchId;
-  name: string;
-  icon: string;
-  effectiveAgainst: MonsterType[];
-  cooldown: number; // in seconds
-  charges: number; // remaining uses
-  maxCharges: number; // total charges available
-  lastUsed: number; // timestamp when last used
+  type: PadType;
 }
 
 export interface GameState {
@@ -57,15 +48,21 @@ export interface GameState {
   timeLeft: number;
   currentWave: number;
   score: number;
-  tensionLevel: number;
-  figures: PostureFigure[];
-  selectedFigure: PostureFigure | null;
+  hearts: number;
+  energy: number;
+  monsters: Monster[];
+  placedPads: PlacedPad[];
+  projectiles: Projectile[];
   lastSpawnTime: number;
   waveStartTime: number;
-  fullBodyCooldown: number;
-  dynamicFlowCooldown: number;
-  lastUpdate?: number; // For triggering cooldown updates
+  lastEnergyGain: number;
+  gamePhase: 'prepare' | 'tutorial' | 'wave' | 'boss' | 'results';
+  monstersSpawned: number;
+  bossSpawned: boolean;
+  bossHitHalf: boolean;
 }
+
+// Removed BuildSlot - using BUILD_SLOTS constant instead
 
 export interface WaveConfig {
   monsters: MonsterType[];
@@ -87,4 +84,19 @@ export interface DestructionEffect {
   y: number;
   score: number;
   isCorrect: boolean;
+}
+
+export interface DamageNumber {
+  id: string;
+  x: number;
+  y: number;
+  damage: number;
+  color: string;
+  effectiveness: 'super' | 'effective' | 'normal' | 'resisted' | 'heavy_resisted';
+}
+
+export interface RangeIndicator {
+  slotId: number;
+  padType: PadType;
+  range: number;
 }
