@@ -15,7 +15,7 @@ import { usePremium } from '../../context/PremiumContext';
 import { WellnessTrueFalse } from '../routine/minigames/WellnessTrueFalse';
 import { StressBuster } from '../routine/minigames/StressBuster';
 import { PosturePatrol } from '../routine/minigames/PosturePatrol';
-import { BalanceDrop } from '../routine/minigames/BalanceDrop';
+import { BalanceDrop } from '../routine/minigames/BalanceDrop/index';
 import { 
   MiniGameType, 
   MiniGameInfo, 

@@ -18,6 +18,7 @@ interface GameAreaProps {
   setGameAreaOffset?: (offset: { x: number; y: number }) => void;
   dropFeedback?: { type: 'success' | 'error' | 'discard'; position: { x: number; y: number } } | null;
   onDropFeedbackComplete?: () => void;
+  hoursLeft?: number;
 }
 
 export const GameArea: React.FC<GameAreaProps> = ({
@@ -29,6 +30,7 @@ export const GameArea: React.FC<GameAreaProps> = ({
   setGameAreaOffset,
   dropFeedback,
   onDropFeedbackComplete,
+  hoursLeft = 24,
 }) => {
   const { theme } = useTheme();
 
@@ -77,6 +79,13 @@ export const GameArea: React.FC<GameAreaProps> = ({
         const panResponder = createPanResponder(item);
         const itemSize = getItemSize(item.data.weight);
         
+        // Check if we have enough hours for this item
+        let requiredHours = item.data.timeCost;
+        if (item.isDual && item.data.dualTimeCost) {
+          requiredHours = Math.min(item.data.dualTimeCost.work, item.data.dualTimeCost.life);
+        }
+        const hasEnoughHours = hoursLeft >= requiredHours;
+        
         return (
           <Animated.View
             key={item.id || `item-${Math.random()}`}
@@ -84,11 +93,14 @@ export const GameArea: React.FC<GameAreaProps> = ({
             style={[
               styles.item,
               {
-                backgroundColor: CATEGORY_COLORS[item.category],
+                backgroundColor: hasEnoughHours ? 
+                  (item.isDual ? '#8B4513' : CATEGORY_COLORS[item.category]) : 
+                  '#666666',
                 width: itemSize,
                 height: itemSize,
-                borderWidth: item.isUrgent ? 3 : 0,
-                borderColor: item.isUrgent ? '#FFD700' : 'transparent',
+                borderWidth: item.isUrgent ? 3 : (item.isCritical ? 4 : 0),
+                borderColor: item.isUrgent ? '#FFD700' : (item.isCritical ? '#FF0000' : 'transparent'),
+                borderStyle: item.isCritical ? 'dashed' : 'solid',
                 left: item.position.x,
                 top: item.position.y,
                 transform: [{ scale: item.scale }],
@@ -103,29 +115,60 @@ export const GameArea: React.FC<GameAreaProps> = ({
                 <View key={i} style={styles.itemDot} />
               ))}
             </View>
+            {item.isDual && (
+              <View style={styles.dualBadge}>
+                <Text style={styles.dualText}>⇄</Text>
+              </View>
+            )}
+            {item.isCritical && (
+              <View style={styles.criticalBadge}>
+                <Text style={styles.criticalText}>!</Text>
+              </View>
+            )}
             {item.isUrgent && item.urgencyTimer !== undefined && item.urgencyTimer > 0 && (
               <View style={styles.urgencyBadge}>
                 <Text style={styles.urgencyText}>{String(item.urgencyTimer)}</Text>
+              </View>
+            )}
+            {!hasEnoughHours && (
+              <View style={styles.noHoursBadge}>
+                <Ionicons name="ban" size={24} color="#FF0000" />
               </View>
             )}
           </Animated.View>
         );
       })}
       
-      {/* Central Discard Zone */}
+      {/* Left Let Go Zone */}
       <Animated.View 
         style={[
           styles.discardZone, 
-          styles.discardZoneCenter, 
+          styles.discardZoneLeft, 
           { 
-            borderColor: activeDropZone === 'discard' ? theme.accent : theme.border,
-            backgroundColor: activeDropZone === 'discard' ? `${theme.accent}20` : 'rgba(255, 255, 255, 0.05)',
-            transform: [{ scale: activeDropZone === 'discard' ? 1.1 : 1 }],
+            borderColor: activeDropZone === 'discard' ? '#9370DB' : 'rgba(147, 112, 219, 0.5)',
+            backgroundColor: activeDropZone === 'discard' ? 'rgba(147, 112, 219, 0.3)' : 'rgba(147, 112, 219, 0.15)',
+            transform: [{ scale: activeDropZone === 'discard' ? 1.15 : 1 }],
           }
         ]}
       >
-        <Ionicons name="trash-outline" size={24} color={activeDropZone === 'discard' ? theme.accent : theme.textSecondary} />
-        <Text style={[styles.discardText, { color: activeDropZone === 'discard' ? theme.accent : theme.textSecondary }]}>Discard</Text>
+        <Ionicons name="hand-left-outline" size={32} color={activeDropZone === 'discard' ? '#9370DB' : '#7B68EE'} />
+        <Text style={[styles.discardText, { color: activeDropZone === 'discard' ? '#9370DB' : '#7B68EE' }]}>Let Go</Text>
+      </Animated.View>
+      
+      {/* Right Let Go Zone */}
+      <Animated.View 
+        style={[
+          styles.discardZone, 
+          styles.discardZoneRight, 
+          { 
+            borderColor: activeDropZone === 'discard' ? '#9370DB' : 'rgba(147, 112, 219, 0.5)',
+            backgroundColor: activeDropZone === 'discard' ? 'rgba(147, 112, 219, 0.3)' : 'rgba(147, 112, 219, 0.15)',
+            transform: [{ scale: activeDropZone === 'discard' ? 1.15 : 1 }],
+          }
+        ]}
+      >
+        <Ionicons name="hand-right-outline" size={32} color={activeDropZone === 'discard' ? '#9370DB' : '#7B68EE'} />
+        <Text style={[styles.discardText, { color: activeDropZone === 'discard' ? '#9370DB' : '#7B68EE' }]}>Let Go</Text>
       </Animated.View>
       
       {/* Scale */}

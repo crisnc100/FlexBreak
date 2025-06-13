@@ -9,6 +9,11 @@ interface TutorialOverlayProps {
 
 const tutorialSteps = [
   {
+    text: "Life is rarely balanced! Fix the tilted scale",
+    arrowPosition: { bottom: 200, left: '50%' },
+    arrowRotation: '180deg',
+  },
+  {
     text: "Drag work items to the WORK side (left)",
     arrowPosition: { left: '25%', bottom: 120 },
     arrowRotation: '225deg',
@@ -24,9 +29,9 @@ const tutorialSteps = [
     arrowRotation: '0deg',
   },
   {
-    text: "Drag items to discard zones if needed",
-    arrowPosition: { bottom: 80, left: 60 },
-    arrowRotation: '180deg',
+    text: "Let go of items on the sides if needed",
+    arrowPosition: { left: 60, top: '40%' },
+    arrowRotation: '270deg',
   },
   {
     text: "Keep your balance! Too much work or life = game over",

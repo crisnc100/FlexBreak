@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../../context/ThemeContext';
 import { ComboInfo } from './types';
 import { styles } from './styles';
-import { MAX_ENERGY } from './constants';
+import { MAX_HOURS } from './constants';
 
 interface GameHeaderProps {
   currentRound: number;
@@ -12,9 +12,13 @@ interface GameHeaderProps {
   roundScore: number;
   timeLeft: number;
   balance: number;
-  energy: number;
-  energyAnimation: Animated.Value;
+  hoursLeft: number;
+  hoursAnimation: Animated.Value;
+  hoursFlashAnimation?: Animated.Value;
   currentCombo: ComboInfo | null;
+  itemsRemaining?: number;
+  letGoCount?: number;
+  maxLetGo?: number;
   onSkip: () => void;
   isTutorial?: boolean;
   onSkipTutorial?: () => void;
@@ -26,9 +30,13 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
   roundScore,
   timeLeft,
   balance,
-  energy,
-  energyAnimation,
+  hoursLeft,
+  hoursAnimation,
+  hoursFlashAnimation,
   currentCombo,
+  itemsRemaining = 0,
+  letGoCount = 0,
+  maxLetGo,
   onSkip,
   isTutorial = false,
   onSkipTutorial,
@@ -46,9 +54,19 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
   const getBalanceStatus = () => {
     const absBalance = Math.abs(balance);
     if (absBalance < 20) return { text: '⚖️ Perfect Balance!', subtext: 'Keep it up!' };
-    if (absBalance < 40) return { text: '👍 Good Balance', subtext: balance < 0 ? 'Slightly work-heavy' : 'Slightly life-heavy' };
-    if (absBalance < 60) return { text: '⚠️ Getting Unbalanced', subtext: 'Consider discarding items' };
-    return { text: '🚨 Too Unbalanced!', subtext: 'Discard items to recover!' };
+    if (absBalance < 35) return { 
+      text: '👍 Good Balance', 
+      subtext: balance < 0 ? 'Slightly work-heavy' : 'Slightly life-heavy' 
+    };
+    if (absBalance < 50) return { 
+      text: balance < 0 ? '💼 Too Much Work!' : '🎮 Too Much Play!', 
+      subtext: balance < 0 ? 'Add life items to balance' : 'Add work items to balance' 
+    };
+    if (absBalance < 65) return { 
+      text: '🚨 Critical Imbalance!', 
+      subtext: 'Fix the scale or lose!' 
+    };
+    return { text: '💥 DANGER ZONE!', subtext: 'Game over imminent!' };
   };
 
   return (
@@ -70,7 +88,23 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
             </View>
             
             <View style={styles.centerHeader}>
-              <Text style={[styles.timerText, { color: theme.text }]}>{timeLeft}s</Text>
+              <Text style={[
+                styles.timerText, 
+                { 
+                  color: timeLeft <= 5 ? '#FF6B6B' : theme.text,
+                  fontSize: timeLeft <= 5 ? 28 : 24,
+                }
+              ]}>
+                {timeLeft}s
+              </Text>
+              {timeLeft <= 5 && (
+                <Text style={[styles.warningText, { color: '#FF6B6B' }]}>⚠️ Hurry!</Text>
+              )}
+              {itemsRemaining > 0 && itemsRemaining <= 5 && (
+                <Text style={[styles.warningText, { color: '#FFA500' }]}>
+                  {itemsRemaining} items left!
+                </Text>
+              )}
               <View style={[styles.balanceIndicator, { backgroundColor: getBalanceColor() }]}>
                 <Text style={styles.balanceText}>{getBalanceStatus().text}</Text>
               </View>
@@ -86,27 +120,44 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
       {isTutorial && (
         <View style={styles.tutorialBanner}>
           <Text style={[styles.tutorialText, { color: theme.text }]}>
-            ⚖️ Keep the scale balanced! • 🗑️ Discard items strategically • 🎯 Wrong side = more imbalance!
+            ⚖️ Keep the scale balanced! • 🤲 Let go on the sides • 🎯 Wrong side = more imbalance!
           </Text>
         </View>
       )}
 
       {!isTutorial && (
         <View style={[styles.energyContainer, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.energyLabel, { color: theme.textSecondary }]}>Energy</Text>
+          <Text style={[styles.energyLabel, { color: theme.textSecondary }]}>Hours Left</Text>
           <View style={styles.energyBarBg}>
             <Animated.View 
               style={[
                 styles.energyBar, 
                 { 
-                  backgroundColor: energy > 30 ? '#4CAF50' : '#FF6B6B',
-                  width: `${energy}%`,
-                  transform: [{ scaleY: energyAnimation }],
+                  backgroundColor: hoursFlashAnimation ? 
+                    hoursFlashAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [hoursLeft > 8 ? '#4CAF50' : '#FF6B6B', '#FF0000']
+                    }) : 
+                    (hoursLeft > 8 ? '#4CAF50' : '#FF6B6B'),
+                  width: `${(hoursLeft / MAX_HOURS) * 100}%`,
+                  transform: [{ scaleY: hoursAnimation }],
                 }
               ]} 
             />
           </View>
-          <Text style={[styles.energyText, { color: theme.text }]}>{Math.round(energy)}%</Text>
+          <Text style={[styles.energyText, { color: theme.text }]}>{hoursLeft.toFixed(1)}h</Text>
+        </View>
+      )}
+      
+      {!isTutorial && maxLetGo && maxLetGo < 999 && (
+        <View style={[styles.letGoContainer, { backgroundColor: theme.cardBackground }]}>
+          <Text style={[styles.letGoLabel, { color: theme.textSecondary }]}>Let Go Uses:</Text>
+          <Text style={[
+            styles.letGoCount, 
+            { color: letGoCount >= maxLetGo ? '#FF6B6B' : theme.text }
+          ]}>
+            {maxLetGo - letGoCount} / {maxLetGo}
+          </Text>
         </View>
       )}
 

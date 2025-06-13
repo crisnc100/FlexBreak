@@ -41,9 +41,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onStartTutorial, onStart
           </View>
           
           <View style={[styles.featureItem, { backgroundColor: theme.cardBackground }]}>
-            <Ionicons name="flash" size={20} color="#FFA500" />
+            <Ionicons name="time" size={20} color="#2196F3" />
             <Text style={[styles.featureText, { color: theme.textSecondary }]}>
-              Manage your daily energy
+              24 hours to balance daily
             </Text>
           </View>
           

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Modal, TouchableOpacity, Text, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../../context/ThemeContext';
@@ -10,7 +10,10 @@ import { GameArea } from './GameArea';
 import { RoundCompleteScreen } from './RoundCompleteScreen';
 import { GameOverScreen } from './GameOverScreen';
 import { TutorialOverlay } from './TutorialOverlay';
+import { RoundStartMessage } from './RoundStartMessage';
+import { PenaltyFeedback } from './PenaltyFeedback';
 import { styles } from './styles';
+import { ROUNDS, TUTORIAL_ROUND } from './constants';
 import * as haptics from '../../../../utils/haptics';
 
 export const BalanceDrop: React.FC<BalanceDropProps> = ({
@@ -22,6 +25,9 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
   const [visible, setVisible] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [showTutorialOverlay, setShowTutorialOverlay] = useState(false);
+  const [showRoundStartMessage, setShowRoundStartMessage] = useState(false);
+  const [roundStartData, setRoundStartData] = useState({ balance: 0, roundNumber: 0 });
+  const [lastShownRound, setLastShownRound] = useState(-1);
   
   const {
     gameState,
@@ -31,19 +37,27 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
     items,
     upcomingItems,
     balance,
-    energy,
+    hoursLeft,
     stats,
     currentCombo,
     activeDropZone,
     dropFeedback,
+    penaltyFeedback,
+    itemsRemaining,
+    letGoCount,
     scaleRotation,
-    energyAnimation,
+    hoursAnimation,
+    hoursFlashAnimation,
     startRound,
     nextRound,
     skipTutorial,
     createPanResponder,
     setGameAreaOffset,
     clearDropFeedback,
+    clearPenaltyFeedback,
+    pauseGame,
+    resumeGame,
+    startGameplay,
   } = useGameLogic(onGameComplete);
 
   const handleClose = () => {
@@ -54,16 +68,19 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
   const handlePause = () => {
     haptics.light();
     setIsPaused(true);
+    pauseGame();
   };
 
   const handleResume = () => {
     haptics.light();
     setIsPaused(false);
+    resumeGame();
   };
 
   const handleRestart = () => {
     haptics.medium();
     setIsPaused(false);
+    setLastShownRound(-1); // Reset for new game
     setGameState('menu');
   };
 
@@ -78,6 +95,31 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
 
   const handleTutorialComplete = () => {
     setShowTutorialOverlay(false);
+    // If no round start message is showing, start gameplay
+    if (!showRoundStartMessage) {
+      startGameplay();
+    }
+  };
+
+  // Show round start message when a new round begins
+  useEffect(() => {
+    // Only show message once per round
+    if ((gameState === 'playing' || gameState === 'tutorial') && currentRound !== lastShownRound) {
+      setLastShownRound(currentRound);
+      if (balance !== 0) {
+        setRoundStartData({ balance, roundNumber: currentRound });
+        setShowRoundStartMessage(true);
+      } else {
+        // If balance is 0 (shouldn't happen with new logic), start gameplay immediately
+        startGameplay();
+      }
+    }
+  }, [gameState, currentRound, balance, startGameplay, lastShownRound]);
+
+  const handleRoundStartMessageComplete = () => {
+    setShowRoundStartMessage(false);
+    // Start the actual gameplay after message
+    startGameplay();
   };
 
   // Render pause menu
@@ -129,9 +171,13 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
               roundScore={stats.roundScore}
               timeLeft={timeLeft}
               balance={balance}
-              energy={energy}
-              energyAnimation={energyAnimation}
+              hoursLeft={hoursLeft}
+              hoursAnimation={hoursAnimation}
+              hoursFlashAnimation={hoursFlashAnimation}
               currentCombo={currentCombo}
+              itemsRemaining={itemsRemaining}
+              letGoCount={letGoCount}
+              maxLetGo={TUTORIAL_ROUND.maxLetGo}
               onSkip={handleClose}
               isTutorial={true}
               onSkipTutorial={skipTutorial}
@@ -145,9 +191,23 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
               setGameAreaOffset={setGameAreaOffset}
               dropFeedback={dropFeedback}
               onDropFeedbackComplete={clearDropFeedback}
+              hoursLeft={hoursLeft}
             />
             {showTutorialOverlay && (
               <TutorialOverlay onComplete={handleTutorialComplete} />
+            )}
+            {showRoundStartMessage && (
+              <RoundStartMessage 
+                balance={roundStartData.balance}
+                roundNumber={roundStartData.roundNumber}
+                onComplete={handleRoundStartMessageComplete}
+              />
+            )}
+            {penaltyFeedback && (
+              <PenaltyFeedback
+                message={penaltyFeedback}
+                onComplete={clearPenaltyFeedback}
+              />
             )}
           </SafeAreaView>
         );
@@ -168,9 +228,13 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
               roundScore={stats.roundScore}
               timeLeft={timeLeft}
               balance={balance}
-              energy={energy}
-              energyAnimation={energyAnimation}
+              hoursLeft={hoursLeft}
+              hoursAnimation={hoursAnimation}
+              hoursFlashAnimation={hoursFlashAnimation}
               currentCombo={currentCombo}
+              itemsRemaining={itemsRemaining}
+              letGoCount={letGoCount}
+              maxLetGo={currentRound > 0 && currentRound <= 3 ? ROUNDS[currentRound - 1].maxLetGo : undefined}
               onSkip={handleClose}
             />
             <GameArea
@@ -182,7 +246,21 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
               setGameAreaOffset={setGameAreaOffset}
               dropFeedback={dropFeedback}
               onDropFeedbackComplete={clearDropFeedback}
+              hoursLeft={hoursLeft}
             />
+            {showRoundStartMessage && (
+              <RoundStartMessage 
+                balance={roundStartData.balance}
+                roundNumber={roundStartData.roundNumber}
+                onComplete={handleRoundStartMessageComplete}
+              />
+            )}
+            {penaltyFeedback && (
+              <PenaltyFeedback
+                message={penaltyFeedback}
+                onComplete={clearPenaltyFeedback}
+              />
+            )}
           </SafeAreaView>
         );
 
@@ -199,7 +277,7 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
         return (
           <GameOverScreen
             balance={balance}
-            energy={energy}
+            hoursLeft={hoursLeft}
             finalScore={stats.score + stats.roundScore}
           />
         );

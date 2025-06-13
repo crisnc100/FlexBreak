@@ -135,6 +135,11 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  warningText: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
   exitButton: {
     padding: 8,
   },
@@ -174,6 +179,26 @@ export const styles = StyleSheet.create({
     minWidth: 40,
     textAlign: 'right',
     marginLeft: 10,
+  },
+  
+  // Let go counter
+  letGoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  letGoLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  letGoCount: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   
   // Combo display
@@ -291,6 +316,51 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  dualBadge: {
+    position: 'absolute',
+    bottom: -8,
+    right: -8,
+    backgroundColor: '#8B4513',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dualText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  criticalBadge: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    backgroundColor: '#FF0000',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  criticalText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  noHoursBadge: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -12,
+    marginLeft: -12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   
   // Scale styles
   scaleContainer: {
@@ -395,6 +465,10 @@ export const styles = StyleSheet.create({
   },
   gameOverText: {
     fontSize: 18,
+    marginBottom: 8,
+  },
+  gameOverSubtext: {
+    fontSize: 14,
     marginBottom: 20,
   },
   finalScoreText: {
@@ -412,29 +486,34 @@ export const styles = StyleSheet.create({
   // Discard zone styles
   discardZone: {
     position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 3,
-    borderStyle: 'dashed',
+    borderStyle: 'solid',
     justifyContent: 'center',
     alignItems: 'center',
-    opacity: 0.6,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    opacity: 0.85,
+    backgroundColor: 'rgba(147, 112, 219, 0.15)', // Soft purple/violet
+    borderColor: 'rgba(147, 112, 219, 0.5)',
   },
-  discardZoneCenter: {
-    bottom: 20,
-    left: '50%',
-    marginLeft: -50, // Half of width to center
+  discardZoneLeft: {
+    left: 10,
+    top: '40%',
+  },
+  discardZoneRight: {
+    right: 10,
+    top: '40%',
   },
   discardZoneActive: {
     opacity: 1,
     transform: [{ scale: 1.1 }],
   },
   discardText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
+    marginTop: 2,
   },
   
   // Drop zone highlight
@@ -517,5 +596,30 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  
+  // Penalty feedback styles
+  penaltyFeedback: {
+    position: 'absolute',
+    top: 200,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  penaltyText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  penaltySubtext: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.9,
   },
 });

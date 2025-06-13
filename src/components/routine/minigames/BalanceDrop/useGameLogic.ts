@@ -14,7 +14,11 @@ import {
   TUTORIAL_ROUND, 
   WORK_ITEMS, 
   LIFE_ITEMS,
-  MAX_ENERGY,
+  HEAVY_WORK_ITEMS,
+  HEAVY_LIFE_ITEMS,
+  DUAL_ITEMS,
+  CRITICAL_ITEMS,
+  MAX_HOURS,
   ITEM_BASE_SIZE,
   SCALE_WIDTH,
   SCALE_HEIGHT,
@@ -32,12 +36,17 @@ export const useGameLogic = (
   const [currentRound, setCurrentRound] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [items, setItems] = useState<Item[]>([]);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isGameplayStarted, setIsGameplayStarted] = useState(false);
+  const [handledItemsCount, setHandledItemsCount] = useState(0);
   const [upcomingItems, setUpcomingItems] = useState<ItemData[]>([]);
   const [balance, setBalance] = useState(0);
-  const [energy, setEnergy] = useState(MAX_ENERGY);
+  const [hoursLeft, setHoursLeft] = useState(MAX_HOURS);
+  const [letGoCount, setLetGoCount] = useState(0);
   const [activeDropZone, setActiveDropZone] = useState<'work' | 'life' | 'discard' | null>(null);
   const [gameAreaOffset, setGameAreaOffset] = useState({ x: 0, y: 0 });
   const [dropFeedback, setDropFeedback] = useState<{ type: 'success' | 'error' | 'discard'; position: { x: number; y: number } } | null>(null);
+  const [penaltyFeedback, setPenaltyFeedback] = useState<string | null>(null);
   
   // Stats
   const [stats, setStats] = useState<GameStats>({
@@ -55,7 +64,8 @@ export const useGameLogic = (
   
   // Refs
   const scaleRotation = useRef(new Animated.Value(0)).current;
-  const energyAnimation = useRef(new Animated.Value(1)).current;
+  const hoursAnimation = useRef(new Animated.Value(1)).current;
+  const hoursFlashAnimation = useRef(new Animated.Value(0)).current;
   const spawnInterval = useRef<NodeJS.Timeout | null>(null);
   const gameTimer = useRef<NodeJS.Timeout | null>(null);
   const itemIdCounter = useRef(0);
@@ -93,6 +103,26 @@ export const useGameLogic = (
     return () => clearInterval(urgencyInterval);
   }, []);
 
+  // Check if all items have been handled
+  useEffect(() => {
+    if (isGameplayStarted && gameState === 'playing') {
+      const round = currentRound === 0 ? TUTORIAL_ROUND : ROUNDS[currentRound - 1];
+      
+      // If all items are handled and no more items on screen
+      if (handledItemsCount >= round.itemCount && items.length === 0 && !spawnInterval.current) {
+        // Give a small delay to ensure animations complete
+        const timeoutId = setTimeout(() => {
+          if (gameTimer.current) clearInterval(gameTimer.current);
+          setStats(prev => ({ ...prev, score: prev.score + prev.roundScore }));
+          setGameState('roundComplete');
+          haptics.medium();
+        }, 500);
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [handledItemsCount, items.length, isGameplayStarted, gameState, currentRound, stats.roundScore]);
+
   const startRound = useCallback((roundNumber: number) => {
     const round = roundNumber === 0 ? TUTORIAL_ROUND : ROUNDS[roundNumber - 1];
     setCurrentRound(roundNumber);
@@ -100,12 +130,21 @@ export const useGameLogic = (
     setTimeLeft(round.duration);
     setItems([]);
     setUpcomingItems([]);
-    setBalance(0);
-    setEnergy(MAX_ENERGY);
+    
+    // Set random starting balance within the round's range
+    const { min, max } = round.startingBalanceRange;
+    const randomBalance = Math.floor(Math.random() * (max - min + 1)) + min;
+    // Ensure we don't start at exactly 0 (perfect balance)
+    const startingBalance = randomBalance === 0 ? (Math.random() < 0.5 ? -10 : 10) : randomBalance;
+    setBalance(startingBalance);
+    
+    setHoursLeft(MAX_HOURS);
     setLastPlacedTypes([]);
     setCurrentCombo(null);
     spawnedCount.current = 0;
     previewQueue.current = [];
+    setHandledItemsCount(0);
+    setLetGoCount(0); // Reset let-go count
     
     // Generate preview items
     for (let i = 0; i < 3; i++) {
@@ -117,24 +156,28 @@ export const useGameLogic = (
     setUpcomingItems([...previewQueue.current]);
     
     setGameState(roundNumber === 0 ? 'tutorial' : 'playing');
+    setIsGameplayStarted(false); // Reset flag for new round
     
-    // Start spawning items
-    startSpawning(round);
-    
-    // Start game timer
-    startTimer(round.duration);
+    // Don't start spawning or timer yet - wait for round start message to complete
   }, []);
 
   const startSpawning = useCallback((round: Round) => {
-    // Spawn first item immediately
-    if (spawnedCount.current < round.itemCount) {
-      spawnItem(round);
+    // Calculate items to spawn per batch - less overwhelming
+    const itemsPerBatch = round.number === 0 ? 1 : Math.min(1 + Math.floor(round.number / 2), 2);
+    
+    // Spawn first batch immediately
+    for (let i = 0; i < itemsPerBatch && spawnedCount.current < round.itemCount; i++) {
+      setTimeout(() => spawnItem(round), i * 150); // More delay between items in batch
     }
     
     // Set up interval for remaining items
     spawnInterval.current = setInterval(() => {
-      if (spawnedCount.current < round.itemCount) {
-        spawnItem(round);
+      const remainingItems = round.itemCount - spawnedCount.current;
+      if (remainingItems > 0) {
+        const batchSize = Math.min(itemsPerBatch, remainingItems);
+        for (let i = 0; i < batchSize; i++) {
+          setTimeout(() => spawnItem(round), i * 150);
+        }
       } else {
         if (spawnInterval.current) {
           clearInterval(spawnInterval.current);
@@ -144,58 +187,132 @@ export const useGameLogic = (
     }, round.spawnRate);
   }, []);
 
+  // Track recent spawn history for fairness
+  const spawnHistory = useRef<('work' | 'life')[]>([]);
+  
   const spawnItem = useCallback((round: Round) => {
     let itemData: ItemData;
-    if (previewQueue.current.length > 0) {
-      itemData = previewQueue.current.shift()!;
-      
-      // Add new item to preview queue
-      const isWork = Math.random() < 0.5;
-      const itemList = isWork ? WORK_ITEMS : LIFE_ITEMS;
-      const newItem = itemList[Math.floor(Math.random() * itemList.length)];
-      previewQueue.current.push(newItem);
-      setUpcomingItems([...previewQueue.current]);
+    let isWork: boolean;
+    let isDual = false;
+    let isCritical = false;
+    
+    // Determine special item type based on round chances
+    const specialRoll = Math.random();
+    
+    if (round.dualItemChance && specialRoll < round.dualItemChance) {
+      // Spawn dual item
+      itemData = DUAL_ITEMS[Math.floor(Math.random() * DUAL_ITEMS.length)];
+      isDual = true;
+      isWork = itemData.category === 'work'; // Default side based on category
+    } else if (round.criticalItemChance && specialRoll < (round.dualItemChance || 0) + round.criticalItemChance) {
+      // Spawn critical item
+      itemData = CRITICAL_ITEMS[Math.floor(Math.random() * CRITICAL_ITEMS.length)];
+      isCritical = true;
+      isWork = itemData.category === 'work';
+    } else if (round.heavyItemChance && specialRoll < (round.dualItemChance || 0) + (round.criticalItemChance || 0) + round.heavyItemChance) {
+      // Spawn heavy item
+      const heavyRoll = Math.random();
+      if (heavyRoll < 0.5) {
+        itemData = HEAVY_WORK_ITEMS[Math.floor(Math.random() * HEAVY_WORK_ITEMS.length)];
+        isWork = true;
+      } else {
+        itemData = HEAVY_LIFE_ITEMS[Math.floor(Math.random() * HEAVY_LIFE_ITEMS.length)];
+        isWork = false;
+      }
     } else {
-      const isWork = Math.random() < 0.5;
-      const itemList = isWork ? WORK_ITEMS : LIFE_ITEMS;
-      itemData = itemList[Math.floor(Math.random() * itemList.length)];
+      // Normal item with fairness check
+      const recentSpawns = spawnHistory.current.slice(-3);
+      const workCount = recentSpawns.filter(type => type === 'work').length;
+      const lifeCount = recentSpawns.filter(type => type === 'life').length;
+      
+      if (workCount >= 3) {
+        isWork = false;
+      } else if (lifeCount >= 3) {
+        isWork = true;
+      } else {
+        const workBias = lifeCount > workCount ? 0.7 : (workCount > lifeCount ? 0.3 : 0.5);
+        isWork = Math.random() < workBias;
+      }
+      
+      if (previewQueue.current.length > 0) {
+        itemData = previewQueue.current.shift()!;
+        
+        // Add new item to preview queue
+        const itemList = isWork ? WORK_ITEMS : LIFE_ITEMS;
+        const newItem = itemList[Math.floor(Math.random() * itemList.length)];
+        previewQueue.current.push(newItem);
+        setUpcomingItems([...previewQueue.current]);
+      } else {
+        const itemList = isWork ? WORK_ITEMS : LIFE_ITEMS;
+        itemData = itemList[Math.floor(Math.random() * itemList.length)];
+      }
+    }
+    
+    // Update spawn history
+    spawnHistory.current.push(isWork ? 'work' : 'life');
+    if (spawnHistory.current.length > 10) {
+      spawnHistory.current.shift(); // Keep only last 10
     }
     
     const id = `item-${itemIdCounter.current++}`;
-    const isWork = WORK_ITEMS.includes(itemData);
-    const isUrgent = Math.random() < round.urgentItemChance;
+    const isWorkItem = WORK_ITEMS.includes(itemData) || HEAVY_WORK_ITEMS.includes(itemData) || 
+                      (itemData.category === 'work' && (isDual || isCritical));
+    const isUrgent = !isCritical && !isDual && Math.random() < round.urgentItemChance;
     
     const itemSize = ITEM_BASE_SIZE + (itemData.weight - 1) * 15;
-    const startX = Math.random() * (width - itemSize - 40) + 20;
-    const position = new Animated.ValueXY({ x: startX, y: -itemSize });
+    
+    // More challenging spawn positions - items can appear from different heights
+    const spawnZone = Math.random();
+    let startX = Math.random() * (width - itemSize - 40) + 20;
+    let startY = -itemSize;
+    
+    // 30% chance to spawn from sides at different heights
+    if (spawnZone < 0.15) {
+      // Spawn from left side
+      startX = -itemSize;
+      startY = Math.random() * (height * 0.3);
+    } else if (spawnZone < 0.3) {
+      // Spawn from right side
+      startX = width;
+      startY = Math.random() * (height * 0.3);
+    }
+    
+    const position = new Animated.ValueXY({ x: startX, y: startY });
     
     const newItem: Item = {
       id,
-      type: isWork ? 'work' : 'life',
+      type: isWorkItem ? 'work' : 'life',
       category: itemData.category,
       data: itemData,
       position,
       opacity: new Animated.Value(1),
       scale: new Animated.Value(1),
-      isUrgent,
-      urgencyTimer: isUrgent ? 5 : undefined,
+      isUrgent: isUrgent && !isCritical, // Critical items can't be urgent
+      urgencyTimer: isUrgent && !isCritical ? 5 : undefined,
+      isDual,
+      isCritical,
     };
     
     
     setItems(prev => [...prev, newItem]);
     spawnedCount.current += 1;
     
-    // Animate falling
-    Animated.timing(position, {
+    // Animate falling - store animation reference
+    const fallAnimation = Animated.timing(position, {
       toValue: { x: startX, y: height - 100 },
       duration: round.fallSpeed,
       useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished) {
+    });
+    
+    // Store animation reference on the item
+    (newItem as any).fallAnimation = fallAnimation;
+    
+    fallAnimation.start(({ finished }) => {
+      if (finished && !isPaused) {
         handleItemMissed(id, isUrgent);
       }
     });
-  }, []);
+  }, [isPaused]);
 
   const handleItemMissed = useCallback((itemId: string, isUrgent: boolean) => {
     const item = items.find(i => i.id === itemId);
@@ -215,9 +332,20 @@ export const useGameLogic = (
     }
     
     setItems(prev => prev.filter(i => i.id !== itemId));
+    setHandledItemsCount(prev => prev + 1);
   }, [items]);
 
   const handleItemDiscarded = useCallback((item: Item) => {
+    // Check if we've exceeded let-go limit
+    const round = currentRound === 0 ? TUTORIAL_ROUND : ROUNDS[currentRound - 1];
+    if (round.maxLetGo && letGoCount >= round.maxLetGo) {
+      // Can't let go anymore - show penalty feedback
+      setPenaltyFeedback('🚫 No more let-go uses!');
+      haptics.error();
+      continueItemFalling(item);
+      return;
+    }
+    
     // Get item position for feedback
     const itemX = (item.position.x as any)._value || 0;
     const itemY = (item.position.y as any)._value || 0;
@@ -229,19 +357,19 @@ export const useGameLogic = (
       position: { x: itemX + itemSize / 2, y: itemY + itemSize / 2 }
     });
     
-    // Strategic discard - evaluate if it helps balance
+    // Strategic let go - evaluate if it helps maintain balance
     const currentBalance = Math.abs(balance);
     let points = 0;
     
-    // If discarding helps prevent imbalance, it's a good move
+    // If letting go helps prevent overwhelming imbalance, it's a good move
     if (currentBalance > 60) {
-      // Scale is very imbalanced - discarding is strategic
-      points = 5; // Small reward for smart play
+      // Scale is very imbalanced - letting go is strategic
+      points = 5; // Small reward for mindful choice
     } else if (currentBalance > 40) {
       // Scale is getting imbalanced - neutral move
       points = 0;
     } else {
-      // Scale is balanced - small penalty for unnecessary discard
+      // Scale is balanced - small penalty for unnecessary letting go
       points = -item.data.weight;
     }
     
@@ -267,8 +395,10 @@ export const useGameLogic = (
       }),
     ]).start(() => {
       setItems(prev => prev.filter(i => i.id !== item.id));
+      setHandledItemsCount(prev => prev + 1);
+      setLetGoCount(prev => prev + 1); // Increment let-go count
     });
-  }, []);
+  }, [currentRound, letGoCount, continueItemFalling]);
 
   const handleItemPlaced = useCallback((item: Item, isCorrect: boolean, onWorkSide: boolean) => {
     // Get item position for feedback
@@ -282,18 +412,63 @@ export const useGameLogic = (
       position: { x: itemX + itemSize / 2, y: itemY + itemSize / 2 }
     });
     
-    // Update energy
-    const netEnergy = -item.data.energyCost + (item.data.energyRestore || 0);
-    setEnergy(prev => Math.max(0, Math.min(MAX_ENERGY, prev + netEnergy)));
+    // Update hours - both work and life consume time
+    let timeCost = item.data.timeCost;
     
-    // Animate energy bar
+    // Handle dual items - different costs for each side
+    if (item.isDual && item.data.dualTimeCost) {
+      timeCost = onWorkSide ? item.data.dualTimeCost.work : item.data.dualTimeCost.life;
+    }
+    
+    // Extra time penalty for wrong placement - "Role Confusion"
+    if (!isCorrect) {
+      // Critical items have severe penalty
+      if (item.isCritical) {
+        timeCost += 4; // Severe penalty for critical items
+        const criticalMessage = item.type === 'work' 
+          ? '⚠️ CRITICAL: Missed important work!' 
+          : '⚠️ CRITICAL: Neglected essential life!';
+        setPenaltyFeedback(criticalMessage);
+      } else {
+        timeCost += 1.5; // Normal penalty
+        const wrongPlacementMessage = item.type === 'work' 
+          ? '📱 Bringing work home!' 
+          : '🎮 Distracted at work!';
+        setPenaltyFeedback(wrongPlacementMessage);
+      }
+      
+      // Flash the hours bar red for wrong placement
+      Animated.sequence([
+        Animated.timing(hoursFlashAnimation, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: false,
+        }),
+        Animated.timing(hoursFlashAnimation, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+    
+    const newHours = Math.max(0, hoursLeft - timeCost);
+    setHoursLeft(newHours);
+    
+    // Check if hours have run out
+    if (newHours <= 0) {
+      // End game immediately
+      setTimeout(() => endRound(false), 100);
+    }
+    
+    // Animate hours bar
     Animated.sequence([
-      Animated.timing(energyAnimation, {
+      Animated.timing(hoursAnimation, {
         toValue: 0.8,
         duration: 100,
         useNativeDriver: false,
       }),
-      Animated.timing(energyAnimation, {
+      Animated.timing(hoursAnimation, {
         toValue: 1,
         duration: 100,
         useNativeDriver: false,
@@ -372,7 +547,7 @@ export const useGameLogic = (
     setBalance(prev => {
       const newBalance = Math.max(-100, Math.min(100, prev + balanceChange));
       
-      if (Math.abs(newBalance) >= 80) {
+      if (Math.abs(newBalance) >= 70) {
         endRound(false);
       }
       
@@ -393,13 +568,14 @@ export const useGameLogic = (
       }),
     ]).start(() => {
       setItems(prev => prev.filter(i => i.id !== item.id));
+      setHandledItemsCount(prev => prev + 1);
     });
     
     // Clear combo after display
     if (currentCombo) {
       setTimeout(() => setCurrentCombo(null), 2000);
     }
-  }, [currentCombo, energyAnimation, lastPlacedTypes]);
+  }, [currentCombo, hoursAnimation, hoursLeft, lastPlacedTypes, endRound]);
 
   const continueItemFalling = useCallback((item: Item) => {
     // Reset scale
@@ -437,8 +613,17 @@ export const useGameLogic = (
       onMoveShouldSetPanResponder: () => true,
       
       onPanResponderGrant: (evt, gesture) => {
-        if (energy < item.data.energyCost) {
+        // Calculate actual time cost for dual items
+        let requiredHours = item.data.timeCost;
+        if (item.isDual && item.data.dualTimeCost) {
+          // Use the minimum cost for dragging check
+          requiredHours = Math.min(item.data.dualTimeCost.work, item.data.dualTimeCost.life);
+        }
+        
+        if (hoursLeft < requiredHours) {
           haptics.error();
+          // Show feedback that there aren't enough hours
+          setPenaltyFeedback('⏰ Not enough hours!');
           return;
         }
         
@@ -503,14 +688,28 @@ export const useGameLogic = (
             setActiveDropZone('life');
           }
         } 
-        // Check central discard zone (below the scale)
-        // Discard zone is at bottom: 20 with height: 100, relative to game area
-        const discardBottom = gameAreaHeight - 20;
-        const discardTop = discardBottom - 100;
+        // Check side let-go zones - positioned at 40% from top
+        const letGoZoneTop = gameAreaHeight * 0.4;
+        const letGoZoneSize = 100;
+        const letGoZonePadding = 20; // Extra padding for easier dropping
         
-        if (itemCenterX > width / 2 - 50 && itemCenterX < width / 2 + 50 && 
-            itemCenterY > discardTop && itemCenterY < discardBottom) {
-          setActiveDropZone('discard');
+        // Left let-go zone
+        const leftZoneLeft = 10;
+        const leftZoneRight = leftZoneLeft + letGoZoneSize + letGoZonePadding;
+        
+        // Right let-go zone  
+        const rightZoneRight = width - 10;
+        const rightZoneLeft = rightZoneRight - letGoZoneSize - letGoZonePadding;
+        
+        if ((itemCenterX >= leftZoneLeft - letGoZonePadding && itemCenterX <= leftZoneRight) ||
+            (itemCenterX >= rightZoneLeft && itemCenterX <= rightZoneRight + letGoZonePadding)) {
+          // Check Y position
+          if (itemCenterY >= letGoZoneTop - letGoZonePadding && 
+              itemCenterY <= letGoZoneTop + letGoZoneSize + letGoZonePadding) {
+            setActiveDropZone('discard');
+          } else {
+            setActiveDropZone(null);
+          }
         } else {
           setActiveDropZone(null);
         }
@@ -545,8 +744,15 @@ export const useGameLogic = (
         if (dropY > paddedTop && dropY < paddedBottom &&
             dropX > paddedLeft && dropX < paddedRight) {
           
-          if (energy < item.data.energyCost) {
+          // Calculate actual time cost
+          let requiredHours = item.data.timeCost;
+          if (item.isDual && item.data.dualTimeCost) {
+            requiredHours = droppedOnWork ? item.data.dualTimeCost.work : item.data.dualTimeCost.life;
+          }
+          
+          if (hoursLeft < requiredHours) {
             haptics.error();
+            setPenaltyFeedback('⏰ Not enough hours!');
             continueItemFalling(item);
             return;
           }
@@ -557,13 +763,23 @@ export const useGameLogic = (
           
           handleItemPlaced(item, isCorrect, droppedOnWork);
         } else {
-          // Check for central discard zone
-          // Discard zone is at bottom: 20 with height: 100, relative to game area
-          const discardBottom = gameAreaHeight - 20;
-          const discardTop = discardBottom - 100;
+          // Check for side let-go zones
+          const letGoZoneTop = gameAreaHeight * 0.4;
+          const letGoZoneSize = 100;
+          const letGoZonePadding = 20;
           
-          const discardZone = dropX > width / 2 - 50 && dropX < width / 2 + 50 && 
-                             dropY > discardTop && dropY < discardBottom;
+          // Left zone
+          const leftZoneLeft = 10;
+          const leftZoneRight = leftZoneLeft + letGoZoneSize + letGoZonePadding;
+          
+          // Right zone  
+          const rightZoneRight = width - 10;
+          const rightZoneLeft = rightZoneRight - letGoZoneSize - letGoZonePadding;
+          
+          const discardZone = ((dropX >= leftZoneLeft - letGoZonePadding && dropX <= leftZoneRight) ||
+                              (dropX >= rightZoneLeft && dropX <= rightZoneRight + letGoZonePadding)) &&
+                              (dropY >= letGoZoneTop - letGoZonePadding && 
+                               dropY <= letGoZoneTop + letGoZoneSize + letGoZonePadding);
           
           if (discardZone) {
             handleItemDiscarded(item);
@@ -573,7 +789,7 @@ export const useGameLogic = (
         }
       },
     });
-  }, [energy, continueItemFalling, handleItemPlaced, handleItemDiscarded, gameAreaOffset]);
+  }, [hoursLeft, continueItemFalling, handleItemPlaced, handleItemDiscarded, gameAreaOffset]);
 
   const startTimer = useCallback((duration: number) => {
     gameTimer.current = setInterval(() => {
@@ -595,7 +811,7 @@ export const useGameLogic = (
       item.position.stopAnimation();
     });
     
-    if (!completed && Math.abs(balance) >= 80) {
+    if (!completed && Math.abs(balance) >= 70) {
       setGameState('gameOver');
       haptics.heavy();
       
@@ -603,7 +819,7 @@ export const useGameLogic = (
       setTimeout(() => {
         onGameComplete(stats.score + stats.roundScore, totalXP);
       }, 2000);
-    } else if (!completed && energy <= 0) {
+    } else if (!completed && hoursLeft <= 0) {
       setGameState('gameOver');
       haptics.heavy();
       
@@ -616,7 +832,7 @@ export const useGameLogic = (
       setGameState('roundComplete');
       haptics.medium();
     }
-  }, [balance, energy, items, onGameComplete, stats]);
+  }, [balance, hoursLeft, items, onGameComplete, stats]);
 
   const nextRound = useCallback(() => {
     if (currentRound >= 3) {
@@ -637,11 +853,86 @@ export const useGameLogic = (
     if (gameTimer.current) clearInterval(gameTimer.current);
     setStats(prev => ({ ...prev, score: 0 }));
     startRound(1);
+    // Note: Don't start gameplay here - let the round start message handle it
   }, [startRound]);
 
   const clearDropFeedback = useCallback(() => {
     setDropFeedback(null);
   }, []);
+  
+  const clearPenaltyFeedback = useCallback(() => {
+    setPenaltyFeedback(null);
+  }, []);
+
+  const pauseGame = useCallback(() => {
+    setIsPaused(true);
+    
+    // Pause all item animations
+    items.forEach(item => {
+      item.position.stopAnimation();
+    });
+    
+    // Pause timers
+    if (spawnInterval.current) clearInterval(spawnInterval.current);
+    if (gameTimer.current) clearInterval(gameTimer.current);
+  }, [items]);
+
+  const startGameplay = useCallback(() => {
+    // Prevent double-starting
+    if (isGameplayStarted) return;
+    
+    setIsGameplayStarted(true);
+    const round = currentRound === 0 ? TUTORIAL_ROUND : ROUNDS[currentRound - 1];
+    
+    // Start spawning items
+    startSpawning(round);
+    
+    // Start game timer
+    startTimer(round.duration);
+  }, [currentRound, isGameplayStarted, startSpawning, startTimer]);
+
+  const resumeGame = useCallback(() => {
+    setIsPaused(false);
+    
+    // Resume item animations
+    items.forEach(item => {
+      const currentY = (item.position.y as any)._value || 0;
+      const currentX = (item.position.x as any)._value || 0;
+      
+      // Calculate remaining fall distance and time
+      const remainingDistance = height - 100 - currentY;
+      if (remainingDistance > 0) {
+        const round = currentRound === 0 ? TUTORIAL_ROUND : ROUNDS[currentRound - 1];
+        const remainingTime = (remainingDistance / (height - 100)) * round.fallSpeed;
+        
+        // Continue falling from current position
+        Animated.timing(item.position, {
+          toValue: { x: currentX, y: height - 100 },
+          duration: remainingTime,
+          useNativeDriver: false,
+        }).start(({ finished }) => {
+          if (finished && !isPaused) {
+            handleItemMissed(item.id, item.isUrgent);
+          }
+        });
+      }
+    });
+    
+    // Resume spawning
+    const round = currentRound === 0 ? TUTORIAL_ROUND : ROUNDS[currentRound - 1];
+    if (spawnedCount.current < round.itemCount) {
+      startSpawning(round);
+    }
+    
+    // Resume timer
+    startTimer(timeLeft);
+  }, [currentRound, height, isPaused, items, startSpawning, startTimer, timeLeft, handleItemMissed]);
+
+  const itemsRemaining = currentRound === 0 ? 
+    Math.max(0, TUTORIAL_ROUND.itemCount - handledItemsCount) : 
+    (currentRound > 0 && currentRound <= 3 ? 
+      Math.max(0, ROUNDS[currentRound - 1].itemCount - handledItemsCount) : 
+      0);
 
   return {
     // State
@@ -652,15 +943,20 @@ export const useGameLogic = (
     items,
     upcomingItems,
     balance,
-    energy,
+    hoursLeft,
     stats,
     currentCombo,
     activeDropZone,
     dropFeedback,
+    penaltyFeedback,
+    isPaused,
+    itemsRemaining,
+    letGoCount,
     
     // Animations
     scaleRotation,
-    energyAnimation,
+    hoursAnimation,
+    hoursFlashAnimation,
     
     // Functions
     startRound,
@@ -669,5 +965,9 @@ export const useGameLogic = (
     createPanResponder,
     setGameAreaOffset,
     clearDropFeedback,
+    clearPenaltyFeedback,
+    pauseGame,
+    resumeGame,
+    startGameplay,
   };
 };

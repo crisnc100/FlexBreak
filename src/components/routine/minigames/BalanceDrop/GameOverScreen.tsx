@@ -6,24 +6,28 @@ import { styles } from './styles';
 
 interface GameOverScreenProps {
   balance: number;
-  energy: number;
+  hoursLeft: number;
   finalScore: number;
 }
 
 export const GameOverScreen: React.FC<GameOverScreenProps> = ({
   balance,
-  energy,
+  hoursLeft,
   finalScore,
 }) => {
   const { theme } = useTheme();
 
-  const failureReason = Math.abs(balance) >= 80 
-    ? (balance < -80 ? 'Too much work!' : 'Too much relaxation!')
-    : 'Out of energy!';
+  const failureReason = Math.abs(balance) >= 70 
+    ? (balance < -70 ? '⚖️ Too much work!' : '⚖️ Too much life!')
+    : '⏰ Out of time!';
     
-  const strategyTip = Math.abs(balance) >= 80 
-    ? '💡 Strategy: Sometimes it\'s better to let items fall than to worsen the imbalance. Focus on items that will help restore balance!'
-    : '💡 Strategy: Prioritize wellness items that restore energy, and let low-value items fall if needed!';
+  const failureDetails = Math.abs(balance) >= 70 
+    ? 'The scale tipped too far. Balance is lost!'
+    : 'You ran out of hours in your day!';
+    
+  const strategyTip = Math.abs(balance) >= 70 
+    ? '💡 Strategy: Sometimes it\'s better to let go of tasks than to worsen the imbalance. Focus on items that will help restore balance!'
+    : '💡 Strategy: Each item costs time from your 24-hour day. Prioritize wisely and let go of less important tasks!';
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -34,6 +38,9 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
         </Text>
         <Text style={[styles.gameOverText, { color: theme.textSecondary }]}>
           {failureReason}
+        </Text>
+        <Text style={[styles.gameOverSubtext, { color: theme.textSecondary }]}>
+          {failureDetails}
         </Text>
         <Text style={[styles.finalScoreText, { color: theme.text }]}>
           Final Score: {finalScore}

@@ -14,7 +14,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { WellnessTrueFalse } from './minigames/WellnessTrueFalse';
 import { StressBuster } from './minigames/StressBuster';
 import { PosturePatrol } from './minigames/PosturePatrol';
-import { BalanceDrop } from './minigames/BalanceDrop';
+import { BalanceDrop } from './minigames/BalanceDrop/index';
 import * as haptics from '../../utils/haptics';
 import { 
   MiniGameType, 

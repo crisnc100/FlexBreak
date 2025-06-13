@@ -56,9 +56,9 @@ export const DropFeedback: React.FC<DropFeedbackProps> = ({ type, position, onCo
         };
       case 'discard':
         return {
-          icon: 'shield-checkmark',
+          icon: 'hand-right',
           color: '#2196F3',
-          text: 'Strategic!',
+          text: 'Let Go!',
         };
     }
   };
