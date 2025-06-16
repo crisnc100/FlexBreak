@@ -266,11 +266,6 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
               +{completionData.xp} XP
             </Text>
           </View>
-
-          {/* Auto-close hint */}
-          <Text style={[styles.autoCloseText, { color: theme.textSecondary }]}>
-            Closing automatically...
-          </Text>
         </View>
       </View>
     );

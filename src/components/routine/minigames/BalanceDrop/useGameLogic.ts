@@ -7,18 +7,19 @@ import {
   ItemData, 
   GameStats, 
   ComboInfo,
-  Round 
+  Round,
+  StatEffect,
+  LifeStats 
 } from './types';
 import { 
   ROUNDS,
   TUTORIAL_ROUND, 
   WORK_ITEMS, 
   LIFE_ITEMS,
-  HEAVY_WORK_ITEMS,
-  HEAVY_LIFE_ITEMS,
-  DUAL_ITEMS,
-  CRITICAL_ITEMS,
-  MAX_HOURS,
+  FLEXIBLE_ITEMS,
+  REST_ITEMS,
+  ESSENTIAL_ITEMS,
+  MAX_ENERGY,
   ITEM_BASE_SIZE,
   SCALE_WIDTH,
   SCALE_HEIGHT,
@@ -41,31 +42,43 @@ export const useGameLogic = (
   const [handledItemsCount, setHandledItemsCount] = useState(0);
   const [upcomingItems, setUpcomingItems] = useState<ItemData[]>([]);
   const [balance, setBalance] = useState(0);
-  const [hoursLeft, setHoursLeft] = useState(MAX_HOURS);
-  const [letGoCount, setLetGoCount] = useState(0);
+  const [energyLeft, setEnergyLeft] = useState(MAX_ENERGY);
+  const [skipCount, setSkipCount] = useState(0);
   const [activeDropZone, setActiveDropZone] = useState<'work' | 'life' | 'discard' | null>(null);
   const [gameAreaOffset, setGameAreaOffset] = useState({ x: 0, y: 0 });
-  const [dropFeedback, setDropFeedback] = useState<{ type: 'success' | 'error' | 'discard'; position: { x: number; y: number } } | null>(null);
+  const [dropFeedback, setDropFeedback] = useState<{ type: 'success' | 'error' | 'skip'; position: { x: number; y: number }; message?: string } | null>(null);
   const [penaltyFeedback, setPenaltyFeedback] = useState<string | null>(null);
+  const [delayedEffects, setDelayedEffects] = useState<StatEffect[]>([]);
   
   // Stats
   const [stats, setStats] = useState<GameStats>({
     score: 0,
     roundScore: 0,
+    itemsPlaced: 0,
+    energyRestored: 0,
+    perfectBalanceCount: 0,
+    currentEnergy: MAX_ENERGY,
     correctPlacements: 0,
     urgentItemsHandled: 0,
     missedUrgentItems: 0,
-    perfectBalanceCount: 0,
+    lifeStats: {
+      career: 50,
+      family: 50,
+      health: 50,
+      social: 50,
+      stress: 30,
+    },
+    decisions: [],
   });
   
   // Combo tracking
-  const [lastPlacedTypes, setLastPlacedTypes] = useState<('work' | 'wellness')[]>([]);
+  const [lastPlacedTypes, setLastPlacedTypes] = useState<('work' | 'life')[]>([]);
   const [currentCombo, setCurrentCombo] = useState<ComboInfo | null>(null);
   
   // Refs
   const scaleRotation = useRef(new Animated.Value(0)).current;
-  const hoursAnimation = useRef(new Animated.Value(1)).current;
-  const hoursFlashAnimation = useRef(new Animated.Value(0)).current;
+  const energyAnimation = useRef(new Animated.Value(1)).current;
+  const energyFlashAnimation = useRef(new Animated.Value(0)).current;
   const spawnInterval = useRef<NodeJS.Timeout | null>(null);
   const gameTimer = useRef<NodeJS.Timeout | null>(null);
   const itemIdCounter = useRef(0);
@@ -93,9 +106,10 @@ export const useGameLogic = (
   useEffect(() => {
     const urgencyInterval = setInterval(() => {
       setItems(prev => prev.map(item => {
-        if (item.isUrgent && item.urgencyTimer && item.urgencyTimer > 0) {
-          return { ...item, urgencyTimer: item.urgencyTimer - 1 };
-        }
+        // Urgency system removed in simplified version
+        // if (item.isUrgent && item.urgencyTimer && item.urgencyTimer > 0) {
+        //   return { ...item, urgencyTimer: item.urgencyTimer - 1 };
+        // }
         return item;
       }));
     }, 1000);
@@ -126,7 +140,17 @@ export const useGameLogic = (
   const startRound = useCallback((roundNumber: number) => {
     const round = roundNumber === 0 ? TUTORIAL_ROUND : ROUNDS[roundNumber - 1];
     setCurrentRound(roundNumber);
-    setStats(prev => ({ ...prev, roundScore: 0, correctPlacements: 0, urgentItemsHandled: 0, missedUrgentItems: 0, perfectBalanceCount: 0 }));
+    setStats(prev => ({ ...prev, roundScore: 0, itemsPlaced: 0, energyRestored: 0, perfectBalanceCount: 0, correctPlacements: 0, urgentItemsHandled: 0, missedUrgentItems: 0, decisions: [] }));
+    
+    // Apply delayed effects from previous round
+    if (delayedEffects.length > 0) {
+      const newLifeStats = { ...stats.lifeStats };
+      delayedEffects.forEach(effect => {
+        newLifeStats[effect.stat] = Math.max(0, Math.min(100, newLifeStats[effect.stat] + effect.change));
+      });
+      setStats(prev => ({ ...prev, lifeStats: newLifeStats }));
+      setDelayedEffects([]);
+    }
     setTimeLeft(round.duration);
     setItems([]);
     setUpcomingItems([]);
@@ -138,21 +162,28 @@ export const useGameLogic = (
     const startingBalance = randomBalance === 0 ? (Math.random() < 0.5 ? -10 : 10) : randomBalance;
     setBalance(startingBalance);
     
-    setHoursLeft(MAX_HOURS);
+    // Apply scenario energy modifier if present
+    const startingEnergy = round.scenario ? Math.round(MAX_ENERGY * round.scenario.energyModifier) : MAX_ENERGY;
+    setEnergyLeft(startingEnergy);
+    
+    // Apply scenario stat modifiers if present
+    let lifeStats = { ...stats.lifeStats };
+    if (round.scenario?.statModifiers) {
+      Object.entries(round.scenario.statModifiers).forEach(([stat, value]) => {
+        lifeStats[stat as keyof LifeStats] = value;
+      });
+    }
+    
+    setStats(prev => ({ ...prev, currentEnergy: startingEnergy, lifeStats }));
     setLastPlacedTypes([]);
     setCurrentCombo(null);
     spawnedCount.current = 0;
     previewQueue.current = [];
     setHandledItemsCount(0);
-    setLetGoCount(0); // Reset let-go count
+    setSkipCount(0); // Reset skip count
     
-    // Generate preview items
-    for (let i = 0; i < 3; i++) {
-      const isWork = Math.random() < 0.5;
-      const itemList = isWork ? WORK_ITEMS : LIFE_ITEMS;
-      const itemData = itemList[Math.floor(Math.random() * itemList.length)];
-      previewQueue.current.push(itemData);
-    }
+    // Generate preview items based on scenario
+    generatePreviewItems(round);
     setUpcomingItems([...previewQueue.current]);
     
     setGameState(roundNumber === 0 ? 'tutorial' : 'playing');
@@ -190,107 +221,124 @@ export const useGameLogic = (
   // Track recent spawn history for fairness
   const spawnHistory = useRef<('work' | 'life')[]>([]);
   
-  const spawnItem = useCallback((round: Round) => {
-    let itemData: ItemData;
-    let isWork: boolean;
-    let isDual = false;
-    let isCritical = false;
+  const generatePreviewItems = useCallback((round: Round) => {
+    previewQueue.current = [];
+    const scenario = round.scenario;
+    const workChance = scenario?.workItemChance || 0.5;
     
-    // Determine special item type based on round chances
-    const specialRoll = Math.random();
-    
-    if (round.dualItemChance && specialRoll < round.dualItemChance) {
-      // Spawn dual item
-      itemData = DUAL_ITEMS[Math.floor(Math.random() * DUAL_ITEMS.length)];
-      isDual = true;
-      isWork = itemData.category === 'work'; // Default side based on category
-    } else if (round.criticalItemChance && specialRoll < (round.dualItemChance || 0) + round.criticalItemChance) {
-      // Spawn critical item
-      itemData = CRITICAL_ITEMS[Math.floor(Math.random() * CRITICAL_ITEMS.length)];
-      isCritical = true;
-      isWork = itemData.category === 'work';
-    } else if (round.heavyItemChance && specialRoll < (round.dualItemChance || 0) + (round.criticalItemChance || 0) + round.heavyItemChance) {
-      // Spawn heavy item
-      const heavyRoll = Math.random();
-      if (heavyRoll < 0.5) {
-        itemData = HEAVY_WORK_ITEMS[Math.floor(Math.random() * HEAVY_WORK_ITEMS.length)];
-        isWork = true;
-      } else {
-        itemData = HEAVY_LIFE_ITEMS[Math.floor(Math.random() * HEAVY_LIFE_ITEMS.length)];
-        isWork = false;
-      }
-    } else {
-      // Normal item with fairness check
-      const recentSpawns = spawnHistory.current.slice(-3);
-      const workCount = recentSpawns.filter(type => type === 'work').length;
-      const lifeCount = recentSpawns.filter(type => type === 'life').length;
+    for (let i = 0; i < 3; i++) {
+      const roll = Math.random();
+      let itemData: ItemData;
       
-      if (workCount >= 3) {
-        isWork = false;
-      } else if (lifeCount >= 3) {
-        isWork = true;
-      } else {
-        const workBias = lifeCount > workCount ? 0.7 : (workCount > lifeCount ? 0.3 : 0.5);
-        isWork = Math.random() < workBias;
+      // 15% chance for essential items
+      if (roll < 0.15) {
+        itemData = ESSENTIAL_ITEMS[Math.floor(Math.random() * ESSENTIAL_ITEMS.length)];
+      } 
+      // 10% chance for rest items
+      else if (roll < 0.25) {
+        itemData = REST_ITEMS[Math.floor(Math.random() * REST_ITEMS.length)];
       }
-      
-      if (previewQueue.current.length > 0) {
-        itemData = previewQueue.current.shift()!;
-        
-        // Add new item to preview queue
-        const itemList = isWork ? WORK_ITEMS : LIFE_ITEMS;
-        const newItem = itemList[Math.floor(Math.random() * itemList.length)];
-        previewQueue.current.push(newItem);
-        setUpcomingItems([...previewQueue.current]);
-      } else {
+      // Remaining split between work and life based on scenario
+      else {
+        const isWork = Math.random() < workChance;
         const itemList = isWork ? WORK_ITEMS : LIFE_ITEMS;
         itemData = itemList[Math.floor(Math.random() * itemList.length)];
       }
+      
+      previewQueue.current.push(itemData);
+    }
+  }, []);
+  
+  const spawnItem = useCallback((round: Round) => {
+    let itemData: ItemData;
+    let itemType: 'work' | 'life' | 'neutral' = 'work';
+    let isFlexible = false;
+    
+    // Use item from preview queue if available
+    if (previewQueue.current.length > 0) {
+      itemData = previewQueue.current.shift()!;
+      
+      // Determine type based on item
+      if (ESSENTIAL_ITEMS.includes(itemData)) {
+        itemType = 'neutral';
+        isFlexible = true;
+      } else if (REST_ITEMS.includes(itemData) || LIFE_ITEMS.includes(itemData)) {
+        itemType = 'life';
+      } else if (WORK_ITEMS.includes(itemData)) {
+        itemType = 'work';
+      } else if (FLEXIBLE_ITEMS.includes(itemData)) {
+        itemType = itemData.category === 'work' ? 'work' : 'life';
+        isFlexible = true;
+      }
+      
+      // Add new item to preview queue
+      generateNextPreviewItem(round);
+      setUpcomingItems([...previewQueue.current]);
+    } else {
+      // Emergency spawn if preview queue is empty
+      const scenario = round.scenario;
+      const roll = Math.random();
+      
+      // Balanced spawning: 20% essential, 15% rest, 15% flexible, 50% work/life
+      if (roll < 0.2) {
+        itemData = ESSENTIAL_ITEMS[Math.floor(Math.random() * ESSENTIAL_ITEMS.length)];
+        itemType = 'neutral';
+        isFlexible = true;
+      } else if (roll < 0.35) {
+        itemData = REST_ITEMS[Math.floor(Math.random() * REST_ITEMS.length)];
+        itemType = 'life';
+      } else if (roll < 0.5) {
+        itemData = FLEXIBLE_ITEMS[Math.floor(Math.random() * FLEXIBLE_ITEMS.length)];
+        itemType = itemData.category === 'work' ? 'work' : 'life';
+        isFlexible = true;
+      } else {
+        // Regular work/life items - use scenario bias but ensure balance
+        const workChance = scenario?.workItemChance || 0.5;
+        const recentSpawns = spawnHistory.current.slice(-5);
+        const recentWorkCount = recentSpawns.filter(t => t === 'work').length;
+        const recentLifeCount = recentSpawns.filter(t => t === 'life').length;
+        
+        // Prevent streaks of more than 3 of same type
+        let useWork = Math.random() < workChance;
+        if (recentWorkCount >= 3 && recentLifeCount < 2) {
+          useWork = false; // Force life item
+        } else if (recentLifeCount >= 3 && recentWorkCount < 2) {
+          useWork = true; // Force work item
+        }
+        
+        const itemList = useWork ? WORK_ITEMS : LIFE_ITEMS;
+        itemData = itemList[Math.floor(Math.random() * itemList.length)];
+        itemType = useWork ? 'work' : 'life';
+      }
     }
     
-    // Update spawn history
-    spawnHistory.current.push(isWork ? 'work' : 'life');
-    if (spawnHistory.current.length > 10) {
-      spawnHistory.current.shift(); // Keep only last 10
+    // Update spawn history (don't track neutral items)
+    if (itemType !== 'neutral') {
+      spawnHistory.current.push(itemType);
+      if (spawnHistory.current.length > 10) {
+        spawnHistory.current.shift(); // Keep only last 10
+      }
     }
     
     const id = `item-${itemIdCounter.current++}`;
-    const isWorkItem = WORK_ITEMS.includes(itemData) || HEAVY_WORK_ITEMS.includes(itemData) || 
-                      (itemData.category === 'work' && (isDual || isCritical));
-    const isUrgent = !isCritical && !isDual && Math.random() < round.urgentItemChance;
     
     const itemSize = ITEM_BASE_SIZE + (itemData.weight - 1) * 15;
     
-    // More challenging spawn positions - items can appear from different heights
-    const spawnZone = Math.random();
+    // Simple spawn positions - items fall from top
     let startX = Math.random() * (width - itemSize - 40) + 20;
     let startY = -itemSize;
-    
-    // 30% chance to spawn from sides at different heights
-    if (spawnZone < 0.15) {
-      // Spawn from left side
-      startX = -itemSize;
-      startY = Math.random() * (height * 0.3);
-    } else if (spawnZone < 0.3) {
-      // Spawn from right side
-      startX = width;
-      startY = Math.random() * (height * 0.3);
-    }
     
     const position = new Animated.ValueXY({ x: startX, y: startY });
     
     const newItem: Item = {
       id,
-      type: isWorkItem ? 'work' : 'life',
+      type: itemType === 'neutral' ? 'life' : itemType, // Neutral items can go to either side
       category: itemData.category,
       data: itemData,
       position,
       opacity: new Animated.Value(1),
       scale: new Animated.Value(1),
-      isUrgent: isUrgent && !isCritical, // Critical items can't be urgent
-      urgencyTimer: isUrgent && !isCritical ? 5 : undefined,
-      isDual,
-      isCritical,
+      isFlexible,
     };
     
     
@@ -309,38 +357,92 @@ export const useGameLogic = (
     
     fallAnimation.start(({ finished }) => {
       if (finished && !isPaused) {
-        handleItemMissed(id, isUrgent);
+        handleItemMissed(id);
       }
     });
   }, [isPaused]);
+  
+  const generateNextPreviewItem = useCallback((round: Round) => {
+    const scenario = round.scenario;
+    const workChance = scenario?.workItemChance || 0.5;
+    const roll = Math.random();
+    let itemData: ItemData;
+    
+    // Balanced distribution
+    if (roll < 0.15) {
+      itemData = ESSENTIAL_ITEMS[Math.floor(Math.random() * ESSENTIAL_ITEMS.length)];
+    } else if (roll < 0.25) {
+      itemData = REST_ITEMS[Math.floor(Math.random() * REST_ITEMS.length)];
+    } else if (roll < 0.35) {
+      itemData = FLEXIBLE_ITEMS[Math.floor(Math.random() * FLEXIBLE_ITEMS.length)];
+    } else {
+      // Check recent history to ensure balance
+      const recentWork = previewQueue.current.filter(item => 
+        WORK_ITEMS.includes(item) || (FLEXIBLE_ITEMS.includes(item) && item.category === 'work')
+      ).length;
+      const recentLife = previewQueue.current.filter(item => 
+        LIFE_ITEMS.includes(item) || REST_ITEMS.includes(item) || 
+        (FLEXIBLE_ITEMS.includes(item) && item.category !== 'work')
+      ).length;
+      
+      let useWork = Math.random() < workChance;
+      // Ensure some balance in preview queue
+      if (recentWork >= 2 && recentLife === 0) useWork = false;
+      if (recentLife >= 2 && recentWork === 0) useWork = true;
+      
+      const itemList = useWork ? WORK_ITEMS : LIFE_ITEMS;
+      itemData = itemList[Math.floor(Math.random() * itemList.length)];
+    }
+    
+    previewQueue.current.push(itemData);
+  }, []);
 
-  const handleItemMissed = useCallback((itemId: string, isUrgent: boolean) => {
+  const handleItemMissed = useCallback((itemId: string) => {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
     
-    setStats(prev => ({
-      ...prev,
-      roundScore: Math.max(0, prev.roundScore - (2 * item.data.weight)),
-      missedUrgentItems: isUrgent ? prev.missedUrgentItems + 1 : prev.missedUrgentItems,
-    }));
-    
-    if (isUrgent) {
+    // Apply skip penalty if defined
+    if (item.data.effects?.skipPenalty) {
+      const newLifeStats = { ...stats.lifeStats };
+      const messages: string[] = [];
+      
+      item.data.effects.skipPenalty.forEach(effect => {
+        newLifeStats[effect.stat] = Math.max(0, Math.min(100, newLifeStats[effect.stat] + effect.change));
+        if (effect.message) messages.push(effect.message);
+      });
+      
+      setStats(prev => ({ 
+        ...prev, 
+        lifeStats: newLifeStats,
+        roundScore: Math.max(0, prev.roundScore - 5),
+        decisions: [...prev.decisions, {
+          item: item.data.label,
+          choice: 'skip',
+          effects: item.data.effects.skipPenalty
+        }]
+      }));
+      
+      if (messages.length > 0) {
+        setPenaltyFeedback(messages.join(' '));
+      }
+    } else {
+      // Small penalty for missing items
       setStats(prev => ({
         ...prev,
-        roundScore: Math.max(0, prev.roundScore - 10),
+        roundScore: Math.max(0, prev.roundScore - 5),
       }));
     }
     
     setItems(prev => prev.filter(i => i.id !== itemId));
     setHandledItemsCount(prev => prev + 1);
-  }, [items]);
+  }, [items, stats.lifeStats]);
 
-  const handleItemDiscarded = useCallback((item: Item) => {
-    // Check if we've exceeded let-go limit
+  const handleItemSkipped = useCallback((item: Item) => {
+    // Check if we've exceeded skip limit
     const round = currentRound === 0 ? TUTORIAL_ROUND : ROUNDS[currentRound - 1];
-    if (round.maxLetGo && letGoCount >= round.maxLetGo) {
-      // Can't let go anymore - show penalty feedback
-      setPenaltyFeedback('🚫 No more let-go uses!');
+    if (round.maxSkips && skipCount >= round.maxSkips) {
+      // Can't skip anymore
+      setPenaltyFeedback('No more skips available!');
       haptics.error();
       continueItemFalling(item);
       return;
@@ -353,7 +455,7 @@ export const useGameLogic = (
     
     // Show drop feedback
     setDropFeedback({
-      type: 'discard',
+      type: 'skip',
       position: { x: itemX + itemSize / 2, y: itemY + itemSize / 2 }
     });
     
@@ -373,10 +475,36 @@ export const useGameLogic = (
       points = -item.data.weight;
     }
     
-    setStats(prev => ({
-      ...prev,
-      roundScore: Math.max(0, prev.roundScore + points),
-    }));
+    // Apply skip penalty if defined
+    if (item.data.effects?.skipPenalty) {
+      const newLifeStats = { ...stats.lifeStats };
+      const messages: string[] = [];
+      
+      item.data.effects.skipPenalty.forEach(effect => {
+        newLifeStats[effect.stat] = Math.max(0, Math.min(100, newLifeStats[effect.stat] + effect.change));
+        if (effect.message) messages.push(effect.message);
+      });
+      
+      setStats(prev => ({ 
+        ...prev, 
+        lifeStats: newLifeStats,
+        roundScore: Math.max(0, prev.roundScore + points),
+        decisions: [...prev.decisions, {
+          item: item.data.label,
+          choice: 'skip',
+          effects: item.data.effects.skipPenalty
+        }]
+      }));
+      
+      if (messages.length > 0) {
+        setPenaltyFeedback(messages.join(' '));
+      }
+    } else {
+      setStats(prev => ({
+        ...prev,
+        roundScore: Math.max(0, prev.roundScore + points),
+      }));
+    }
     
     // Visual feedback
     haptics.light();
@@ -396,9 +524,9 @@ export const useGameLogic = (
     ]).start(() => {
       setItems(prev => prev.filter(i => i.id !== item.id));
       setHandledItemsCount(prev => prev + 1);
-      setLetGoCount(prev => prev + 1); // Increment let-go count
+      setSkipCount(prev => prev + 1); // Increment skip count
     });
-  }, [currentRound, letGoCount, continueItemFalling]);
+  }, [currentRound, skipCount]);
 
   const handleItemPlaced = useCallback((item: Item, isCorrect: boolean, onWorkSide: boolean) => {
     // Get item position for feedback
@@ -412,39 +540,30 @@ export const useGameLogic = (
       position: { x: itemX + itemSize / 2, y: itemY + itemSize / 2 }
     });
     
-    // Update hours - both work and life consume time
-    let timeCost = item.data.timeCost;
+    // Update energy - both work and life consume energy
+    let energyCost = item.data.energyCost;
     
-    // Handle dual items - different costs for each side
-    if (item.isDual && item.data.dualTimeCost) {
-      timeCost = onWorkSide ? item.data.dualTimeCost.work : item.data.dualTimeCost.life;
+    // Handle flexible items - different costs for each side
+    if (item.isFlexible && item.data.flexibleEnergyCost) {
+      energyCost = onWorkSide ? item.data.flexibleEnergyCost.work : item.data.flexibleEnergyCost.life;
     }
     
-    // Extra time penalty for wrong placement - "Role Confusion"
+    // Extra energy penalty for wrong placement (reduced in tutorial)
     if (!isCorrect) {
-      // Critical items have severe penalty
-      if (item.isCritical) {
-        timeCost += 4; // Severe penalty for critical items
-        const criticalMessage = item.type === 'work' 
-          ? '⚠️ CRITICAL: Missed important work!' 
-          : '⚠️ CRITICAL: Neglected essential life!';
-        setPenaltyFeedback(criticalMessage);
-      } else {
-        timeCost += 1.5; // Normal penalty
-        const wrongPlacementMessage = item.type === 'work' 
-          ? '📱 Bringing work home!' 
-          : '🎮 Distracted at work!';
-        setPenaltyFeedback(wrongPlacementMessage);
-      }
+      energyCost += currentRound === 0 ? 2 : 5; // Less penalty in tutorial
+      const wrongPlacementMessage = item.type === 'work' 
+        ? '📱 Work spilling into life!' 
+        : '🎮 Life distracting from work!';
+      setPenaltyFeedback(wrongPlacementMessage);
       
-      // Flash the hours bar red for wrong placement
+      // Flash the energy bar red for wrong placement
       Animated.sequence([
-        Animated.timing(hoursFlashAnimation, {
+        Animated.timing(energyFlashAnimation, {
           toValue: 1,
           duration: 150,
           useNativeDriver: false,
         }),
-        Animated.timing(hoursFlashAnimation, {
+        Animated.timing(energyFlashAnimation, {
           toValue: 0,
           duration: 150,
           useNativeDriver: false,
@@ -452,23 +571,35 @@ export const useGameLogic = (
       ]).start();
     }
     
-    const newHours = Math.max(0, hoursLeft - timeCost);
-    setHoursLeft(newHours);
-    
-    // Check if hours have run out
-    if (newHours <= 0) {
-      // End game immediately
-      setTimeout(() => endRound(false), 100);
+    // Handle rest items that restore energy
+    let newEnergy;
+    if (item.data.energyRestore && isCorrect) {
+      newEnergy = Math.min(MAX_ENERGY, energyLeft + item.data.energyRestore);
+      setStats(prev => ({ ...prev, energyRestored: prev.energyRestored + item.data.energyRestore! }));
+    } else {
+      newEnergy = Math.max(0, energyLeft - energyCost);
     }
     
-    // Animate hours bar
+    setEnergyLeft(newEnergy);
+    setStats(prev => ({ ...prev, currentEnergy: newEnergy }));
+    
+    // Check if energy has run out (but not in tutorial)
+    if (newEnergy <= 0 && currentRound !== 0) {
+      // End the round (not the whole game)
+      setTimeout(() => {
+        endRound(false);
+      }, 100);
+      return; // Prevent further execution
+    }
+    
+    // Animate energy bar
     Animated.sequence([
-      Animated.timing(hoursAnimation, {
+      Animated.timing(energyAnimation, {
         toValue: 0.8,
         duration: 100,
         useNativeDriver: false,
       }),
-      Animated.timing(hoursAnimation, {
+      Animated.timing(energyAnimation, {
         toValue: 1,
         duration: 100,
         useNativeDriver: false,
@@ -494,12 +625,9 @@ export const useGameLogic = (
         points += 10;
       }
       
-      if (item.isUrgent && item.urgencyTimer! > 2) {
-        points += 20;
-        setStats(prev => ({ ...prev, urgentItemsHandled: prev.urgentItemsHandled + 1 }));
-      }
+      // Removed urgency system for simplified version
       
-      setStats(prev => ({ ...prev, correctPlacements: prev.correctPlacements + 1 }));
+      setStats(prev => ({ ...prev, itemsPlaced: prev.itemsPlaced + 1 }));
       haptics.success();
     } else {
       // Penalty for wrong placement
@@ -519,7 +647,7 @@ export const useGameLogic = (
         setCurrentCombo({ type: 'Productivity Streak', count: 3 });
         points += 30;
         haptics.medium();
-      } else if (last3.every(t => t === 'wellness')) {
+      } else if (last3.every(t => t === 'life')) {
         setCurrentCombo({ type: 'Self-Care Streak', count: 3 });
         points += 30;
         haptics.medium();
@@ -540,15 +668,62 @@ export const useGameLogic = (
       }
     }
     
-    setStats(prev => ({ ...prev, roundScore: Math.max(0, prev.roundScore + points) }));
+    // Apply immediate effects
+    let effectMessages: string[] = [];
+    if (item.data.effects?.immediate) {
+      const newLifeStats = { ...stats.lifeStats };
+      
+      item.data.effects.immediate.forEach(effect => {
+        newLifeStats[effect.stat] = Math.max(0, Math.min(100, newLifeStats[effect.stat] + effect.change));
+        if (effect.message) effectMessages.push(effect.message);
+      });
+      
+      setStats(prev => ({ 
+        ...prev, 
+        lifeStats: newLifeStats,
+        roundScore: Math.max(0, prev.roundScore + points),
+        decisions: [...prev.decisions, {
+          item: item.data.label,
+          choice: onWorkSide ? 'work' : 'life',
+          effects: item.data.effects.immediate
+        }]
+      }));
+      
+      // Show effect messages
+      if (effectMessages.length > 0) {
+        setDropFeedback(prev => prev ? { ...prev, message: effectMessages[0] } : null);
+      }
+    } else {
+      setStats(prev => ({ ...prev, roundScore: Math.max(0, prev.roundScore + points) }));
+    }
+    
+    // Queue delayed effects for next round
+    if (item.data.effects?.delayed) {
+      setDelayedEffects(prev => [...prev, ...item.data.effects.delayed]);
+    }
     
     // Update balance
     const balanceChange = (onWorkSide ? -1 : 1) * item.data.weight * 10;
     setBalance(prev => {
       const newBalance = Math.max(-100, Math.min(100, prev + balanceChange));
       
-      if (Math.abs(newBalance) >= 70) {
-        endRound(false);
+      // Skip failure checks in tutorial
+      if (currentRound !== 0) {
+        if (Math.abs(newBalance) >= 70) {
+          endRound(false);
+        }
+        
+        // Check critical life stats
+        if (stats.lifeStats.stress >= 90) {
+          setPenaltyFeedback('⚠️ BURNOUT! Too much stress!');
+          endRound(false);
+        } else if (stats.lifeStats.health <= 20) {
+          setPenaltyFeedback('⚠️ HEALTH CRISIS! Need rest!');
+          endRound(false);
+        } else if (stats.lifeStats.family <= 20) {
+          setPenaltyFeedback('⚠️ RELATIONSHIP CRISIS!');
+          endRound(false);
+        }
       }
       
       return newBalance;
@@ -575,7 +750,7 @@ export const useGameLogic = (
     if (currentCombo) {
       setTimeout(() => setCurrentCombo(null), 2000);
     }
-  }, [currentCombo, hoursAnimation, hoursLeft, lastPlacedTypes, endRound]);
+  }, [currentCombo, energyAnimation, energyLeft, lastPlacedTypes]);
 
   const continueItemFalling = useCallback((item: Item) => {
     // Reset scale
@@ -599,7 +774,7 @@ export const useGameLogic = (
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (finished) {
-        handleItemMissed(item.id, item.isUrgent);
+        handleItemMissed(item.id);
       }
     });
   }, [handleItemMissed]);
@@ -613,17 +788,17 @@ export const useGameLogic = (
       onMoveShouldSetPanResponder: () => true,
       
       onPanResponderGrant: (evt, gesture) => {
-        // Calculate actual time cost for dual items
-        let requiredHours = item.data.timeCost;
-        if (item.isDual && item.data.dualTimeCost) {
+        // Calculate actual energy cost for flexible items
+        let requiredEnergy = item.data.energyCost;
+        if (item.isFlexible && item.data.flexibleEnergyCost) {
           // Use the minimum cost for dragging check
-          requiredHours = Math.min(item.data.dualTimeCost.work, item.data.dualTimeCost.life);
+          requiredEnergy = Math.min(item.data.flexibleEnergyCost.work, item.data.flexibleEnergyCost.life);
         }
         
-        if (hoursLeft < requiredHours) {
+        if (energyLeft < requiredEnergy) {
           haptics.error();
-          // Show feedback that there aren't enough hours
-          setPenaltyFeedback('⏰ Not enough hours!');
+          // Show feedback that there isn't enough energy
+          setPenaltyFeedback('⚡ Not enough energy!');
           return;
         }
         
@@ -663,11 +838,11 @@ export const useGameLogic = (
         const itemCenterX = newX + halfSize;
         const itemCenterY = newY + halfSize;
         
-        // Scale is positioned at bottom: 180 in styles, but relative to game area
+        // Scale is positioned at bottom: 120 in styles, but relative to game area
         // Since items use coordinates relative to game area (0,0 at top-left of game area)
         // we need to calculate relative to game area height, not screen height
         const gameAreaHeight = height - gameAreaOffset.y;
-        const scaleBottom = gameAreaHeight - 180;
+        const scaleBottom = gameAreaHeight - 120;
         const scaleTop = scaleBottom - SCALE_HEIGHT;
         const scaleLeft = (width - SCALE_WIDTH) / 2;
         const scaleRight = scaleLeft + SCALE_WIDTH;
@@ -724,11 +899,11 @@ export const useGameLogic = (
         const dropX = finalX + halfSize;
         const dropY = finalY + halfSize;
         
-        // Scale is positioned at bottom: 180 in styles, but relative to game area
+        // Scale is positioned at bottom: 120 in styles, but relative to game area
         // Since items use coordinates relative to game area (0,0 at top-left of game area)
         // we need to calculate relative to game area height, not screen height
         const gameAreaHeight = height - gameAreaOffset.y;
-        const scaleBottom = gameAreaHeight - 180;
+        const scaleBottom = gameAreaHeight - 120;
         const scaleTop = scaleBottom - SCALE_HEIGHT;
         const scaleLeft = (width - SCALE_WIDTH) / 2;
         const scaleRight = scaleLeft + SCALE_WIDTH;
@@ -744,21 +919,24 @@ export const useGameLogic = (
         if (dropY > paddedTop && dropY < paddedBottom &&
             dropX > paddedLeft && dropX < paddedRight) {
           
-          // Calculate actual time cost
-          let requiredHours = item.data.timeCost;
-          if (item.isDual && item.data.dualTimeCost) {
-            requiredHours = droppedOnWork ? item.data.dualTimeCost.work : item.data.dualTimeCost.life;
+          const droppedOnWork = dropX < scaleCenter;
+          
+          // Calculate actual energy cost
+          let requiredEnergy = item.data.energyCost;
+          if (item.isFlexible && item.data.flexibleEnergyCost) {
+            requiredEnergy = droppedOnWork ? item.data.flexibleEnergyCost.work : item.data.flexibleEnergyCost.life;
           }
           
-          if (hoursLeft < requiredHours) {
+          if (energyLeft < requiredEnergy) {
             haptics.error();
-            setPenaltyFeedback('⏰ Not enough hours!');
+            setPenaltyFeedback('⚡ Not enough energy!');
             continueItemFalling(item);
             return;
           }
-          
-          const droppedOnWork = dropX < scaleCenter;
-          const isCorrect = (droppedOnWork && item.type === 'work') || 
+          // Essential items are always correct regardless of side
+          const isEssential = ESSENTIAL_ITEMS.includes(item.data);
+          const isCorrect = isEssential || 
+                           (droppedOnWork && item.type === 'work') || 
                            (!droppedOnWork && item.type === 'life');
           
           handleItemPlaced(item, isCorrect, droppedOnWork);
@@ -782,14 +960,14 @@ export const useGameLogic = (
                                dropY <= letGoZoneTop + letGoZoneSize + letGoZonePadding);
           
           if (discardZone) {
-            handleItemDiscarded(item);
+            handleItemSkipped(item);
           } else {
             continueItemFalling(item);
           }
         }
       },
     });
-  }, [hoursLeft, continueItemFalling, handleItemPlaced, handleItemDiscarded, gameAreaOffset]);
+  }, [energyLeft, continueItemFalling, handleItemPlaced, handleItemSkipped, gameAreaOffset]);
 
   const startTimer = useCallback((duration: number) => {
     gameTimer.current = setInterval(() => {
@@ -811,15 +989,13 @@ export const useGameLogic = (
       item.position.stopAnimation();
     });
     
-    if (!completed && Math.abs(balance) >= 70) {
-      setGameState('gameOver');
-      haptics.heavy();
-      
-      const totalXP = Math.max(25, Math.min(100, stats.score + stats.roundScore));
-      setTimeout(() => {
-        onGameComplete(stats.score + stats.roundScore, totalXP);
-      }, 2000);
-    } else if (!completed && hoursLeft <= 0) {
+    // Tutorial always completes successfully
+    if (currentRound === 0) {
+      setStats(prev => ({ ...prev, score: prev.score + prev.roundScore }));
+      setGameState('roundComplete');
+      haptics.medium();
+    } else if (!completed && Math.abs(balance) >= 70) {
+      // Balance failure - end the game
       setGameState('gameOver');
       haptics.heavy();
       
@@ -828,19 +1004,20 @@ export const useGameLogic = (
         onGameComplete(stats.score + stats.roundScore, totalXP);
       }, 2000);
     } else {
+      // For all other cases (including energy depletion), just end the round
       setStats(prev => ({ ...prev, score: prev.score + prev.roundScore }));
       setGameState('roundComplete');
       haptics.medium();
     }
-  }, [balance, hoursLeft, items, onGameComplete, stats]);
+  }, [balance, energyLeft, items, onGameComplete, stats]);
 
   const nextRound = useCallback(() => {
     if (currentRound >= 3) {
       const baseXP = 50;
-      const urgencyBonus = Math.floor((stats.urgentItemsHandled / (stats.urgentItemsHandled + stats.missedUrgentItems + 0.1)) * 20);
+      const energyBonus = energyLeft > 30 ? 10 : 0;
       const balanceBonus = Math.abs(balance) < 30 ? 20 : 0;
       const comboBonus = stats.perfectBalanceCount * 5;
-      const totalXP = Math.min(100, baseXP + urgencyBonus + balanceBonus + comboBonus);
+      const totalXP = Math.min(100, baseXP + energyBonus + balanceBonus + comboBonus);
       
       onGameComplete(stats.score, totalXP);
     } else {
@@ -912,7 +1089,7 @@ export const useGameLogic = (
           useNativeDriver: false,
         }).start(({ finished }) => {
           if (finished && !isPaused) {
-            handleItemMissed(item.id, item.isUrgent);
+            handleItemMissed(item.id);
           }
         });
       }
@@ -943,7 +1120,7 @@ export const useGameLogic = (
     items,
     upcomingItems,
     balance,
-    hoursLeft,
+    energyLeft,
     stats,
     currentCombo,
     activeDropZone,
@@ -951,12 +1128,12 @@ export const useGameLogic = (
     penaltyFeedback,
     isPaused,
     itemsRemaining,
-    letGoCount,
+    skipCount,
     
     // Animations
     scaleRotation,
-    hoursAnimation,
-    hoursFlashAnimation,
+    energyAnimation,
+    energyFlashAnimation,
     
     // Functions
     startRound,

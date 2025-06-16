@@ -9,34 +9,37 @@ interface TutorialOverlayProps {
 
 const tutorialSteps = [
   {
-    text: "Life is rarely balanced! Fix the tilted scale",
+    text: "Welcome! Your work-life balance is off. Let's fix it!",
     arrowPosition: { bottom: 200, left: '50%' },
     arrowRotation: '180deg',
   },
   {
-    text: "Drag work items to the WORK side (left)",
+    text: "RED work items (meetings, emails) go LEFT",
     arrowPosition: { left: '25%', bottom: 120 },
     arrowRotation: '225deg',
   },
   {
-    text: "Drag life items to the LIFE side (right)",
+    text: "GREEN/BLUE life items (family, health) go RIGHT", 
     arrowPosition: { right: '25%', bottom: 120 },
     arrowRotation: '315deg',
   },
   {
-    text: "Watch your energy! Some items restore it",
+    text: "PURPLE items (lunch, water) can go ANYWHERE!",
+    arrowPosition: null, // No arrow for this one
+  },
+  {
+    text: "Energy bar depletes with each action. Zero = game over!",
     arrowPosition: { top: 120, left: '50%' },
     arrowRotation: '0deg',
   },
   {
-    text: "Let go of items on the sides if needed",
+    text: "Overwhelmed? Let items go in the side zones",
     arrowPosition: { left: 60, top: '40%' },
     arrowRotation: '270deg',
   },
   {
-    text: "Keep your balance! Too much work or life = game over",
-    arrowPosition: { bottom: 160, left: '50%' },
-    arrowRotation: '180deg',
+    text: "Try it now! Drag items to the correct sides",
+    arrowPosition: null, // No arrow, let them practice
   },
 ];
 
@@ -87,38 +90,43 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) 
   const step = tutorialSteps[currentStep];
 
   return (
-    <TouchableOpacity style={styles.tutorialOverlay} onPress={nextStep} activeOpacity={1}>
-      <Animated.View 
+    <View style={styles.tutorialOverlay} pointerEvents="box-none">
+      <TouchableOpacity 
         style={[
           styles.tutorialInstruction,
           {
             opacity: fadeAnim,
-            top: '45%',
+            top: currentStep === 0 ? '20%' : '10%',
             alignSelf: 'center',
           }
         ]}
+        onPress={nextStep}
+        activeOpacity={0.9}
       >
         <Text style={styles.tutorialText}>{step.text}</Text>
         <Text style={[styles.tutorialText, { fontSize: 14, marginTop: 10 }]}>
-          Tap to continue ({currentStep + 1}/{tutorialSteps.length})
+          Tap here to continue ({currentStep + 1}/{tutorialSteps.length})
         </Text>
-      </Animated.View>
+      </TouchableOpacity>
 
-      <Animated.View
-        style={[
-          styles.tutorialArrow,
-          step.arrowPosition,
-          {
-            opacity: fadeAnim,
-            transform: [
-              { translateY: arrowAnim },
-              { rotate: step.arrowRotation },
-            ],
-          },
-        ]}
-      >
-        <Ionicons name="arrow-down" size={40} color="#FFFFFF" />
-      </Animated.View>
-    </TouchableOpacity>
+      {step.arrowPosition && (
+        <Animated.View
+          style={[
+            styles.tutorialArrow,
+            step.arrowPosition as any,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateY: arrowAnim },
+                { rotate: step.arrowRotation },
+              ],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Ionicons name="arrow-down" size={40} color="#FFFFFF" />
+        </Animated.View>
+      )}
+    </View>
   );
 };

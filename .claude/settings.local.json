@@ -5,7 +5,8 @@
       "mcp__brave-search__brave_web_search",
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(node:*)",
-      "Bash(firebase --version)"
+      "Bash(firebase --version)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

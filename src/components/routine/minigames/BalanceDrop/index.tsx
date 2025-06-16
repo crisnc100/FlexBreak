@@ -26,7 +26,7 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const [showTutorialOverlay, setShowTutorialOverlay] = useState(false);
   const [showRoundStartMessage, setShowRoundStartMessage] = useState(false);
-  const [roundStartData, setRoundStartData] = useState({ balance: 0, roundNumber: 0 });
+  const [roundStartData, setRoundStartData] = useState({ balance: 0, roundNumber: 0, energyLeft: 100, scenario: undefined as any });
   const [lastShownRound, setLastShownRound] = useState(-1);
   
   const {
@@ -37,17 +37,17 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
     items,
     upcomingItems,
     balance,
-    hoursLeft,
+    energyLeft,
     stats,
     currentCombo,
     activeDropZone,
     dropFeedback,
     penaltyFeedback,
     itemsRemaining,
-    letGoCount,
+    skipCount,
     scaleRotation,
-    hoursAnimation,
-    hoursFlashAnimation,
+    energyAnimation,
+    energyFlashAnimation,
     startRound,
     nextRound,
     skipTutorial,
@@ -107,14 +107,21 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
     if ((gameState === 'playing' || gameState === 'tutorial') && currentRound !== lastShownRound) {
       setLastShownRound(currentRound);
       if (balance !== 0) {
-        setRoundStartData({ balance, roundNumber: currentRound });
+        // Get the scenario for this round
+        const round = currentRound === 0 ? TUTORIAL_ROUND : ROUNDS[currentRound - 1];
+        setRoundStartData({ 
+          balance, 
+          roundNumber: currentRound, 
+          energyLeft, 
+          scenario: round?.scenario 
+        });
         setShowRoundStartMessage(true);
       } else {
         // If balance is 0 (shouldn't happen with new logic), start gameplay immediately
         startGameplay();
       }
     }
-  }, [gameState, currentRound, balance, startGameplay, lastShownRound]);
+  }, [gameState, currentRound, balance, energyLeft, startGameplay, lastShownRound]);
 
   const handleRoundStartMessageComplete = () => {
     setShowRoundStartMessage(false);
@@ -168,19 +175,16 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
             <GameHeader
               currentRound={currentRound}
               score={stats.score}
-              roundScore={stats.roundScore}
               timeLeft={timeLeft}
               balance={balance}
-              hoursLeft={hoursLeft}
-              hoursAnimation={hoursAnimation}
-              hoursFlashAnimation={hoursFlashAnimation}
+              energyLeft={energyLeft}
               currentCombo={currentCombo}
-              itemsRemaining={itemsRemaining}
-              letGoCount={letGoCount}
-              maxLetGo={TUTORIAL_ROUND.maxLetGo}
+              lifeStats={stats.lifeStats}
               onSkip={handleClose}
               isTutorial={true}
               onSkipTutorial={skipTutorial}
+              energyAnimation={energyAnimation}
+              energyFlashAnimation={energyFlashAnimation}
             />
             <GameArea
               items={items}
@@ -191,7 +195,7 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
               setGameAreaOffset={setGameAreaOffset}
               dropFeedback={dropFeedback}
               onDropFeedbackComplete={clearDropFeedback}
-              hoursLeft={hoursLeft}
+              energyLeft={energyLeft}
             />
             {showTutorialOverlay && (
               <TutorialOverlay onComplete={handleTutorialComplete} />
@@ -200,6 +204,8 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
               <RoundStartMessage 
                 balance={roundStartData.balance}
                 roundNumber={roundStartData.roundNumber}
+                scenario={roundStartData.scenario}
+                energyLeft={roundStartData.energyLeft}
                 onComplete={handleRoundStartMessageComplete}
               />
             )}
@@ -216,7 +222,7 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
         return (
           <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
             <TouchableOpacity 
-              style={styles.pauseButton}
+              style={styles.pauseButtonIcon}
               onPress={handlePause}
             >
               <Ionicons name="pause" size={24} color={theme.text} />
@@ -225,17 +231,14 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
             <GameHeader
               currentRound={currentRound}
               score={stats.score}
-              roundScore={stats.roundScore}
               timeLeft={timeLeft}
               balance={balance}
-              hoursLeft={hoursLeft}
-              hoursAnimation={hoursAnimation}
-              hoursFlashAnimation={hoursFlashAnimation}
+              energyLeft={energyLeft}
               currentCombo={currentCombo}
-              itemsRemaining={itemsRemaining}
-              letGoCount={letGoCount}
-              maxLetGo={currentRound > 0 && currentRound <= 3 ? ROUNDS[currentRound - 1].maxLetGo : undefined}
+              lifeStats={stats.lifeStats}
               onSkip={handleClose}
+              energyAnimation={energyAnimation}
+              energyFlashAnimation={energyFlashAnimation}
             />
             <GameArea
               items={items}
@@ -246,12 +249,14 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
               setGameAreaOffset={setGameAreaOffset}
               dropFeedback={dropFeedback}
               onDropFeedbackComplete={clearDropFeedback}
-              hoursLeft={hoursLeft}
+              energyLeft={energyLeft}
             />
             {showRoundStartMessage && (
               <RoundStartMessage 
                 balance={roundStartData.balance}
                 roundNumber={roundStartData.roundNumber}
+                scenario={roundStartData.scenario}
+                energyLeft={roundStartData.energyLeft}
                 onComplete={handleRoundStartMessageComplete}
               />
             )}
@@ -277,8 +282,9 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
         return (
           <GameOverScreen
             balance={balance}
-            hoursLeft={hoursLeft}
+            energyLeft={energyLeft}
             finalScore={stats.score + stats.roundScore}
+            lifeStats={stats.lifeStats}
           />
         );
 

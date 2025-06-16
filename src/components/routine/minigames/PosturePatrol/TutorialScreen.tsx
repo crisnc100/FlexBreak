@@ -5,9 +5,9 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { PAD_CONFIG } from './constants';
 
 interface TutorialScreenProps {
   theme: any;
@@ -22,97 +22,81 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({
   onStart,
   onSmartSkip
 }) => {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+  React.useEffect(() => {
+    // Subtle pulse animation for the icon
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
   return (
     <View style={styles.startScreen}>
-      <View style={[styles.iconContainer, { backgroundColor: theme.accent + '20' }]}>
-        <Ionicons name="construct" size={48} color={theme.accent} />
-      </View>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <View style={[styles.iconContainer, { backgroundColor: theme.accent + '20' }]}>
+          <Ionicons name="shield-checkmark" size={80} color={theme.accent} />
+        </View>
+      </Animated.View>
       
       <Text style={[styles.title, { color: theme.text }]}>
         Posture Defense
       </Text>
       
-      <Text style={[styles.description, { color: theme.textSecondary }]}>
-        Build stretch pads to defend against bad posture monsters!
+      <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+        Stop bad posture monsters!
       </Text>
 
-      {/* Monster Showcase */}
-      <View style={styles.showcaseSection}>
-        <Text style={[styles.showcaseTitle, { color: theme.accent }]}>
-          👾 Posture Monsters
-        </Text>
-        <View style={styles.monsterShowcase}>
-          <View style={styles.showcaseItem}>
-            <Image 
-              source={require('../../../../../assets/images/miniGames/techNeck.png')}
-              style={styles.showcaseImage}
-              resizeMode="contain"
-            />
-            <Text style={[styles.showcaseLabel, { color: theme.text }]}>Tech Neck</Text>
-          </View>
-          <View style={styles.showcaseItem}>
-            <Image 
-              source={require('../../../../../assets/images/miniGames/slouchSlump.png')}
-              style={styles.showcaseImage}
-              resizeMode="contain"
-            />
-            <Text style={[styles.showcaseLabel, { color: theme.text }]}>Slouch Slump</Text>
-          </View>
-          <View style={styles.showcaseItem}>
-            <Image 
-              source={require('../../../../../assets/images/miniGames/deskHunch2.png')}
-              style={styles.showcaseImage}
-              resizeMode="contain"
-            />
-            <Text style={[styles.showcaseLabel, { color: theme.text }]}>Desk Hunch</Text>
-          </View>
-          <View style={styles.showcaseItem}>
-            <Image 
-              source={require('../../../../../assets/images/miniGames/leanTwist.png')}
-              style={styles.showcaseImage}
-              resizeMode="contain"
-            />
-            <Text style={[styles.showcaseLabel, { color: theme.text }]}>Lean Twist</Text>
-          </View>
+      {/* Simple Monster Preview */}
+      <View style={styles.monsterPreview}>
+        <Image 
+          source={require('../../../../../assets/images/miniGames/techNeck.png')}
+          style={styles.mainMonster}
+          resizeMode="contain"
+        />
+        <View style={styles.vsText}>
+          <Text style={[styles.vs, { color: theme.accent }]}>VS</Text>
+        </View>
+        <View style={styles.stretchPadPreview}>
+          <Image 
+            source={require('../../../../../assets/images/miniGames/headspaceHalo1.png')}
+            style={styles.stretchPadImage}
+            resizeMode="contain"
+          />
         </View>
       </View>
 
-      {/* Stretch Pad Showcase */}
-      <View style={styles.showcaseSection}>
-        <Text style={[styles.showcaseTitle, { color: theme.success }]}>
-          🧘 Stretch Pads
-        </Text>
-        <View style={styles.padShowcase}>
-          {Object.values(PAD_CONFIG).map(pad => (
-            <View key={pad.id} style={styles.showcaseItem}>
-              <View style={[styles.padPreview, { backgroundColor: pad.color + '40' }]}>
-                <Image 
-                  source={pad.image}
-                  style={styles.showcasePadImage}
-                  resizeMode="contain"
-                />
-              </View>
-              <Text style={[styles.showcaseLabel, { color: theme.text }]}>
-                {pad.name.replace(' Pad', '')}
-              </Text>
-              <Text style={[styles.showcaseCost, { color: pad.color }]}>
-                {pad.cost}⚡
-              </Text>
-            </View>
-          ))}
+      {/* Simple How to Play */}
+      <View style={styles.howToPlay}>
+        <View style={styles.instruction}>
+          <Ionicons name="finger-print" size={30} color={theme.accent} />
+          <Text style={[styles.instructionText, { color: theme.text }]}>
+            TAP to place stretch pads
+          </Text>
         </View>
-      </View>
-
-      <View style={styles.quickTips}>
-        <Text style={[styles.tipText, { color: theme.textSecondary }]}>
-          🎯 Place pads on strategic positions to defend
-        </Text>
-        <Text style={[styles.tipText, { color: theme.textSecondary }]}>
-          ⚡ Energy: +1 every 6s, +1 per kill
-        </Text>
-        <Text style={[styles.tipText, { color: theme.textSecondary }]}>
-          💖 3 hearts - don't let monsters reach the defender!
-        </Text>
+        <View style={styles.instruction}>
+          <Ionicons name="flash" size={30} color="#FFD700" />
+          <Text style={[styles.instructionText, { color: theme.text }]}>
+            Costs energy to build
+          </Text>
+        </View>
+        <View style={styles.instruction}>
+          <Ionicons name="heart" size={30} color="#FF6B6B" />
+          <Text style={[styles.instructionText, { color: theme.text }]}>
+            Don't lose all hearts!
+          </Text>
+        </View>
       </View>
       
       <View style={styles.buttons}>
@@ -120,16 +104,20 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({
           style={[styles.playButton, { backgroundColor: theme.accent }]}
           onPress={onStart}
         >
-          <Text style={styles.playButtonText}>Start Defense</Text>
+          <Text style={styles.playButtonText}>PLAY</Text>
         </TouchableOpacity>
         
         {onSmartSkip && (
           <TouchableOpacity
-            style={[styles.smartSkipButton, { backgroundColor: theme.success }]}
+            style={[styles.quickStartButton, { 
+              borderColor: theme.border,
+              borderWidth: 2,
+              backgroundColor: 'transparent'
+            }]}
             onPress={onSmartSkip}
           >
-            <Text style={styles.smartSkipButtonText}>
-              🚀 Quick Start (Skip Tutorial)
+            <Text style={[styles.quickStartText, { color: theme.text }]}>
+              Quick Start
             </Text>
           </TouchableOpacity>
         )}
@@ -139,7 +127,7 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({
           onPress={onSkip}
         >
           <Text style={[styles.skipButtonText, { color: theme.textSecondary }]}>
-            Skip Game
+            Skip
           </Text>
         </TouchableOpacity>
       </View>
@@ -155,58 +143,89 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 30,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 12,
+    fontSize: 42,
+    fontWeight: '800',
+    marginBottom: 8,
     textAlign: 'center',
   },
-  description: {
-    fontSize: 16,
+  subtitle: {
+    fontSize: 20,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
+    marginBottom: 40,
+    opacity: 0.8,
   },
-  quickTips: {
+  monsterPreview: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 40,
+    gap: 20,
   },
-  tipText: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 4,
+  mainMonster: {
+    width: 80,
+    height: 80,
+  },
+  vsText: {
+    paddingHorizontal: 10,
+  },
+  vs: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  stretchPadPreview: {
+    width: 100,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stretchPadImage: {
+    width: 90,
+    height: 90,
+  },
+  howToPlay: {
+    gap: 20,
+    marginBottom: 50,
+  },
+  instruction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  instructionText: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   buttons: {
     width: '100%',
-    gap: 12,
+    gap: 16,
+    alignItems: 'center',
   },
   playButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 80,
+    borderRadius: 30,
     alignItems: 'center',
   },
   playButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
   },
-  smartSkipButton: {
+  quickStartButton: {
     paddingVertical: 14,
-    borderRadius: 10,
+    paddingHorizontal: 50,
+    borderRadius: 25,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
-  smartSkipButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  quickStartText: {
+    fontSize: 18,
     fontWeight: '600',
   },
   skipButton: {
@@ -214,62 +233,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   skipButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-  },
-  showcaseSection: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  showcaseTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  monsterShowcase: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  padShowcase: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  showcaseItem: {
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  showcaseImage: {
-    width: 40,
-    height: 40,
-    marginBottom: 4,
-  },
-  showcasePadImage: {
-    width: 30,
-    height: 30,
-  },
-  padPreview: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  showcaseLabel: {
-    fontSize: 10,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  showcaseCost: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    marginTop: 2,
   },
 });

@@ -3,7 +3,7 @@ import { View, Text, Animated, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface DropFeedbackProps {
-  type: 'success' | 'error' | 'discard';
+  type: 'success' | 'error' | 'skip';
   position: { x: number; y: number };
   onComplete: () => void;
 }
@@ -54,7 +54,7 @@ export const DropFeedback: React.FC<DropFeedbackProps> = ({ type, position, onCo
           color: '#FF6B6B',
           text: 'Wrong side!',
         };
-      case 'discard':
+      case 'skip':
         return {
           icon: 'hand-right',
           color: '#2196F3',

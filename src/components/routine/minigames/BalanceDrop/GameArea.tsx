@@ -3,7 +3,7 @@ import { View, Text, Animated, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../../context/ThemeContext';
 import { Item, ItemData } from './types';
-import { WORK_ITEMS, LIFE_ITEMS, MAX_TILT, ITEM_BASE_SIZE, CATEGORY_COLORS, SCALE_WIDTH, SCALE_HEIGHT, GAME_DIMENSIONS } from './constants';
+import { WORK_ITEMS, LIFE_ITEMS, ESSENTIAL_ITEMS, MAX_TILT, ITEM_BASE_SIZE, CATEGORY_COLORS, SCALE_WIDTH, SCALE_HEIGHT, GAME_DIMENSIONS } from './constants';
 import { styles } from './styles';
 import { DropFeedback } from './DropFeedback';
 
@@ -16,9 +16,9 @@ interface GameAreaProps {
   createPanResponder: (item: Item) => any;
   activeDropZone: 'work' | 'life' | 'discard' | null;
   setGameAreaOffset?: (offset: { x: number; y: number }) => void;
-  dropFeedback?: { type: 'success' | 'error' | 'discard'; position: { x: number; y: number } } | null;
+  dropFeedback?: { type: 'success' | 'error' | 'skip'; position: { x: number; y: number }; message?: string } | null;
   onDropFeedbackComplete?: () => void;
-  hoursLeft?: number;
+  energyLeft?: number;
 }
 
 export const GameArea: React.FC<GameAreaProps> = ({
@@ -30,7 +30,7 @@ export const GameArea: React.FC<GameAreaProps> = ({
   setGameAreaOffset,
   dropFeedback,
   onDropFeedbackComplete,
-  hoursLeft = 24,
+  energyLeft = 100,
 }) => {
   const { theme } = useTheme();
 
@@ -79,12 +79,12 @@ export const GameArea: React.FC<GameAreaProps> = ({
         const panResponder = createPanResponder(item);
         const itemSize = getItemSize(item.data.weight);
         
-        // Check if we have enough hours for this item
-        let requiredHours = item.data.timeCost;
-        if (item.isDual && item.data.dualTimeCost) {
-          requiredHours = Math.min(item.data.dualTimeCost.work, item.data.dualTimeCost.life);
+        // Check if we have enough energy for this item
+        let requiredEnergy = item.data.energyCost;
+        if (item.isFlexible && item.data.flexibleEnergyCost) {
+          requiredEnergy = Math.min(item.data.flexibleEnergyCost.work, item.data.flexibleEnergyCost.life);
         }
-        const hasEnoughHours = hoursLeft >= requiredHours;
+        const hasEnoughEnergy = energyLeft >= requiredEnergy;
         
         return (
           <Animated.View
@@ -93,14 +93,16 @@ export const GameArea: React.FC<GameAreaProps> = ({
             style={[
               styles.item,
               {
-                backgroundColor: hasEnoughHours ? 
-                  (item.isDual ? '#8B4513' : CATEGORY_COLORS[item.category]) : 
+                backgroundColor: hasEnoughEnergy ? 
+                  (ESSENTIAL_ITEMS.includes(item.data) ? '#9370DB' : // Purple for neutral
+                  item.isFlexible ? '#8B4513' : 
+                  CATEGORY_COLORS[item.category]) : 
                   '#666666',
                 width: itemSize,
                 height: itemSize,
-                borderWidth: item.isUrgent ? 3 : (item.isCritical ? 4 : 0),
-                borderColor: item.isUrgent ? '#FFD700' : (item.isCritical ? '#FF0000' : 'transparent'),
-                borderStyle: item.isCritical ? 'dashed' : 'solid',
+                borderWidth: ESSENTIAL_ITEMS.includes(item.data) ? 2 : 0,
+                borderColor: ESSENTIAL_ITEMS.includes(item.data) ? '#FFFFFF' : 'transparent',
+                borderStyle: 'dashed',
                 left: item.position.x,
                 top: item.position.y,
                 transform: [{ scale: item.scale }],
@@ -110,31 +112,44 @@ export const GameArea: React.FC<GameAreaProps> = ({
           >
             <Ionicons name={item.data.icon as any} size={28} color="#FFFFFF" />
             <Text style={styles.itemLabel}>{item.data.label || ''}</Text>
+            {/* Show description on larger items */}
+            {item.data.weight >= 3 && item.data.description && (
+              <Text style={styles.itemDescription}>{item.data.description}</Text>
+            )}
             <View style={styles.itemWeightDots}>
               {Array.from({ length: item.data.weight }).map((_, i) => (
                 <View key={i} style={styles.itemDot} />
               ))}
             </View>
-            {item.isDual && (
-              <View style={styles.dualBadge}>
-                <Text style={styles.dualText}>⇄</Text>
+            {item.isFlexible && (
+              <View style={styles.flexibleBadge}>
+                <Text style={styles.flexibleText}>⇄</Text>
               </View>
             )}
-            {item.isCritical && (
-              <View style={styles.criticalBadge}>
-                <Text style={styles.criticalText}>!</Text>
+            {item.data.energyRestore && (
+              <View style={styles.restBadge}>
+                <Text style={styles.restText}>+</Text>
               </View>
             )}
-            {item.isUrgent && item.urgencyTimer !== undefined && item.urgencyTimer > 0 && (
-              <View style={styles.urgencyBadge}>
-                <Text style={styles.urgencyText}>{String(item.urgencyTimer)}</Text>
-              </View>
-            )}
-            {!hasEnoughHours && (
-              <View style={styles.noHoursBadge}>
+            {!hasEnoughEnergy && (
+              <View style={styles.noEnergyBadge}>
                 <Ionicons name="ban" size={24} color="#FF0000" />
               </View>
             )}
+            {/* Neutral item badge */}
+            {ESSENTIAL_ITEMS.includes(item.data) && (
+              <View style={styles.neutralBadge}>
+                <Text style={styles.neutralText}>⚖</Text>
+              </View>
+            )}
+            {/* Energy cost preview */}
+            <View style={[styles.energyCostBadge, { 
+              backgroundColor: item.data.energyRestore ? '#4CAF50' : '#FF9800' 
+            }]}>
+              <Text style={styles.energyCostText}>
+                {item.data.energyRestore ? `+${item.data.energyRestore}` : `-${requiredEnergy}`}
+              </Text>
+            </View>
           </Animated.View>
         );
       })}

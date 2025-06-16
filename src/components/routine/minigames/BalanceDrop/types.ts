@@ -6,16 +6,36 @@ export interface BalanceDropProps {
   context?: 'routine' | 'home';
 }
 
+export interface LifeStats {
+  career: number;      // 0-100 Career progress
+  family: number;      // 0-100 Family happiness  
+  health: number;      // 0-100 Physical health
+  social: number;      // 0-100 Social connections
+  stress: number;      // 0-100 Stress level
+}
+
+export interface StatEffect {
+  stat: keyof LifeStats;
+  change: number;
+  message?: string; // Optional message to show
+}
+
 export interface ItemData {
   icon: string;
   label: string;
-  weight: 1 | 2 | 3 | 4 | 5; // Added heavy weights
-  timeCost: number; // Hours consumed
-  timeRestore?: number; // Some activities might give you more efficient time
+  description?: string; // Brief description of the situation
+  weight: 1 | 2 | 3 | 4 | 5; // Visual size and balance impact
+  energyCost: number; // Energy consumed (positive number)
+  energyRestore?: number; // Energy restored after activity (for rest items)
   category: ItemCategory;
-  isDual?: boolean; // Can go to either side
-  dualTimeCost?: { work: number; life: number }; // Different costs for each side
-  isCritical?: boolean; // Must be placed correctly
+  isFlexible?: boolean; // Can go to either side
+  flexibleEnergyCost?: { work: number; life: number }; // Different costs for each side
+  effects?: {
+    immediate?: StatEffect[]; // Applied when placed
+    delayed?: StatEffect[]; // Applied next round
+    skipPenalty?: StatEffect[]; // Applied if missed/skipped
+  };
+  isCritical?: boolean; // Can't be skipped without major penalty
 }
 
 export type ItemCategory = 'work' | 'family' | 'wellness' | 'hobbies' | 'goals' | 'social';
@@ -28,10 +48,21 @@ export interface Item {
   position: Animated.ValueXY;
   opacity: Animated.Value;
   scale: Animated.Value;
-  isUrgent: boolean;
-  urgencyTimer?: number;
-  isDual?: boolean; // Can be placed on either side
-  isCritical?: boolean; // Must be placed correctly
+  isFlexible?: boolean; // Can be placed on either side
+}
+
+export interface DayScenario {
+  id: string;
+  name: string;
+  description: string;
+  storyText?: string; // Narrative context for the scenario
+  energyModifier: number; // Multiplier for starting energy (0.6 = 60% energy)
+  workItemChance: number; // Chance of work items spawning
+  essentialItemChance: number; // Chance of neutral essential items
+  specialItems?: string[]; // Special items that spawn in this scenario
+  stressEvents?: string[]; // Random events that can happen
+  tips: string[]; // Helpful hints for the scenario
+  statModifiers?: Partial<LifeStats>; // Starting stat adjustments for scenario
 }
 
 export interface Round {
@@ -40,12 +71,11 @@ export interface Round {
   spawnRate: number;
   fallSpeed: number;
   itemCount: number;
-  urgentItemChance: number;
   startingBalanceRange: { min: number; max: number };
-  maxLetGo?: number; // Maximum number of items that can be let go
-  heavyItemChance?: number; // Chance of spawning heavy items (weight 4-5)
-  dualItemChance?: number; // Chance of spawning dual items
-  criticalItemChance?: number; // Chance of spawning critical items
+  maxSkips?: number; // Maximum number of items that can be skipped
+  restItemChance?: number; // Chance of spawning energy-restoring items
+  flexibleItemChance?: number; // Chance of spawning flexible items
+  scenario?: DayScenario; // The daily scenario for this round
 }
 
 export type GameState = 'menu' | 'tutorial' | 'playing' | 'roundComplete' | 'gameOver';
@@ -53,10 +83,19 @@ export type GameState = 'menu' | 'tutorial' | 'playing' | 'roundComplete' | 'gam
 export interface GameStats {
   score: number;
   roundScore: number;
+  itemsPlaced: number;
+  energyRestored: number;
+  perfectBalanceCount: number;
+  currentEnergy: number;
   correctPlacements: number;
   urgentItemsHandled: number;
   missedUrgentItems: number;
-  perfectBalanceCount: number;
+  lifeStats: LifeStats;
+  decisions: {
+    item: string;
+    choice: 'work' | 'life' | 'skip';
+    effects: StatEffect[];
+  }[];
 }
 
 export interface ComboInfo {

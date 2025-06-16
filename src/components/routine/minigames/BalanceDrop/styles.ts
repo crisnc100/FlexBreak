@@ -18,7 +18,13 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 20,
+    fontStyle: 'italic',
   },
   instructionCard: {
     padding: 20,
@@ -154,8 +160,13 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 10,
-    padding: 10,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   energyLabel: {
     fontSize: 14,
@@ -164,21 +175,38 @@ export const styles = StyleSheet.create({
   },
   energyBarBg: {
     flex: 1,
-    height: 20,
+    height: 24,
     backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 10,
+    borderRadius: 12,
     overflow: 'hidden',
+    marginHorizontal: 10,
   },
   energyBar: {
     height: '100%',
-    borderRadius: 10,
+    borderRadius: 12,
+  },
+  energyFlash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FF0000',
+    borderRadius: 12,
+  },
+  energyTextContainer: {
+    minWidth: 50,
+    alignItems: 'flex-end',
   },
   energyText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '700',
-    minWidth: 40,
     textAlign: 'right',
-    marginLeft: 10,
+  },
+  energyWarning: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
   },
   
   // Let go counter
@@ -224,7 +252,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 10,
   },
-  tutorialText: {
+  tutorialHintText: {
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
@@ -288,6 +316,15 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 2,
     textAlign: 'center',
+  },
+  itemDescription: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '600',
+    marginTop: 1,
+    textAlign: 'center',
+    paddingHorizontal: 4,
+    opacity: 0.9,
   },
   itemWeightDots: {
     flexDirection: 'row',
@@ -365,7 +402,7 @@ export const styles = StyleSheet.create({
   // Scale styles
   scaleContainer: {
     position: 'absolute',
-    bottom: 180, // Higher position to make room for discard zone
+    bottom: 120, // Lowered for better visual balance
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -557,7 +594,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  pauseButton: {
+  pauseButtonIcon: {
     position: 'absolute',
     top: 60,
     right: 60,
@@ -621,5 +658,433 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     opacity: 0.9,
+  },
+
+  // Status container styles
+  statusContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginTop: 8,
+    borderRadius: 12,
+  },
+  simpleStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statusItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  simpleStatusValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  statusLabel: {
+    fontSize: 12,
+    marginTop: 2,
+    opacity: 0.8,
+  },
+  statusDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 20,
+  },
+
+  // How to play styles
+  howToPlay: {
+    marginBottom: 20,
+    width: '100%',
+    padding: 16,
+    borderRadius: 12,
+  },
+  howToPlayTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  howToPlayText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  // Balance Container
+  balanceContainer: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  balanceBar: {
+    flexDirection: 'row',
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  balanceSection: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  workSection: {
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+  },
+  lifeSection: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  balanceCenter: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  balanceIndicator: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+  },
+  balanceLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  balanceWarning: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  timerWarning: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // Life Stats with Bars
+  lifeStatsGrid: {
+    paddingTop: 10,
+  },
+  statItemWithBar: {
+    marginBottom: 10,
+  },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  statMiniLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  statBarBg: {
+    height: 8,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  statBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+
+  // Badge styles for items
+  flexibleBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#8B4513',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  flexibleText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  restBadge: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  noEnergyBadge: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -12,
+    marginLeft: -12,
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  energyCostBadge: {
+    position: 'absolute',
+    bottom: -8,
+    right: '50%',
+    marginRight: -20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+  },
+  energyCostText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  neutralBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: '#9370DB',
+    borderRadius: 8,
+    width: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  neutralText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  
+  // Life Stats
+  lifeStatsContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+  },
+  lifeStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Enhanced Score Showcase
+  scoreShowcase: {
+    padding: 24,
+    borderRadius: 20,
+    marginTop: 30,
+    marginBottom: 20,
+    alignItems: 'center',
+    width: '100%',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  bigScore: {
+    fontSize: 48,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  scoreLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 5,
+    marginBottom: 20,
+  },
+  quickStats: {
+    flexDirection: 'row',
+    gap: 20,
+    justifyContent: 'center',
+  },
+  quickStat: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickStatNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // Visual Life Stats with Circles
+  lifeStatsVisual: {
+    padding: 20,
+    borderRadius: 20,
+    marginTop: 20,
+    width: '100%',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  lifeStatsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  lifeStatsCircles: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+  },
+  statCircle: {
+    alignItems: 'center',
+    width: 50,
+  },
+  statCircleProgress: {
+    width: 40,
+    borderRadius: 20,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 8,
+    minHeight: 40,
+    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  statCircleValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  // Legacy styles (keeping for backward compatibility)
+  lifeStatsCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    width: '100%',
+  },
+  lifeStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+  },
+  lifeStat: {
+    alignItems: 'center',
+    marginBottom: 12,
+    width: '30%',
+  },
+  lifeStatLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  lifeStatValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  
+  // Round Complete - Decisions
+  decisionsCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    width: '100%',
+  },
+  decisionsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  decisionItem: {
+    marginBottom: 8,
+  },
+  decisionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  decisionEffect: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  
+  // Game Over Screen
+  gameOverStory: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+    lineHeight: 20,
+    opacity: 0.9,
+  },
+  finalStatsContainer: {
+    padding: 12,
+    borderRadius: 12,
+    marginVertical: 16,
+    width: '100%',
+  },
+  finalStatsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  finalStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  finalStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  finalStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

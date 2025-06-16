@@ -402,23 +402,32 @@ export const StressBuster: React.FC<StressBusterProps> = ({
           <View style={styles.topControls}>
             <TouchableOpacity style={styles.skipFromInstructions} onPress={handleSkipPress}>
               <Text style={[context === 'home' ? styles.skipTextHome : styles.skipText, { color: theme.textSecondary }]}>
-                Skip Game
+                Skip
               </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.instructionsContent}>
+            <Animated.View style={{ transform: [{ scale: new Animated.Value(1) }] }}>
+              <Ionicons 
+                name="body" 
+                size={80} 
+                color={theme.accent} 
+                style={{ alignSelf: 'center', marginBottom: 20 }}
+              />
+            </Animated.View>
+            
             <Text style={[styles.instructionsTitle, { color: theme.text }]}>
-              Posture Recognition Game
+              Posture Check
             </Text>
             <Text style={[styles.instructionsSubtitle, { color: theme.textSecondary }]}>
-              Tap workers with GOOD posture!
+              Tap good posture only!
             </Text>
             
             {!imagesPreloaded && (
               <View style={styles.loadingContainer}>
                 <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
-                  Loading images...
+                  Loading...
                 </Text>
               </View>
             )}
@@ -427,41 +436,47 @@ export const StressBuster: React.FC<StressBusterProps> = ({
             {imagesPreloaded && (
               <View style={styles.examplesContainer}>
                 <View style={styles.exampleItem}>
-                  <View style={[styles.exampleImageContainer, { borderColor: '#4CAF50' }]}>
+                  <View style={[styles.exampleImageContainer, { 
+                    borderColor: '#4CAF50',
+                    borderWidth: 3,
+                    width: 120,
+                    height: 120,
+                  }]}>
                     <Image 
                       source={require('../../../../assets/images/goodWorker1.png')}
-                      style={styles.exampleImage}
+                      style={[styles.exampleImage, { width: 100, height: 100 }]}
                       resizeMode="contain"
                     />
                   </View>
-                  <Text style={[styles.exampleLabel, { color: '#4CAF50' }]}>TAP THIS</Text>
-                  <Text style={[styles.exampleDescription, { color: theme.textSecondary }]}>
-                    Good Posture
+                  <Text style={[styles.exampleLabel, { color: '#4CAF50', fontSize: 20 }]}>
+                    ✓ TAP
                   </Text>
                 </View>
                 
                 <View style={styles.exampleItem}>
-                  <View style={[styles.exampleImageContainer, { borderColor: '#F44336' }]}>
+                  <View style={[styles.exampleImageContainer, { 
+                    borderColor: '#F44336',
+                    borderWidth: 3,
+                    width: 120,
+                    height: 120,
+                  }]}>
                     <Image 
                       source={require('../../../../assets/images/tiredWorker1.png')}
-                      style={styles.exampleImage}
+                      style={[styles.exampleImage, { width: 100, height: 100 }]}
                       resizeMode="contain"
                     />
                   </View>
-                  <Text style={[styles.exampleLabel, { color: '#F44336' }]}>AVOID THIS</Text>
-                  <Text style={[styles.exampleDescription, { color: theme.textSecondary }]}>
-                    Poor Posture
+                  <Text style={[styles.exampleLabel, { color: '#F44336', fontSize: 20 }]}>
+                    ✗ SKIP
                   </Text>
                 </View>
               </View>
             )}
             
-            <View style={styles.instructionsDetails}>
-              <Text style={[styles.instructionsText, { color: theme.textSecondary }]}>
-                • Workers will appear randomly on screen{'\n'}
-                • You have 45 seconds{'\n'}
-                • Look for good vs poor posture{'\n'}
-                • Tap only the workers with good posture!
+            <View style={styles.simpleTimer}>
+              <Ionicons name="timer-outline" size={30} color={theme.accent} />
+              <Text style={[styles.timerText, { color: theme.text }]}>
+                45 seconds
               </Text>
             </View>
             
@@ -470,14 +485,17 @@ export const StressBuster: React.FC<StressBusterProps> = ({
                 styles.startButton, 
                 { 
                   backgroundColor: imagesPreloaded ? theme.accent : theme.border,
-                  opacity: imagesPreloaded ? 1 : 0.5 
+                  opacity: imagesPreloaded ? 1 : 0.5,
+                  paddingVertical: 20,
+                  paddingHorizontal: 60,
+                  marginTop: 30,
                 }
               ]}
               onPress={startGame}
               disabled={!imagesPreloaded}
             >
-              <Text style={styles.startButtonText}>
-                {imagesPreloaded ? 'Start Game' : 'Loading...'}
+              <Text style={[styles.startButtonText, { fontSize: 22 }]}>
+                {imagesPreloaded ? 'PLAY' : 'Loading...'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -826,15 +844,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   instructionsTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 42,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   instructionsSubtitle: {
-    fontSize: 16,
+    fontSize: 24,
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 40,
+    opacity: 0.8,
   },
   examplesContainer: {
     flexDirection: 'row',
@@ -975,5 +994,16 @@ const styles = StyleSheet.create({
   badBurst: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  simpleTimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 20,
+  },
+  timerText: {
+    fontSize: 20,
+    fontWeight: '600',
   },
 });

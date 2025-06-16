@@ -18,39 +18,44 @@ export const RoundCompleteScreen: React.FC<RoundCompleteScreenProps> = ({
 }) => {
   const { theme } = useTheme();
 
+  const getPerformanceMessage = () => {
+    const accuracy = stats.itemsPlaced > 0 ? (stats.roundScore / (stats.itemsPlaced * 10)) : 0;
+    if (accuracy >= 0.8) return '🎉 Excellent!';
+    if (accuracy >= 0.6) return '⭐ Great Job!';
+    if (accuracy >= 0.4) return '👍 Good Work!';
+    return '✅ Round Complete!';
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.completeContainer}>
-        <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-        <Text style={[styles.completeTitle, { color: theme.text }]}>
-          Round {currentRound} Complete!
+        
+        <Text style={[styles.completeTitle, { color: theme.text, fontSize: 36, fontWeight: '800', marginBottom: 30 }]}>
+          {getPerformanceMessage()}
         </Text>
         
-        <View style={[styles.statsCard, { backgroundColor: theme.cardBackground }]}>
-          <View style={styles.statRow}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Round Score:</Text>
-            <Text style={[styles.statValue, { color: theme.text }]}>{stats.roundScore}</Text>
+        <View style={[styles.statsCard, { backgroundColor: theme.cardBackground, padding: 30, marginBottom: 40 }]}>
+          <View style={[styles.statRow, { marginBottom: 16 }]}>
+            <Text style={[styles.statLabel, { color: theme.textSecondary, fontSize: 20 }]}>Score</Text>
+            <Text style={[styles.statValue, { color: theme.accent, fontSize: 32, fontWeight: '700' }]}>{Math.round(stats.roundScore)}</Text>
           </View>
           <View style={styles.statRow}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Correct Placements:</Text>
-            <Text style={[styles.statValue, { color: '#4CAF50' }]}>{stats.correctPlacements}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Urgent Items Handled:</Text>
-            <Text style={[styles.statValue, { color: '#FFA500' }]}>{stats.urgentItemsHandled}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Perfect Balance Combos:</Text>
-            <Text style={[styles.statValue, { color: theme.accent }]}>{stats.perfectBalanceCount}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary, fontSize: 20 }]}>Items Placed</Text>
+            <Text style={[styles.statValue, { color: theme.text, fontSize: 24, fontWeight: '600' }]}>{stats.itemsPlaced}</Text>
           </View>
         </View>
         
         <TouchableOpacity
-          style={[styles.continueButton, { backgroundColor: theme.accent }]}
+          style={[styles.continueButton, { 
+            backgroundColor: theme.accent,
+            paddingVertical: 20,
+            paddingHorizontal: 50,
+            borderRadius: 25
+          }]}
           onPress={onNextRound}
         >
-          <Text style={styles.continueButtonText}>
-            {currentRound >= 3 ? 'Finish' : 'Next Round'}
+          <Text style={[styles.continueButtonText, { fontSize: 22, fontWeight: '700' }]}>
+            {currentRound >= 3 ? '🏆 FINISH GAME' : '▶️ NEXT ROUND'}
           </Text>
         </TouchableOpacity>
       </View>
