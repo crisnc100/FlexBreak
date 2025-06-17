@@ -432,137 +432,239 @@ export const LIFE_ITEMS: ItemData[] = [
   },
 ];
 
-// Essential items - neutral activities everyone needs, can go to either side with NO penalty
+// Essential items - MUST be handled, can't be skipped, go to either side
 export const ESSENTIAL_ITEMS: ItemData[] = [
   { 
-    icon: 'water-outline', 
-    label: 'Hydration', 
-    description: 'Stay hydrated',
-    weight: 1, 
-    energyCost: 0, // No cost - essential!
-    energyRestore: 2,
+    icon: 'call-outline', 
+    label: 'Emergency Call', 
+    description: 'Family emergency!',
+    weight: 3, 
+    energyCost: 0, // No cost for emergencies
+    category: 'family',
+    isCritical: true,
+    effects: {
+      immediate: [
+        { stat: 'family', change: 5, message: 'Handled emergency' },
+        { stat: 'stress', change: 10 }
+      ],
+      skipPenalty: [
+        { stat: 'family', change: -30, message: 'Ignored emergency!' },
+        { stat: 'stress', change: 20 }
+      ]
+    }
+  },
+  { 
+    icon: 'medical-outline', 
+    label: 'Medicine Time', 
+    description: 'Daily medication',
+    weight: 2, 
+    energyCost: 0,
     category: 'wellness',
-    isFlexible: true,
+    isCritical: true,
+    effects: {
+      immediate: [
+        { stat: 'health', change: 5, message: 'Took medicine' }
+      ],
+      skipPenalty: [
+        { stat: 'health', change: -20, message: 'Missed medication!' }
+      ]
+    }
+  },
+  { 
+    icon: 'car-outline', 
+    label: 'Pick up Kids', 
+    description: 'School closes at 3PM',
+    weight: 3, 
+    energyCost: 8,
+    category: 'family',
+    isCritical: true,
+    effects: {
+      immediate: [
+        { stat: 'family', change: 10, message: 'Kids safe' }
+      ],
+      skipPenalty: [
+        { stat: 'family', change: -40, message: 'Kids stranded!' },
+        { stat: 'stress', change: 30 }
+      ]
+    }
   },
   { 
     icon: 'restaurant-outline', 
-    label: 'Quick Lunch', 
-    description: 'Fuel your body',
+    label: 'Eat Something', 
+    description: 'Haven\'t eaten all day',
     weight: 2, 
-    energyCost: 2,
-    energyRestore: 5,
+    energyCost: 0,
+    energyRestore: 10,
     category: 'wellness',
-    isFlexible: true,
+    isCritical: true,
+    effects: {
+      immediate: [
+        { stat: 'health', change: 5, message: 'Finally ate' }
+      ],
+      skipPenalty: [
+        { stat: 'health', change: -15, message: 'Starving!' },
+        { stat: 'stress', change: 10 }
+      ]
+    }
   },
   { 
-    icon: 'walk-outline', 
-    label: 'Bathroom Break', 
-    description: 'Nature calls',
-    weight: 1, 
-    energyCost: 0, // No cost - essential!
-    energyRestore: 1,
-    category: 'wellness',
-    isFlexible: true,
+    icon: 'alarm-outline', 
+    label: 'Urgent Deadline', 
+    description: 'Contract expires!',
+    weight: 3, 
+    energyCost: 5,
+    category: 'work',
+    isCritical: true,
+    effects: {
+      immediate: [
+        { stat: 'career', change: 10, message: 'Met deadline' }
+      ],
+      skipPenalty: [
+        { stat: 'career', change: -30, message: 'Lost contract!' }
+      ]
+    }
   },
   { 
-    icon: 'eye-outline', 
-    label: 'Eye Break', 
-    description: '20-20-20 rule',
+    icon: 'water-outline', 
+    label: 'Dehydration Alert', 
+    description: 'Feeling dizzy',
     weight: 1, 
     energyCost: 0,
-    energyRestore: 2,
+    energyRestore: 5,
     category: 'wellness',
-    isFlexible: true,
-  },
-  { 
-    icon: 'nutrition-outline', 
-    label: 'Quick Snack', 
-    description: 'Energy boost',
-    weight: 1, 
-    energyCost: 1,
-    energyRestore: 3,
-    category: 'wellness',
-    isFlexible: true,
-  },
-  { 
-    icon: 'phone-portrait-outline', 
-    label: 'Important Call', 
-    description: 'Can\'t ignore',
-    weight: 2, 
-    energyCost: 5,
-    category: 'social',
-    isFlexible: true,
+    isCritical: true,
+    effects: {
+      immediate: [
+        { stat: 'health', change: 5, message: 'Hydrated' }
+      ],
+      skipPenalty: [
+        { stat: 'health', change: -10, message: 'Dehydrated!' }
+      ]
+    }
   },
 ];
 
 // Flexible items - can go to either work or life side but with different consequences
 export const FLEXIBLE_ITEMS: ItemData[] = [
   { 
-    icon: 'phone-portrait-outline', 
-    label: 'Phone Call', 
-    description: 'Who\'s calling?',
+    icon: 'cafe-outline', 
+    label: 'Lunch Break', 
+    description: 'Quick desk lunch or proper meal?',
     weight: 2, 
     energyCost: 5,
-    category: 'social',
+    category: 'wellness',
     isFlexible: true,
-    flexibleEnergyCost: { work: 3, life: 6 }, // Quick at work, longer at home
+    flexibleEnergyCost: { work: 3, life: 8 }, // Quick at desk, proper break away
     effects: {
-      immediate: [
-        { stat: 'social', change: 5 }
-      ]
+      work: {
+        immediate: [
+          { stat: 'career', change: 3, message: 'Working lunch' },
+          { stat: 'health', change: -5, message: 'Rushed meal' }
+        ]
+      },
+      life: {
+        immediate: [
+          { stat: 'health', change: 10, message: 'Proper meal' },
+          { stat: 'stress', change: -10, message: 'Relaxed' }
+        ]
+      }
     }
   },
   { 
     icon: 'laptop-outline', 
-    label: 'Laptop Time', 
-    description: 'Work or play?',
-    weight: 3, 
-    energyCost: 10,
-    category: 'goals',
-    isFlexible: true,
-    flexibleEnergyCost: { work: 12, life: 8 }, // Stressful at work, relaxing at home
-    effects: {
-      immediate: [
-        { stat: 'stress', change: 5 } // If at work
-      ]
-    }
-  },
-  { 
-    icon: 'cafe-outline', 
-    label: 'Coffee Break', 
-    description: 'Quick or social?',
-    weight: 2, 
-    energyCost: 3,
-    energyRestore: 4,
-    category: 'social',
-    isFlexible: true,
-    flexibleEnergyCost: { work: 2, life: 4 } // Quick at work, social at home
-  },
-  { 
-    icon: 'book-outline', 
-    label: 'Reading Time', 
-    description: 'Work or pleasure?',
+    label: 'Email Check', 
+    description: 'Quick scan or deep dive?',
     weight: 2, 
     energyCost: 8,
-    category: 'goals',
+    category: 'work',
     isFlexible: true,
-    flexibleEnergyCost: { work: 10, life: 6 }, // Work reading is harder
+    flexibleEnergyCost: { work: 10, life: 5 }, // Stressful at work, quick at home
     effects: {
-      immediate: [
-        { stat: 'career', change: 5 } // If at work
-      ]
+      work: {
+        immediate: [
+          { stat: 'career', change: 5, message: 'Inbox cleared' },
+          { stat: 'stress', change: 8 }
+        ]
+      },
+      life: {
+        immediate: [
+          { stat: 'career', change: 2, message: 'Quick check' },
+          { stat: 'stress', change: 3 }
+        ]
+      }
     }
   },
   { 
-    icon: 'musical-notes-outline', 
-    label: 'Music Break', 
-    description: 'Background or focus?',
+    icon: 'people-outline', 
+    label: 'Team Chat', 
+    description: 'Work discussion or social chat?',
+    weight: 2, 
+    energyCost: 6,
+    category: 'social',
+    isFlexible: true,
+    flexibleEnergyCost: { work: 8, life: 4 },
+    effects: {
+      work: {
+        immediate: [
+          { stat: 'career', change: 5, message: 'Good teamwork' },
+          { stat: 'social', change: 3 }
+        ]
+      },
+      life: {
+        immediate: [
+          { stat: 'social', change: 10, message: 'Connected with team' },
+          { stat: 'stress', change: -5 }
+        ]
+      }
+    }
+  },
+  { 
+    icon: 'walk-outline', 
+    label: 'Quick Walk', 
+    description: 'Rushed or relaxing?',
     weight: 1, 
-    energyCost: 2,
-    energyRestore: 2,
+    energyCost: 4,
+    energyRestore: 3,
     category: 'wellness',
     isFlexible: true,
-    flexibleEnergyCost: { work: 1, life: 2 }
+    flexibleEnergyCost: { work: 2, life: 5 },
+    effects: {
+      work: {
+        immediate: [
+          { stat: 'health', change: 3, message: 'Quick stretch' }
+        ]
+      },
+      life: {
+        immediate: [
+          { stat: 'health', change: 8, message: 'Refreshing walk' },
+          { stat: 'stress', change: -8 }
+        ]
+      }
+    }
+  },
+  { 
+    icon: 'phone-portrait-outline', 
+    label: 'Personal Call', 
+    description: 'Quick or quality time?',
+    weight: 2, 
+    energyCost: 6,
+    category: 'social',
+    isFlexible: true,
+    flexibleEnergyCost: { work: 4, life: 8 },
+    effects: {
+      work: {
+        immediate: [
+          { stat: 'social', change: 3, message: 'Quick hello' },
+          { stat: 'stress', change: 5, message: 'Felt rushed' }
+        ]
+      },
+      life: {
+        immediate: [
+          { stat: 'social', change: 10, message: 'Good conversation' },
+          { stat: 'family', change: 5 }
+        ]
+      }
+    }
   },
 ];
 
@@ -652,6 +754,83 @@ export const DAY_SCENARIOS: DayScenario[] = [
     stressEvents: ['Client emergency!', 'Server down!', 'Boss needs this NOW!'],
     tips: ['Stay calm', 'Breathe', 'One at a time'],
     statModifiers: { stress: 50, career: 35, family: 35 }
+  },
+  {
+    id: 'sick_day',
+    name: 'Feeling Unwell',
+    description: 'Should you push through?',
+    storyText: 'Woke up with headache. Important meeting today. Fever starting.',
+    energyModifier: 0.6, // 60% energy (sick)
+    workItemChance: 0.35, // 35% work items - should rest
+    essentialItemChance: 0.4, // 40% essential items (medicine, rest)
+    tips: ['Health first', 'Rest needed', 'Call in sick?'],
+    statModifiers: { health: 30, stress: 40 }
+  },
+  {
+    id: 'vacation_prep',
+    name: 'Pre-Vacation Rush',
+    description: 'Leaving tomorrow!',
+    storyText: 'Flight at 6AM. Still packing. Boss wants everything done.',
+    energyModifier: 0.8, // 80% energy
+    workItemChance: 0.6, // 60% work items - need to finish
+    essentialItemChance: 0.2, // 20% essential items
+    tips: ['Delegate tasks', 'Pack light', 'Set OOO'],
+    statModifiers: { stress: 45, social: 60 }
+  },
+  {
+    id: 'performance_review',
+    name: 'Review Week',
+    description: 'Make it count!',
+    storyText: 'Annual review Friday. Need to impress. Family feels neglected.',
+    energyModifier: 0.85, // 85% energy
+    workItemChance: 0.7, // 70% work items - career focus
+    essentialItemChance: 0.15, // 15% essential items
+    tips: ['Show results', 'Stay late?', 'Document wins'],
+    statModifiers: { career: 50, family: 35, stress: 45 }
+  },
+  {
+    id: 'birthday_chaos',
+    name: 'Birthday Surprise',
+    description: 'It\'s your special day!',
+    storyText: 'Forgot own birthday. Friends planned party. Deadline tomorrow.',
+    energyModifier: 0.95, // 95% energy
+    workItemChance: 0.4, // 40% work items
+    essentialItemChance: 0.2, // 20% essential items
+    tips: ['Enjoy today', 'Work can wait', 'Celebrate!'],
+    statModifiers: { social: 70, family: 65, stress: 30 }
+  },
+  {
+    id: 'remote_struggle',
+    name: 'WFH Blues',
+    description: 'Cabin fever setting in',
+    storyText: 'Kids home sick. WiFi acting up. Haven\'t left house in days.',
+    energyModifier: 0.75, // 75% energy
+    workItemChance: 0.5, // 50% work items
+    essentialItemChance: 0.25, // 25% essential items
+    tips: ['Take walks', 'Set boundaries', 'Stay connected'],
+    statModifiers: { stress: 40, social: 30, family: 45 }
+  },
+  {
+    id: 'promotion_day',
+    name: 'Big Opportunity',
+    description: 'Promotion interview!',
+    storyText: 'Interview at 2PM. Kids have recital at 3PM. Can\'t miss either.',
+    energyModifier: 0.9, // 90% energy
+    workItemChance: 0.65, // 65% work items
+    essentialItemChance: 0.2, // 20% essential items
+    tips: ['Prepare well', 'Time management', 'Both matter'],
+    statModifiers: { career: 60, family: 50, stress: 55 }
+  },
+  {
+    id: 'burnout_warning',
+    name: 'Running on Empty',
+    description: 'Something\'s gotta give',
+    storyText: 'Third all-nighter this week. Hands shaking. Friends worried.',
+    energyModifier: 0.5, // 50% energy (exhausted)
+    workItemChance: 0.3, // 30% work items - need rest
+    essentialItemChance: 0.5, // 50% essential items (rest, health)
+    tips: ['STOP', 'Rest now', 'Ask for help'],
+    statModifiers: { health: 25, stress: 80, social: 30 }
   }
 ];
 
@@ -666,31 +845,31 @@ export const ROUNDS: Round[] = [
     startingBalanceRange: { min: -20, max: 20 }, // Slight imbalance
     maxSkips: 999, // Unlimited skips in round 1
     restItemChance: 0.2, // 20% chance of rest items
-    scenario: DAY_SCENARIOS[2], // Balanced Tuesday - good for learning
+    scenario: DAY_SCENARIOS[Math.floor(Math.random() * 5)], // Random from first 5 easier scenarios
   },
   { 
     number: 2, 
     duration: 30, 
-    spawnRate: 1800, // Spawn every 1.8 seconds
-    fallSpeed: 4000, // Moderate speed
-    itemCount: 20, // 20 items
+    spawnRate: 2200, // Spawn every 2.2 seconds (slightly slower)
+    fallSpeed: 4200, // Slightly faster than round 1
+    itemCount: 18, // 18 items (reduced from 20)
     startingBalanceRange: { min: -30, max: 30 }, // More imbalance
     maxSkips: 5, // Limited skips
     restItemChance: 0.15, // 15% chance of rest items
     flexibleItemChance: 0.2, // 20% chance of flexible items
-    scenario: DAY_SCENARIOS[0], // Monday Rush
+    scenario: DAY_SCENARIOS[Math.floor(Math.random() * 8)], // Random from first 8 scenarios
   },
   { 
     number: 3, 
     duration: 30, 
-    spawnRate: 1500, // Spawn every 1.5 seconds
-    fallSpeed: 3500, // Faster speed
-    itemCount: 25, // 25 items
+    spawnRate: 1900, // Spawn every 1.9 seconds (slower than before)
+    fallSpeed: 3800, // Moderately faster than round 2
+    itemCount: 22, // 22 items (reduced from 25)
     startingBalanceRange: { min: -40, max: 40 }, // Higher imbalance
     maxSkips: 3, // Very limited skips
     restItemChance: 0.1, // 10% chance of rest items
     flexibleItemChance: 0.25, // 25% chance of flexible items
-    scenario: DAY_SCENARIOS[1], // Deadline Day - intense!
+    scenario: DAY_SCENARIOS[Math.floor(Math.random() * DAY_SCENARIOS.length)], // Any scenario possible!
   },
 ];
 

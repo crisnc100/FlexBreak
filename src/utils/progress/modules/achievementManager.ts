@@ -97,6 +97,22 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
       case 'total_minutes': 
         achievement.progress = stats.totalMinutes || 0; 
         break;
+      case 'minigame_streak':
+        // This will be tracked separately by minigame service
+        // Progress will be updated when minigames are played
+        break;
+      case 'posture_patrol_perfect':
+        // This will be updated when Posture Patrol is completed perfectly
+        break;
+      case 'stress_buster_perfect':
+        // This will be updated when Stress Buster is completed perfectly
+        break;
+      case 'balance_drop_perfect':
+        // This will be updated when Balance Drop is completed with perfect balance
+        break;
+      case 'trivia_streak':
+        // This will track consecutive perfect trivia games
+        break;
     }
     
     // Check for completion and award XP
@@ -272,4 +288,113 @@ export const getNewlyUnlockedBadges = (userProgress: UserProgress): Achievement[
   return Object.values(userProgress.achievements).filter(achievement => 
     achievement.completed && achievement.badgeUnlocked === false
   );
+};
+
+/**
+ * Update mini-game related achievements
+ * @param userProgress User progress object
+ * @param gameType The type of mini-game played
+ * @param isPerfectScore Whether the game was completed perfectly
+ */
+export const updateMiniGameAchievements = async (
+  userProgress: UserProgress,
+  gameType: 'posture_patrol' | 'stress_buster' | 'balance_drop' | 'trivia',
+  isPerfectScore: boolean
+): Promise<void> => {
+  // Ensure achievements are initialized
+  initializeAchievements(userProgress);
+  
+  const newlyCompletedAchievements: Achievement[] = [];
+  
+  // Update minigame streak achievement
+  const dailyPlayerAchievement = userProgress.achievements['daily_player'];
+  if (dailyPlayerAchievement && !dailyPlayerAchievement.completed) {
+    // Get minigame streak from storage
+    const minigameStreak = await storageService.getData(storageService.KEYS.MINIGAMES.CONSECUTIVE_DAYS, 0);
+    dailyPlayerAchievement.progress = minigameStreak;
+    
+    if (dailyPlayerAchievement.progress >= dailyPlayerAchievement.requirement) {
+      dailyPlayerAchievement.completed = true;
+      dailyPlayerAchievement.dateCompleted = new Date().toISOString();
+      dailyPlayerAchievement.badgeUnlocked = false;
+      userProgress.totalXP += dailyPlayerAchievement.xp;
+      newlyCompletedAchievements.push(dailyPlayerAchievement);
+    }
+  }
+  
+  // Handle perfect score achievements
+  if (isPerfectScore) {
+    let achievementId: string | null = null;
+    
+    switch (gameType) {
+      case 'posture_patrol':
+        achievementId = 'game_master';
+        break;
+      case 'stress_buster':
+        achievementId = 'lightning_reflexes';
+        break;
+      case 'balance_drop':
+        achievementId = 'perfect_balance';
+        break;
+      case 'trivia':
+        // Handle trivia streak
+        const triviaAchievement = userProgress.achievements['trivia_expert'];
+        if (triviaAchievement && !triviaAchievement.completed) {
+          // Get current trivia streak from storage
+          const triviaStreakKey = '@trivia_perfect_streak';
+          const currentStreak = await storageService.getData(triviaStreakKey, 0);
+          const newStreak = currentStreak + 1;
+          await storageService.setData(triviaStreakKey, newStreak);
+          
+          triviaAchievement.progress = newStreak;
+          
+          if (triviaAchievement.progress >= triviaAchievement.requirement) {
+            triviaAchievement.completed = true;
+            triviaAchievement.dateCompleted = new Date().toISOString();
+            triviaAchievement.badgeUnlocked = false;
+            userProgress.totalXP += triviaAchievement.xp;
+            newlyCompletedAchievements.push(triviaAchievement);
+          }
+        }
+        break;
+    }
+    
+    // Handle single perfect game achievements
+    if (achievementId && userProgress.achievements[achievementId]) {
+      const achievement = userProgress.achievements[achievementId];
+      if (!achievement.completed) {
+        achievement.progress = 1;
+        achievement.completed = true;
+        achievement.dateCompleted = new Date().toISOString();
+        achievement.badgeUnlocked = false;
+        userProgress.totalXP += achievement.xp;
+        newlyCompletedAchievements.push(achievement);
+      }
+    }
+  } else {
+    // Reset trivia streak if not perfect
+    if (gameType === 'trivia') {
+      const triviaStreakKey = '@trivia_perfect_streak';
+      await storageService.setData(triviaStreakKey, 0);
+      const triviaAchievement = userProgress.achievements['trivia_expert'];
+      if (triviaAchievement && !triviaAchievement.completed) {
+        triviaAchievement.progress = 0;
+      }
+    }
+  }
+  
+  // Save updated progress
+  await storageService.saveUserProgress(userProgress);
+  
+  // Emit events for newly completed achievements
+  if (newlyCompletedAchievements.length > 0) {
+    setTimeout(() => {
+      newlyCompletedAchievements.forEach((achievement, index) => {
+        setTimeout(() => {
+          console.log(`Emitting mini-game achievement completed event for: ${achievement.title}`);
+          gamificationEvents.emit(ACHIEVEMENT_COMPLETED_EVENT, achievement);
+        }, index * 2000);
+      });
+    }, 1000);
+  }
 };

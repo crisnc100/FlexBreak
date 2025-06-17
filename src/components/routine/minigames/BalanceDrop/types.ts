@@ -34,6 +34,14 @@ export interface ItemData {
     immediate?: StatEffect[]; // Applied when placed
     delayed?: StatEffect[]; // Applied next round
     skipPenalty?: StatEffect[]; // Applied if missed/skipped
+    work?: { // Effects when placed on work side (for flexible items)
+      immediate?: StatEffect[];
+      delayed?: StatEffect[];
+    };
+    life?: { // Effects when placed on life side (for flexible items)
+      immediate?: StatEffect[];
+      delayed?: StatEffect[];
+    };
   };
   isCritical?: boolean; // Can't be skipped without major penalty
 }
@@ -42,7 +50,7 @@ export type ItemCategory = 'work' | 'family' | 'wellness' | 'hobbies' | 'goals' 
 
 export interface Item {
   id: string;
-  type: 'life' | 'work';  // Simplified to life vs work for balance
+  type: 'life' | 'work' | 'neutral';  // Neutral items don't affect balance
   category: ItemCategory;
   data: ItemData;
   position: Animated.ValueXY;

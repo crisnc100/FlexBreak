@@ -100,7 +100,6 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
           width: gameWidth,
           height: gameHeight,
           backgroundColor: theme.cardBackground + '20',
-          borderColor: theme.border,
         }
       ]}>
         {/* Grid background (optional) */}
@@ -180,8 +179,6 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
 const styles = StyleSheet.create({
   gameBoard: {
     position: 'absolute',
-    borderWidth: 2,
-    borderRadius: 8,
   },
   gridContainer: {
     position: 'absolute',

@@ -56,9 +56,10 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
     const games = await getAvailableGames(isPremium);
     setAvailableGames(games);
     
-    // Auto-select the first game for now (we'll add selection UI later)
+    // Randomly select one game from available games
     if (games.length > 0) {
-      setSelectedGame(games[0].id);
+      const randomIndex = Math.floor(Math.random() * games.length);
+      setSelectedGame(games[randomIndex].id);
     }
   };
 
@@ -82,20 +83,33 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
           isPerfectScore = score === 5; // 5/5 correct answers
           break;
         case MiniGameType.STRESS_BUSTER:
-          // Perfect score if no misses and good accuracy
-          isPerfectScore = score >= 10; // Adjust based on game balance
+          // Perfect score if high score with good accuracy
+          // Score includes accuracy bonus, so high score means no/few misses
+          isPerfectScore = score >= 20 && xp >= 80; // High score and high XP
           break;
         case MiniGameType.POSTURE_PATROL:
-          isPerfectScore = score >= 200; // High balance score threshold
+          // Perfect score if completed with all 3 hearts remaining
+          // This is tracked in the game results (perfectDefense)
+          // High score usually indicates perfect defense
+          isPerfectScore = xp >= 90; // High XP indicates perfect or near-perfect play
           break;
         case MiniGameType.BALANCE_DROP:
-          isPerfectScore = score >= 100; // Balance drop perfect score
+          // Perfect score if completed all rounds with good balance and energy
+          // XP calculation includes energy and balance bonuses
+          isPerfectScore = xp >= 90; // High XP means good balance + energy management
           break;
         default:
           isPerfectScore = false;
       }
       
-      await recordMiniGamePlayed(selectedGame, score, xp, isPerfectScore);
+      const result = await recordMiniGamePlayed(selectedGame, score, xp, isPerfectScore);
+      
+      // Check if there was a level up
+      if (result?.levelUp) {
+        // Store level up info to show after closing
+        // The parent component should handle showing level-up UI
+        console.log(`Level up! ${result.levelUp.oldLevel} → ${result.levelUp.newLevel}`);
+      }
     }
     
     // Auto-close after 2 seconds

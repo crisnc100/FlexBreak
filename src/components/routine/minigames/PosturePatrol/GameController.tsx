@@ -15,6 +15,13 @@ import {
   createMonster,
 } from './utils';
 import * as haptics from '../../../../utils/haptics';
+import {
+  playIncorrectSound,
+  playBossRoundSound,
+  playPadPlacementSound,
+  playRoundCompleteSound,
+  playCorrectSound,
+} from '../../../../utils/soundEffects';
 
 interface GameControllerProps {
   onGameComplete: (score: number, xp: number) => void;
@@ -233,6 +240,9 @@ export const GameController: React.FC<GameControllerProps> = ({
     boss.speed = bossConfig.speed;
     boss.isBoss = true;
 
+    // Play boss round sound
+    playBossRoundSound();
+
     setGameState(prev => ({
       ...prev,
       monsters: [...prev.monsters, boss],
@@ -254,6 +264,9 @@ export const GameController: React.FC<GameControllerProps> = ({
     
     const upgradeCost = getUpgradeCost(pad.padType, pad.level);
     if (gameState.energy < upgradeCost) return;
+    
+    // Play upgrade sound
+    playCorrectSound();
     
     setGameState(prev => ({
       ...prev,
@@ -312,6 +325,9 @@ export const GameController: React.FC<GameControllerProps> = ({
     if (!unlockedPads.has(selectedPadType)) return;
 
     haptics.medium();
+    
+    // Play pad placement sound
+    playPadPlacementSound();
     
     // Place pad and deduct energy
     const newPad = {
@@ -453,6 +469,12 @@ export const GameController: React.FC<GameControllerProps> = ({
         if (prev.timeLeft <= 1) {
           // Use same wave progression logic as normal game
           console.log(`Smart Skip: Wave ${prev.currentWave} ending, moving to next`);
+          
+          // Play round complete sound for waves (not prepare phase)
+          if (prev.currentWave >= 0) {
+            playRoundCompleteSound();
+          }
+          
           if (prev.currentWave === -1) {
             // Skip tutorial, go directly to wave 1
             startWave(1);
@@ -565,6 +587,12 @@ export const GameController: React.FC<GameControllerProps> = ({
         if (prev.timeLeft <= 1) {
           // Move to next wave/phase
           console.log(`Wave ${prev.currentWave} ending, moving to next`); // Debug log
+          
+          // Play round complete sound for waves (not prepare phase)
+          if (prev.currentWave >= 0) {
+            playRoundCompleteSound();
+          }
+          
           if (prev.currentWave === -1) {
             startWave(0);
             const duration = WAVE_CONFIG[0]?.duration || 10;

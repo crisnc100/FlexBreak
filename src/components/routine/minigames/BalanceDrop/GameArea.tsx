@@ -32,7 +32,7 @@ export const GameArea: React.FC<GameAreaProps> = ({
   onDropFeedbackComplete,
   energyLeft = 100,
 }) => {
-  const { theme } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
 
   const getItemSize = (weight: number) => ITEM_BASE_SIZE + (weight - 1) * 15;
   
@@ -57,13 +57,23 @@ export const GameArea: React.FC<GameAreaProps> = ({
               style={[
                 styles.previewItem,
                 {
-                  backgroundColor: CATEGORY_COLORS[item.category],
+                  backgroundColor: item.isCritical ? '#9370DB' : 
+                                 item.energyRestore ? '#4CAF50' :
+                                 item.isFlexible ? '#FF6B6B' :
+                                 CATEGORY_COLORS[item.category],
                   width: size,
                   height: size,
+                  borderWidth: item.isCritical ? 2 : 0,
+                  borderColor: '#FFD700',
                 }
               ]}
             >
               <Ionicons name={item.icon as any} size={16} color="#FFFFFF" />
+              {item.isCritical && (
+                <View style={{ position: 'absolute', top: -5, right: -5, backgroundColor: '#FFD700', borderRadius: 6, padding: 1 }}>
+                  <Ionicons name="alert" size={10} color="#000" />
+                </View>
+              )}
               <View style={styles.weightIndicator}>
                 {Array.from({ length: item.weight }).map((_, i) => (
                   <View key={i} style={styles.weightDot} />
@@ -94,19 +104,22 @@ export const GameArea: React.FC<GameAreaProps> = ({
               styles.item,
               {
                 backgroundColor: hasEnoughEnergy ? 
-                  (ESSENTIAL_ITEMS.includes(item.data) ? '#9370DB' : // Purple for neutral
-                  item.isFlexible ? '#8B4513' : 
-                  CATEGORY_COLORS[item.category]) : 
+                  (item.type === 'neutral' ? '#9370DB' : // Purple for neutral/essential
+                  item.data.energyRestore ? '#4CAF50' : // Green for rest items
+                  CATEGORY_COLORS[item.category]) : // Use natural category color
                   '#666666',
                 width: itemSize,
                 height: itemSize,
-                borderWidth: ESSENTIAL_ITEMS.includes(item.data) ? 2 : 0,
-                borderColor: ESSENTIAL_ITEMS.includes(item.data) ? '#FFFFFF' : 'transparent',
-                borderStyle: 'dashed',
+                borderWidth: item.type === 'neutral' ? 3 : 
+                             item.data.energyRestore ? 2 : 0,
+                borderColor: item.type === 'neutral' ? '#FFD700' : // Gold border for essential
+                            item.data.energyRestore ? '#00FF00' : 'transparent', // Bright green for rest
+                borderStyle: item.type === 'neutral' ? 'solid' : 'solid',
                 left: item.position.x,
                 top: item.position.y,
                 transform: [{ scale: item.scale }],
                 opacity: item.opacity,
+                overflow: 'visible',
               },
             ]}
           >
@@ -121,14 +134,34 @@ export const GameArea: React.FC<GameAreaProps> = ({
                 <View key={i} style={styles.itemDot} />
               ))}
             </View>
-            {item.isFlexible && (
-              <View style={styles.flexibleBadge}>
-                <Text style={styles.flexibleText}>⇄</Text>
+            {/* Flexible item badge */}
+            {item.isFlexible && !item.data.energyRestore && (
+              <View style={{
+                position: 'absolute',
+                top: 4,
+                left: 4,
+                backgroundColor: '#8B4513',
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700', marginRight: 2 }}>FLEXIBLE</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 12 }}>⇄</Text>
               </View>
             )}
             {item.data.energyRestore && (
-              <View style={styles.restBadge}>
-                <Text style={styles.restText}>+</Text>
+              <View style={{
+                position: 'absolute',
+                top: 4,
+                left: 4,
+                backgroundColor: '#00C853',
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 8,
+              }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>REST +{item.data.energyRestore}</Text>
               </View>
             )}
             {!hasEnoughEnergy && (
@@ -136,20 +169,35 @@ export const GameArea: React.FC<GameAreaProps> = ({
                 <Ionicons name="ban" size={24} color="#FF0000" />
               </View>
             )}
-            {/* Neutral item badge */}
-            {ESSENTIAL_ITEMS.includes(item.data) && (
-              <View style={styles.neutralBadge}>
-                <Text style={styles.neutralText}>⚖</Text>
+            {/* Essential item indicators */}
+            {item.type === 'neutral' && (
+              <>
+                <View style={[styles.urgencyBadge, { backgroundColor: '#FFD700', top: -10, right: -10 }]}>
+                  <Ionicons name="alert" size={14} color="#000" />
+                </View>
+                <View style={{
+                  position: 'absolute',
+                  top: 4,
+                  left: 4,
+                  backgroundColor: '#FFD700',
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 8,
+                }}>
+                  <Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>ESSENTIAL</Text>
+                </View>
+              </>
+            )}
+            {/* Energy cost preview - only show if not already showing REST badge */}
+            {!item.data.energyRestore && (
+              <View style={[styles.energyCostBadge, { 
+                backgroundColor: '#FF9800' 
+              }]}>
+                <Text style={styles.energyCostText}>
+                  -{requiredEnergy}
+                </Text>
               </View>
             )}
-            {/* Energy cost preview */}
-            <View style={[styles.energyCostBadge, { 
-              backgroundColor: item.data.energyRestore ? '#4CAF50' : '#FF9800' 
-            }]}>
-              <Text style={styles.energyCostText}>
-                {item.data.energyRestore ? `+${item.data.energyRestore}` : `-${requiredEnergy}`}
-              </Text>
-            </View>
           </Animated.View>
         );
       })}
@@ -208,14 +256,20 @@ export const GameArea: React.FC<GameAreaProps> = ({
           <View style={[
             styles.scaleSide, 
             styles.workSide,
+            (isDark || isSunset) && {
+              backgroundColor: '#FF6B6B30', // More vibrant in dark/sunset
+            },
             activeDropZone === 'work' && { 
-              backgroundColor: '#FF6B6B40',
+              backgroundColor: (isDark || isSunset) ? '#FF6B6B60' : '#FF6B6B40',
               borderWidth: 3,
               borderColor: '#FF6B6B'
             }
           ]}>
             <Text style={[
               styles.scaleLabel,
+              (isDark || isSunset) && {
+                color: '#FF9999', // Brighter label in dark/sunset
+              },
               activeDropZone === 'work' && { 
                 color: '#FF6B6B', 
                 fontWeight: '900',
@@ -227,14 +281,20 @@ export const GameArea: React.FC<GameAreaProps> = ({
           <View style={[
             styles.scaleSide, 
             styles.wellnessSide,
+            (isDark || isSunset) && {
+              backgroundColor: '#4CAF5030', // More vibrant in dark/sunset
+            },
             activeDropZone === 'life' && { 
-              backgroundColor: '#4CAF5040',
+              backgroundColor: (isDark || isSunset) ? '#4CAF5060' : '#4CAF5040',
               borderWidth: 3,
               borderColor: '#4CAF50'
             }
           ]}>
             <Text style={[
               styles.scaleLabel,
+              (isDark || isSunset) && {
+                color: '#81C784', // Brighter label in dark/sunset
+              },
               activeDropZone === 'life' && { 
                 color: '#4CAF50', 
                 fontWeight: '900',

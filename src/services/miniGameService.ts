@@ -1,4 +1,7 @@
 import { getData, setData, KEYS } from './storageService';
+import { getUserProgress, saveUserProgress } from './storageService';
+import { updateMiniGameAchievements } from '../utils/progress/modules/achievementManager';
+import { processCompletedMiniGame } from '../utils/progress/gameEngine';
 
 // Mini-game types
 export enum MiniGameType {
@@ -79,16 +82,8 @@ export async function getAvailableGames(isPremium: boolean): Promise<MiniGameInf
     // Premium users get all 4 games
     return Object.values(MINI_GAMES);
   } else {
-    // Free users get 2 random games from the first 3 available
-    const availableFreeGames = [
-      MINI_GAMES[MiniGameType.WELLNESS_TRIVIA],
-      MINI_GAMES[MiniGameType.STRESS_BUSTER],
-      MINI_GAMES[MiniGameType.POSTURE_PATROL],
-    ];
-    
-    // Randomly shuffle and return 2 games
-    const shuffled = availableFreeGames.sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 2);
+    // Free users get all 4 games too (but popup will randomly select one)
+    return Object.values(MINI_GAMES);
   }
 }
 
@@ -98,9 +93,13 @@ export async function recordMiniGamePlayed(
   score: number,
   xpEarned: number,
   isPerfectScore: boolean
-): Promise<void> {
+): Promise<any> {
   try {
     const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString();
+    
+    // Get previous last played date for streak tracking
+    const lastPlayDate = await getData(KEYS.MINIGAMES.LAST_PLAYED_DATE, '');
     
     // Update last played date
     await setData(KEYS.MINIGAMES.LAST_PLAYED_DATE, today);
@@ -115,10 +114,52 @@ export async function recordMiniGamePlayed(
       await setData(KEYS.MINIGAMES.PERFECT_SCORES, perfectScores + 1);
     }
     
-    // TODO: Update consecutive days tracking
-    // TODO: Update achievement progress
+    // Update consecutive days tracking
+    let consecutiveDays = await getData(KEYS.MINIGAMES.CONSECUTIVE_DAYS, 0);
     
-    console.log(`Mini-game recorded: ${gameType}, Score: ${score}, XP: ${xpEarned}`);
+    if (lastPlayDate === yesterday) {
+      // Continuing streak
+      consecutiveDays += 1;
+    } else if (lastPlayDate === today) {
+      // Already played today, don't increment
+    } else {
+      // Streak broken or first play
+      consecutiveDays = 1;
+    }
+    
+    await setData(KEYS.MINIGAMES.CONSECUTIVE_DAYS, consecutiveDays);
+    
+    // Update achievement progress
+    const userProgress = await getUserProgress();
+    
+    // Map game types to achievement types
+    let achievementGameType: 'posture_patrol' | 'stress_buster' | 'balance_drop' | 'trivia';
+    switch (gameType) {
+      case MiniGameType.POSTURE_PATROL:
+        achievementGameType = 'posture_patrol';
+        break;
+      case MiniGameType.STRESS_BUSTER:
+        achievementGameType = 'stress_buster';
+        break;
+      case MiniGameType.BALANCE_DROP:
+        achievementGameType = 'balance_drop';
+        break;
+      case MiniGameType.WELLNESS_TRIVIA:
+        achievementGameType = 'trivia';
+        break;
+      default:
+        return; // Unknown game type
+    }
+    
+    await updateMiniGameAchievements(userProgress, achievementGameType, isPerfectScore);
+    
+    // Process the mini-game completion and add XP to user's total
+    const result = await processCompletedMiniGame(gameType, score, xpEarned, isPerfectScore);
+    
+    console.log(`Mini-game recorded: ${gameType}, Score: ${score}, XP: ${result.totalXpEarned}, Perfect: ${isPerfectScore}`);
+    
+    // Return the result for UI updates (level up notifications, etc.)
+    return result;
   } catch (error) {
     console.error('Error recording mini-game:', error);
   }

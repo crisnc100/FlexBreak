@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Animated, PanResponder } from 'react-native';
 import * as haptics from '../../../../utils/haptics';
+import { playCorrectSound, playIncorrectSound } from '../../../../utils/soundEffects';
 import { 
   GameState, 
   Item, 
@@ -279,15 +280,15 @@ export const useGameLogic = (
       const scenario = round.scenario;
       const roll = Math.random();
       
-      // Balanced spawning: 20% essential, 15% rest, 15% flexible, 50% work/life
-      if (roll < 0.2) {
+      // Balanced spawning: 10% essential, 10% rest, 15% flexible, 65% work/life
+      if (roll < 0.1) {
         itemData = ESSENTIAL_ITEMS[Math.floor(Math.random() * ESSENTIAL_ITEMS.length)];
         itemType = 'neutral';
         isFlexible = true;
-      } else if (roll < 0.35) {
+      } else if (roll < 0.2) {
         itemData = REST_ITEMS[Math.floor(Math.random() * REST_ITEMS.length)];
         itemType = 'life';
-      } else if (roll < 0.5) {
+      } else if (roll < 0.35) {
         itemData = FLEXIBLE_ITEMS[Math.floor(Math.random() * FLEXIBLE_ITEMS.length)];
         itemType = itemData.category === 'work' ? 'work' : 'life';
         isFlexible = true;
@@ -332,7 +333,7 @@ export const useGameLogic = (
     
     const newItem: Item = {
       id,
-      type: itemType === 'neutral' ? 'life' : itemType, // Neutral items can go to either side
+      type: itemType, // Keep neutral as neutral
       category: itemData.category,
       data: itemData,
       position,
@@ -347,7 +348,7 @@ export const useGameLogic = (
     
     // Animate falling - store animation reference
     const fallAnimation = Animated.timing(position, {
-      toValue: { x: startX, y: height - 100 },
+      toValue: { x: startX, y: height + itemSize + 100 }, // Fall completely off-screen
       duration: round.fallSpeed,
       useNativeDriver: false,
     });
@@ -368,10 +369,10 @@ export const useGameLogic = (
     const roll = Math.random();
     let itemData: ItemData;
     
-    // Balanced distribution
-    if (roll < 0.15) {
+    // Balanced distribution: 10% essential, 10% rest, 15% flexible, 65% work/life
+    if (roll < 0.1) {
       itemData = ESSENTIAL_ITEMS[Math.floor(Math.random() * ESSENTIAL_ITEMS.length)];
-    } else if (roll < 0.25) {
+    } else if (roll < 0.2) {
       itemData = REST_ITEMS[Math.floor(Math.random() * REST_ITEMS.length)];
     } else if (roll < 0.35) {
       itemData = FLEXIBLE_ITEMS[Math.floor(Math.random() * FLEXIBLE_ITEMS.length)];
@@ -529,6 +530,10 @@ export const useGameLogic = (
   }, [currentRound, skipCount]);
 
   const handleItemPlaced = useCallback((item: Item, isCorrect: boolean, onWorkSide: boolean) => {
+    // Special handling for neutral items - they're always correct and don't affect balance
+    if (item.type === 'neutral') {
+      isCorrect = true; // Neutral items can go anywhere
+    }
     // Get item position for feedback
     const itemX = (item.position.x as any)._value || 0;
     const itemY = (item.position.y as any)._value || 0;
@@ -614,25 +619,30 @@ export const useGameLogic = (
       // Base points for correct placement
       points = 5 * item.data.weight;
       
-      // Bonus points if this helps balance the scale
-      const newBalance = Math.abs(balance + (onWorkSide ? -1 : 1) * item.data.weight * 10);
-      if (newBalance < currentBalance) {
-        points += 15; // Bonus for improving balance
-      }
-      
-      // Extra bonus if maintaining perfect balance (within 20 points)
-      if (newBalance < 20) {
-        points += 10;
+      // Bonus points if this helps balance the scale (neutral items don't affect balance)
+      let projectedBalance = currentBalance;
+      if (item.type !== 'neutral') {
+        projectedBalance = Math.abs(balance + (onWorkSide ? -1 : 1) * item.data.weight * 10);
+        if (projectedBalance < currentBalance) {
+          points += 15; // Bonus for improving balance
+        }
+        
+        // Extra bonus if maintaining perfect balance (within 20 points)
+        if (projectedBalance < 20) {
+          points += 10;
+        }
       }
       
       // Removed urgency system for simplified version
       
       setStats(prev => ({ ...prev, itemsPlaced: prev.itemsPlaced + 1 }));
       haptics.success();
+      playCorrectSound();
     } else {
       // Penalty for wrong placement
       points = -10 * item.data.weight;
       haptics.error();
+      playIncorrectSound();
     }
     
     // Check for combos
@@ -670,10 +680,25 @@ export const useGameLogic = (
     
     // Apply immediate effects
     let effectMessages: string[] = [];
-    if (item.data.effects?.immediate) {
+    let effectsToApply: StatEffect[] = [];
+    
+    // Determine which effects to apply based on item type
+    if (item.isFlexible && item.data.effects) {
+      // Flexible items have different effects based on placement
+      const sideEffects = onWorkSide ? item.data.effects.work : item.data.effects.life;
+      if (sideEffects?.immediate) {
+        effectsToApply = sideEffects.immediate;
+      }
+    } else if (item.data.effects?.immediate) {
+      // Regular items have the same effects regardless of placement
+      effectsToApply = item.data.effects.immediate;
+    }
+    
+    // Apply the effects
+    if (effectsToApply.length > 0) {
       const newLifeStats = { ...stats.lifeStats };
       
-      item.data.effects.immediate.forEach(effect => {
+      effectsToApply.forEach(effect => {
         newLifeStats[effect.stat] = Math.max(0, Math.min(100, newLifeStats[effect.stat] + effect.change));
         if (effect.message) effectMessages.push(effect.message);
       });
@@ -685,7 +710,7 @@ export const useGameLogic = (
         decisions: [...prev.decisions, {
           item: item.data.label,
           choice: onWorkSide ? 'work' : 'life',
-          effects: item.data.effects.immediate
+          effects: effectsToApply
         }]
       }));
       
@@ -702,8 +727,8 @@ export const useGameLogic = (
       setDelayedEffects(prev => [...prev, ...item.data.effects.delayed]);
     }
     
-    // Update balance
-    const balanceChange = (onWorkSide ? -1 : 1) * item.data.weight * 10;
+    // Update balance (neutral items don't affect balance)
+    const balanceChange = item.type === 'neutral' ? 0 : (onWorkSide ? -1 : 1) * item.data.weight * 10;
     setBalance(prev => {
       const newBalance = Math.max(-100, Math.min(100, prev + balanceChange));
       
@@ -933,9 +958,10 @@ export const useGameLogic = (
             continueItemFalling(item);
             return;
           }
-          // Essential items are always correct regardless of side
+          // Essential items and flexible items are always correct regardless of side
           const isEssential = ESSENTIAL_ITEMS.includes(item.data);
-          const isCorrect = isEssential || 
+          const isFlexible = item.isFlexible;
+          const isCorrect = isEssential || isFlexible ||
                            (droppedOnWork && item.type === 'work') || 
                            (!droppedOnWork && item.type === 'life');
           

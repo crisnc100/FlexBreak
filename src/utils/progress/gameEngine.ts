@@ -567,3 +567,77 @@ export const normalizeUserProgress = (progress: UserProgress): UserProgress => {
 
 // Export refreshChallenges for compatibility
 export const refreshChallenges = challengeManager.refreshChallenges;
+
+/**
+ * Process completed mini-game and award XP
+ * @param gameType The type of mini-game completed
+ * @param score The score achieved in the game
+ * @param xpEarned The base XP earned from the game (25-100)
+ * @param isPerfectScore Whether the game was completed perfectly
+ * @returns Updated user progress with XP breakdown and level info
+ */
+export const processCompletedMiniGame = async (
+  gameType: string,
+  score: number,
+  xpEarned: number,
+  isPerfectScore: boolean
+): Promise<{
+  userProgress: UserProgress;
+  xpBreakdown: any;
+  totalXpEarned: number;
+  levelUp?: { oldLevel: number; newLevel: number };
+}> => {
+  let userProgress = await storageService.getUserProgress();
+  userProgress = normalizeUserProgress(userProgress);
+  
+  // Check if XP boost is active
+  const { isActive: isXpBoostActive, data: xpBoostData } = await xpBoostManager.checkXpBoostStatus();
+  const xpMultiplier = isXpBoostActive ? xpBoostData.multiplier : 1;
+  
+  // Calculate final XP with boost
+  const baseXp = xpEarned;
+  const totalXp = Math.floor(baseXp * xpMultiplier);
+  
+  // Build XP breakdown
+  const breakdown: Array<{ source: string; amount: number; description: string }> = [];
+  
+  // Base game XP
+  breakdown.push({
+    source: 'minigame',
+    amount: totalXp,
+    description: `${gameType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}${isPerfectScore ? ' (Perfect!)' : ''}${isXpBoostActive ? ' (2x XP Boost)' : ''}`
+  });
+  
+  // Track old level for level-up detection
+  const oldLevel = userProgress.level;
+  
+  // Add XP to user's total
+  userProgress.totalXP += totalXp;
+  
+  // Check for level up
+  const { level: newLevel } = calculateLevel(userProgress.totalXP);
+  let levelUp = undefined;
+  
+  if (newLevel !== oldLevel) {
+    userProgress.level = newLevel;
+    levelUp = { oldLevel, newLevel };
+    
+    // Update rewards on level up
+    await rewardManager.updateRewards(userProgress);
+    
+    // Check for flex save refill
+    if (userProgress.rewards['flex_saves']?.unlocked) {
+      await flexSaveManager.refillMonthlyFlexSaves();
+    }
+  }
+  
+  // Save updated progress
+  await storageService.saveUserProgress(userProgress);
+  
+  return {
+    userProgress,
+    xpBreakdown: breakdown,
+    totalXpEarned: totalXp,
+    levelUp
+  };
+};

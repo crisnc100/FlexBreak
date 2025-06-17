@@ -2,7 +2,10 @@ import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types
-type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'flexSave' | 'xpBoost' | 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 'transition1' | 'transition2' | 'halfway' | 'correct' | 'incorrect';
+type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'flexSave' | 'xpBoost' | 
+'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 
+'transition1' | 'transition2' | 'halfway' | 'correct' | 'incorrect' | 'bossRound' | 'monstersDestroyed' | 'padPlacement' |
+'roundComplete';
 
 // Define the cache to store loaded sounds
 const soundCache: Record<SoundEffect, Audio.Sound | null> = {
@@ -22,6 +25,10 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   halfway: null,
   correct: null,
   incorrect: null,
+  bossRound: null,
+  monstersDestroyed: null,
+  padPlacement: null,
+  roundComplete: null,
 };
 
 // Add debounce tracking for sounds that are frequently played
@@ -42,6 +49,10 @@ const soundDebounceMap: Record<SoundEffect, number> = {
   halfway: 0,
   correct: 0,
   incorrect: 0,
+  bossRound: 0,
+  monstersDestroyed: 0,
+  padPlacement: 0,
+  roundComplete: 0,
 };
 
 // Minimum time between playing the same sound (in milliseconds)
@@ -75,6 +86,10 @@ const soundUris: Record<SoundEffect, any> = {
   halfway: require('../../assets/sounds/unlockedPremium.mp3'),
   correct: require('../../assets/sounds/correctTheme.mp3'),
   incorrect: require('../../assets/sounds/incorrectTheme.mp3'),
+  bossRound: require('../../assets/sounds/bossRound.mp3'),
+  monstersDestroyed: require('../../assets/sounds/monstersDestroyed.mp3'),
+  padPlacement: require('../../assets/sounds/padPlacement.mp3'),
+  roundComplete: require('../../assets/sounds/roundComplete.mp3'),
 };
 
 /**
@@ -347,7 +362,7 @@ export const playRedeemingChallengeSound = async (): Promise<void> => {
   await playSound('redeemingChallenge', 0.4); // Use lower volume (40%)
 };
 
-/**
+/** Minigame sounds
  * Play correct sound
  */
 export const playCorrectSound = async (): Promise<void> => {
@@ -360,7 +375,21 @@ export const playCorrectSound = async (): Promise<void> => {
 export const playIncorrectSound = async (): Promise<void> => {
   await playSound('incorrect', 1.0);
 };
+export const playBossRoundSound = async (): Promise<void> => {
+  await playSound('bossRound', 1.0);
+};
 
+export const playMonstersDestroyedSound = async (): Promise<void> => {
+  await playSound('monstersDestroyed', 1.0);
+};
+
+export const playPadPlacementSound = async (): Promise<void> => {
+  await playSound('padPlacement', 1.0);
+};
+
+export const playRoundCompleteSound = async (): Promise<void> => {
+  await playSound('roundComplete', 1.0);
+};
 /**
  * Cleanup function to unload all sounds and free memory
  */

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Modal, TouchableOpacity, Text, SafeAreaView } from 'react-native';
+import { View, Modal, TouchableOpacity, Text, SafeAreaView, AppState, AppStateStatus } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../../context/ThemeContext';
 import { BalanceDropProps } from './types';
@@ -128,6 +128,20 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
     // Start the actual gameplay after message
     startGameplay();
   };
+
+  // Handle app state changes for auto-pause
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'background' && gameState === 'playing' && !isPaused) {
+        handlePause();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [gameState, isPaused]);
 
   // Render pause menu
   const renderPauseMenu = () => (
@@ -275,6 +289,8 @@ export const BalanceDrop: React.FC<BalanceDropProps> = ({
             currentRound={currentRound}
             stats={stats}
             onNextRound={nextRound}
+            balance={balance}
+            energyLeft={energyLeft}
           />
         );
 

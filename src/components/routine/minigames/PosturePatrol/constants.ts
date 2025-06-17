@@ -16,14 +16,14 @@ export const WAVE_TEMPLATES = {
     // Wave 1 variants - early game
     {
       monsters: [
-        { type: 'tech_neck', count: 6, spawnDelay: 2500 },
-        { type: 'slouch_slump', count: 2, spawnDelay: 4000 }
+        { type: 'tech_neck', count: 9, spawnDelay: 2500 },
+        { type: 'slouch_slump', count: 5, spawnDelay: 4000 }
       ]
     },
     {
       monsters: [
-        { type: 'tech_neck', count: 4, spawnDelay: 2000 },
-        { type: 'slouch_slump', count: 4, spawnDelay: 3000 }
+        { type: 'tech_neck', count: 11, spawnDelay: 2000 },
+        { type: 'slouch_slump', count: 7, spawnDelay: 3000 }
       ]
     },
     {
@@ -36,21 +36,21 @@ export const WAVE_TEMPLATES = {
     // Wave 2 variants - medium difficulty
     {
       monsters: [
-        { type: 'tech_neck', count: 5, spawnDelay: 2200 },
-        { type: 'slouch_slump', count: 4, spawnDelay: 2800 },
-        { type: 'desk_hunch', count: 2, spawnDelay: 4000 }
+        { type: 'tech_neck', count: 10, spawnDelay: 2200 },
+        { type: 'slouch_slump', count: 8, spawnDelay: 2800 },
+        { type: 'desk_hunch', count: 5, spawnDelay: 4000 }
       ]
     },
     {
       monsters: [
-        { type: 'slouch_slump', count: 6, spawnDelay: 2500 },
-        { type: 'desk_hunch', count: 3, spawnDelay: 3500 }
+        { type: 'slouch_slump', count: 9, spawnDelay: 2500 },
+        { type: 'desk_hunch', count: 6, spawnDelay: 3500 }
       ]
     },
     {
       monsters: [
-        { type: 'tech_neck', count: 7, spawnDelay: 1800 },
-        { type: 'desk_hunch', count: 3, spawnDelay: 3000 }
+        { type: 'tech_neck', count: 12, spawnDelay: 1800 },
+        { type: 'desk_hunch', count: 7, spawnDelay: 3000 }
       ]
     }
   ],
@@ -58,21 +58,21 @@ export const WAVE_TEMPLATES = {
     // Wave 3 variants - high difficulty
     {
       monsters: [
-        { type: 'lean_twist', count: 5, spawnDelay: 2000 },
-        { type: 'desk_hunch', count: 4, spawnDelay: 2500 },
-        { type: 'slouch_slump', count: 3, spawnDelay: 3000 }
+        { type: 'lean_twist', count: 11, spawnDelay: 2000 },
+        { type: 'desk_hunch', count: 9, spawnDelay: 2500 },
+        { type: 'slouch_slump', count: 7, spawnDelay: 3000 }
       ]
     },
     {
       monsters: [
-        { type: 'desk_hunch', count: 7, spawnDelay: 2200 },
-        { type: 'lean_twist', count: 4, spawnDelay: 2400 }
+        { type: 'desk_hunch', count: 10, spawnDelay: 2200 },
+        { type: 'lean_twist', count: 9, spawnDelay: 2400 }
       ]
     },
     {
       monsters: [
-        { type: 'tech_neck', count: 10, spawnDelay: 1600 },
-        { type: 'lean_twist', count: 4, spawnDelay: 2000 }
+        { type: 'tech_neck', count: 14, spawnDelay: 1600 },
+        { type: 'lean_twist', count: 11, spawnDelay: 2000 }
       ]
     }
   ],

@@ -27,6 +27,10 @@ import {
 } from '../utils';
 import * as haptics from '../../../../../utils/haptics';
 import { Dimensions } from 'react-native';
+import {
+  playIncorrectSound,
+  playMonstersDestroyedSound,
+} from '../../../../../utils/soundEffects';
 
 const { width } = Dimensions.get('window');
 
@@ -123,6 +127,11 @@ export const useGameActions = (
       // Check for monsters reaching defender
       const monstersReachingDefender = newMonsters.filter(hasMonsterReachedDefender);
       let newHearts = prev.hearts;
+      
+      if (monstersReachingDefender.length > 0) {
+        // Play incorrect sound when any monster reaches defender
+        playIncorrectSound();
+      }
       
       monstersReachingDefender.forEach((monster) => {
         // Bosses take 2 lives, normal monsters take 1
@@ -248,6 +257,11 @@ export const useGameActions = (
       // Check if target was killed
       const targetAfterDamage = finalMonsters.find(m => m.id === target.id);
       const wasKilled = targetAfterDamage && targetAfterDamage.hp <= 0;
+
+      // Play monster destroyed sound if killed
+      if (wasKilled) {
+        playMonstersDestroyedSound();
+      }
 
       return {
         ...prevState,
