@@ -53,6 +53,14 @@ export const KEYS = {
   USER_AGREEMENTS: {
     FITNESS_DISCLAIMER_ACCEPTED: 'fitness_disclaimer_accepted',
     NON_MEDICAL_NOTICE_SHOWN: 'non_medical_notice_shown',
+  },
+  AI_WELLNESS: {
+    CONVERSATION_HISTORY: '@ai_wellness_conversations',
+    USER_PATTERNS: '@ai_wellness_patterns',
+    EFFECTIVENESS_TRACKING: '@ai_wellness_effectiveness',
+    LAST_CHECKIN: '@ai_wellness_last_checkin',
+    WEEKLY_USAGE: '@ai_wellness_weekly_usage',
+    ENABLED: '@ai_wellness_enabled',
   }
 };
 

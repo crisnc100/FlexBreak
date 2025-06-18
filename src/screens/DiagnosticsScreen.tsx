@@ -17,6 +17,8 @@ import * as performance from '../utils/performance/performance';
 import * as appHealthCheck from '../utils/performance/appHealthCheck';
 import { AppHealthScore, AppHealthIssue } from '../utils/performance/appHealthCheck';
 import * as firebaseReminders from '../utils/firebaseReminders';
+import { testAIIntegration, runQuickTest } from '../utils/aiWellness/testAIIntegration';
+import { testAIWellnessNotification, testCompleteAIFlow, checkScheduledAINotifications } from '../utils/testAINotifications';
 
 interface StorageStats {
   totalSize: number;
@@ -33,6 +35,8 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
   const [appHealth, setAppHealth] = useState<AppHealthScore | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [notificationStats, setNotificationStats] = useState<any>(null);
+  const [aiTestLoading, setAITestLoading] = useState(false);
+  const [aiTestResults, setAITestResults] = useState<string>('');
   
   // Animated values for score display
   const scoreAnim = useState(new Animated.Value(0))[0];
@@ -183,6 +187,62 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
       Alert.alert('Error', 'Failed to fix issue');
     } finally {
       setIsFixing(false);
+    }
+  };
+
+  // AI Wellness test handlers
+  const handleRunAITest = async () => {
+    setAITestLoading(true);
+    setAITestResults('Running AI Wellness tests...\n');
+    
+    try {
+      // Capture console output
+      const originalLog = console.log;
+      let output = '';
+      
+      console.log = (message: any, ...optionalParams: any[]) => {
+        output += message + (optionalParams.length > 0 ? ' ' + optionalParams.join(' ') : '') + '\n';
+        originalLog(message, ...optionalParams);
+      };
+      
+      // Run the tests
+      await runQuickTest();
+      
+      // Restore console.log
+      console.log = originalLog;
+      
+      setAITestResults(output);
+    } catch (error) {
+      console.error('AI test error:', error);
+      setAITestResults('Error running AI tests: ' + error.message);
+    } finally {
+      setAITestLoading(false);
+    }
+  };
+
+  const handleRunFullAITest = async () => {
+    setAITestLoading(true);
+    setAITestResults('Running full AI Wellness integration tests...\n');
+    
+    try {
+      const originalLog = console.log;
+      let output = '';
+      
+      console.log = (message: any, ...optionalParams: any[]) => {
+        output += message + (optionalParams.length > 0 ? ' ' + optionalParams.join(' ') : '') + '\n';
+        originalLog(message, ...optionalParams);
+      };
+      
+      const results = await testAIIntegration();
+      
+      console.log = originalLog;
+      
+      setAITestResults(output);
+    } catch (error) {
+      console.error('AI test error:', error);
+      setAITestResults('Error running AI tests: ' + error.message);
+    } finally {
+      setAITestLoading(false);
     }
   };
 
@@ -521,6 +581,101 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
                   <Text style={styles.noDataText}>Loading notification data...</Text>
                 )}
               </View>
+
+              {/* AI Wellness Test Section */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>AI Wellness Coach Testing</Text>
+                
+                <Text style={styles.statDescription}>
+                  Test the AI Wellness Coach integration with OpenRouter API
+                </Text>
+                
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { flex: 1, marginRight: 8 }]}
+                    onPress={handleRunAITest}
+                    disabled={aiTestLoading}
+                  >
+                    <Ionicons name="flash-outline" size={18} color="#FFF" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Quick Test</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, { flex: 1, marginLeft: 8, backgroundColor: '#9C27B0' }]}
+                    onPress={handleRunFullAITest}
+                    disabled={aiTestLoading}
+                  >
+                    <Ionicons name="flask-outline" size={18} color="#FFF" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Full Test</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {aiTestLoading && (
+                  <View style={styles.testLoadingContainer}>
+                    <ActivityIndicator size="small" color="#4CAF50" />
+                    <Text style={styles.testLoadingText}>Running AI tests...</Text>
+                  </View>
+                )}
+                
+                {aiTestResults ? (
+                  <View style={styles.testResultsContainer}>
+                    <Text style={styles.subsectionTitle}>Test Results</Text>
+                    <ScrollView style={styles.testResultsScroll} nestedScrollEnabled>
+                      <Text style={styles.testResultsText}>{aiTestResults}</Text>
+                    </ScrollView>
+                  </View>
+                ) : null}
+                
+                {/* AI Notification Test */}
+                <View style={styles.notificationTestSection}>
+                  <Text style={styles.subsectionTitle}>Notification Testing</Text>
+                  <Text style={styles.testDescription}>
+                    Test AI wellness notifications with text input
+                  </Text>
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#FF5722' }]}
+                    onPress={async () => {
+                      try {
+                        await testAIWellnessNotification();
+                        Alert.alert(
+                          'Test Notification Sent',
+                          'Check your notification center and tap to reply!',
+                          [{ text: 'OK' }]
+                        );
+                      } catch (error) {
+                        Alert.alert('Error', 'Failed to send test notification');
+                      }
+                    }}
+                  >
+                    <Ionicons name="notifications-outline" size={18} color="#FFF" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Test AI Notification</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#795548', marginTop: 8 }]}
+                    onPress={async () => {
+                      try {
+                        const notifications = await checkScheduledAINotifications();
+                        if (notifications.length === 0) {
+                          Alert.alert('No AI Notifications', 'No AI wellness notifications are scheduled');
+                        } else {
+                          Alert.alert(
+                            'Scheduled AI Notifications',
+                            `Found ${notifications.length} scheduled AI wellness check-ins`,
+                            [{ text: 'OK' }]
+                          );
+                        }
+                      } catch (error) {
+                        Alert.alert('Error', 'Failed to check notifications');
+                      }
+                    }}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#FFF" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Check Scheduled AI Notifications</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </>
           )}
         </ScrollView>
@@ -844,6 +999,55 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     backgroundColor: '#2E7D32',
+  },
+  statDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  testLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingHorizontal: 4,
+  },
+  testLoadingText: {
+    marginLeft: 8,
+    color: '#666',
+    fontSize: 14,
+  },
+  testResultsContainer: {
+    marginTop: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+  },
+  testResultsScroll: {
+    maxHeight: 300,
+    marginTop: 8,
+  },
+  testResultsText: {
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#333',
+    lineHeight: 18,
+  },
+  notificationTestSection: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  testDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
 });
 

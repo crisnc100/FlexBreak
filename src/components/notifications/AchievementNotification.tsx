@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,6 +12,7 @@ interface AchievementNotificationProps {
     xp: number;
     icon?: string;
     category?: string;
+    badgeImage?: string;
   };
   onDismiss: () => void;
 }
@@ -60,6 +61,24 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
     };
   }, []);
   
+  // Get badge image based on achievement id
+  const getBadgeImage = (achievement: any) => {
+    switch (achievement.id) {
+      case 'daily_player':
+        return require('../../../assets/images/achievements/dailyPlayerBadge.png');
+      case 'lightning_reflexes':
+        return require('../../../assets/images/achievements/lightningReflexes.png');
+      case 'game_master':
+        return require('../../../assets/images/achievements/gameMaster.png');
+      case 'trivia_expert':
+        return require('../../../assets/images/achievements/triviaExpert.png');
+      case 'perfect_balance':
+        return require('../../../assets/images/achievements/perfectScoreBadge.png');
+      default:
+        return null;
+    }
+  };
+  
   // Get icon based on achievement category or icon
   const getIcon = () => {
     if (achievement.icon) {
@@ -107,14 +126,24 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
         }
       ]}
     >
-      <LinearGradient
-        colors={['rgba(76, 175, 80, 0.7)', 'rgba(76, 175, 80, 0.3)']}
-        style={styles.achievementBadge}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <Ionicons name={getIcon() as any} size={28} color="#FFFFFF" />
-      </LinearGradient>
+      {achievement.badgeImage ? (
+        <View style={styles.badgeImageContainer}>
+          <Image 
+            source={getBadgeImage(achievement)} 
+            style={styles.badgeImage}
+            resizeMode="contain"
+          />
+        </View>
+      ) : (
+        <LinearGradient
+          colors={['rgba(76, 175, 80, 0.7)', 'rgba(76, 175, 80, 0.3)']}
+          style={styles.achievementBadge}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Ionicons name={getIcon() as any} size={28} color="#FFFFFF" />
+        </LinearGradient>
+      )}
       
       <View style={styles.textContainer}>
         <Text style={[styles.title, { color: theme.text }]}>
@@ -163,6 +192,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  badgeImageContainer: {
+    width: 64,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  badgeImage: {
+    width: 56,
+    height: 56,
   },
   textContainer: {
     flex: 1,

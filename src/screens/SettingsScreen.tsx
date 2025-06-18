@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { clearAllData, clearAllPremiumStatus, saveTransitionDuration, getTransitionDuration, saveIsPremium } from '../services/storageService';
+import { clearAllData, clearAllPremiumStatus, saveTransitionDuration, getTransitionDuration, saveIsPremium, KEYS } from '../services/storageService';
 import { resetSimulationData } from '../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AIWellnessSettings } from '../components/settings/ai';
 
 import DiagnosticsScreen from './DiagnosticsScreen';
 import { ThemeType, useTheme } from '../context/ThemeContext';
@@ -477,6 +478,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
             ios_backgroundColor="#3e3e3e"
           />
         </View>
+
+        {/* AI Wellness Coach Settings */}
+        <AIWellnessSettings />
       </View>
     );
   };

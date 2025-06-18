@@ -8,8 +8,10 @@ import {
   Animated,
   Dimensions,
   FlatList,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { WellnessTrueFalse } from './minigames/WellnessTrueFalse';
 import { StressBuster } from './minigames/StressBuster';
@@ -22,8 +24,41 @@ import {
   getAvailableGames,
   recordMiniGamePlayed 
 } from '../../services/miniGameService';
+import { MiniGameAchievementNotification } from '../notifications/MiniGameAchievementNotification';
 
 const { width, height } = Dimensions.get('window');
+
+// Achievement definitions for mini-games
+const MINIGAME_ACHIEVEMENTS = {
+  [MiniGameType.STRESS_BUSTER]: {
+    id: 'lightning_reflexes',
+    title: 'Lightning Reflexes',
+    description: 'Perfect score in Stress Buster!',
+    xp: 100,
+    badgeImage: require('../../../assets/images/achievements/lightningReflexes.png'),
+  },
+  [MiniGameType.POSTURE_PATROL]: {
+    id: 'game_master',
+    title: 'Game Master',
+    description: 'Completed without losing lives!',
+    xp: 150,
+    badgeImage: require('../../../assets/images/achievements/gameMaster.png'),
+  },
+  [MiniGameType.WELLNESS_TRIVIA]: {
+    id: 'trivia_expert',
+    title: 'Perfect Knowledge',
+    description: 'All answers correct!',
+    xp: 50,
+    badgeImage: require('../../../assets/images/achievements/triviaExpert.png'),
+  },
+  [MiniGameType.BALANCE_DROP]: {
+    id: 'perfect_balance',
+    title: 'Perfect Balance',
+    description: 'Flawless balance achieved!',
+    xp: 200,
+    badgeImage: require('../../../assets/images/achievements/perfectScoreBadge.png'),
+  },
+};
 
 interface MiniGamePopupProps {
   visible: boolean;
@@ -73,10 +108,10 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
     setGameCompleted(true);
     onXpEarned(xp);
     
+    let isPerfectScore = false;
+    
     // Record the game played
     if (selectedGame) {
-      let isPerfectScore = false;
-      
       // Determine perfect score based on game type
       switch (selectedGame) {
         case MiniGameType.WELLNESS_TRIVIA:
@@ -84,19 +119,18 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
           break;
         case MiniGameType.STRESS_BUSTER:
           // Perfect score if high score with good accuracy
-          // Score includes accuracy bonus, so high score means no/few misses
-          isPerfectScore = score >= 20 && xp >= 80; // High score and high XP
+          // Lowered threshold based on actual gameplay - perfect can be 17-18
+          isPerfectScore = score >= 17 && xp >= 80; // High score and high XP
           break;
         case MiniGameType.POSTURE_PATROL:
           // Perfect score if completed with all 3 hearts remaining
-          // This is tracked in the game results (perfectDefense)
-          // High score usually indicates perfect defense
-          isPerfectScore = xp >= 90; // High XP indicates perfect or near-perfect play
+          // Posture Patrol gives 75-100 XP for victory, lower score threshold
+          isPerfectScore = xp >= 75 && score >= 200; // Victory with good score
           break;
         case MiniGameType.BALANCE_DROP:
           // Perfect score if completed all rounds with good balance and energy
-          // XP calculation includes energy and balance bonuses
-          isPerfectScore = xp >= 90; // High XP means good balance + energy management
+          // Balance Drop gives high XP for good performance
+          isPerfectScore = xp >= 85; // High XP means good balance + energy management
           break;
         default:
           isPerfectScore = false;
@@ -110,12 +144,23 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
         // The parent component should handle showing level-up UI
         console.log(`Level up! ${result.levelUp.oldLevel} → ${result.levelUp.newLevel}`);
       }
+      
+      // The achievement notification will be handled by the global listener
+      // Just provide haptic feedback if perfect score
+      if (isPerfectScore) {
+        haptics.success();
+        console.log(`[MiniGamePopup] Perfect score achieved! Waiting for achievement processing...`);
+      }
     }
     
-    // Auto-close after 2 seconds
+    // Wait a bit longer to ensure achievement events are processed
+    // This gives time for the achievement manager to emit events
+    const closeDelay = isPerfectScore ? 5000 : 2500;
+    console.log(`[MiniGamePopup] Will close in ${closeDelay}ms`);
+    
     setTimeout(() => {
       handleClose();
-    }, 2000);
+    }, closeDelay);
   };
 
   const handleSkipGame = () => {
@@ -271,19 +316,23 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
               ) : (
                 // Game completion screen
                 <View style={styles.completionScreen}>
-                  <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-                  <Text style={[styles.completionTitle, { color: theme.text }]}>
-                    Bonus XP Earned!
-                  </Text>
-                  <Text style={[styles.completionXp, { color: theme.accent }]}>
-                    +{earnedXp} XP
-                  </Text>
+                  <Animated.View style={[styles.completionContent]}>
+                    <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+                    <Text style={[styles.completionTitle, { color: theme.text }]}>
+                      Bonus XP Earned!
+                    </Text>
+                    <Text style={[styles.completionXp, { color: theme.accent }]}>
+                      +{earnedXp} XP
+                    </Text>
+                  </Animated.View>
+                  
                 </View>
               )}
             </View>
           )}
         </TouchableOpacity>
       </TouchableOpacity>
+      
     </Modal>
   );
 };
@@ -403,5 +452,8 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  completionContent: {
+    alignItems: 'center',
   },
 });

@@ -94,6 +94,8 @@ export async function recordMiniGamePlayed(
   xpEarned: number,
   isPerfectScore: boolean
 ): Promise<any> {
+  console.log(`[MiniGameService] Recording game: ${gameType}, score: ${score}, XP: ${xpEarned}, perfect: ${isPerfectScore}`);
+  
   try {
     const today = new Date().toDateString();
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString();
@@ -151,12 +153,20 @@ export async function recordMiniGamePlayed(
         return; // Unknown game type
     }
     
+    console.log(`[MiniGameService] Updating achievements for ${achievementGameType}`);
     await updateMiniGameAchievements(userProgress, achievementGameType, isPerfectScore);
     
     // Process the mini-game completion and add XP to user's total
+    console.log(`[MiniGameService] Processing completed mini-game...`);
     const result = await processCompletedMiniGame(gameType, score, xpEarned, isPerfectScore);
     
-    console.log(`Mini-game recorded: ${gameType}, Score: ${score}, XP: ${result.totalXpEarned}, Perfect: ${isPerfectScore}`);
+    console.log(`[MiniGameService] Mini-game recorded successfully:`, {
+      gameType,
+      score,
+      xpEarned: result.totalXpEarned,
+      isPerfectScore,
+      levelUp: result.levelUp
+    });
     
     // Return the result for UI updates (level up notifications, etc.)
     return result;

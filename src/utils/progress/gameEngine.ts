@@ -634,6 +634,25 @@ export const processCompletedMiniGame = async (
   // Save updated progress
   await storageService.saveUserProgress(userProgress);
   
+  // Emit XP update event for UI refresh
+  const { gamificationEvents, XP_UPDATED_EVENT, LEVEL_UP_EVENT } = await import('../../hooks/progress/useGamification');
+  
+  // Emit XP updated event
+  gamificationEvents.emit(XP_UPDATED_EVENT, {
+    totalXP: userProgress.totalXP,
+    xpEarned: totalXp,
+    source: 'mini-game'
+  });
+  
+  // Emit level up event if applicable
+  if (levelUp) {
+    gamificationEvents.emit(LEVEL_UP_EVENT, {
+      oldLevel: levelUp.oldLevel,
+      newLevel: levelUp.newLevel,
+      totalXP: userProgress.totalXP
+    });
+  }
+  
   return {
     userProgress,
     xpBreakdown: breakdown,

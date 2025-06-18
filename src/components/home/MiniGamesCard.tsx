@@ -26,6 +26,37 @@ import * as haptics from '../../utils/haptics';
 
 const { width } = Dimensions.get('window');
 
+const MINIGAME_ACHIEVEMENTS = {
+  [MiniGameType.STRESS_BUSTER]: {
+    id: 'lightning_reflexes',
+    title: 'Lightning Reflexes',
+    description: 'Perfect score in Stress Buster!',
+    xp: 100,
+    badgeImage: require('../../../assets/images/achievements/lightningReflexes.png'),
+  },
+  [MiniGameType.POSTURE_PATROL]: {
+    id: 'game_master',
+    title: 'Game Master',
+    description: 'Completed without losing lives!',
+    xp: 150,
+    badgeImage: require('../../../assets/images/achievements/gameMaster.png'),
+  },
+  [MiniGameType.WELLNESS_TRIVIA]: {
+    id: 'trivia_expert',
+    title: 'Perfect Knowledge',
+    description: 'All answers correct!',
+    xp: 50,
+    badgeImage: require('../../../assets/images/achievements/triviaExpert.png'),
+  },
+  [MiniGameType.BALANCE_DROP]: {
+    id: 'perfect_balance',
+    title: 'Perfect Balance',
+    description: 'Flawless balance achieved!',
+    xp: 200,
+    badgeImage: require('../../../assets/images/achievements/perfectScoreBadge.png'),
+  },
+};
+
 interface MiniGamesCardProps {
   onOpenSubscription: () => void;
 }
@@ -67,29 +98,41 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
   const handleGameComplete = async (score: number, xp: number) => {
     console.log(`🎮 HOME: Mini-game completed! Score: ${score}, XP: ${xp}`);
     
+    let isPerfectScore = false;
+    
     // Record the game played
     if (selectedGame) {
-      let isPerfectScore = false;
-      
       // Determine perfect score based on game type
       switch (selectedGame) {
         case MiniGameType.WELLNESS_TRIVIA:
           isPerfectScore = score === 5; // 5/5 correct answers
           break;
         case MiniGameType.STRESS_BUSTER:
-          isPerfectScore = score >= 10; // Good accuracy threshold
+          // Perfect score if high score with good accuracy
+          // Lowered threshold based on actual gameplay - perfect can be 17-18
+          isPerfectScore = score >= 17 && xp >= 80; // High score and high XP
           break;
         case MiniGameType.POSTURE_PATROL:
-          isPerfectScore = score >= 200; // High balance score threshold
+          // Perfect score if completed with all 3 hearts remaining
+          // Posture Patrol gives 75-100 XP for victory, lower score threshold
+          isPerfectScore = xp >= 75 && score >= 200; // Victory with good score
           break;
         case MiniGameType.BALANCE_DROP:
-          isPerfectScore = score >= 100; // Unknown threshold
+          // Perfect score if completed all rounds with good balance and energy
+          // Balance Drop gives high XP for good performance
+          isPerfectScore = xp >= 85; // High XP means good balance + energy management
           break;
         default:
           isPerfectScore = false;
       }
       
-      await recordMiniGamePlayed(selectedGame, score, xp, isPerfectScore);
+      const result = await recordMiniGamePlayed(selectedGame, score, xp, isPerfectScore);
+      
+      // The achievement notification will be handled by the global listener
+      // Just provide haptic feedback if perfect score
+      if (isPerfectScore) {
+        haptics.success();
+      }
     }
     
     // Show completion screen specific to home mini-games
@@ -97,10 +140,11 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
     setModalMode('completion');
     haptics.heavy();
     
-    // Auto-close after 3 seconds
+    // Auto-close after 3 seconds (or 4 seconds if achievement shown)
+    const closeDelay = isPerfectScore ? 4000 : 3000;
     setTimeout(() => {
       handleCloseGame();
-    }, 3000);
+    }, closeDelay);
     
     // TODO: Integrate with XP system
   };
@@ -403,6 +447,7 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           renderCompletionScreen()
         )}
       </Modal>
+      
     </>
   );
 };

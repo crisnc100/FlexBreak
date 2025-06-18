@@ -40,6 +40,7 @@ import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsIn
 // Import video loader service
 import { videoLoaderService } from './src/services/videoLoaderService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
+import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
 
 // Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
@@ -354,7 +355,7 @@ function MainApp() {
     const initApp = async () => {
       try {
         // Initialize local notifications system
-        notifications.configureNotifications();
+        await notifications.configureNotifications();
         
         // Get notification permissions (both systems need this)
         const permissionsGranted = await notifications.requestNotificationsPermissions();
@@ -506,6 +507,9 @@ function MainApp() {
       
       {/* Flex Save Prompt */}
       <FlexSavePrompt />
+      
+      {/* Global Achievement Listener */}
+      <GlobalAchievementListener />
       
       {/* Update Notification Modal */}
       {updateInfo && (

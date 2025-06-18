@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as storageService from '../services/storageService';
+import { configureAINotifications, setupAINotificationHandlers } from '../services/notifications/aiNotificationHandler';
 
 // Special keys for async storage that aren't in storageService
 const REMINDER_DAYS_KEY = 'reminder_days';
@@ -33,7 +34,7 @@ export const saveReminderTime = storageService.saveReminderTime;
 export const getReminderTime = storageService.getReminderTime;
 
 // Configure notifications
-export function configureNotifications(): void {
+export async function configureNotifications(): Promise<void> {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -42,15 +43,14 @@ export function configureNotifications(): void {
     }),
   });
   
-  // Set up notification received handler
-  Notifications.addNotificationReceivedListener((notification) => {
-    console.log('Notification received in foreground!', notification);
-  });
+  // Configure AI notification categories
+  await configureAINotifications();
   
-  // Set up notification response handler (when user taps notification)
-  Notifications.addNotificationResponseReceivedListener((response) => {
-    console.log('Notification response received!', response);
-  });
+  // Set up AI notification handlers
+  setupAINotificationHandlers();
+  
+  // Note: Notification handlers are set up in setupAINotificationHandlers
+  // We don't need duplicate listeners here
   
   console.log('Notifications handler configured');
 }

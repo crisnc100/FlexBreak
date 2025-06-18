@@ -301,6 +301,8 @@ export const updateMiniGameAchievements = async (
   gameType: 'posture_patrol' | 'stress_buster' | 'balance_drop' | 'trivia',
   isPerfectScore: boolean
 ): Promise<void> => {
+  console.log(`[AchievementManager] Updating mini-game achievements for ${gameType}, perfect: ${isPerfectScore}`);
+  
   // Ensure achievements are initialized
   initializeAchievements(userProgress);
   
@@ -311,6 +313,7 @@ export const updateMiniGameAchievements = async (
   if (dailyPlayerAchievement && !dailyPlayerAchievement.completed) {
     // Get minigame streak from storage
     const minigameStreak = await storageService.getData(storageService.KEYS.MINIGAMES.CONSECUTIVE_DAYS, 0);
+    console.log(`[AchievementManager] Daily Player progress: ${minigameStreak}/${dailyPlayerAchievement.requirement}`);
     dailyPlayerAchievement.progress = minigameStreak;
     
     if (dailyPlayerAchievement.progress >= dailyPlayerAchievement.requirement) {
@@ -319,6 +322,7 @@ export const updateMiniGameAchievements = async (
       dailyPlayerAchievement.badgeUnlocked = false;
       userProgress.totalXP += dailyPlayerAchievement.xp;
       newlyCompletedAchievements.push(dailyPlayerAchievement);
+      console.log(`[AchievementManager] Daily Player achievement completed!`);
     }
   }
   
@@ -363,12 +367,15 @@ export const updateMiniGameAchievements = async (
     if (achievementId && userProgress.achievements[achievementId]) {
       const achievement = userProgress.achievements[achievementId];
       if (!achievement.completed) {
+        console.log(`[AchievementManager] Completing ${achievementId} achievement`);
         achievement.progress = 1;
         achievement.completed = true;
         achievement.dateCompleted = new Date().toISOString();
         achievement.badgeUnlocked = false;
         userProgress.totalXP += achievement.xp;
         newlyCompletedAchievements.push(achievement);
+      } else {
+        console.log(`[AchievementManager] Achievement ${achievementId} already completed`);
       }
     }
   } else {

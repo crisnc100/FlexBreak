@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useGamification, gamificationEvents, XP_UPDATED_EVENT, LEVEL_UP_EVENT } from '../../hooks/progress/useGamification';
 import { useTheme } from '../../context/ThemeContext';
 import { useLevelProgress } from '../../hooks/progress/useLevelProgress';
+import { MiniGameBadgeDisplay } from './MiniGameBadgeDisplay';
+import * as haptics from '../../utils/haptics';
 // Simple date formatter function to replace date-fns
 const formatTimeAgo = (dateString: string): string => {
   try {
@@ -255,6 +257,68 @@ const ACHIEVEMENTS = [
     category: 'elite',
     backendCategory: 'progress',
     type: 'routine_count'
+  },
+  
+  // Mini-game achievements
+  {
+    id: 'daily_player',
+    title: 'Daily Player',
+    description: 'Complete a mini-game after routine for 7 days in a row',
+    icon: 'game-controller-outline',
+    requirement: 7,
+    xp: 100,
+    category: 'intermediate',
+    backendCategory: 'minigames',
+    type: 'minigame_streak',
+    badgeImage: require('../../../assets/images/achievements/dailyPlayerBadge.png')
+  },
+  {
+    id: 'lightning_reflexes',
+    title: 'Lightning Reflexes',
+    description: 'Get all correct taps in Stress Buster',
+    icon: 'flash-outline',
+    requirement: 1,
+    xp: 100,
+    category: 'intermediate',
+    backendCategory: 'minigames',
+    type: 'stress_buster_perfect',
+    badgeImage: require('../../../assets/images/achievements/lightningReflexes.png')
+  },
+  {
+    id: 'game_master',
+    title: 'Game Master',
+    description: 'Complete Posture Patrol without losing lives',
+    icon: 'shield-outline',
+    requirement: 1,
+    xp: 150,
+    category: 'advanced',
+    backendCategory: 'minigames',
+    type: 'posture_patrol_perfect',
+    badgeImage: require('../../../assets/images/achievements/gameMaster.png')
+  },
+  {
+    id: 'trivia_expert',
+    title: 'Trivia Expert',
+    description: 'Get all trivia questions correct 3 times in a row',
+    icon: 'school-outline',
+    requirement: 3,
+    xp: 150,
+    category: 'advanced',
+    backendCategory: 'minigames',
+    type: 'trivia_streak',
+    badgeImage: require('../../../assets/images/achievements/triviaExpert.png')
+  },
+  {
+    id: 'perfect_balance',
+    title: 'Perfect Balance',
+    description: 'Complete Balance Drop with perfect balance and high energy',
+    icon: 'scale-outline',
+    requirement: 1,
+    xp: 200,
+    category: 'elite',
+    backendCategory: 'minigames',
+    type: 'balance_drop_perfect',
+    badgeImage: require('../../../assets/images/achievements/perfectScoreBadge.png')
   }
 ];
 
@@ -304,24 +368,40 @@ const AchievementCard = ({ achievement, onPress, isDark, isSunset, theme }) => (
     ]}
     onPress={() => onPress(achievement)}
   >
-    <View style={[
-      styles.achievementIconContainer, 
-      achievement.isUnlocked && styles.achievementIconContainerUnlocked,
-      achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementIconContainerInProgress,
-      {
-        backgroundColor: achievement.isUnlocked 
-          ? isDark || isSunset ? theme.accent : '#4CAF50'
-          : achievement.currentProgress > 0 
-            ? isDark || isSunset ? 'rgba(76,175,80,0.3)' : '#E8F5E9'
-            : isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0'
-      }
-    ]}>
-      <Ionicons 
-        name={achievement.icon} 
-        size={24} 
-        color={achievement.isUnlocked ? '#FFFFFF' : (achievement.currentProgress > 0 ? (isDark || isSunset ? theme.accent : '#4CAF50') : (isDark || isSunset ? 'rgba(255,255,255,0.5)' : '#999'))} 
-      />
-    </View>
+    {achievement.badgeImage ? (
+      <View style={[
+        styles.badgeImageContainer,
+        !achievement.isUnlocked && styles.badgeImageLocked
+      ]}>
+        <Image 
+          source={achievement.badgeImage} 
+          style={[
+            styles.badgeImage,
+            !achievement.isUnlocked && styles.badgeImageGrayscale
+          ]}
+          resizeMode="contain"
+        />
+      </View>
+    ) : (
+      <View style={[
+        styles.achievementIconContainer, 
+        achievement.isUnlocked && styles.achievementIconContainerUnlocked,
+        achievement.currentProgress > 0 && !achievement.isUnlocked && styles.achievementIconContainerInProgress,
+        {
+          backgroundColor: achievement.isUnlocked 
+            ? isDark || isSunset ? theme.accent : '#4CAF50'
+            : achievement.currentProgress > 0 
+              ? isDark || isSunset ? 'rgba(76,175,80,0.3)' : '#E8F5E9'
+              : isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0'
+        }
+      ]}>
+        <Ionicons 
+          name={achievement.icon} 
+          size={24} 
+          color={achievement.isUnlocked ? '#FFFFFF' : (achievement.currentProgress > 0 ? (isDark || isSunset ? theme.accent : '#4CAF50') : (isDark || isSunset ? 'rgba(255,255,255,0.5)' : '#999'))} 
+        />
+      </View>
+    )}
     <Text style={[
       styles.achievementTitle, 
       !achievement.isUnlocked && styles.achievementLockedText,
@@ -380,6 +460,144 @@ const AchievementCard = ({ achievement, onPress, isDark, isSunset, theme }) => (
     )}
   </TouchableOpacity>
 );
+
+// Badge Showcase component for mini-game badges with improved UX
+const BadgeShowcase = ({ badges, isDark, isSunset, theme }) => {
+  const [selectedBadge, setSelectedBadge] = useState(null);
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+  
+  if (!badges || badges.length === 0) return null;
+  
+  const handleBadgePress = (badge) => {
+    if (badge.isUnlocked) {
+      haptics.medium();
+      setSelectedBadge(badge);
+      setShowBadgeModal(true);
+    }
+  };
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+  
+  return (
+    <>
+      <View style={[styles.badgeShowcaseContainer, { 
+        backgroundColor: isDark || isSunset ? theme.cardBackground : '#FFF',
+        borderColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#E0E0E0'
+      }]}>
+        <View style={styles.showcaseHeader}>
+          <Text style={[styles.showcaseTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>
+            Mini-Game Badges
+          </Text>
+          <Text style={[styles.showcaseSubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
+            {badges.filter(b => b.isUnlocked).length} of {badges.length} earned
+          </Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.badgeScroll}>
+          <View style={styles.badgeGrid}>
+            {badges.map((badge) => (
+              <MiniGameBadgeDisplay
+                key={badge.id}
+                badge={badge}
+                size="medium"
+                showTitle={true}
+                onPress={handleBadgePress}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+      
+      {/* Badge Detail Modal */}
+      <Modal
+        visible={showBadgeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowBadgeModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowBadgeModal(false)}
+        >
+          <View 
+            style={[
+              styles.badgeModalContent, 
+              { 
+                backgroundColor: theme.cardBackground,
+                shadowColor: isDark || isSunset ? 'black' : '#000',
+              }
+            ]}
+          >
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => setShowBadgeModal(false)}
+            >
+              <Ionicons 
+                name="close-circle" 
+                size={28} 
+                color={isDark || isSunset ? theme.textSecondary : 'rgba(0,0,0,0.5)'} 
+              />
+            </TouchableOpacity>
+            
+            {selectedBadge && (
+              <View style={styles.badgeDetailContent}>
+                <Image
+                  source={selectedBadge.badgeImage}
+                  style={styles.modalBadgeImage}
+                  resizeMode="contain"
+                />
+                
+                <Text style={[styles.modalBadgeTitle, { color: theme.text }]}>
+                  {selectedBadge.title}
+                </Text>
+                
+                <Text style={[styles.modalBadgeDescription, { color: theme.textSecondary }]}>
+                  {selectedBadge.description}
+                </Text>
+                
+                <View style={styles.badgeStats}>
+                  <View style={[styles.badgeStatItem, { backgroundColor: theme.accent + '15' }]}>
+                    <Ionicons name="flash" size={20} color={theme.accent} />
+                    <Text style={[styles.badgeStatText, { color: theme.accent }]}>
+                      +{selectedBadge.xp} XP
+                    </Text>
+                  </View>
+                  
+                  {selectedBadge.dateCompleted && (
+                    <View style={[styles.badgeStatItem, { backgroundColor: isDark || isSunset ? 'rgba(255,255,255,0.1)' : '#F0F0F0' }]}>
+                      <Ionicons name="calendar" size={20} color={theme.textSecondary} />
+                      <Text style={[styles.badgeStatText, { color: theme.textSecondary }]}>
+                        {formatDate(selectedBadge.dateCompleted)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                
+                <View style={[styles.badgeRarity, { 
+                  backgroundColor: '#FFD700' + '20',
+                  borderColor: '#FFD700'
+                }]}>
+                  <Ionicons name="star" size={16} color="#FFD700" />
+                  <Text style={[styles.badgeRarityText, { color: '#FFD700' }]}>
+                    Special Achievement
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+};
 
 // Add an empty state component for when there are no achievements yet
 const EmptyAchievements = ({ isDark, isSunset, theme }) => (
@@ -461,6 +679,9 @@ const Achievements: React.FC<AchievementsProps> = ({
     };
   }, [refreshData]);
   
+  // State for mini-game badges
+  const [miniGameBadges, setMiniGameBadges] = useState<any[]>([]);
+  
   // Setup local values using either gamification data or props (for backward compatibility)
   useEffect(() => {
     if (gamificationSummary) {
@@ -499,6 +720,10 @@ const Achievements: React.FC<AchievementsProps> = ({
           completedTimeAgo
         };
       });
+      
+      // Extract mini-game badges
+      const badges = processedAchievements.filter(a => a.badgeImage);
+      setMiniGameBadges(badges);
       
       // Set the processed achievements
       setUnlockedAchievements(processedAchievements);
@@ -603,6 +828,16 @@ const Achievements: React.FC<AchievementsProps> = ({
           </Text>
         )}
       </View>
+      
+      {/* Badge Showcase for mini-game badges */}
+      {miniGameBadges.length > 0 && (
+        <BadgeShowcase 
+          badges={miniGameBadges}
+          isDark={isDark}
+          isSunset={isSunset}
+          theme={theme}
+        />
+      )}
       
       {/* Achievements section */}
       <View style={[styles.achievementsSection, { 
@@ -1024,6 +1259,126 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     marginHorizontal: 24,
+  },
+  badgeImageContainer: {
+    width: 64,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  badgeImage: {
+    width: 56,
+    height: 56,
+  },
+  badgeImageLocked: {
+    opacity: 0.5,
+  },
+  badgeImageGrayscale: {
+    tintColor: '#666',
+    opacity: 0.4,
+  },
+  badgeShowcaseContainer: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  showcaseHeader: {
+    marginBottom: 12,
+  },
+  showcaseTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  showcaseSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  badgeScroll: {
+    marginHorizontal: -8,
+  },
+  badgeGrid: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    gap: 12,
+  },
+  badgeModalContent: {
+    width: '85%',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 1,
+  },
+  badgeDetailContent: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 10,
+  },
+  modalBadgeImage: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
+  modalBadgeTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalBadgeDescription: {
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  badgeStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  badgeStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  badgeStatText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  badgeRarity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  badgeRarityText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, ScrollView, Modal, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import LevelProgressBar from '../progress/LevelProgressBar';
@@ -13,6 +13,7 @@ import * as achievementManager from '../../utils/progress/modules/achievementMan
 import * as storageService from '../../services/storageService';
 import { Achievement } from '../../utils/progress/types';
 import * as haptics from '../../utils/haptics';
+import { MiniGameBadgeDisplay } from '../progress/MiniGameBadgeDisplay';
 
 interface LevelProgressCardProps {
   onPress?: () => void;
@@ -29,6 +30,45 @@ const formatDate = (dateString: string | undefined): string => {
     day: 'numeric' 
   });
 };
+
+// Mini-game badge definitions
+const MINIGAME_BADGES = [
+  {
+    id: 'daily_player',
+    title: 'Daily Player',
+    description: 'Complete a mini-game after routine for 7 days in a row',
+    badgeImage: require('../../../assets/images/achievements/dailyPlayerBadge.png'),
+    xp: 100,
+  },
+  {
+    id: 'lightning_reflexes',
+    title: 'Lightning Reflexes',
+    description: 'Get all correct taps in Stress Buster',
+    badgeImage: require('../../../assets/images/achievements/lightningReflexes.png'),
+    xp: 100,
+  },
+  {
+    id: 'game_master',
+    title: 'Game Master',
+    description: 'Complete Posture Patrol without losing lives',
+    badgeImage: require('../../../assets/images/achievements/gameMaster.png'),
+    xp: 150,
+  },
+  {
+    id: 'trivia_expert',
+    title: 'Trivia Expert',
+    description: 'Get all trivia questions correct 3 times in a row',
+    badgeImage: require('../../../assets/images/achievements/triviaExpert.png'),
+    xp: 150,
+  },
+  {
+    id: 'perfect_balance',
+    title: 'Perfect Balance',
+    description: 'Complete Balance Drop with perfect balance and high energy',
+    badgeImage: require('../../../assets/images/achievements/perfectScoreBadge.png'),
+    xp: 200,
+  }
+];
 
 const LevelProgressCard: React.FC<LevelProgressCardProps> = ({ 
   onPress, 
@@ -53,6 +93,9 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
   const [isLoadingAchievements, setIsLoadingAchievements] = useState(true);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const [showAchievementModal, setShowAchievementModal] = useState(false);
+  
+  // Mini-game badge data
+  const [miniGameBadges, setMiniGameBadges] = useState<any[]>([]);
   
   // Animation for visual feedback when XP updates
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -166,6 +209,18 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
         
         setAllAchievements(sortedAchievements);
         setRecentAchievements(sortedAchievements.slice(0, 3));
+        
+        // Filter and process mini-game badges
+        const miniGameAchievementIds = MINIGAME_BADGES.map(b => b.id);
+        const userMiniGameBadges = MINIGAME_BADGES.map(badge => {
+          const completed = completedAchievements.find(a => a.id === badge.id);
+          return {
+            ...badge,
+            isUnlocked: !!completed,
+            dateCompleted: completed?.dateCompleted,
+          };
+        });
+        setMiniGameBadges(userMiniGameBadges);
       } catch (error) {
         console.error('Error loading achievements:', error);
       } finally {
@@ -298,6 +353,17 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
       
       setAllAchievements(sortedAchievements);
       setRecentAchievements(sortedAchievements.slice(0, 3));
+      
+      // Filter and process mini-game badges
+      const userMiniGameBadges = MINIGAME_BADGES.map(badge => {
+        const completed = completedAchievements.find(a => a.id === badge.id);
+        return {
+          ...badge,
+          isUnlocked: !!completed,
+          dateCompleted: completed?.dateCompleted,
+        };
+      });
+      setMiniGameBadges(userMiniGameBadges);
     } catch (error) {
       console.error('Error loading achievements:', error);
     }
@@ -501,58 +567,95 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
             />
           </View>
           
-          {/* Recent achievement badges for premium users */}
-          {isPremium && recentAchievements.length > 0 && (
-            <View style={styles.badgesContainer}>
-              <View style={styles.badgesHeader}>
-                <Text style={[styles.badgesTitle, { color: theme.text }]}>
-                  Badges Unlocked
-                </Text>
-                {allAchievements.length > 3 && (
-                  <TouchableOpacity onPress={handleViewAllAchievements}>
-                    <Text style={[styles.viewAllText, { color: theme.accent }]}>
-                      View All ({allAchievements.length})
+          {/* Recent badges for premium users */}
+          {isPremium && (
+            <>
+              {/* Show mini-game badges if available */}
+              {miniGameBadges.filter(b => b.isUnlocked).length > 0 && (
+                <View style={styles.miniGameBadgesContainer}>
+                  <View style={styles.badgesHeader}>
+                    <Text style={[styles.miniGameBadgesTitle, { color: theme.text }]}>
+                      Recent Badges
                     </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <View style={styles.badgesRow}>
-                {recentAchievements.map((achievement) => (
-                  <TouchableOpacity 
-                    key={achievement.id} 
-                    style={styles.badgeItem}
-                    onPress={() => handleBadgePress(achievement)}
-                    activeOpacity={0.7}
-                  >
-                    <Animated.View
-                      style={[
-                        {transform: [{ scale: badgePulseAnim }]}
-                      ]}
-                    >
-                      <LinearGradient
-                        colors={[getBadgeColor(achievement), getBadgeColor(achievement)]}
-                        style={styles.badgeCircle}
-                        start={{x: 0, y: 0}}
-                        end={{x: 1, y: 1}}
+                    <TouchableOpacity onPress={handleViewAllAchievements}>
+                      <Text style={[styles.viewAllText, { color: theme.accent }]}>
+                        View All
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.miniGameBadgesRow}>
+                      {miniGameBadges
+                        .filter(b => b.isUnlocked)
+                        .slice(0, 5)
+                        .map((badge) => (
+                          <MiniGameBadgeDisplay
+                            key={badge.id}
+                            badge={badge}
+                            size="small"
+                            showTitle={true}
+                            onPress={() => handleBadgePress(badge)}
+                          />
+                        ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
+              
+              {/* Show regular achievements if no mini-game badges */}
+              {miniGameBadges.filter(b => b.isUnlocked).length === 0 && recentAchievements.length > 0 && (
+                <View style={styles.badgesContainer}>
+                  <View style={styles.badgesHeader}>
+                    <Text style={[styles.badgesTitle, { color: theme.text }]}>
+                      Recent Achievements
+                    </Text>
+                    {allAchievements.length > 3 && (
+                      <TouchableOpacity onPress={handleViewAllAchievements}>
+                        <Text style={[styles.viewAllText, { color: theme.accent }]}>
+                          View All ({allAchievements.length})
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <View style={styles.badgesRow}>
+                    {recentAchievements.slice(0, 3).map((achievement) => (
+                      <TouchableOpacity 
+                        key={achievement.id} 
+                        style={styles.badgeItem}
+                        onPress={() => handleBadgePress(achievement)}
+                        activeOpacity={0.7}
                       >
-                        <Ionicons 
-                          name={getBadgeIcon(achievement)} 
-                          size={22} 
-                          color="white" 
-                        />
-                      </LinearGradient>
-                    </Animated.View>
-                    <Text 
-                      style={[styles.badgeName, { color: theme.text }]}
-                      numberOfLines={2}
-                      ellipsizeMode="tail"
-                    >
-                      {achievement.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+                        <Animated.View
+                          style={[
+                            {transform: [{ scale: badgePulseAnim }]}
+                          ]}
+                        >
+                          <LinearGradient
+                            colors={[getBadgeColor(achievement), getBadgeColor(achievement)]}
+                            style={styles.badgeCircle}
+                            start={{x: 0, y: 0}}
+                            end={{x: 1, y: 1}}
+                          >
+                            <Ionicons 
+                              name={getBadgeIcon(achievement)} 
+                              size={22} 
+                              color="white" 
+                            />
+                          </LinearGradient>
+                        </Animated.View>
+                        <Text 
+                          style={[styles.badgeName, { color: theme.text }]}
+                          numberOfLines={2}
+                          ellipsizeMode="tail"
+                        >
+                          {achievement.title}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
           )}
           
           {isPremium ? (
@@ -622,18 +725,26 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
             
             {selectedAchievement && (
               <View style={styles.achievementDetail}>
-                <LinearGradient
-                  colors={[getBadgeColor(selectedAchievement), getBadgeColor(selectedAchievement)]}
-                  style={styles.detailBadge}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 1}}
-                >
-                  <Ionicons 
-                    name={getBadgeIcon(selectedAchievement)} 
-                    size={40} 
-                    color="white" 
+                {selectedAchievement.badgeImage ? (
+                  <Image
+                    source={selectedAchievement.badgeImage}
+                    style={styles.modalBadgeImage}
+                    resizeMode="contain"
                   />
-                </LinearGradient>
+                ) : (
+                  <LinearGradient
+                    colors={[getBadgeColor(selectedAchievement), getBadgeColor(selectedAchievement)]}
+                    style={styles.detailBadge}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 1}}
+                  >
+                    <Ionicons 
+                      name={getBadgeIcon(selectedAchievement)} 
+                      size={40} 
+                      color="white" 
+                    />
+                  </LinearGradient>
+                )}
                 
                 <Text style={[styles.detailTitle, { color: theme.text }]}>
                   {selectedAchievement.title}
@@ -896,6 +1007,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  modalBadgeImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+  },
   detailTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -930,6 +1046,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  miniGameBadgesContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(150, 150, 150, 0.1)',
+  },
+  miniGameBadgesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  miniGameBadgesRow: {
+    flexDirection: 'row',
+    paddingRight: 16,
+    gap: 12,
   },
 });
 
