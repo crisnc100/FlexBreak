@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
 
-export const scheduleAICheckIns = async (isPremium: boolean = false) => {
+export const scheduleAICheckIns = async (isPremium: boolean = false, isInitialSetup: boolean = false) => {
   console.log(`Scheduling AI check-ins for ${isPremium ? 'premium' : 'free'} user`);
   
   // Cancel existing AI check-ins
@@ -17,15 +17,45 @@ export const scheduleAICheckIns = async (isPremium: boolean = false) => {
     await Notifications.cancelScheduledNotificationAsync(notification.identifier);
   }
   
+  // Get user ID if available
+  const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
+  
+  // Check if user has seen welcome before
+  const hasSeenWelcome = await AsyncStorage.getItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME);
+  
+  // If this is initial setup AND user hasn't seen welcome before
+  if (isInitialSetup && !hasSeenWelcome) {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Welcome to AI Flex Coach! 🎉",
+        body: "Tap to start! Just type your first name and share how you're feeling - I'll help with personalized wellness tips! 💪",
+        data: { 
+          type: 'ai_wellness_checkin',
+          userId,
+          isWelcome: true
+        },
+        categoryIdentifier: 'AI_WELLNESS_CHECK',
+      },
+      trigger: {
+        seconds: 2 // Send after 2 seconds
+      }
+    });
+    console.log('Scheduled welcome notification');
+    
+    // Mark that user has seen welcome
+    await AsyncStorage.setItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME, 'true');
+    
+    // For initial setup, don't schedule regular check-ins yet
+    // They'll be scheduled after the intro conversation
+    return;
+  }
+  
   // Schedule new check-ins based on premium status
   const checkInDays = isPremium 
     ? [1, 2, 3, 4, 5, 6, 0] // Daily for premium
-    : [3, 5]; // Wed & Fri for free
+    : [3]; // Wednesday only for free users
   
   console.log(`Scheduling for days: ${checkInDays.join(', ')}`)
-  
-  // Get user ID if available
-  const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
   
   for (const day of checkInDays) {
     // Calculate the next occurrence of this weekday
@@ -144,12 +174,12 @@ export const checkAIWellnessAccess = async (): Promise<{ canAccess: boolean; rea
   
   // Free users: Check if it's their allowed day
   const today = new Date().getDay();
-  const freeAccessDays = [3, 5]; // Wednesday and Friday
+  const freeAccessDays = [3]; // Wednesday only
   
   if (!freeAccessDays.includes(today)) {
     return { 
       canAccess: false, 
-      reason: 'AI Wellness Coach is available on Wednesdays and Fridays for free users. Upgrade to premium for daily access!' 
+      reason: 'AI Wellness Coach is available on Wednesdays for free users. Upgrade to premium for daily access!' 
     };
   }
   

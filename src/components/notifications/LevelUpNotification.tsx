@@ -32,9 +32,9 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [isFullyMounted, setIsFullyMounted] = useState(false);
   
-  // Only show notification for challenges
-  // Skip rendering for any other sources
-  if (source !== 'challenge') {
+  // Show notification for challenges and mini-games
+  // Skip rendering for other sources (routines use their own flow)
+  if (source !== 'challenge' && source !== 'mini-game') {
     console.log(`LevelUpNotification: Skipping notification for source '${source}'`);
     
     // Immediately dismiss without rendering
@@ -103,7 +103,11 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
       return `from completing "${challengeTitle}" challenge!`;
     }
     
-    // Fall back to default source-based text
+    // Fall back based on source
+    if (source === 'mini-game') {
+      return 'from completing a mini-game!';
+    }
+    
     return 'from completing a challenge!';
   };
   

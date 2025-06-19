@@ -27,6 +27,12 @@ export const GlobalAchievementListener: React.FC = () => {
         xp: achievement.xp
       });
       
+      // Skip mini-game achievements as they're shown in the completion screen
+      if (MINIGAME_ACHIEVEMENT_IDS.includes(achievement.id)) {
+        console.log('[GlobalAchievementListener] Skipping mini-game achievement - shown in completion screen');
+        return;
+      }
+      
       // Show the achievement notification
       setCurrentAchievement(achievement);
       setShowNotification(true);

@@ -23,6 +23,7 @@ import {
   recordMiniGamePlayed 
 } from '../../services/miniGameService';
 import * as haptics from '../../utils/haptics';
+import { AchievementBanner } from '../achievements/AchievementBanner';
 
 const { width } = Dimensions.get('window');
 
@@ -71,6 +72,8 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
   const [selectedGame, setSelectedGame] = useState<MiniGameType | null>(null);
   const [availableGames, setAvailableGames] = useState<MiniGameInfo[]>([]);
   const [completionData, setCompletionData] = useState<{score: number, xp: number} | null>(null);
+  const [achievementEarned, setAchievementEarned] = useState<any | null>(null);
+  const [showAchievementBanner, setShowAchievementBanner] = useState(false);
 
   const handleCardPress = async () => {
     haptics.light();
@@ -114,8 +117,9 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           break;
         case MiniGameType.POSTURE_PATROL:
           // Perfect score if completed with all 3 hearts remaining
-          // Posture Patrol gives 75-100 XP for victory, lower score threshold
-          isPerfectScore = xp >= 75 && score >= 200; // Victory with good score
+          // Posture Patrol gives 75-100 XP for victory
+          // Score of 150+ indicates good performance with minimal damage taken
+          isPerfectScore = xp >= 75 && score >= 150; // Victory with good score
           break;
         case MiniGameType.BALANCE_DROP:
           // Perfect score if completed all rounds with good balance and energy
@@ -128,9 +132,13 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
       
       const result = await recordMiniGamePlayed(selectedGame, score, xp, isPerfectScore);
       
-      // The achievement notification will be handled by the global listener
-      // Just provide haptic feedback if perfect score
-      if (isPerfectScore) {
+      // Store achievement for banner display after completion screen
+      if (isPerfectScore && selectedGame) {
+        const achievementData = MINIGAME_ACHIEVEMENTS[selectedGame];
+        if (achievementData) {
+          setAchievementEarned(achievementData);
+          console.log(`[MiniGamesCard] Perfect score achieved! Achievement: ${achievementData.title}`);
+        }
         haptics.success();
       }
     }
@@ -155,6 +163,13 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
     setSelectedGame(null);
     setCompletionData(null);
     setModalMode('selection');
+    
+    // Show achievement banner after modal closes if achievement was earned
+    if (achievementEarned) {
+      setTimeout(() => {
+        setShowAchievementBanner(true);
+      }, 300); // Small delay for smooth transition
+    }
   };
 
   const getGameDescription = (gameType: MiniGameType): string => {
@@ -310,6 +325,21 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
               +{completionData.xp} XP
             </Text>
           </View>
+
+          {/* Achievement Badge if earned */}
+          {achievementEarned && (
+            <View style={[styles.achievementBadge, { backgroundColor: theme.accent + '15', borderColor: theme.accent }]}>
+              <Ionicons name="trophy" size={24} color={theme.accent} />
+              <View style={styles.achievementText}>
+                <Text style={[styles.achievementTitle, { color: theme.accent }]}>
+                  Badge Unlocked!
+                </Text>
+                <Text style={[styles.achievementDescription, { color: theme.text }]}>
+                  {achievementEarned.title}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -448,6 +478,15 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         )}
       </Modal>
       
+      {/* Achievement Banner - shows after modal closes */}
+      <AchievementBanner
+        visible={showAchievementBanner}
+        achievement={achievementEarned}
+        onHide={() => {
+          setShowAchievementBanner(false);
+          setAchievementEarned(null);
+        }}
+      />
     </>
   );
 };
@@ -645,5 +684,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     opacity: 0.7,
+  },
+  achievementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 20,
+  },
+  achievementText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  achievementTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  achievementDescription: {
+    fontSize: 14,
+    opacity: 0.8,
   },
 });

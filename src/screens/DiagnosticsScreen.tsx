@@ -19,6 +19,8 @@ import { AppHealthScore, AppHealthIssue } from '../utils/performance/appHealthCh
 import * as firebaseReminders from '../utils/firebaseReminders';
 import { testAIIntegration, runQuickTest } from '../utils/aiWellness/testAIIntegration';
 import { testAIWellnessNotification, testCompleteAIFlow, checkScheduledAINotifications } from '../utils/testAINotifications';
+import { runAllNotificationTests, testNotificationScheduling } from '../utils/aiWellness/testNotificationFlow';
+import { testCompleteAIWellnessFlow, testNotificationDisplay } from '../utils/aiWellness/testCompleteFlow';
 
 interface StorageStats {
   totalSize: number;
@@ -233,14 +235,43 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
         originalLog(message, ...optionalParams);
       };
       
-      const results = await testAIIntegration();
+      await testAIIntegration();
       
       console.log = originalLog;
-      
       setAITestResults(output);
     } catch (error) {
-      console.error('AI test error:', error);
-      setAITestResults('Error running AI tests: ' + error.message);
+      console.error('Full AI test error:', error);
+      setAITestResults('Error running full AI tests: ' + error.message);
+    } finally {
+      setAITestLoading(false);
+    }
+  };
+
+  const handleRunNotificationFlowTest = async () => {
+    setAITestLoading(true);
+    setAITestResults('Running AI Notification Flow tests...\n');
+    
+    try {
+      const originalLog = console.log;
+      let output = '';
+      
+      console.log = (message: any, ...optionalParams: any[]) => {
+        output += message + (optionalParams.length > 0 ? ' ' + optionalParams.join(' ') : '') + '\n';
+        originalLog(message, ...optionalParams);
+      };
+      
+      // Run notification flow tests
+      const results = await runAllNotificationTests();
+      
+      // Test notification scheduling
+      await testNotificationScheduling(false); // Test free user
+      await testNotificationScheduling(true);  // Test premium user
+      
+      console.log = originalLog;
+      setAITestResults(output);
+    } catch (error) {
+      console.error('Notification flow test error:', error);
+      setAITestResults('Error running notification flow tests: ' + error.message);
     } finally {
       setAITestLoading(false);
     }
@@ -592,21 +623,30 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
                 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
-                    style={[styles.actionButton, { flex: 1, marginRight: 8 }]}
+                    style={[styles.actionButton, { flex: 1, marginRight: 4 }]}
                     onPress={handleRunAITest}
                     disabled={aiTestLoading}
                   >
                     <Ionicons name="flash-outline" size={18} color="#FFF" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Quick Test</Text>
+                    <Text style={styles.buttonText}>Quick</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
-                    style={[styles.actionButton, { flex: 1, marginLeft: 8, backgroundColor: '#9C27B0' }]}
+                    style={[styles.actionButton, { flex: 1, marginHorizontal: 4, backgroundColor: '#9C27B0' }]}
                     onPress={handleRunFullAITest}
                     disabled={aiTestLoading}
                   >
                     <Ionicons name="flask-outline" size={18} color="#FFF" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Full Test</Text>
+                    <Text style={styles.buttonText}>Full</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, { flex: 1, marginLeft: 4, backgroundColor: '#FF9800' }]}
+                    onPress={handleRunNotificationFlowTest}
+                    disabled={aiTestLoading}
+                  >
+                    <Ionicons name="chatbubbles-outline" size={18} color="#FFF" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Flow</Text>
                   </TouchableOpacity>
                 </View>
                 
@@ -673,6 +713,38 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
                   >
                     <Ionicons name="calendar-outline" size={18} color="#FFF" style={styles.buttonIcon} />
                     <Text style={styles.buttonText}>Check Scheduled AI Notifications</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#4CAF50', marginTop: 8 }]}
+                    onPress={async () => {
+                      setAITestLoading(true);
+                      setAITestResults('Running complete AI wellness flow test...\n');
+                      
+                      try {
+                        const originalLog = console.log;
+                        let output = '';
+                        
+                        console.log = (message: any, ...optionalParams: any[]) => {
+                          output += message + (optionalParams.length > 0 ? ' ' + optionalParams.join(' ') : '') + '\n';
+                          originalLog(message, ...optionalParams);
+                        };
+                        
+                        await testCompleteAIWellnessFlow();
+                        
+                        console.log = originalLog;
+                        setAITestResults(output);
+                      } catch (error) {
+                        console.error('Complete flow test error:', error);
+                        setAITestResults('Error running complete flow test: ' + error.message);
+                      } finally {
+                        setAITestLoading(false);
+                      }
+                    }}
+                    disabled={aiTestLoading}
+                  >
+                    <Ionicons name="play-circle-outline" size={18} color="#FFF" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Test Complete Flow</Text>
                   </TouchableOpacity>
                 </View>
               </View>

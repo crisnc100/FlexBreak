@@ -16,7 +16,7 @@ export const testAIWellnessNotification = async () => {
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: "AI Wellness Check 🤖",
-        body: "Hey! How's your body and mind feeling today? Tap to chat",
+        body: "Hey! How's your body and mind feeling today? Tap and hold to chat",
         data: { 
           type: 'ai_wellness_checkin',
           userId

@@ -61,6 +61,9 @@ export const KEYS = {
     LAST_CHECKIN: '@ai_wellness_last_checkin',
     WEEKLY_USAGE: '@ai_wellness_weekly_usage',
     ENABLED: '@ai_wellness_enabled',
+    USER_NAME: '@ai_wellness_user_name',
+    HAS_SEEN_WELCOME: '@ai_wellness_has_seen_welcome',
+    INTRO_MESSAGES_COUNT: '@ai_wellness_intro_count',
   }
 };
 

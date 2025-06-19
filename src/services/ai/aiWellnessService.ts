@@ -19,12 +19,13 @@ export class AIWellnessService {
     userId?: string
   ): Promise<WellnessResponse> {
     try {
-      // Check usage limits
-      const canUse = await this.checkUsageLimit(userId);
-      if (!canUse) {
+      // Check day and usage limits for free users
+      const accessCheck = await this.checkAccessAndLimits(userId);
+      if (!accessCheck.canAccess) {
         return {
-          response: "You've reached your daily AI wellness limit. Upgrade to premium for unlimited access!",
-          category: 'limit_reached'
+          response: accessCheck.message || "You've reached your AI wellness limit. Upgrade to premium for unlimited access!",
+          category: 'limit_reached',
+          suggestedActions: ['Upgrade to Premium']
         };
       }
       
@@ -34,10 +35,12 @@ export class AIWellnessService {
       // Check if this is the first interaction and we don't have a name
       if (!context.userName && userId) {
         const conversationCount = await this.getConversationCount(userId);
-        if (conversationCount === 0) {
-          // First time user - ask for their name
+        const data = context.notificationData;
+        
+        // Check if this is from the welcome notification
+        if (conversationCount === 0 || data?.isWelcome) {
           return {
-            response: "Hi there! I'm your AI wellness coach. What should I call you? (Just your first name is fine!)",
+            response: "Hey there! 👋 I'm your AI Flex Coach. Just type your first name (like 'Sarah' or 'Mike') and I'll remember it for our chats!",
             category: 'name_collection',
             suggestedActions: []
           };
@@ -48,19 +51,44 @@ export class AIWellnessService {
       if (await this.isNameResponse(userInput, userId)) {
         const name = this.extractName(userInput);
         if (name) {
-          await AsyncStorage.setItem('@ai_wellness_user_name', name);
-          return {
-            response: `Nice to meet you, ${name}! How are you feeling today?`,
-            category: 'greeting',
-            suggestedActions: []
-          };
+          await AsyncStorage.setItem(KEYS.AI_WELLNESS.USER_NAME, name);
+          
+          // Track intro message
+          await this.trackIntroMessage(userId);
+          
+          // Check if they also included how they're feeling
+          const feelingPattern = /(?:and|,|\.|!)\s*(.+)/i;
+          const feelingMatch = userInput.match(feelingPattern);
+          
+          if (feelingMatch && feelingMatch[1].trim().length > 5) {
+            // They provided both name and feeling - process the feeling part
+            const feeling = feelingMatch[1].trim();
+            
+            // Update context with their name
+            context.userName = name;
+            
+            // Continue to process their wellness input
+            // (Let the rest of the function handle it)
+            userInput = feeling;
+          } else {
+            // Just name provided, ask for feeling
+            return {
+              response: `Nice to meet you, ${name}! 🌟 How are you feeling today? Share what's going on - tired, stressed, sore back, anything! I'll help with personalized tips.`,
+              category: 'greeting',
+              suggestedActions: []
+            };
+          }
         }
       }
+      
+      // Get effectiveness data for better suggestions
+      const effectiveActions = await this.getEffectiveActions(userId);
       
       // Prepare messages
       const contextData: any = {
         timeOfDay: context.timeOfDay,
-        dayOfWeek: context.dayOfWeek
+        dayOfWeek: context.dayOfWeek,
+        effectiveActions: effectiveActions.length > 0 ? effectiveActions : undefined
       };
       
       if (context.userName) {
@@ -112,6 +140,15 @@ export class AIWellnessService {
       // Track usage
       await this.trackUsage(userId);
       
+      // Track intro messages if applicable
+      const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
+      if (!hasName || category === 'greeting') {
+        await this.trackIntroMessage(userId);
+      }
+      
+      // Check if intro is complete and schedule regular notifications
+      await this.checkIntroComplete(userId);
+      
       return {
         response: aiResponse,
         suggestedActions,
@@ -130,19 +167,52 @@ export class AIWellnessService {
     }
   }
   
-  private async checkUsageLimit(userId?: string): Promise<boolean> {
-    if (!userId) return true; // Anonymous users get limited access
+  private async checkAccessAndLimits(userId?: string): Promise<{ canAccess: boolean; message?: string }> {
+    if (!userId) {
+      return { 
+        canAccess: false, 
+        message: "Please enable AI Wellness Coach in settings to get started!" 
+      };
+    }
     
     const isPremium = await AsyncStorage.getItem('@user_premium');
-    if (isPremium === 'true') return true;
+    if (isPremium === 'true') {
+      return { canAccess: true };
+    }
+    
+    // Check if user is in intro conversation
+    const introCount = await AsyncStorage.getItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT);
+    const introMessages = introCount ? parseInt(introCount) : 0;
+    const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
+    
+    // Allow up to 3 messages during intro (name collection + 2 wellness messages)
+    if (introMessages < 3 && !hasName) {
+      return { canAccess: true };
+    }
+    
+    // Free users: Check if it's Wednesday
+    const today = new Date().getDay();
+    if (today !== 3) {
+      return { 
+        canAccess: false, 
+        message: "AI Wellness Coach is available on Wednesdays for free users. Upgrade to premium for daily access! 💎" 
+      };
+    }
     
     // Check daily usage for free users
-    const today = new Date().toDateString();
-    const usageKey = `@ai_usage_${userId}_${today}`;
+    const todayStr = new Date().toDateString();
+    const usageKey = `@ai_usage_${userId}_${todayStr}`;
     const usage = await AsyncStorage.getItem(usageKey);
     const usageCount = usage ? parseInt(usage) : 0;
     
-    return usageCount < AI_CONFIG.limits.free.dailyRequests;
+    if (usageCount >= AI_CONFIG.limits.free.dailyRequests) {
+      return { 
+        canAccess: false, 
+        message: "You've used your free AI wellness chat for today. Come back next Wednesday or upgrade to premium for unlimited daily access! 🌟" 
+      };
+    }
+    
+    return { canAccess: true };
   }
   
   private async trackUsage(userId?: string): Promise<void> {
@@ -218,31 +288,41 @@ export class AIWellnessService {
   
   private async isNameResponse(input: string, userId: string): Promise<boolean> {
     // Check if we're expecting a name (last message was name collection)
-    const conversations = this.conversationHistory.get(userId) || [];
-    if (conversations.length > 0) {
-      const lastAssistantMessage = conversations[conversations.length - 1];
-      if (lastAssistantMessage?.content?.includes("What should I call you")) {
+    const conversationCount = await this.getConversationCount(userId);
+    const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
+    
+    // If no name saved and this is early in conversation
+    if (!hasName && conversationCount <= 1) {
+      // Check if input looks like a name
+      const trimmed = input.trim();
+      
+      // Single word that could be a name (2-20 letters)
+      if (/^[A-Za-z]{2,20}$/.test(trimmed)) {
         return true;
       }
+      
+      // Common name patterns
+      const namePatterns = [
+        /^(i'm |i am |my name is |call me |it's |its |hi i'm |hello i'm )/i,
+      ];
+      
+      return namePatterns.some(pattern => pattern.test(trimmed));
     }
     
-    // Check for common name response patterns
-    const namePatterns = [
-      /^(i'm |i am |my name is |call me |it's |its )/i,
-      /^[A-Z][a-z]+$/  // Single capitalized word
-    ];
-    
-    return namePatterns.some(pattern => pattern.test(input.trim()));
+    return false;
   }
   
   private extractName(input: string): string | null {
     // Remove common prefixes
-    let name = input.trim()
-      .replace(/^(i'm |i am |my name is |call me |it's |its )/i, '')
+    let cleaned = input.trim()
+      .replace(/^(i'm |i am |my name is |call me |it's |its |hi i'm |hello i'm )/i, '')
       .trim();
     
-    // Take only the first word (first name)
-    name = name.split(/\s+/)[0];
+    // Check if they included their feeling too (e.g., "Sarah and I'm tired")
+    const andPattern = /^([A-Za-z]+)\s+(and|,|\.|!|\s+I'm|\s+I\s+am|\s+feeling)/i;
+    const match = cleaned.match(andPattern);
+    
+    let name = match ? match[1] : cleaned.split(/\s+/)[0];
     
     // Basic validation - should be letters only, reasonable length
     if (/^[A-Za-z]{2,20}$/.test(name)) {
@@ -281,6 +361,74 @@ export class AIWellnessService {
       this.conversationHistory.delete(userId);
     } catch (error) {
       console.error('Error clearing conversation history:', error);
+    }
+  }
+  
+  private async getEffectiveActions(userId?: string): Promise<string[]> {
+    if (!userId) return [];
+    
+    try {
+      const summaryKey = `@ai_wellness_patterns_${userId}`;
+      const existing = await AsyncStorage.getItem(summaryKey);
+      if (!existing) return [];
+      
+      const summary = JSON.parse(existing);
+      
+      // Get actions with effectiveness >= 0.7 (70%)
+      const effectiveActions = Object.entries(summary)
+        .filter(([_, data]: [string, any]) => data.averageEffectiveness >= 0.7)
+        .sort(([_, a]: [string, any], [__, b]: [string, any]) => 
+          b.averageEffectiveness - a.averageEffectiveness
+        )
+        .slice(0, 3) // Top 3 effective actions
+        .map(([action, _]) => action);
+      
+      return effectiveActions;
+    } catch (error) {
+      console.error('Error getting effective actions:', error);
+      return [];
+    }
+  }
+  
+  private async trackIntroMessage(userId?: string): Promise<void> {
+    if (!userId) return;
+    
+    try {
+      const countStr = await AsyncStorage.getItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT);
+      const count = countStr ? parseInt(countStr) : 0;
+      await AsyncStorage.setItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT, (count + 1).toString());
+      console.log(`Intro message count: ${count + 1}`);
+    } catch (error) {
+      console.error('Error tracking intro message:', error);
+    }
+  }
+  
+  private async checkIntroComplete(userId?: string): Promise<void> {
+    if (!userId) return;
+    
+    try {
+      const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
+      const introCount = await AsyncStorage.getItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT);
+      const messages = introCount ? parseInt(introCount) : 0;
+      
+      // If user has provided name and had at least 2 messages, intro is complete
+      if (hasName && messages >= 2) {
+        // Check if we've already scheduled regular notifications
+        const scheduled = await AsyncStorage.getItem('@ai_wellness_regular_scheduled');
+        if (!scheduled) {
+          console.log('Intro complete! Scheduling regular check-ins...');
+          
+          // Import scheduler to avoid circular dependency
+          const { scheduleAICheckIns } = await import('./aiWellnessScheduler');
+          const isPremium = await AsyncStorage.getItem('@user_premium') === 'true';
+          
+          // Schedule regular check-ins (not initial setup)
+          await scheduleAICheckIns(isPremium, false);
+          await AsyncStorage.setItem('@ai_wellness_regular_scheduled', 'true');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking intro complete:', error);
     }
   }
 }

@@ -25,6 +25,8 @@ import {
   recordMiniGamePlayed 
 } from '../../services/miniGameService';
 import { MiniGameAchievementNotification } from '../notifications/MiniGameAchievementNotification';
+import LevelUpNotification from '../notifications/LevelUpNotification';
+import { AchievementBanner } from '../achievements/AchievementBanner';
 
 const { width, height } = Dimensions.get('window');
 
@@ -79,6 +81,10 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
   const [earnedXp, setEarnedXp] = useState(0);
   const [availableGames, setAvailableGames] = useState<MiniGameInfo[]>([]);
   const [selectedGame, setSelectedGame] = useState<MiniGameType | null>(null);
+  const [achievementEarned, setAchievementEarned] = useState<any | null>(null);
+  const [levelUpInfo, setLevelUpInfo] = useState<{ oldLevel: number; newLevel: number } | null>(null);
+  const [showLevelUpNotification, setShowLevelUpNotification] = useState(false);
+  const [showAchievementBanner, setShowAchievementBanner] = useState(false);
 
   // Load available games when popup becomes visible
   useEffect(() => {
@@ -124,8 +130,9 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
           break;
         case MiniGameType.POSTURE_PATROL:
           // Perfect score if completed with all 3 hearts remaining
-          // Posture Patrol gives 75-100 XP for victory, lower score threshold
-          isPerfectScore = xp >= 75 && score >= 200; // Victory with good score
+          // Posture Patrol gives 75-100 XP for victory
+          // Score of 150+ indicates good performance with minimal damage taken
+          isPerfectScore = xp >= 75 && score >= 150; // Victory with good score
           break;
         case MiniGameType.BALANCE_DROP:
           // Perfect score if completed all rounds with good balance and energy
@@ -140,22 +147,27 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
       
       // Check if there was a level up
       if (result?.levelUp) {
-        // Store level up info to show after closing
-        // The parent component should handle showing level-up UI
+        setLevelUpInfo(result.levelUp);
+        // Show level up notification after a brief delay
+        setTimeout(() => {
+          setShowLevelUpNotification(true);
+        }, 1500);
         console.log(`Level up! ${result.levelUp.oldLevel} → ${result.levelUp.newLevel}`);
       }
       
-      // The achievement notification will be handled by the global listener
-      // Just provide haptic feedback if perfect score
-      if (isPerfectScore) {
+      // If perfect score, store achievement info for notification
+      if (isPerfectScore && selectedGame) {
+        const achievementData = MINIGAME_ACHIEVEMENTS[selectedGame];
+        if (achievementData) {
+          setAchievementEarned(achievementData);
+          console.log(`[MiniGamePopup] Perfect score achieved! Achievement: ${achievementData.title}`);
+        }
         haptics.success();
-        console.log(`[MiniGamePopup] Perfect score achieved! Waiting for achievement processing...`);
       }
     }
     
-    // Wait a bit longer to ensure achievement events are processed
-    // This gives time for the achievement manager to emit events
-    const closeDelay = isPerfectScore ? 5000 : 2500;
+    // Auto-close timing: longer if achievement earned to let user see it
+    const closeDelay = isPerfectScore ? 4000 : 2000;
     console.log(`[MiniGamePopup] Will close in ${closeDelay}ms`);
     
     setTimeout(() => {
@@ -173,7 +185,22 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
     setEarnedXp(0);
     setSelectedGame(null);
     setAvailableGames([]);
+    
+    // Don't clear achievement data yet if we're going to show the banner
+    if (!achievementEarned) {
+      setAchievementEarned(null);
+    }
+    
+    setLevelUpInfo(null);
+    setShowLevelUpNotification(false);
     onClose();
+    
+    // Show achievement banner after modal closes if achievement was earned
+    if (achievementEarned) {
+      setTimeout(() => {
+        setShowAchievementBanner(true);
+      }, 300); // Small delay for smooth transition
+    }
   };
 
   const getGameDescription = (gameType: MiniGameType): string => {
@@ -240,6 +267,7 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
   console.log('🎮 POPUP COMPONENT: Rendering popup, showGame:', showGame);
 
   return (
+    <>
     <Modal
       visible={visible}
       transparent
@@ -324,6 +352,21 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
                     <Text style={[styles.completionXp, { color: theme.accent }]}>
                       +{earnedXp} XP
                     </Text>
+                    
+                    {/* Achievement Badge Notification */}
+                    {achievementEarned && (
+                      <View style={[styles.achievementBadge, { backgroundColor: theme.accent + '15', borderColor: theme.accent }]}>
+                        <Ionicons name="trophy" size={24} color={theme.accent} />
+                        <View style={styles.achievementText}>
+                          <Text style={[styles.achievementTitle, { color: theme.accent }]}>
+                            Badge Unlocked!
+                          </Text>
+                          <Text style={[styles.achievementDescription, { color: theme.text }]}>
+                            {achievementEarned.title}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </Animated.View>
                   
                 </View>
@@ -333,7 +376,28 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
         </TouchableOpacity>
       </TouchableOpacity>
       
+      {/* Level Up Notification - shows over the modal */}
+      {showLevelUpNotification && levelUpInfo && (
+        <LevelUpNotification
+          oldLevel={levelUpInfo.oldLevel}
+          newLevel={levelUpInfo.newLevel}
+          source="mini-game"
+          onDismiss={() => setShowLevelUpNotification(false)}
+        />
+      )}
+      
     </Modal>
+    
+    {/* Achievement Banner - shows after modal closes */}
+    <AchievementBanner
+      visible={showAchievementBanner}
+      achievement={achievementEarned}
+      onHide={() => {
+        setShowAchievementBanner(false);
+        setAchievementEarned(null);
+      }}
+    />
+    </>
   );
 };
 
@@ -455,5 +519,28 @@ const styles = StyleSheet.create({
   },
   completionContent: {
     alignItems: 'center',
+  },
+  achievementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 20,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  achievementText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  achievementTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  achievementDescription: {
+    fontSize: 14,
+    opacity: 0.8,
   },
 });

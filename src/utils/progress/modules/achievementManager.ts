@@ -320,7 +320,7 @@ export const updateMiniGameAchievements = async (
       dailyPlayerAchievement.completed = true;
       dailyPlayerAchievement.dateCompleted = new Date().toISOString();
       dailyPlayerAchievement.badgeUnlocked = false;
-      userProgress.totalXP += dailyPlayerAchievement.xp;
+      // Don't add XP here - it will be handled by processCompletedMiniGame
       newlyCompletedAchievements.push(dailyPlayerAchievement);
       console.log(`[AchievementManager] Daily Player achievement completed!`);
     }
@@ -356,7 +356,7 @@ export const updateMiniGameAchievements = async (
             triviaAchievement.completed = true;
             triviaAchievement.dateCompleted = new Date().toISOString();
             triviaAchievement.badgeUnlocked = false;
-            userProgress.totalXP += triviaAchievement.xp;
+            // Don't add XP here - it will be handled by processCompletedMiniGame
             newlyCompletedAchievements.push(triviaAchievement);
           }
         }
@@ -372,7 +372,7 @@ export const updateMiniGameAchievements = async (
         achievement.completed = true;
         achievement.dateCompleted = new Date().toISOString();
         achievement.badgeUnlocked = false;
-        userProgress.totalXP += achievement.xp;
+        // Don't add XP here - it will be handled by processCompletedMiniGame
         newlyCompletedAchievements.push(achievement);
       } else {
         console.log(`[AchievementManager] Achievement ${achievementId} already completed`);
