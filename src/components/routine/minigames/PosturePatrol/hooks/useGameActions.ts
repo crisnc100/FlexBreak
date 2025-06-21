@@ -31,6 +31,7 @@ import {
   playIncorrectSound,
   playMonstersDestroyedSound,
 } from '../../../../../utils/soundEffects';
+import { getPosturePatrolTier, getRandomXP } from '../../../../../utils/miniGameXP';
 
 const { width } = Dimensions.get('window');
 
@@ -302,19 +303,24 @@ export const useGameActions = (
     
     const finalScore = baseScore + survivalBonus + waveBonus + perfectBonus + killBonus;
     
-    // Enhanced XP calculation
-    let xp = Math.floor(finalScore * 0.8); // Base XP from score
-    xp += gameStats.totalKills * 2; // Bonus XP per kill
-    xp += gameStats.padsBuilt * 3; // Bonus XP per pad built
-    xp += gameStats.upgradesMade * 5; // Bonus XP per upgrade
+    // Calculate performance tier and random XP
+    // Victory means completing all waves including boss (wave 4) with hearts remaining
+    // The game ends DURING wave 4 when the timer expires, so we check if we're on wave 4
+    // and if we've survived long enough (game phase is not 'tutorial' or 'prepare')
+    const isVictory = gameState.currentWave === 4 && heartsRemaining > 0 && gameState.gamePhase === 'boss';
     
-    // Victory vs defeat XP
-    const isVictory = gameState.currentWave >= 4 && heartsRemaining > 0;
-    if (isVictory) {
-      xp = Math.min(100, Math.max(75, xp)); // Victory: 75-100 XP
-    } else {
-      xp = Math.min(50, Math.max(15, xp)); // Defeat: 15-50 XP
-    }
+    console.log('[PosturePatrol] Game ending - Wave:', gameState.currentWave, 'Hearts:', heartsRemaining, 'Phase:', gameState.gamePhase, 'Victory:', isVictory);
+    
+    const tier = getPosturePatrolTier(
+      gameState.currentWave + 1, // Convert to 1-based wave number (5 for completed game)
+      heartsRemaining,
+      isVictory
+    );
+    
+    console.log('[PosturePatrol] Performance tier:', tier);
+    
+    const xp = getRandomXP(tier);
+    console.log('[PosturePatrol] XP earned:', xp);
     
     // Set results and show results screen
     setGameResults({

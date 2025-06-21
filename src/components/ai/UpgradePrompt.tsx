@@ -39,7 +39,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
         return {
           icon: 'chatbubbles-outline',
           title: 'Daily Limit Reached',
-          message: "You've used your free AI wellness chat for today.",
+          message: "You've used your 3 free AI wellness chats for today.",
           benefits: [
             'Unlimited daily conversations',
             'Priority AI responses',

@@ -37,7 +37,7 @@ export const AchievementBanner: React.FC<AchievementBannerProps> = ({
   useEffect(() => {
     if (visible && achievement) {
       // Play success sound and haptic
-      soundEffects.playAchievementUnlockedSound();
+      //soundEffects.playRoundCompleteSound();
       haptics.success();
 
       // Animate in

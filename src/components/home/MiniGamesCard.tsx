@@ -114,23 +114,32 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           // Perfect score if high score with good accuracy
           // Lowered threshold based on actual gameplay - perfect can be 17-18
           isPerfectScore = score >= 17 && xp >= 80; // High score and high XP
+          console.log(`[MiniGamesCard] Stress Buster - Score: ${score}, XP: ${xp}, Perfect: ${isPerfectScore}`);
           break;
         case MiniGameType.POSTURE_PATROL:
           // Perfect score if completed with all 3 hearts remaining
-          // Posture Patrol gives 75-100 XP for victory
-          // Score of 150+ indicates good performance with minimal damage taken
-          isPerfectScore = xp >= 75 && score >= 150; // Victory with good score
+          // Since XP calculation can be inconsistent, we'll check score directly
+          // In Posture Patrol, score includes hearts remaining bonus (heartsRemaining * 10)
+          // So if they have 3 hearts, they get +30 to score
+          // We can detect this by checking if score ends with 30 (3 hearts), 20 (2 hearts), etc.
+          const heartsBonus = score % 100; // Get the last two digits
+          const likelyHearts = Math.floor(heartsBonus / 10);
+          isPerfectScore = likelyHearts >= 3 || xp >= 80; // 3 hearts or PERFECT tier XP
+          console.log(`[MiniGamesCard] Posture Patrol - Score: ${score}, XP: ${xp}, Hearts estimate: ${likelyHearts}, Perfect: ${isPerfectScore}`);
           break;
         case MiniGameType.BALANCE_DROP:
           // Perfect score if completed all rounds with good balance and energy
           // Balance Drop gives high XP for good performance
           isPerfectScore = xp >= 85; // High XP means good balance + energy management
+          console.log(`[MiniGamesCard] Balance Drop - Score: ${score}, XP: ${xp}, Perfect: ${isPerfectScore}`);
           break;
         default:
           isPerfectScore = false;
       }
       
+      console.log(`[MiniGamesCard] Recording mini-game: ${selectedGame}, score: ${score}, xp: ${xp}, perfect: ${isPerfectScore}`);
       const result = await recordMiniGamePlayed(selectedGame, score, xp, isPerfectScore);
+      console.log(`[MiniGamesCard] recordMiniGamePlayed result:`, result);
       
       // Store achievement for banner display after completion screen
       if (isPerfectScore && selectedGame) {
@@ -138,6 +147,8 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         if (achievementData) {
           setAchievementEarned(achievementData);
           console.log(`[MiniGamesCard] Perfect score achieved! Achievement: ${achievementData.title}`);
+        } else {
+          console.log(`[MiniGamesCard] No achievement data found for game: ${selectedGame}`);
         }
         haptics.success();
       }
@@ -377,7 +388,7 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
         <View style={styles.xpBadge}>
           <Ionicons name="flash" size={12} color={theme.accent} />
           <Text style={[styles.xpText, { color: theme.accent }]}>
-            +{item.minXP}-{item.maxXP} XP
+            Earn up to {item.maxXP} XP
           </Text>
         </View>
       </View>

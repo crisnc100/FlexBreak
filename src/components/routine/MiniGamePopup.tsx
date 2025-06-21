@@ -130,9 +130,14 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
           break;
         case MiniGameType.POSTURE_PATROL:
           // Perfect score if completed with all 3 hearts remaining
-          // Posture Patrol gives 75-100 XP for victory
-          // Score of 150+ indicates good performance with minimal damage taken
-          isPerfectScore = xp >= 75 && score >= 150; // Victory with good score
+          // Since XP calculation can be inconsistent, we'll check score directly
+          // In Posture Patrol, score includes hearts remaining bonus (heartsRemaining * 10)
+          // So if they have 3 hearts, they get +30 to score
+          // We can detect this by checking if score ends with 30 (3 hearts), 20 (2 hearts), etc.
+          const heartsBonus = score % 100; // Get the last two digits
+          const likelyHearts = Math.floor(heartsBonus / 10);
+          isPerfectScore = likelyHearts >= 3 || xp >= 80; // 3 hearts or PERFECT tier XP
+          console.log(`[MiniGamePopup] Posture Patrol - Score: ${score}, XP: ${xp}, Hearts estimate: ${likelyHearts}, Perfect: ${isPerfectScore}`);
           break;
         case MiniGameType.BALANCE_DROP:
           // Perfect score if completed all rounds with good balance and energy
@@ -313,7 +318,7 @@ export const MiniGamePopup: React.FC<MiniGamePopupProps> = ({
                 <View style={[styles.xpBadge, { backgroundColor: theme.accent + '15' }]}>
                   <Ionicons name="flash" size={16} color={theme.accent} />
                   <Text style={[styles.xpText, { color: theme.accent }]}>
-                    +25-100 XP
+                    Earn up to 100 XP
                   </Text>
                 </View>
 

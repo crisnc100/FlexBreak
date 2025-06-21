@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Animated, PanResponder } from 'react-native';
 import * as haptics from '../../../../utils/haptics';
 import { playCorrectSound, playIncorrectSound } from '../../../../utils/soundEffects';
+import { getBalanceDropTier, getRandomXP } from '../../../../utils/miniGameXP';
 import { 
   GameState, 
   Item, 
@@ -1025,7 +1026,10 @@ export const useGameLogic = (
       setGameState('gameOver');
       haptics.heavy();
       
-      const totalXP = Math.max(25, Math.min(100, stats.score + stats.roundScore));
+      // Use performance tier system for XP
+      const tier = getBalanceDropTier(currentRound, Math.abs(balance), energyLeft);
+      const totalXP = getRandomXP(tier);
+      
       setTimeout(() => {
         onGameComplete(stats.score + stats.roundScore, totalXP);
       }, 2000);
@@ -1039,11 +1043,9 @@ export const useGameLogic = (
 
   const nextRound = useCallback(() => {
     if (currentRound >= 3) {
-      const baseXP = 50;
-      const energyBonus = energyLeft > 30 ? 10 : 0;
-      const balanceBonus = Math.abs(balance) < 30 ? 20 : 0;
-      const comboBonus = stats.perfectBalanceCount * 5;
-      const totalXP = Math.min(100, baseXP + energyBonus + balanceBonus + comboBonus);
+      // Use performance tier system for XP
+      const tier = getBalanceDropTier(currentRound + 1, Math.abs(balance), energyLeft);
+      const totalXP = getRandomXP(tier);
       
       onGameComplete(stats.score, totalXP);
     } else {

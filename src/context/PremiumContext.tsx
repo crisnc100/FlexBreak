@@ -245,6 +245,18 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       // Update rewards after premium status changes
       await updateRewardsAfterPremiumChange(status);
+
+      // Handle AI Wellness Coach upgrade/downgrade
+      try {
+        const { handleAIWellnessUpgrade, handleAIWellnessDowngrade } = await import('../services/ai/aiWellnessUpgrade');
+        if (status) {
+          await handleAIWellnessUpgrade();
+        } else {
+          await handleAIWellnessDowngrade();
+        }
+      } catch (error) {
+        console.error('Error updating AI Wellness schedule:', error);
+      }
     } catch (error) {
       console.error('Error saving premium status:', error);
     }

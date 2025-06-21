@@ -36,11 +36,16 @@ export const getReminderTime = storageService.getReminderTime;
 // Configure notifications
 export async function configureNotifications(): Promise<void> {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      // Check if this is an AI wellness notification
+      const isAIWellness = notification.request.content.data?.type === 'ai_wellness_checkin';
+      
+      return {
+        shouldShowAlert: true,
+        shouldPlaySound: !isAIWellness, // Don't play sound for AI wellness in-app
+        shouldSetBadge: false,
+      };
+    },
   });
   
   // Configure AI notification categories

@@ -19,30 +19,19 @@ export const AI_CONFIG = {
   
   limits: {
     free: {
-      dailyRequests: 2,
-      maxInputLength: 100,
+      dailyRequests: 3,      // Increased from 2 to 3 for better user experience
+      introMessages: 5,      // Generous intro experience
+      maxInputLength: 150,   // Slightly longer inputs allowed
       maxOutputTokens: 150,
     },
     premium: {
-      dailyRequests: 50,
-      maxInputLength: 200,
+      dailyRequests: 100,    // Effectively unlimited
+      maxInputLength: 300,
       maxOutputTokens: 200,
     }
   },
   
-  // System prompt for wellness coach
-  SYSTEM_PROMPT: `You are a caring wellness coach for FlexBreak app. 
-Your role is to provide brief, practical advice for physical wellness and work-related stress.
-
-Guidelines:
-- Keep responses under 50 words
-- Focus on stretches, movement, posture, and motivation
-- Be encouraging and specific
-- Suggest actions that can be done at a desk or in a small space
-- If someone mentions pain, suggest gentle movements but remind them to consult a healthcare provider for persistent issues
-
-Response format:
-1. Acknowledge their feeling
-2. Provide one specific, actionable suggestion
-3. End with encouragement`
+  // Note: The actual system prompt is in promptTemplates.ts
+  // This is kept for backwards compatibility
+  SYSTEM_PROMPT: `You are a caring wellness coach for FlexBreak app.`
 };

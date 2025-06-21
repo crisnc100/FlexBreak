@@ -5,6 +5,7 @@ import { KEYS } from '../../../services/storageService';
 import { AIWellnessToggle } from './AIWellnessToggle';
 import { AIDebugButton } from './AIDebugButton';
 import { AINameSettings } from './AINameSettings';
+import { AIDataManagement } from './AIDataManagement';
 
 export const AIWellnessSettings: React.FC = () => {
   const [aiWellnessEnabled, setAIWellnessEnabled] = useState(false);
@@ -18,13 +19,19 @@ export const AIWellnessSettings: React.FC = () => {
     loadAIWellnessSetting();
   }, []);
 
+  // Handle toggle from child component
+  const handleToggle = (value: boolean) => {
+    setAIWellnessEnabled(value);
+  };
+
   return (
     <View>
       <AIWellnessToggle 
         enabled={aiWellnessEnabled}
-        onToggle={setAIWellnessEnabled}
+        onToggle={handleToggle}
       />
       <AINameSettings visible={aiWellnessEnabled} />
+      <AIDataManagement visible={aiWellnessEnabled} />
       <AIDebugButton visible={aiWellnessEnabled} />
     </View>
   );

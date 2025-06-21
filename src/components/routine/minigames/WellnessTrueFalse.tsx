@@ -12,6 +12,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import * as haptics from '../../../utils/haptics';
 import { playCorrectSound, playIncorrectSound } from '../../../utils/soundEffects';
 import { getRandomTriviaQuestions, TriviaQuestion } from '../../../data/triviaQuestions';
+import { getWellnessTriviaTier, getRandomXP } from '../../../utils/miniGameXP';
 
 const { width, height } = Dimensions.get('window');
 
@@ -148,24 +149,10 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
   const completeGame = () => {
     setGameComplete(true);
     const finalScore = score;
-    const percentage = (finalScore / questions.length) * 100;
     
-    // Calculate XP: Base 25 XP for playing, max 100 XP total
-    let xpEarned = 25;
-    
-    // Bonus XP based on performance (max 50 XP from performance)
-    if (percentage >= 100) xpEarned += 30; // Perfect score bonus
-    else if (percentage >= 80) xpEarned += 20; // Excellent bonus  
-    else if (percentage >= 60) xpEarned += 10; // Good bonus
-    
-    // Time bonus (max 25 XP from time)
-    if (timeLeft > 0) {
-      const timeBonus = Math.min(25, Math.floor(timeLeft / 3)); // 1 XP per 3 seconds remaining, max 25
-      xpEarned += timeBonus;
-    }
-    
-    // Cap at 100 XP max
-    xpEarned = Math.min(100, xpEarned);
+    // Calculate performance tier and random XP
+    const tier = getWellnessTriviaTier(finalScore);
+    const xpEarned = getRandomXP(tier);
     
     haptics.heavy();
     onGameComplete(finalScore, xpEarned);

@@ -3,6 +3,9 @@ import { WELLNESS_COACH_PROMPT, FALLBACK_RESPONSES } from './promptTemplates';
 import { buildUserContext, categorizeInput } from './contextBuilder';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AI_CONFIG } from '../../config/aiConfig';
+import { KEYS } from '../storageService';
+import responseCache from './responseCache';
+import ConversationAnalytics from './conversationAnalytics';
 
 export interface WellnessResponse {
   response: string;
@@ -32,53 +35,36 @@ export class AIWellnessService {
       // Build context
       const context = await buildUserContext(userInput, userId);
       
-      // Check if this is the first interaction and we don't have a name
-      if (!context.userName && userId) {
-        const conversationCount = await this.getConversationCount(userId);
-        const data = context.notificationData;
-        
-        // Check if this is from the welcome notification
-        if (conversationCount === 0 || data?.isWelcome) {
-          return {
-            response: "Hey there! 👋 I'm your AI Flex Coach. Just type your first name (like 'Sarah' or 'Mike') and I'll remember it for our chats!",
-            category: 'name_collection',
-            suggestedActions: []
-          };
-        }
-      }
+      // Skip name collection - not needed anymore
       
-      // Check if user is providing their name
-      if (await this.isNameResponse(userInput, userId)) {
-        const name = this.extractName(userInput);
-        if (name) {
-          await AsyncStorage.setItem(KEYS.AI_WELLNESS.USER_NAME, name);
-          
-          // Track intro message
-          await this.trackIntroMessage(userId);
-          
-          // Check if they also included how they're feeling
-          const feelingPattern = /(?:and|,|\.|!)\s*(.+)/i;
-          const feelingMatch = userInput.match(feelingPattern);
-          
-          if (feelingMatch && feelingMatch[1].trim().length > 5) {
-            // They provided both name and feeling - process the feeling part
-            const feeling = feelingMatch[1].trim();
-            
-            // Update context with their name
-            context.userName = name;
-            
-            // Continue to process their wellness input
-            // (Let the rest of the function handle it)
-            userInput = feeling;
-          } else {
-            // Just name provided, ask for feeling
-            return {
-              response: `Nice to meet you, ${name}! 🌟 How are you feeling today? Share what's going on - tired, stressed, sore back, anything! I'll help with personalized tips.`,
-              category: 'greeting',
-              suggestedActions: []
-            };
-          }
+      // Check cache first for common queries
+      const cachedResponse = await responseCache.getCachedResponse(userInput, context.timeOfDay);
+      if (cachedResponse) {
+        console.log('Using cached response for common query');
+        
+        // Still track usage and conversation
+        if (userId) {
+          await this.storeConversation(userId, userInput, cachedResponse);
         }
+        await this.trackUsage(userId);
+        
+        const category = categorizeInput(userInput);
+        const suggestedActions = this.extractActions(cachedResponse);
+        
+        // Track analytics
+        await ConversationAnalytics.trackConversation(
+          userId || 'anonymous',
+          userInput,
+          cachedResponse,
+          category,
+          true // wasCached
+        );
+        
+        return {
+          response: cachedResponse,
+          suggestedActions,
+          category
+        };
       }
       
       // Get effectiveness data for better suggestions
@@ -140,14 +126,20 @@ export class AIWellnessService {
       // Track usage
       await this.trackUsage(userId);
       
-      // Track intro messages if applicable
-      const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
-      if (!hasName || category === 'greeting') {
-        await this.trackIntroMessage(userId);
-      }
+      // Track analytics
+      await ConversationAnalytics.trackConversation(
+        userId || 'anonymous',
+        userInput,
+        aiResponse,
+        category,
+        false // not cached
+      );
       
-      // Check if intro is complete and schedule regular notifications
-      await this.checkIntroComplete(userId);
+      // If this was a welcome message response, schedule regular check-ins
+      if (context.notificationData?.isWelcome) {
+        const { scheduleRegularCheckInsAfterWelcome } = await import('./aiWellnessScheduler');
+        await scheduleRegularCheckInsAfterWelcome();
+      }
       
       return {
         response: aiResponse,
@@ -176,39 +168,38 @@ export class AIWellnessService {
     }
     
     const isPremium = await AsyncStorage.getItem('@user_premium');
+    
+    // Check daily usage first (applies to all users)
+    const todayStr = new Date().toDateString();
+    const usageKey = `@ai_usage_${userId}_${todayStr}`;
+    const usage = await AsyncStorage.getItem(usageKey);
+    const usageCount = usage ? parseInt(usage) : 0;
+    
+    // Premium users have higher limits
     if (isPremium === 'true') {
+      if (usageCount >= AI_CONFIG.limits.premium.dailyRequests) {
+        return { 
+          canAccess: false, 
+          message: "You've reached your daily limit. Even premium users need breaks! 😊" 
+        };
+      }
       return { canAccess: true };
     }
     
-    // Check if user is in intro conversation
-    const introCount = await AsyncStorage.getItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT);
-    const introMessages = introCount ? parseInt(introCount) : 0;
-    const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
-    
-    // Allow up to 3 messages during intro (name collection + 2 wellness messages)
-    if (introMessages < 3 && !hasName) {
-      return { canAccess: true };
-    }
-    
-    // Free users: Check if it's Wednesday
+    // Free users: Check if it's Wednesday (unless it's their first message today)
     const today = new Date().getDay();
-    if (today !== 3) {
+    if (today !== 3 && usageCount > 0) {
       return { 
         canAccess: false, 
         message: "AI Wellness Coach is available on Wednesdays for free users. Upgrade to premium for daily access! 💎" 
       };
     }
     
-    // Check daily usage for free users
-    const todayStr = new Date().toDateString();
-    const usageKey = `@ai_usage_${userId}_${todayStr}`;
-    const usage = await AsyncStorage.getItem(usageKey);
-    const usageCount = usage ? parseInt(usage) : 0;
-    
+    // Free users get 1 message any day as their first, then Wednesday only
     if (usageCount >= AI_CONFIG.limits.free.dailyRequests) {
       return { 
         canAccess: false, 
-        message: "You've used your free AI wellness chat for today. Come back next Wednesday or upgrade to premium for unlimited daily access! 🌟" 
+        message: "You've used your 3 free AI wellness chats for today. Come back next Wednesday or upgrade to premium for unlimited daily access! 🌟" 
       };
     }
     
@@ -275,63 +266,6 @@ export class AIWellnessService {
     return actions.slice(0, 1);
   }
   
-  private async getConversationCount(userId: string): Promise<number> {
-    try {
-      const conversationKey = `@ai_wellness_conversations_${userId}`;
-      const existing = await AsyncStorage.getItem(conversationKey);
-      const conversations = existing ? JSON.parse(existing) : [];
-      return conversations.length;
-    } catch (error) {
-      return 0;
-    }
-  }
-  
-  private async isNameResponse(input: string, userId: string): Promise<boolean> {
-    // Check if we're expecting a name (last message was name collection)
-    const conversationCount = await this.getConversationCount(userId);
-    const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
-    
-    // If no name saved and this is early in conversation
-    if (!hasName && conversationCount <= 1) {
-      // Check if input looks like a name
-      const trimmed = input.trim();
-      
-      // Single word that could be a name (2-20 letters)
-      if (/^[A-Za-z]{2,20}$/.test(trimmed)) {
-        return true;
-      }
-      
-      // Common name patterns
-      const namePatterns = [
-        /^(i'm |i am |my name is |call me |it's |its |hi i'm |hello i'm )/i,
-      ];
-      
-      return namePatterns.some(pattern => pattern.test(trimmed));
-    }
-    
-    return false;
-  }
-  
-  private extractName(input: string): string | null {
-    // Remove common prefixes
-    let cleaned = input.trim()
-      .replace(/^(i'm |i am |my name is |call me |it's |its |hi i'm |hello i'm )/i, '')
-      .trim();
-    
-    // Check if they included their feeling too (e.g., "Sarah and I'm tired")
-    const andPattern = /^([A-Za-z]+)\s+(and|,|\.|!|\s+I'm|\s+I\s+am|\s+feeling)/i;
-    const match = cleaned.match(andPattern);
-    
-    let name = match ? match[1] : cleaned.split(/\s+/)[0];
-    
-    // Basic validation - should be letters only, reasonable length
-    if (/^[A-Za-z]{2,20}$/.test(name)) {
-      // Capitalize first letter
-      return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-    }
-    
-    return null;
-  }
   
   private getFallbackResponse(input: string): string {
     const category = categorizeInput(input);
@@ -390,46 +324,27 @@ export class AIWellnessService {
     }
   }
   
-  private async trackIntroMessage(userId?: string): Promise<void> {
-    if (!userId) return;
-    
+
+  async getCostReport(): Promise<string> {
     try {
-      const countStr = await AsyncStorage.getItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT);
-      const count = countStr ? parseInt(countStr) : 0;
-      await AsyncStorage.setItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT, (count + 1).toString());
-      console.log(`Intro message count: ${count + 1}`);
+      const { getAICostReport } = await import('../../utils/aiWellness/costMonitor');
+      return await getAICostReport();
     } catch (error) {
-      console.error('Error tracking intro message:', error);
+      console.error('Error getting cost report:', error);
+      return 'Cost report unavailable';
     }
   }
-  
-  private async checkIntroComplete(userId?: string): Promise<void> {
-    if (!userId) return;
-    
-    try {
-      const hasName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
-      const introCount = await AsyncStorage.getItem(KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT);
-      const messages = introCount ? parseInt(introCount) : 0;
-      
-      // If user has provided name and had at least 2 messages, intro is complete
-      if (hasName && messages >= 2) {
-        // Check if we've already scheduled regular notifications
-        const scheduled = await AsyncStorage.getItem('@ai_wellness_regular_scheduled');
-        if (!scheduled) {
-          console.log('Intro complete! Scheduling regular check-ins...');
-          
-          // Import scheduler to avoid circular dependency
-          const { scheduleAICheckIns } = await import('./aiWellnessScheduler');
-          const isPremium = await AsyncStorage.getItem('@user_premium') === 'true';
-          
-          // Schedule regular check-ins (not initial setup)
-          await scheduleAICheckIns(isPremium, false);
-          await AsyncStorage.setItem('@ai_wellness_regular_scheduled', 'true');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking intro complete:', error);
-    }
+
+  async getCacheStats(): Promise<any> {
+    return await responseCache.getCacheStats();
+  }
+
+  async getUserAnalytics(userId: string): Promise<any> {
+    return await ConversationAnalytics.getUserMetrics(userId);
+  }
+
+  async getWeeklyAnalytics(): Promise<any> {
+    return await ConversationAnalytics.getWeeklyReport();
   }
 }
 

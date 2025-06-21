@@ -777,14 +777,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             onPress={goToPrevPage}
             activeOpacity={0.7}
           >
-            <LinearGradient
-              colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
-              style={styles.navArrowGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-            </LinearGradient>
+            <Ionicons name="chevron-back" size={32} color="#FFFFFF" />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -802,14 +795,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             onPress={goToNextPage}
             activeOpacity={0.7}
           >
-            <LinearGradient
-              colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
-              style={styles.navArrowGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
-            </LinearGradient>
+            <Ionicons name="chevron-forward" size={32} color="#FFFFFF" />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -988,28 +974,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   navArrowLeft: {
-    left: 20,
+    left: 5,
   },
   navArrowRight: {
-    right: 20,
+    right: 5,
   },
   navArrowButton: {
     width: 50,
     height: 50,
-  },
-  navArrowGradient: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
   },
   // Loader styles
   loaderContainer: {

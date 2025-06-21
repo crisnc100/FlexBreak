@@ -80,15 +80,15 @@ export const WAVE_TEMPLATES = {
     duration: 25,
     boss: {
       type: 'boss_posture',
-      hp: 120,
+      hp: 150, // Increased from 120 to 150 for more challenge
       speed: 15000,
       minionsAt50: ['tech_neck', 'slouch_slump']
     },
-    bossMinions: { // Spawn 3 random faster minions after boss
+    bossMinions: { // Spawn 3 lean twist monsters for consistent dodging challenge
       count: 3,
       delay: 5000, // 5 seconds after boss spawn
-      speedMultiplier: 1.5, // 50% faster than normal
-      types: ['tech_neck', 'slouch_slump', 'desk_hunch', 'lean_twist'] // Random from these
+      speedMultiplier: 1.2, // 20% faster than normal (reduced from 50%)
+      types: ['lean_twist'] // All lean twist for dodging challenge
     },
     phase: 'boss'
   }
@@ -139,7 +139,7 @@ export const MONSTER_CONFIG = {
   slouch_slump: { hp: 35, speed: 10000, value: 1 },
   desk_hunch: { hp: 45, speed: 9000, value: 2 },
   lean_twist: { hp: 30, speed: 7000, value: 1 },
-  boss_posture: { hp: 120, speed: 15000, value: 5 }
+  boss_posture: { hp: 150, speed: 15000, value: 5 } // Increased from 120 to 150
 };
 
 // Upgrade configurations for each pad (3 levels max)

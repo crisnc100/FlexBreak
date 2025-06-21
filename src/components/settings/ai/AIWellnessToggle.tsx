@@ -105,51 +105,72 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
   const handleToggle = async (value: boolean) => {
     if (isToggling) return; // Prevent rapid toggling
     
-    setIsToggling(true);
-    
-    // Check for toggle spam (optional - only for fun notification)
-    const isSpamming = await checkToggleSpam();
-    
-    onToggle(value);
-    await AsyncStorage.setItem(KEYS.AI_WELLNESS.ENABLED, value.toString());
-    
-    if (value) {
-      // If user is toggle spamming, show a funny message
-      if (isSpamming) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Playing with the switch? 🎮",
-            body: "I'm getting dizzy! Pick a side - I'm either here to help or taking a nap! 😵",
-            data: { type: 'ai_wellness_spam' },
-          },
-          trigger: { seconds: 1 }
-        });
+    // Check if we're in the middle of a premium upgrade to avoid double scheduling
+    try {
+      const { getIsUpgrading } = await import('../../../services/ai/aiWellnessUpgrade');
+      if (getIsUpgrading()) {
+        console.log('🔧 DEBUG: Skipping toggle during premium upgrade');
+        return;
       }
-      
-      await scheduleAICheckIns(isPremium, true); // isInitialSetup = true
-      Toast.show(
-        `AI Wellness Coach enabled! ${isPremium ? 'Daily check-ins scheduled.' : 'Check-ins scheduled for Wednesday.'}`, 
-        {
-          duration: 3000,
-          placement: 'top',
-        }
-      );
-    } else {
-      await cancelAICheckIns();
-      
-      // Clear the regular scheduled flag so it can reschedule after intro when re-enabled
-      await AsyncStorage.removeItem('@ai_wellness_regular_scheduled');
-      
-      // Send a funny goodbye notification
-      await sendGoodbyeNotification();
-      
-      Toast.show('AI Wellness Coach disabled', {
-        duration: 2000,
-        placement: 'top',
-      });
+    } catch (error) {
+      // If import fails, continue with normal flow
     }
     
-    setTimeout(() => setIsToggling(false), 1000); // Re-enable after 1 second
+    setIsToggling(true);
+    
+    try {
+      // Check for toggle spam (optional - only for fun notification)
+      const isSpamming = await checkToggleSpam();
+      
+      // Update AsyncStorage first
+      await AsyncStorage.setItem(KEYS.AI_WELLNESS.ENABLED, value.toString());
+      
+      // Then update parent state
+      onToggle(value);
+      
+      if (value) {
+        // If user is toggle spamming, show a funny message
+        if (isSpamming) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "Playing with the switch? 🎮",
+              body: "I'm getting dizzy! Pick a side - I'm either here to help or taking a nap! 😵",
+              data: { type: 'ai_wellness_spam' },
+            },
+            trigger: { seconds: 1 }
+          });
+        }
+        
+        await scheduleAICheckIns(isPremium, true); // isInitialSetup = true
+        Toast.show(
+          `AI Wellness Coach enabled! ${isPremium ? 'Daily check-ins scheduled.' : 'Check-ins scheduled for Wednesday.'}`, 
+          {
+            duration: 3000,
+            placement: 'top',
+          }
+        );
+      } else {
+        await cancelAICheckIns();
+        
+        // Clear flags so it can restart properly when re-enabled
+        await AsyncStorage.removeItem('@ai_wellness_regular_scheduled');
+        await AsyncStorage.removeItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME);
+        
+        // Send a funny goodbye notification
+        await sendGoodbyeNotification();
+        
+        Toast.show('AI Wellness Coach disabled', {
+          duration: 2000,
+          placement: 'top',
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling AI Wellness:', error);
+      // Reset state on error
+      onToggle(enabled);
+    } finally {
+      setTimeout(() => setIsToggling(false), 1000); // Re-enable after 1 second
+    }
   };
 
   return (
@@ -177,6 +198,7 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
         trackColor={{ false: '#767577', true: isDark || isSunset ? theme.accent + '80' : theme.accent + '50' }}
         thumbColor={enabled ? theme.accent : '#f4f3f4'}
         ios_backgroundColor="#3e3e3e"
+        disabled={isToggling}
       />
     </View>
   );
@@ -184,15 +206,16 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
 
 const styles = StyleSheet.create({
   settingRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    alignItems: 'center',
   },
   settingLabelContainer: {
     flex: 1,
-    marginBottom: 8,
+    marginRight: 12,
   },
   settingLabel: {
     fontSize: 16,

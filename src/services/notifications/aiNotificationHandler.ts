@@ -2,12 +2,83 @@ import * as Notifications from 'expo-notifications';
 import aiWellnessService from '../ai/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
+import ConversationAnalytics from '../ai/conversationAnalytics';
 
 export const configureAINotifications = async () => {
-  // Set up text input category
+  // Set up quick response category with multiple options
   await Notifications.setNotificationCategoryAsync('AI_WELLNESS_CHECK', [
     {
-      identifier: 'REPLY',
+      identifier: 'FEELING_GREAT',
+      buttonTitle: '😊 Great!',
+      options: {
+        opensAppToForeground: false,
+        isDestructive: false,
+        isAuthenticationRequired: false,
+      }
+    },
+    {
+      identifier: 'FEELING_SORE',
+      buttonTitle: '🤕 Sore/Tired',
+      options: {
+        opensAppToForeground: false,
+        isDestructive: false,
+        isAuthenticationRequired: false,
+      }
+    },
+    {
+      identifier: 'TYPE_CUSTOM',
+      buttonTitle: '💬 Type Reply',
+      options: {
+        opensAppToForeground: false,
+        isDestructive: false,
+        isAuthenticationRequired: false,
+      },
+      textInput: {
+        submitButtonTitle: 'Send',
+        placeholder: 'Tell me how you\'re feeling...'
+      }
+    }
+  ]);
+  
+  // Set up advanced wellness category with voice note option
+  await Notifications.setNotificationCategoryAsync('AI_WELLNESS_ADVANCED', [
+    {
+      identifier: 'QUICK_VOICE',
+      buttonTitle: '🎙️ Voice Note',
+      options: {
+        opensAppToForeground: true, // Opens app for voice recording
+        isDestructive: false,
+        isAuthenticationRequired: false,
+      }
+    },
+    {
+      identifier: 'TYPE_DETAILED',
+      buttonTitle: '📝 Detailed Reply',
+      options: {
+        opensAppToForeground: false,
+        isDestructive: false,
+        isAuthenticationRequired: false,
+      },
+      textInput: {
+        submitButtonTitle: 'Send',
+        placeholder: 'Describe how you\'re feeling in detail...'
+      }
+    },
+    {
+      identifier: 'FEELING_STRESSED',
+      buttonTitle: '😰 Stressed',
+      options: {
+        opensAppToForeground: false,
+        isDestructive: false,
+        isAuthenticationRequired: false,
+      }
+    }
+  ]);
+  
+  // Set up a direct reply category (like WhatsApp/iMessage)
+  await Notifications.setNotificationCategoryAsync('AI_WELLNESS_DIRECT_REPLY', [
+    {
+      identifier: 'DIRECT_REPLY',
       buttonTitle: 'Reply',
       options: {
         opensAppToForeground: false,
@@ -17,6 +88,24 @@ export const configureAINotifications = async () => {
       textInput: {
         submitButtonTitle: 'Send',
         placeholder: 'How are you feeling?'
+      }
+    },
+    {
+      identifier: 'QUICK_GOOD',
+      buttonTitle: '😊 Good',
+      options: {
+        opensAppToForeground: false,
+        isDestructive: false,
+        isAuthenticationRequired: false,
+      }
+    },
+    {
+      identifier: 'QUICK_STRESSED',
+      buttonTitle: '😰 Stressed',
+      options: {
+        opensAppToForeground: false,
+        isDestructive: false,
+        isAuthenticationRequired: false,
       }
     }
   ]);
@@ -62,6 +151,13 @@ export const configureAINotifications = async () => {
 // Keep track of whether handlers are already set up
 let handlersSetUp = false;
 
+// Export function to show AI modal - will be called from App.tsx
+export let showAIWellnessModal: (() => void) | null = null;
+
+export const setShowAIWellnessModal = (fn: () => void) => {
+  showAIWellnessModal = fn;
+};
+
 export const setupAINotificationHandlers = () => {
   // Prevent duplicate handler registration
   if (handlersSetUp) {
@@ -74,67 +170,183 @@ export const setupAINotificationHandlers = () => {
   
   // Handle notification responses (when user interacts)
   Notifications.addNotificationResponseReceivedListener(async (response) => {
-    const { notification } = response;
-    const data = notification.request.content.data;
-    
-    if (data?.type === 'ai_wellness_checkin') {
-      // Get user's text input
-      const userInput = response.userText;
+    try {
+      const { notification } = response;
+      const data = notification.request.content.data;
       
-      if (userInput) {
-        console.log(`Processing AI wellness input from user ${data.userId}: "${userInput}"`);
-        
-        // Process with AI
-        const result = await aiWellnessService.processWellnessCheckIn(
-          userInput,
-          data.userId
-        );
-        
-        // Determine notification title based on response type
-        let notificationTitle = 'Wellness Coach 🤖';
-        let categoryIdentifier = undefined;
-        
-        if (result.category === 'limit_reached') {
-          notificationTitle = 'Usage Limit Reached 🔒';
-          // Add action button to upgrade
-          categoryIdentifier = 'UPGRADE_PROMPT';
-        } else if (result.category === 'name_collection') {
-          notificationTitle = 'Nice to meet you! 👋';
-        } else if (result.category === 'greeting') {
-          notificationTitle = 'Welcome! 🌟';
+      if (data?.type === 'ai_wellness_checkin') {
+        // Handle quick action buttons
+        if (response.actionIdentifier && response.actionIdentifier !== 'REPLY') {
+          console.log(`User selected quick action: ${response.actionIdentifier}`);
+          
+          let userMessage = '';
+          switch (response.actionIdentifier) {
+            case 'FEELING_GREAT':
+              userMessage = "I'm feeling great today! Full of energy.";
+              break;
+            case 'FEELING_SORE':
+              userMessage = "I'm feeling sore and tired, especially in my neck/back/shoulders.";
+              break;
+            case 'FEELING_STRESSED':
+              userMessage = "I'm feeling stressed and overwhelmed right now.";
+              break;
+            case 'TYPE_CUSTOM':
+            case 'TYPE_DETAILED':
+              // Use the text input from the notification
+              userMessage = response.userText || '';
+              if (!userMessage) {
+                console.log('No custom text provided');
+                return;
+              }
+              break;
+            case 'QUICK_VOICE':
+              // This opens the app with voice recording intent
+              console.log('Voice note requested - app should open with voice recorder');
+              // Store flag to open voice recorder
+              await AsyncStorage.setItem('@ai_wellness_voice_mode', 'true');
+              return;
+            case 'QUICK_GOOD':
+              userMessage = "I'm feeling good today! Everything is going well.";
+              break;
+            case 'QUICK_BAD':
+              userMessage = "I'm not feeling great. Having some discomfort and stress.";
+              break;
+            case 'QUICK_STRESSED':
+              userMessage = "I'm feeling stressed and could use some help relaxing.";
+              break;
+            case 'DIRECT_REPLY':
+              // Use the text from the reply field
+              userMessage = response.userText || '';
+              if (!userMessage) {
+                console.log('No reply text provided');
+                return;
+              }
+              break;
+            case 'OPEN_CHAT':
+              // This should open the app with the chat modal
+              console.log('User wants to open chat modal');
+              if (showAIWellnessModal) {
+                showAIWellnessModal();
+              } else {
+                // Fallback: set flag for app to check
+                await AsyncStorage.setItem('@ai_wellness_show_modal', 'true');
+              }
+              return;
+            default:
+              userMessage = response.userText || '';
+          }
+          
+          if (userMessage) {
+            // Process with AI
+            const result = await aiWellnessService.processWellnessCheckIn(
+              userMessage,
+              data.userId
+            );
+            
+            // Send follow-up notification with AI response
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: 'AI Flex Coach 🤖',
+                body: result.response,
+                data: {
+                  type: 'ai_wellness_response',
+                  category: result.category,
+                  actions: result.suggestedActions
+                },
+                categoryIdentifier: 'AI_WELLNESS_TEXT' // Allow text reply to continue conversation
+              },
+              trigger: null // Immediate
+            });
+            
+            // Schedule effectiveness check if needed
+            if (result.suggestedActions?.length > 0 && !data.isWelcome) {
+              await scheduleEffectivenessCheck(
+                data.userId,
+                result.suggestedActions[0]
+              );
+            }
+          }
+          return; // Exit early for quick actions
         }
         
-        // Send follow-up notification with AI response
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: notificationTitle,
-            body: result.response,
-            data: {
-              type: 'ai_wellness_response',
-              category: result.category,
-              actions: result.suggestedActions
-            },
-            categoryIdentifier
-          },
-          trigger: null // Immediate
-        });
+        // Get user's text input (for REPLY action or long press)
+        const userInput = response.userText;
         
-        // Schedule effectiveness check after 30 minutes
-        if (result.suggestedActions?.length > 0 && 
-            result.category !== 'limit_reached' &&
-            result.category !== 'name_collection') {
-          await scheduleEffectivenessCheck(
-            data.userId,
-            result.suggestedActions[0]
+        if (userInput) {
+          console.log(`Processing AI wellness input from user ${data.userId}: "${userInput}"`);
+          
+          // Process with AI
+          const result = await aiWellnessService.processWellnessCheckIn(
+            userInput,
+            data.userId
           );
+          
+          // Determine notification title based on response type
+          let notificationTitle = 'Wellness Coach 🤖';
+          let categoryIdentifier = undefined;
+          
+          if (result.category === 'limit_reached') {
+            notificationTitle = 'Usage Limit Reached 🔒';
+            // Add action button to upgrade
+            categoryIdentifier = 'UPGRADE_PROMPT';
+          } else if (result.category === 'name_collection') {
+            notificationTitle = 'Nice to meet you! 👋';
+          } else if (result.category === 'greeting') {
+            notificationTitle = 'Welcome! 🌟';
+          }
+          
+          // Send follow-up notification with AI response
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: notificationTitle,
+              body: result.response,
+              data: {
+                type: 'ai_wellness_response',
+                category: result.category,
+                actions: result.suggestedActions
+              },
+              categoryIdentifier
+            },
+            trigger: null // Immediate
+          });
+          
+          // Schedule effectiveness check after 30 minutes
+          // Skip for welcome messages and limit messages
+          if (result.suggestedActions?.length > 0 && 
+              result.category !== 'limit_reached' &&
+              result.category !== 'name_collection' &&
+              !data.isWelcome) {
+            await scheduleEffectivenessCheck(
+              data.userId,
+              result.suggestedActions[0]
+            );
+          }
+        } else {
+          // User just tapped notification without selecting an action
+          console.log('User tapped AI wellness notification body');
+          
+          // For simple tap, we'll send a follow-up notification with clearer instructions
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'AI Flex Coach 🤖',
+              body: 'To respond: Tap and hold this notification (iOS) or swipe down (Android) to see quick reply options. Or just type your response below! 👇',
+              data: {
+                type: 'ai_wellness_response',
+                userId: data.userId,
+                helpMessage: true
+              },
+              categoryIdentifier: 'AI_WELLNESS_CHECK' // Keep the same category for actions
+            },
+            trigger: null // Immediate
+          });
         }
-      } else {
-        console.log('No text input received from notification response');
+      } else if (data?.type === 'ai_wellness_effectiveness') {
+        // Handle effectiveness check response
+        const effectiveness = response.actionIdentifier; // YES, SOMEWHAT, or NO
+        await trackEffectiveness(data.userId, data.action, effectiveness);
       }
-    } else if (data?.type === 'ai_wellness_effectiveness') {
-      // Handle effectiveness check response
-      const effectiveness = response.actionIdentifier; // YES, SOMEWHAT, or NO
-      await trackEffectiveness(data.userId, data.action, effectiveness);
+    } catch (error) {
+      console.error('Error in AI notification handler:', error);
     }
   });
 };
@@ -164,8 +376,8 @@ const scheduleEffectivenessCheck = async (
   
   const body = messages[action] || messages['default'];
   
-  // In development/testing, use shorter delay
-  const delaySeconds = __DEV__ ? 60 : 1800; // 1 minute in dev, 30 minutes in production
+  // In development/testing, use shorter delay but not too short
+  const delaySeconds = __DEV__ ? 300 : 1800; // 5 minutes in dev, 30 minutes in production
   
   console.log(`Effectiveness check will trigger in ${delaySeconds} seconds (${delaySeconds / 60} minutes)`);
   
@@ -219,6 +431,9 @@ const trackEffectiveness = async (
     
     // Update action effectiveness summary
     await updateActionEffectiveness(userId, action, score);
+    
+    // Track in analytics
+    await ConversationAnalytics.trackEffectivenessResponse(userId, effectiveness);
     
     // Log for debugging
     console.log(`Tracked effectiveness: ${action} - ${effectiveness} (score: ${score})`);

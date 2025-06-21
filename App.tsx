@@ -41,6 +41,9 @@ import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsIn
 import { videoLoaderService } from './src/services/videoLoaderService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
+import { AIWellnessModal } from './src/components/ai/AIWellnessNotificationHandler';
+import { setShowAIWellnessModal } from './src/services/notifications/aiNotificationHandler';
+import { ToastProvider } from 'react-native-toast-notifications';
 
 // Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
@@ -154,12 +157,21 @@ export default function App() {
           <PremiumProvider>
             <RefreshProvider>
               <AchievementProvider>
-                <StatusBar 
-                  barStyle="dark-content" 
-                  backgroundColor="transparent" 
-                  translucent={true} 
-                />
-                <MainApp />
+                <ToastProvider
+                  placement="top"
+                  duration={3000}
+                  animationType="slide-in"
+                  successColor="#4CAF50"
+                  dangerColor="#F44336"
+                  warningColor="#FF9800"
+                >
+                  <StatusBar 
+                    barStyle="dark-content" 
+                    backgroundColor="transparent" 
+                    translucent={true} 
+                  />
+                  <MainApp />
+                </ToastProvider>
               </AchievementProvider>
             </RefreshProvider>
           </PremiumProvider>
@@ -341,9 +353,42 @@ function MainApp() {
   const [showIntro, setShowIntro] = useState(true);
   const fadeInAnim = useRef(new Animated.Value(0)).current;
   const { recentAchievement, clearRecentAchievement } = useAchievements();
+  const [showAIModal, setShowAIModal] = useState(false);
   
   // Initialize update notification hook
   const { showModal, updateInfo, checkForUpdates, hideModal } = useUpdateNotification();
+  
+  // Set up AI Wellness modal handler with proper cleanup
+  useEffect(() => {
+    const showModal = () => {
+      console.log('AI Wellness modal triggered');
+      setShowAIModal(true);
+    };
+    setShowAIWellnessModal(showModal);
+    
+    // Check if we need to show modal on app focus (fallback)
+    const checkModalFlag = async () => {
+      const shouldShow = await AsyncStorage.getItem('@ai_wellness_show_modal');
+      if (shouldShow === 'true') {
+        console.log('Found pending AI Wellness modal flag');
+        setShowAIModal(true);
+        await AsyncStorage.removeItem('@ai_wellness_show_modal');
+      }
+    };
+    
+    // Check on mount and when app becomes active
+    checkModalFlag();
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkModalFlag();
+      }
+    });
+    
+    return () => {
+      setShowAIWellnessModal(null);
+      subscription?.remove();
+    };
+  }, []);
   
   // Mark component render for performance tracking
   useEffect(() => {
@@ -519,6 +564,12 @@ function MainApp() {
           updateInfo={updateInfo}
         />
       )}
+      
+      {/* AI Wellness Modal */}
+      <AIWellnessModal
+        visible={showAIModal}
+        onClose={() => setShowAIModal(false)}
+      />
     </Animated.View>
   );
 } 

@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'flexSave' | 'xpBoost' | 
 'intro' | 'premiumUnlocked' | 'redeemingChallenge' | 'timerTheme2' | 'timerTheme1' | 
 'transition1' | 'transition2' | 'halfway' | 'correct' | 'incorrect' | 'bossRound' | 'monstersDestroyed' | 'padPlacement' |
-'roundComplete';
+'roundComplete' | 'AInotification1';
 
 // Define the cache to store loaded sounds
 const soundCache: Record<SoundEffect, Audio.Sound | null> = {
@@ -29,6 +29,7 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   monstersDestroyed: null,
   padPlacement: null,
   roundComplete: null,
+  AInotification1: null,
 };
 
 // Add debounce tracking for sounds that are frequently played
@@ -53,6 +54,7 @@ const soundDebounceMap: Record<SoundEffect, number> = {
   monstersDestroyed: 0,
   padPlacement: 0,
   roundComplete: 0,
+  AInotification1: 0,
 };
 
 // Minimum time between playing the same sound (in milliseconds)
@@ -90,6 +92,7 @@ const soundUris: Record<SoundEffect, any> = {
   monstersDestroyed: require('../../assets/sounds/monstersDestroyed.mp3'),
   padPlacement: require('../../assets/sounds/padPlacement.mp3'),
   roundComplete: require('../../assets/sounds/roundComplete.mp3'),
+  AInotification1: require('../../assets/sounds/AInotification1.mp3'),
 };
 
 /**
@@ -390,6 +393,11 @@ export const playPadPlacementSound = async (): Promise<void> => {
 export const playRoundCompleteSound = async (): Promise<void> => {
   await playSound('roundComplete', 1.0);
 };
+
+export const playAInotification1Sound = async (): Promise<void> => {
+  await playSound('AInotification1', 1.0);
+};
+
 /**
  * Cleanup function to unload all sounds and free memory
  */

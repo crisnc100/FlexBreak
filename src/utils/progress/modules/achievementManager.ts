@@ -366,6 +366,12 @@ export const updateMiniGameAchievements = async (
     // Handle single perfect game achievements
     if (achievementId && userProgress.achievements[achievementId]) {
       const achievement = userProgress.achievements[achievementId];
+      console.log(`[AchievementManager] Checking achievement ${achievementId}, current state:`, {
+        completed: achievement.completed,
+        progress: achievement.progress,
+        dateCompleted: achievement.dateCompleted
+      });
+      
       if (!achievement.completed) {
         console.log(`[AchievementManager] Completing ${achievementId} achievement`);
         achievement.progress = 1;
@@ -375,8 +381,10 @@ export const updateMiniGameAchievements = async (
         // Don't add XP here - it will be handled by processCompletedMiniGame
         newlyCompletedAchievements.push(achievement);
       } else {
-        console.log(`[AchievementManager] Achievement ${achievementId} already completed`);
+        console.log(`[AchievementManager] Achievement ${achievementId} already completed on ${achievement.dateCompleted}`);
       }
+    } else {
+      console.log(`[AchievementManager] Achievement ${achievementId} not found in user progress`);
     }
   } else {
     // Reset trivia streak if not perfect

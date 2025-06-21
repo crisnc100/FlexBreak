@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import * as haptics from '../../../utils/haptics';
 import { playCorrectSound, playIncorrectSound } from '../../../utils/soundEffects';
+import { getStressBusterTier, getRandomXP } from '../../../utils/miniGameXP';
 
 const { width, height } = Dimensions.get('window');
 
@@ -371,23 +372,9 @@ export const StressBuster: React.FC<StressBusterProps> = ({
       clearInterval(workerSpawnTimer.current);
     }
     
-    // Calculate XP: Base 25 XP for playing
-    let xpEarned = 25;
-    
-    // Accuracy bonus (max 40 XP)
-    const totalAttempts = score + misses;
-    const accuracy = totalAttempts > 0 ? score / totalAttempts : 0;
-    xpEarned += Math.floor(accuracy * 40);
-    
-    // Speed bonus (max 35 XP) - based on average reaction time
-    if (reactionTimes.length > 0) {
-      const avgReactionTime = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
-      const speedBonus = Math.max(0, 35 - Math.floor(avgReactionTime / 50)); // Faster = more XP
-      xpEarned += speedBonus;
-    }
-    
-    // Cap at 100 XP max
-    xpEarned = Math.min(100, xpEarned);
+    // Calculate performance tier and random XP
+    const tier = getStressBusterTier(score);
+    const xpEarned = getRandomXP(tier);
     
     haptics.heavy();
     onGameComplete(score, xpEarned);
