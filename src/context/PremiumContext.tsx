@@ -248,14 +248,20 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       // Handle AI Wellness Coach upgrade/downgrade
       try {
-        const { handleAIWellnessUpgrade, handleAIWellnessDowngrade } = await import('../services/ai/aiWellnessUpgrade');
         if (status) {
-          await handleAIWellnessUpgrade();
+          // Check if AI wellness is already enabled and needs daily scheduling
+          const { checkAndRestoreAfterUpgrade } = await import('../services/ai/aiWellnessInitializer');
+          await checkAndRestoreAfterUpgrade();
+          
+          // Also send the upgrade welcome message
+          const { scheduleAIWellnessV2 } = await import('../services/ai/aiWellnessSchedulerV2');
+          await scheduleAIWellnessV2('upgrade');
         } else {
-          await handleAIWellnessDowngrade();
+          // Downgrade handling not needed for MVP
+          console.log('Premium downgrade - AI wellness will adjust on next toggle');
         }
       } catch (error) {
-        console.error('Error updating AI Wellness schedule:', error);
+        console.error('Error handling AI Wellness upgrade:', error);
       }
     } catch (error) {
       console.error('Error saving premium status:', error);

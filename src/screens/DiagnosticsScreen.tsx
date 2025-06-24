@@ -17,10 +17,10 @@ import * as performance from '../utils/performance/performance';
 import * as appHealthCheck from '../utils/performance/appHealthCheck';
 import { AppHealthScore, AppHealthIssue } from '../utils/performance/appHealthCheck';
 import * as firebaseReminders from '../utils/firebaseReminders';
-import { testAIIntegration, runQuickTest } from '../utils/aiWellness/testAIIntegration';
-import { testAIWellnessNotification, testCompleteAIFlow, checkScheduledAINotifications } from '../utils/testAINotifications';
-import { runAllNotificationTests, testNotificationScheduling } from '../utils/aiWellness/testNotificationFlow';
-import { testCompleteAIWellnessFlow, testNotificationDisplay } from '../utils/aiWellness/testCompleteFlow';
+import { testNotificationSystem } from '../utils/testNotificationSystem';
+import { checkAINotifications } from '../utils/checkAINotifications';
+import { forceScheduleAICheckIns } from '../utils/manualAIScheduling';
+// AI test imports removed - not part of MVP
 
 interface StorageStats {
   totalSize: number;
@@ -597,16 +597,43 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
                       </View>
                     )}
                     
-                    <TouchableOpacity 
-                      style={[styles.button, styles.refreshButton]}
-                      onPress={async () => {
-                        const stats = await firebaseReminders.getScheduledNotificationsSummary();
-                        setNotificationStats(stats);
-                      }}
-                    >
-                      <Ionicons name="refresh" size={16} color="#FFF" />
-                      <Text style={styles.buttonText}>Refresh Notification Status</Text>
-                    </TouchableOpacity>
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity 
+                        style={[styles.button, styles.refreshButton, { flex: 1, marginRight: 4 }]}
+                        onPress={async () => {
+                          const stats = await firebaseReminders.getScheduledNotificationsSummary();
+                          setNotificationStats(stats);
+                        }}
+                      >
+                        <Ionicons name="refresh" size={16} color="#FFF" />
+                        <Text style={styles.buttonText}>Refresh</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.button, { flex: 1, marginLeft: 4, backgroundColor: '#9C27B0' }]}
+                        onPress={async () => {
+                          setIsLoading(true);
+                          try {
+                            const results = await testNotificationSystem();
+                            Alert.alert(
+                              'Notification Test Results',
+                              `Motivational: ${results.totalMotivational}\n` +
+                              `AI Wellness: ${results.totalAIWellness}\n` +
+                              `Duplicates: ${results.duplicates}\n` +
+                              `Today's Total: ${results.todaysNotifications}`,
+                              [{ text: 'OK' }]
+                            );
+                          } catch (error) {
+                            Alert.alert('Error', 'Failed to run notification test');
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                      >
+                        <Ionicons name="checkmark-circle" size={16} color="#FFF" />
+                        <Text style={styles.buttonText}>Test System</Text>
+                      </TouchableOpacity>
+                    </View>
                   </>
                 ) : (
                   <Text style={styles.noDataText}>Loading notification data...</Text>
@@ -620,6 +647,71 @@ const DiagnosticsScreen = ({ navigation }: { navigation: { goBack: () => void } 
                 <Text style={styles.statDescription}>
                   Test the AI Wellness Coach integration with OpenRouter API
                 </Text>
+                
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#00BCD4', flex: 1, marginRight: 4 }]}
+                    onPress={async () => {
+                      setIsLoading(true);
+                      try {
+                        const result = await checkAINotifications();
+                        const message = result.notifications.total === 0
+                          ? 'No AI notifications scheduled!\n\n' +
+                            `AI Enabled: ${result.status.enabled ? 'Yes' : 'No'}\n` +
+                            `Premium: ${result.status.isPremium ? 'Yes' : 'No'}\n` +
+                            `Has Seen Welcome: ${result.status.hasSeenWelcome ? 'Yes' : 'No'}`
+                          : `Found ${result.notifications.total} AI notifications\n\n` +
+                            Object.entries(result.notifications.byDay)
+                              .map(([day, count]) => `${day}: ${count}`)
+                              .join('\n');
+                        
+                        Alert.alert('AI Notification Status', message, [
+                          { text: 'OK' },
+                          { 
+                            text: 'View Console', 
+                            onPress: () => console.log('Check console for detailed output')
+                          }
+                        ]);
+                      } catch (error) {
+                        Alert.alert('Error', 'Failed to check AI notifications');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Ionicons name="notifications-outline" size={16} color="#FFF" />
+                    <Text style={styles.buttonText}>Check AI</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#4CAF50', flex: 1, marginLeft: 4 }]}
+                    onPress={async () => {
+                      setIsLoading(true);
+                      try {
+                        await forceScheduleAICheckIns();
+                        Alert.alert('Success', 'AI wellness check-ins scheduled!', [
+                          { text: 'OK' },
+                          { 
+                            text: 'Check Status', 
+                            onPress: async () => {
+                              const result = await checkAINotifications();
+                              console.log('Updated AI notifications:', result);
+                            }
+                          }
+                        ]);
+                      } catch (error) {
+                        Alert.alert('Error', 'Failed to schedule AI check-ins');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Ionicons name="calendar-outline" size={16} color="#FFF" />
+                    <Text style={styles.buttonText}>Schedule AI</Text>
+                  </TouchableOpacity>
+                </View>
                 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity

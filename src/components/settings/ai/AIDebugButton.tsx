@@ -1,78 +1,98 @@
 import React from 'react';
 import { TouchableOpacity, Text, Alert, StyleSheet, View } from 'react-native';
-import { useTheme } from '../../../context/ThemeContext';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { KEYS } from '../../../services/storageService';
 
 interface AIDebugButtonProps {
   visible: boolean;
 }
 
 export const AIDebugButton: React.FC<AIDebugButtonProps> = ({ visible }) => {
-  const { theme } = useTheme();
-
   if (!__DEV__ || !visible) {
     return null;
   }
 
-  const handlePress = async () => {
-    const { getScheduledAINotifications } = await import('../../../services/ai/aiWellnessScheduler');
-    const scheduled = await getScheduledAINotifications();
+  const handleViewSchedule = async () => {
+    const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const aiNotifs = allScheduled.filter(n => 
+      n.content.data?.type?.includes('ai_wellness') ||
+      n.content.title?.includes('AI') ||
+      n.content.title?.includes('wellness')
+    );
     
-    if (scheduled.length === 0) {
-      Alert.alert('No AI Notifications', 'No AI wellness check-ins are scheduled.');
-    } else {
-      const message = scheduled.map(n => n.scheduledFor).join('\n');
-      Alert.alert(`${scheduled.length} AI Check-ins Scheduled`, message);
+    if (aiNotifs.length === 0) {
+      Alert.alert('No AI Notifications', 'No AI wellness notifications are scheduled');
+      return;
     }
+    
+    const info = aiNotifs.map((n, i) => {
+      const trigger = n.trigger as any;
+      let when = 'Unknown';
+      if (trigger?.date) {
+        when = new Date(trigger.date).toLocaleString();
+      } else if (trigger?.seconds) {
+        when = `In ${trigger.seconds} seconds`;
+      }
+      return `${i+1}. ${n.content.title}\n   When: ${when}`;
+    }).join('\n\n');
+    
+    Alert.alert(`AI Notifications (${aiNotifs.length})`, info);
   };
 
-  const handleTestNotification = async (type = 'basic', delay = 30) => {
+  const handleResetAI = async () => {
+    Alert.alert(
+      'Reset AI Wellness',
+      'This will clear all AI notifications and settings. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { cleanupAllAINotifications } = await import('../../../utils/cleanupAINotifications');
+              await cleanupAllAINotifications();
+              
+              await AsyncStorage.removeItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME);
+              await AsyncStorage.removeItem('@ai_wellness_regular_scheduled');
+              await AsyncStorage.removeItem('@ai_wellness_show_modal');
+              await AsyncStorage.removeItem('@ai_wellness_voice_mode');
+              await AsyncStorage.removeItem(KEYS.AI_WELLNESS.ENABLED);
+              
+              Alert.alert('Success', 'AI Wellness has been reset. Toggle it on to start fresh.');
+            } catch (error) {
+              console.error('Error resetting AI wellness:', error);
+              Alert.alert('Error', 'Failed to reset AI wellness');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleTestNotification = async () => {
     try {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
       
-      let categoryId = 'AI_WELLNESS_DIRECT_REPLY';
-      let bodyText = "How's your body feeling? Reply to this message or tap a quick option below 💬";
-      let actionOptions = '• Reply button with text field (like WhatsApp)\n• 😊 Good (quick tap)\n• 😰 Stressed (quick tap)';
-      
-      if (type === 'basic') {
-        categoryId = 'AI_WELLNESS_CHECK';
-        bodyText = "How are you feeling? Long press (iOS) or swipe down for quick replies 👇";
-        actionOptions = '• 😊 Great! (quick response)\n• 🤕 Sore/Tired (quick response)\n• 💬 Type Reply (type in notification)';
-      } else if (type === 'advanced') {
-        categoryId = 'AI_WELLNESS_ADVANCED';
-        bodyText = "How are you feeling? Detailed options available below 📝";
-        actionOptions = '• 🎙️ Voice Note (opens app)\n• 📝 Detailed Reply (type in notification)\n• 😰 Stressed (quick response)';
-      }
-      
-      // Schedule a test notification
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "AI Wellness Check 🤖",
-          body: bodyText,
+          body: `Test notification - How are you feeling?`,
           sound: true,
           data: { 
             type: 'ai_wellness_checkin',
             userId,
             isTest: true
           },
-          categoryIdentifier: categoryId,
+          categoryIdentifier: 'AI_WELLNESS_SIMPLE',
         },
         trigger: {
-          seconds: delay
+          seconds: 3
         }
       });
       
-      Alert.alert(
-        'Test Notification Scheduled', 
-        `A test AI Wellness notification will appear in ${delay} seconds.\n\nActions available:\n${actionOptions}\n\n` +
-        'Try these interactions:\n' +
-        '1. Tap and hold to see quick actions (iOS)\n' +
-        '2. Swipe down to see action buttons\n' +
-        '3. Select an action to respond\n\n' +
-        'Note: Only "Voice Note" should open the app!',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Test Sent', 'Notification will appear in 3 seconds');
     } catch (error) {
       Alert.alert('Error', 'Failed to schedule test notification');
       console.error('Test notification error:', error);
@@ -80,49 +100,48 @@ export const AIDebugButton: React.FC<AIDebugButtonProps> = ({ visible }) => {
   };
 
   return (
-    <View>
+    <View style={styles.container}>
+      <Text style={styles.title}>AI Debug Tools</Text>
+      
       <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: theme.accent }]}
-        onPress={handlePress}
+        style={[styles.debugButton, { backgroundColor: '#3498DB' }]}
+        onPress={handleViewSchedule}
       >
-        <Text style={styles.debugButtonText}>View Scheduled AI Check-ins</Text>
+        <Text style={styles.debugButtonText}>View Schedule</Text>
       </TouchableOpacity>
       
       <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: '#2ECC71', marginTop: 8 }]}
-        onPress={() => handleTestNotification('direct', 30)}
+        style={[styles.debugButton, { backgroundColor: '#E74C3C' }]}
+        onPress={handleResetAI}
       >
-        <Text style={styles.debugButtonText}>Test Direct Reply (30s) 💬</Text>
+        <Text style={styles.debugButtonText}>Reset AI Wellness</Text>
       </TouchableOpacity>
       
       <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: '#FF6B6B', marginTop: 8 }]}
-        onPress={() => handleTestNotification('basic', 30)}
+        style={[styles.debugButton, { backgroundColor: '#2ECC71' }]}
+        onPress={handleTestNotification}
       >
-        <Text style={styles.debugButtonText}>Test Long Press (30s) 😊</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: '#9B59B6', marginTop: 8 }]}
-        onPress={() => handleTestNotification('advanced', 30)}
-      >
-        <Text style={styles.debugButtonText}>Test Advanced (30s) 📝</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: '#3498DB', marginTop: 8 }]}
-        onPress={() => handleTestNotification('simple', 5)}
-      >
-        <Text style={styles.debugButtonText}>Quick Test (5s) - Stay in App</Text>
+        <Text style={styles.debugButtonText}>Test Notification</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    margin: 16,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   debugButton: {
-    marginTop: 12,
-    marginHorizontal: 16,
+    marginTop: 8,
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,

@@ -42,8 +42,13 @@ import { videoLoaderService } from './src/services/videoLoaderService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
 import { AIWellnessModal } from './src/components/ai/AIWellnessNotificationHandler';
+import { WellnessBubble } from './src/components/wellness/WellnessBubble';
 import { setShowAIWellnessModal } from './src/services/notifications/aiNotificationHandler';
 import { ToastProvider } from 'react-native-toast-notifications';
+import { clearDataCleanupNotifications } from './src/utils/clearDataCleanupNotifications';
+// Removed non-MVP imports
+// import dataCleanupManager from './src/services/ai/dataCleanupManager';
+// import { checkAndRestoreAISchedule } from './src/services/ai/aiSchedulingPersistence';
 
 // Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
@@ -110,6 +115,9 @@ export function forceNavigate(name: keyof RootStackParamList, params?: any) {
 function navigate(name: keyof RootStackParamList, params?: any) {
   navigateFromAnywhere(name, params);
 }
+
+// Global initialization flags to prevent multiple initializations
+let isMotivationalMessagesInitialized = false;
 
 // Main entry point for the app
 export default function App() {
@@ -354,6 +362,7 @@ function MainApp() {
   const fadeInAnim = useRef(new Animated.Value(0)).current;
   const { recentAchievement, clearRecentAchievement } = useAchievements();
   const [showAIModal, setShowAIModal] = useState(false);
+  const [showWellnessBubble, setShowWellnessBubble] = useState(false);
   
   // Initialize update notification hook
   const { showModal, updateInfo, checkForUpdates, hideModal } = useUpdateNotification();
@@ -361,17 +370,21 @@ function MainApp() {
   // Set up AI Wellness modal handler with proper cleanup
   useEffect(() => {
     const showModal = () => {
-      console.log('AI Wellness modal triggered');
-      setShowAIModal(true);
+      console.log('AI Wellness triggered - showing bubble');
+      setShowWellnessBubble(true);
+      // Don't show the old modal anymore
+      setShowAIModal(false);
     };
     setShowAIWellnessModal(showModal);
     
-    // Check if we need to show modal on app focus (fallback)
+    // Check if we need to show bubble on app focus (fallback)
     const checkModalFlag = async () => {
       const shouldShow = await AsyncStorage.getItem('@ai_wellness_show_modal');
-      if (shouldShow === 'true') {
-        console.log('Found pending AI Wellness modal flag');
-        setShowAIModal(true);
+      const hasStoredResponse = await AsyncStorage.getItem('@ai_wellness_last_response');
+      
+      if (shouldShow === 'true' || hasStoredResponse) {
+        console.log('Found pending AI Wellness flag or stored response - showing bubble');
+        setShowWellnessBubble(true);
         await AsyncStorage.removeItem('@ai_wellness_show_modal');
       }
     };
@@ -381,6 +394,8 @@ function MainApp() {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         checkModalFlag();
+        // Data cleanup removed for MVP
+        // Don't check AI schedule here - it's already done in initApp
       }
     });
     
@@ -401,6 +416,14 @@ function MainApp() {
       try {
         // Initialize local notifications system
         await notifications.configureNotifications();
+        
+        // Clear any data cleanup notifications
+        await clearDataCleanupNotifications();
+        
+        // Initialize AI wellness notifications if enabled
+        // This ensures notifications are scheduled for users who have AI wellness enabled
+        const { initializeAIWellnessOnStartup } = await import('./src/services/ai/aiWellnessInitializer');
+        await initializeAIWellnessOnStartup();
         
         // Get notification permissions (both systems need this)
         const permissionsGranted = await notifications.requestNotificationsPermissions();
@@ -431,11 +454,21 @@ function MainApp() {
               
               // Start local motivational messages as a fallback for Firebase Cloud Functions
               // Use the production mode (2 messages per day) instead of test mode
-              const cleanupMotivationalMessages = firebaseReminders.startLocalMotivationalMessages(false);
+              // Add guard to prevent multiple initializations
+              let cleanupMotivationalMessages = () => {};
+              
+              if (!isMotivationalMessagesInitialized) {
+                console.log('Initializing motivational messages for the first time');
+                isMotivationalMessagesInitialized = true;
+                cleanupMotivationalMessages = firebaseReminders.startLocalMotivationalMessages(false);
+              } else {
+                console.log('Skipping motivational messages initialization - already initialized');
+              }
               
               // Return cleanup function
               return () => {
                 cleanupMotivationalMessages();
+                isMotivationalMessagesInitialized = false; // Reset on cleanup
               };
             }
           } catch (error) {
@@ -565,10 +598,16 @@ function MainApp() {
         />
       )}
       
-      {/* AI Wellness Modal */}
+      {/* AI Wellness Modal - Keep for fallback */}
       <AIWellnessModal
         visible={showAIModal}
         onClose={() => setShowAIModal(false)}
+      />
+      
+      {/* Wellness Bubble - New experience */}
+      <WellnessBubble
+        visible={showWellnessBubble}
+        onClose={() => setShowWellnessBubble(false)}
       />
     </Animated.View>
   );

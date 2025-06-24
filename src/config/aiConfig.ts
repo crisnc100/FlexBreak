@@ -19,13 +19,13 @@ export const AI_CONFIG = {
   
   limits: {
     free: {
-      dailyRequests: 3,      // Increased from 2 to 3 for better user experience
+      dailyRequests: 3,      // 3 messages on Wednesdays only
       introMessages: 5,      // Generous intro experience
       maxInputLength: 150,   // Slightly longer inputs allowed
       maxOutputTokens: 150,
     },
     premium: {
-      dailyRequests: 100,    // Effectively unlimited
+      dailyRequests: 15,     // 15 message exchanges per day as per requirements
       maxInputLength: 300,
       maxOutputTokens: 200,
     }

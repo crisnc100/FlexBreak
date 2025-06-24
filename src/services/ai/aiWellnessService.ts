@@ -4,8 +4,6 @@ import { buildUserContext, categorizeInput } from './contextBuilder';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AI_CONFIG } from '../../config/aiConfig';
 import { KEYS } from '../storageService';
-import responseCache from './responseCache';
-import ConversationAnalytics from './conversationAnalytics';
 
 export interface WellnessResponse {
   response: string;
@@ -22,7 +20,6 @@ export class AIWellnessService {
     userId?: string
   ): Promise<WellnessResponse> {
     try {
-      // Check day and usage limits for free users
       const accessCheck = await this.checkAccessAndLimits(userId);
       if (!accessCheck.canAccess) {
         return {
@@ -32,49 +29,21 @@ export class AIWellnessService {
         };
       }
       
-      // Build context
       const context = await buildUserContext(userInput, userId);
       
       // Skip name collection - not needed anymore
       
-      // Check cache first for common queries
-      const cachedResponse = await responseCache.getCachedResponse(userInput, context.timeOfDay);
-      if (cachedResponse) {
-        console.log('Using cached response for common query');
-        
-        // Still track usage and conversation
-        if (userId) {
-          await this.storeConversation(userId, userInput, cachedResponse);
-        }
-        await this.trackUsage(userId);
-        
-        const category = categorizeInput(userInput);
-        const suggestedActions = this.extractActions(cachedResponse);
-        
-        // Track analytics
-        await ConversationAnalytics.trackConversation(
-          userId || 'anonymous',
-          userInput,
-          cachedResponse,
-          category,
-          true // wasCached
-        );
-        
-        return {
-          response: cachedResponse,
-          suggestedActions,
-          category
-        };
-      }
+      // Cache functionality removed for MVP simplification
       
-      // Get effectiveness data for better suggestions
       const effectiveActions = await this.getEffectiveActions(userId);
       
       // Prepare messages
       const contextData: any = {
         timeOfDay: context.timeOfDay,
         dayOfWeek: context.dayOfWeek,
-        effectiveActions: effectiveActions.length > 0 ? effectiveActions : undefined
+        effectiveActions: effectiveActions.length > 0 ? effectiveActions : undefined,
+        isPremium: context.isPremium,
+        isFirstInteraction: context.isFirstInteraction
       };
       
       if (context.userName) {
@@ -95,7 +64,6 @@ export class AIWellnessService {
       // Add conversation history if exists
       if (userId && this.conversationHistory.has(userId)) {
         const history = this.conversationHistory.get(userId);
-        // Only include last 2 exchanges to save tokens
         messages.push(...history.slice(-4));
       }
       
@@ -123,23 +91,12 @@ export class AIWellnessService {
         await this.storeConversation(userId, userInput, aiResponse);
       }
       
-      // Track usage
       await this.trackUsage(userId);
       
-      // Track analytics
-      await ConversationAnalytics.trackConversation(
-        userId || 'anonymous',
-        userInput,
-        aiResponse,
-        category,
-        false // not cached
-      );
+      // Analytics tracking removed for MVP
       
-      // If this was a welcome message response, schedule regular check-ins
-      if (context.notificationData?.isWelcome) {
-        const { scheduleRegularCheckInsAfterWelcome } = await import('./aiWellnessScheduler');
-        await scheduleRegularCheckInsAfterWelcome();
-      }
+      // Note: Regular check-ins are now scheduled in the notification handler
+      // after the user responds to the welcome message
       
       return {
         response: aiResponse,
@@ -180,13 +137,12 @@ export class AIWellnessService {
       if (usageCount >= AI_CONFIG.limits.premium.dailyRequests) {
         return { 
           canAccess: false, 
-          message: "You've reached your daily limit. Even premium users need breaks! 😊" 
+          message: "You've reached your 15 daily message exchanges. Even premium users need breaks! 😊" 
         };
       }
       return { canAccess: true };
     }
     
-    // Free users: Check if it's Wednesday (unless it's their first message today)
     const today = new Date().getDay();
     if (today !== 3 && usageCount > 0) {
       return { 
@@ -195,7 +151,6 @@ export class AIWellnessService {
       };
     }
     
-    // Free users get 1 message any day as their first, then Wednesday only
     if (usageCount >= AI_CONFIG.limits.free.dailyRequests) {
       return { 
         canAccess: false, 
@@ -219,34 +174,56 @@ export class AIWellnessService {
   
   private async storeConversation(userId: string, userInput: string, aiResponse: string): Promise<void> {
     try {
-      const conversationKey = `@ai_wellness_conversations_${userId}`;
-      const existing = await AsyncStorage.getItem(conversationKey);
-      const conversations = existing ? JSON.parse(existing) : [];
+      // Only store anonymized metrics, not full conversations
+      const metricsKey = `@ai_wellness_metrics_${userId}`;
+      const existing = await AsyncStorage.getItem(metricsKey);
+      const metrics = existing ? JSON.parse(existing) : {
+        totalInteractions: 0,
+        categories: {},
+        moodPatterns: {},
+        lastInteraction: null
+      };
       
-      conversations.push({
-        timestamp: Date.now(),
-        userInput,
-        aiResponse,
-        category: categorizeInput(userInput)
-      });
+      // Update metrics without storing actual message content
+      metrics.totalInteractions++;
+      metrics.lastInteraction = Date.now();
       
-      // Keep only last 50 conversations
-      if (conversations.length > 50) {
-        conversations.splice(0, conversations.length - 50);
+      // Store category counts
+      const category = categorizeInput(userInput);
+      metrics.categories[category] = (metrics.categories[category] || 0) + 1;
+      
+      // Extract mood indicators (anonymized)
+      const mood = this.extractMoodIndicator(userInput);
+      if (mood) {
+        metrics.moodPatterns[mood] = (metrics.moodPatterns[mood] || 0) + 1;
       }
       
-      await AsyncStorage.setItem(conversationKey, JSON.stringify(conversations));
+      await AsyncStorage.setItem(metricsKey, JSON.stringify(metrics));
     } catch (error) {
-      console.error('Error storing conversation:', error);
+      console.error('Error storing anonymized metrics:', error);
     }
+  }
+  
+  private extractMoodIndicator(input: string): string | null {
+    const lowerInput = input.toLowerCase();
+    
+    if (lowerInput.includes('great') || lowerInput.includes('good') || lowerInput.includes('happy')) {
+      return 'positive';
+    } else if (lowerInput.includes('stressed') || lowerInput.includes('anxious') || lowerInput.includes('worried')) {
+      return 'stressed';
+    } else if (lowerInput.includes('tired') || lowerInput.includes('exhausted') || lowerInput.includes('fatigue')) {
+      return 'tired';
+    } else if (lowerInput.includes('sore') || lowerInput.includes('pain') || lowerInput.includes('ache')) {
+      return 'discomfort';
+    }
+    
+    return null;
   }
   
   private extractActions(response: string): string[] {
     // Extract specific actions from the response
     const actions = [];
     const lowerResponse = response.toLowerCase();
-    
-    // Look for specific stretch types
     if (lowerResponse.includes('neck stretch') || lowerResponse.includes('neck roll')) {
       actions.push('neck stretches');
     } else if (lowerResponse.includes('shoulder')) {
@@ -262,7 +239,6 @@ export class AIWellnessService {
     if (lowerResponse.includes('water') || lowerResponse.includes('hydrate')) actions.push('water break');
     if (lowerResponse.includes('eye') && lowerResponse.includes('rest')) actions.push('eye rest');
     
-    // Only return the first action to avoid multiple effectiveness checks
     return actions.slice(0, 1);
   }
   
@@ -298,53 +274,8 @@ export class AIWellnessService {
     }
   }
   
-  private async getEffectiveActions(userId?: string): Promise<string[]> {
-    if (!userId) return [];
-    
-    try {
-      const summaryKey = `@ai_wellness_patterns_${userId}`;
-      const existing = await AsyncStorage.getItem(summaryKey);
-      if (!existing) return [];
-      
-      const summary = JSON.parse(existing);
-      
-      // Get actions with effectiveness >= 0.7 (70%)
-      const effectiveActions = Object.entries(summary)
-        .filter(([_, data]: [string, any]) => data.averageEffectiveness >= 0.7)
-        .sort(([_, a]: [string, any], [__, b]: [string, any]) => 
-          b.averageEffectiveness - a.averageEffectiveness
-        )
-        .slice(0, 3) // Top 3 effective actions
-        .map(([action, _]) => action);
-      
-      return effectiveActions;
-    } catch (error) {
-      console.error('Error getting effective actions:', error);
-      return [];
-    }
-  }
-  
-
-  async getCostReport(): Promise<string> {
-    try {
-      const { getAICostReport } = await import('../../utils/aiWellness/costMonitor');
-      return await getAICostReport();
-    } catch (error) {
-      console.error('Error getting cost report:', error);
-      return 'Cost report unavailable';
-    }
-  }
-
-  async getCacheStats(): Promise<any> {
-    return await responseCache.getCacheStats();
-  }
-
-  async getUserAnalytics(userId: string): Promise<any> {
-    return await ConversationAnalytics.getUserMetrics(userId);
-  }
-
-  async getWeeklyAnalytics(): Promise<any> {
-    return await ConversationAnalytics.getWeeklyReport();
+  private async getEffectiveActions(_userId?: string): Promise<string[]> {
+    return [];
   }
 }
 

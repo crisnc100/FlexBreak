@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
-import dataRetentionService from '../../../services/ai/dataRetentionPolicy';
+// import dataRetentionService from '../../../services/ai/dataRetentionPolicy'; // Removed for MVP
 import aiWellnessService from '../../../services/ai/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -21,7 +21,8 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
     try {
       setIsExporting(true);
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-      const userData = await dataRetentionService.exportUserData(userId);
+      // Data export removed for MVP
+      const userData = { message: 'Data export not available in MVP' };
       
       // Convert to JSON string with pretty printing
       const jsonData = JSON.stringify(userData, null, 2);
@@ -68,7 +69,10 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
               const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
               
               // Delete all user data
-              await dataRetentionService.deleteUserData(userId);
+              // Data deletion removed for MVP
+      // In MVP, we'll just clear the basic storage
+      await AsyncStorage.removeItem('@ai_wellness_enabled');
+      await AsyncStorage.removeItem('@ai_wellness_has_seen_welcome');
               
               // Clear conversation history from service
               await aiWellnessService.clearConversationHistory(userId);

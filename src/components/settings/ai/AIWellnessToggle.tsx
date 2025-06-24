@@ -4,7 +4,8 @@ import { useTheme } from '../../../context/ThemeContext';
 import { usePremium } from '../../../context/PremiumContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../../services/storageService';
-import { scheduleAICheckIns, cancelAICheckIns } from '../../../services/ai/aiWellnessScheduler';
+// Using only V2 scheduler for MVP
+import { scheduleAIWellnessV2 } from '../../../services/ai/aiWellnessSchedulerV2';
 import { Toast } from 'react-native-toast-notifications';
 import * as Notifications from 'expo-notifications';
 
@@ -105,16 +106,7 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
   const handleToggle = async (value: boolean) => {
     if (isToggling) return; // Prevent rapid toggling
     
-    // Check if we're in the middle of a premium upgrade to avoid double scheduling
-    try {
-      const { getIsUpgrading } = await import('../../../services/ai/aiWellnessUpgrade');
-      if (getIsUpgrading()) {
-        console.log('🔧 DEBUG: Skipping toggle during premium upgrade');
-        return;
-      }
-    } catch (error) {
-      // If import fails, continue with normal flow
-    }
+    // Premium upgrade check removed for MVP simplification
     
     setIsToggling(true);
     
@@ -141,7 +133,8 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
           });
         }
         
-        await scheduleAICheckIns(isPremium, true); // isInitialSetup = true
+        // Use the new cleaner scheduler
+        await scheduleAIWellnessV2('enable');
         Toast.show(
           `AI Wellness Coach enabled! ${isPremium ? 'Daily check-ins scheduled.' : 'Check-ins scheduled for Wednesday.'}`, 
           {
@@ -150,11 +143,8 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
           }
         );
       } else {
-        await cancelAICheckIns();
-        
-        // Clear flags so it can restart properly when re-enabled
-        await AsyncStorage.removeItem('@ai_wellness_regular_scheduled');
-        await AsyncStorage.removeItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME);
+        // Use the new cleaner scheduler to disable
+        await scheduleAIWellnessV2('disable');
         
         // Send a funny goodbye notification
         await sendGoodbyeNotification();

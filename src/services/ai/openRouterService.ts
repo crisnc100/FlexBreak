@@ -1,5 +1,4 @@
 import { AI_CONFIG } from '../../config/aiConfig';
-import { trackAIUsage } from '../../utils/aiWellness/costMonitor';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -70,10 +69,6 @@ class OpenRouterService {
         throw new Error('No response from AI');
       }
       
-      // Track usage for cost monitoring
-      if (data.usage) {
-        await trackAIUsage(model, data.usage.total_tokens);
-      }
       
       return data.choices[0].message.content;
       

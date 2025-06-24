@@ -37,12 +37,28 @@ export const getReminderTime = storageService.getReminderTime;
 export async function configureNotifications(): Promise<void> {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
-      // Check if this is an AI wellness notification
-      const isAIWellness = notification.request.content.data?.type === 'ai_wellness_checkin';
+      // Get the notification data
+      const data = notification.request.content.data;
+      const isWelcome = data?.isWelcome || data?.isPremiumWelcome;
+      const isGoodbye = data?.isGoodbye;
+      const isAIResponse = data?.type === 'ai_wellness_response' || data?.isWelcomeResponse;
       
+      // Allow these notification types to show immediately:
+      // 1. Welcome/goodbye messages
+      // 2. AI wellness responses (for conversation flow)
+      if (isWelcome || isGoodbye || isAIResponse) {
+        return {
+          shouldShowAlert: true,   // Show these immediately
+          shouldPlaySound: true,   // Play sound for these
+          shouldSetBadge: false,
+        };
+      }
+      
+      // SUPPRESS ALL OTHER NOTIFICATIONS WHILE APP IS IN FOREGROUND
+      // This prevents spam from scheduled check-ins and upgrade prompts
       return {
-        shouldShowAlert: true,
-        shouldPlaySound: !isAIWellness, // Don't play sound for AI wellness in-app
+        shouldShowAlert: false,  // Don't show scheduled notifications while app is active
+        shouldPlaySound: false,  // No sounds while in app
         shouldSetBadge: false,
       };
     },

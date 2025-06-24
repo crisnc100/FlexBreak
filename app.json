@@ -16,7 +16,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"],
-        "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested."
+        "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested.",
+        "NSMicrophoneUsageDescription": "FlexBreak needs access to your microphone for voice responses to the AI Wellness Coach."
       },
       "splash": {
         "xib": "./ios/FlexBreak/SplashScreen.storyboard"
@@ -31,7 +32,8 @@
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "RECORD_AUDIO"
       ],
       "versionCode": 3,
       "enableProguardInReleaseBuilds": true,

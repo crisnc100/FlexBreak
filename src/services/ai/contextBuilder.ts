@@ -9,6 +9,8 @@ export interface UserContext {
   userName?: string;
   recentPatterns?: string[];
   effectiveSolutions?: string[];
+  isPremium?: boolean;
+  isFirstInteraction?: boolean;
 }
 
 export const buildUserContext = async (userInput: string, userId?: string): Promise<UserContext> => {
@@ -36,19 +38,28 @@ export const buildUserContext = async (userInput: string, userId?: string): Prom
         context.userName = userName;
       }
       
-      const patternsKey = `@ai_wellness_patterns_${userId}`;
-      const patternsData = await AsyncStorage.getItem(patternsKey);
-      if (patternsData) {
-        const patterns = JSON.parse(patternsData);
-        context.recentPatterns = patterns.slice(-3); // Last 3 patterns
-      }
+      // Check if premium
+      const isPremium = await AsyncStorage.getItem('@user_premium') === 'true';
+      context.isPremium = isPremium;
       
-      const effectiveKey = `@ai_wellness_effective_${userId}`;
-      const effectiveData = await AsyncStorage.getItem(effectiveKey);
-      if (effectiveData) {
-        const effective = JSON.parse(effectiveData);
-        context.effectiveSolutions = effective.slice(-3); // Last 3 effective solutions
-      }
+      // Check if this is first interaction (greeting words)
+      const greetings = ['hi', 'hello', 'hey', 'welcome', 'start'];
+      context.isFirstInteraction = greetings.some(g => userInput.toLowerCase().includes(g));
+      
+      // Pattern tracking removed for MVP simplification
+      // const patternsKey = `@ai_wellness_patterns_${userId}`;
+      // const patternsData = await AsyncStorage.getItem(patternsKey);
+      // if (patternsData) {
+      //   const patterns = JSON.parse(patternsData);
+      //   context.recentPatterns = patterns.slice(-3); // Last 3 patterns
+      // }
+      
+      // const effectiveKey = `@ai_wellness_effective_${userId}`;
+      // const effectiveData = await AsyncStorage.getItem(effectiveKey);
+      // if (effectiveData) {
+      //   const effective = JSON.parse(effectiveData);
+      //   context.effectiveSolutions = effective.slice(-3); // Last 3 effective solutions
+      // }
     } catch (error) {
       console.log('Error loading user context:', error);
     }

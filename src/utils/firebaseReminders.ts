@@ -8,6 +8,7 @@ import * as Notifications from 'expo-notifications';
 import * as storageService from '../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { NotificationType, cancelNotificationsByType, scheduleTypedNotification } from './notificationManager';
 
 // Storage keys
 const FIREBASE_REMINDER_ENABLED_KEY = 'firebase_reminder_enabled';
@@ -145,31 +146,6 @@ export const getFCMToken = async (): Promise<string | null> => {
   } catch (error) {
     console.error('Error getting FCM token:', error);
     return null;
-  }
-};
-
-/**
- * Try to refresh the App Check token, but continue if it fails
- * This ensures we have a fresh token for each request when possible
- * But doesn't block operations if App Check is misconfigured
- */
-const refreshAppCheckToken = async (): Promise<void> => {
-  try {
-    if (firebase.apps.length > 0 && firebase.appCheck) {
-      // Try to get a token but don't throw if it fails
-      try {
-        await firebase.appCheck().getToken(true);
-        console.log('App Check token refreshed successfully');
-      } catch (appCheckError) {
-        // Just log the error but continue execution
-        console.warn('App Check token refresh failed, continuing without refresh:', appCheckError);
-      }
-    } else {
-      console.log('Firebase App or AppCheck not initialized, skipping token refresh');
-    }
-  } catch (error) {
-    // Catch any unexpected errors but don't block execution
-    console.error('Unexpected error in refreshAppCheckToken:', error);
   }
 };
 
@@ -429,72 +405,6 @@ export const setReminderMessage = async (message: string): Promise<boolean> => {
   }
 };
 
-/**
- * Test function to send an immediate test notification
- */
-export const sendTestNotification = async (): Promise<boolean> => {
-  try {
-    // Try direct Firebase function call first to bypass App Check
-    try {
-      // Create a unique ID for this instance
-      const uniqueId = 'direct-test-' + Date.now();
-      
-      // Initialize a temporary app without App Check
-      const directApp = firebase.initializeApp(
-        firebase.app().options,
-        uniqueId
-      );
-      
-      // Get functions from this app
-      const directFunctions = directApp.functions();
-      const testFunction = directFunctions.httpsCallable('sendCustomNotification');
-      
-      // Call the function
-      await testFunction({
-        title: 'FlexBreak Test',
-        body: 'This is a TEST notification that confirms your reminder system is working!',
-        data: { type: 'test_notification' }
-      });
-      
-      console.log('Test notification sent successfully via direct call');
-      
-      // Clean up the temporary app
-      directApp.delete();
-      
-      return true;
-    } catch (directError) {
-      console.error('Direct test notification failed, trying original method:', directError);
-      
-      // Fall back to original method with App Check
-      const testFunction = firebase.functions().httpsCallable('sendCustomNotification');
-      await testFunction({
-        title: 'FlexBreak Test',
-        body: 'This is a TEST notification that confirms your reminder system is working!',
-        data: { type: 'test_notification' }
-      });
-      
-      console.log('Test notification sent successfully via fallback');
-      return true;
-    }
-  } catch (error) {
-    console.error('Error sending test notification:', error);
-    // As a fallback, schedule a local notification if Firebase fails
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'FlexBreak Test',
-          body: 'This is a local TEST notification (Firebase unavailable)',
-          data: { type: 'test_notification' },
-        },
-        trigger: null, // Use null trigger for immediate notification
-      });
-      return true;
-    } catch (fallbackError) {
-      console.error('Fallback notification failed too:', fallbackError);
-      return false;
-    }
-  }
-};
 
 /**
  * Send an immediate local notification for testing purposes
@@ -605,135 +515,6 @@ export const setupMessageHandlers = (): (() => void) => {
   }
 };
 
-/**
- * Send a test push notification through Firebase Cloud Functions
- * This tests the entire push notification system end-to-end
- */
-export const sendFirebaseTestNotification = async (): Promise<boolean> => {
-  try {
-    // Get the current token
-    const token = await getFCMToken();
-    if (!token) {
-      console.error('Cannot send test notification: No push token available');
-      return false;
-    }
-    
-    console.log('Sending Firebase test notification to token:', token);
-    
-    // Use a cloud function to send a notification
-    try {
-      const testFunction = firebase.functions().httpsCallable('testPushNotification');
-      
-      const result = await testFunction({
-        token,
-        title: 'FlexBreak Test',
-        body: 'This is a test notification sent directly from the app! If you see this, push notifications are working!',
-        data: { 
-          type: 'firebase_test',
-          testId: Date.now().toString()
-        }
-      });
-      
-      console.log('Firebase test notification sent successfully:', result.data);
-      return true;
-    } catch (cloudFunctionError) {
-      // Check if it's an AppCheck error, and if so, suppress the detailed error message
-      if (cloudFunctionError.message && cloudFunctionError.message.includes('appCheck')) {
-        console.log('Firebase AppCheck validation failed - falling back to direct method');
-      } else {
-        console.error('Error calling Firebase function:', cloudFunctionError);
-      }
-      
-      // If the cloud function fails, try using direct Expo Push API if it's an Expo token
-      if (token.startsWith('ExponentPushToken[')) {
-        console.log('Falling back to direct Expo Push API');
-        
-        try {
-          // This is a client-side fallback using fetch - not ideal but works in a pinch
-          const response = await fetch('https://exp.host/--/api/v2/push/send', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              to: token,
-              title: 'FlexBreak Test (Direct)',
-              body: 'This is a DIRECT test notification (bypassing Firebase)!',
-              sound: 'default',
-              data: { 
-                type: 'direct_test',
-                testId: Date.now().toString() 
-              }
-            }),
-          });
-          
-          const responseData = await response.json();
-          console.log('Direct Expo push notification result:', responseData);
-          return true;
-        } catch (expoPushError) {
-          console.error('Error sending direct Expo push notification:', expoPushError);
-        }
-      }
-      
-      // As a last resort, try a local notification
-      await sendImmediateLocalNotification();
-      console.log('Sent local notification as ultimate fallback');
-      return false;
-    }
-  } catch (error) {
-    console.error('Error in sendFirebaseTestNotification:', error);
-    
-    // As a fallback, send a local notification
-    try {
-      await sendImmediateLocalNotification();
-      console.log('Sent local notification as fallback');
-      return true;
-    } catch (localError) {
-      console.error('Local notification fallback also failed:', localError);
-      return false;
-    }
-  }
-};
-
-/**
- * Schedule a test notification to appear in one minute from now
- * This is useful for testing background notifications
- */
-export const scheduleTestNotificationInOneMinute = async (): Promise<string> => {
-  try {
-    console.log('Scheduling test notification to appear in one minute');
-    
-    // Calculate one minute from now
-    const now = new Date();
-    const oneMinuteFromNow = new Date(now.getTime() + 60 * 1000);
-    
-    // Format for display
-    const timeString = `${oneMinuteFromNow.getHours()}:${oneMinuteFromNow.getMinutes().toString().padStart(2, '0')}`;
-    
-    // Schedule the notification
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'FlexBreak 1-Minute Test',
-        body: `This is a test notification scheduled for ${timeString}. If you see this, background notifications are working!`,
-        data: { type: 'minute_test' },
-        sound: true,
-      },
-      trigger: { 
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 60
-      },
-    });
-    
-    console.log('Test notification scheduled with ID:', notificationId);
-    console.log(`It should appear at approximately ${timeString}`);
-    
-    return notificationId;
-  } catch (error) {
-    console.error('Error scheduling test notification:', error);
-    throw error;
-  }
-};
 
 /**
  * Schedule multiple reminders based on user's premium level
@@ -746,9 +527,9 @@ export const scheduleAdvancedReminders = async (
   try {
     console.log('Scheduling advanced reminders based on premium level:', premiumLevel);
     
-    // Cancel any existing notifications first
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('Cancelled existing notifications');
+    // Cancel only existing reminder notifications first
+    await cancelNotificationsByType([NotificationType.REMINDER, NotificationType.PREMIUM_REMINDER]);
+    console.log('Cancelled existing reminder notifications');
     
     const scheduledNotificationIds: string[] = [];
     
@@ -902,6 +683,68 @@ const getNextDayOfWeek = (dayOfWeek: number, hours: number, minutes: number): Da
 };
 
 /**
+ * Get a summary of all scheduled notifications
+ * Used by the diagnostics screen
+ */
+export const getScheduledNotificationsSummary = async () => {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    
+    let motivational = 0;
+    let reminders = 0;
+    let other = 0;
+    const details: any[] = [];
+    
+    scheduled.forEach(notification => {
+      const type = notification.content.data?.type;
+      const title = notification.content.title || 'Untitled';
+      
+      // Categorize notification
+      if (type === 'motivational_message' || title.includes('FlexBreak') || title.includes('motivational')) {
+        motivational++;
+      } else if (type === 'scheduled_reminder' || type === 'premium_reminder' || title.includes('Reminder')) {
+        reminders++;
+      } else {
+        other++;
+      }
+      
+      // Add to details
+      details.push({
+        type: type || 'unknown',
+        title: title,
+        scheduledFor: notification.trigger && 'date' in notification.trigger 
+          ? notification.trigger.date 
+          : null
+      });
+    });
+    
+    // Sort details by scheduled time
+    details.sort((a, b) => {
+      if (!a.scheduledFor) return 1;
+      if (!b.scheduledFor) return -1;
+      return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime();
+    });
+    
+    return {
+      total: scheduled.length,
+      motivational,
+      reminders,
+      other,
+      details
+    };
+  } catch (error) {
+    console.error('Error getting notification summary:', error);
+    return {
+      total: 0,
+      motivational: 0,
+      reminders: 0,
+      other: 0,
+      details: []
+    };
+  }
+};
+
+/**
  * Send a random motivational message as a local notification
  * This simulates the system-wide motivational messages from Firebase
  */
@@ -1027,11 +870,11 @@ export const sendLocalMotivationalMessage = async (): Promise<string> => {
 export const startLocalMotivationalMessages = (testMode: boolean = false): (() => void) => {
   console.log(`Starting local motivational messages timer (${testMode ? 'TEST MODE - every 5 minutes' : 'PRODUCTION MODE - 2 per day'})`);
 
-  // Cancel any existing scheduled motivational messages first
-  Notifications.cancelAllScheduledNotificationsAsync().then(() => {
-    console.log('Cleared existing scheduled notifications');
+  // Cancel only existing motivational messages, not all notifications
+  cancelNotificationsByType([NotificationType.MOTIVATIONAL, NotificationType.PREMIUM_REMINDER]).then(() => {
+    console.log('Cleared existing motivational messages');
   }).catch(error => {
-    console.error('Error clearing scheduled notifications:', error);
+    console.error('Error clearing motivational messages:', error);
   });
 
   // Skip scheduling any immediate notification since user is actively using the app
@@ -1047,10 +890,10 @@ export const startLocalMotivationalMessages = (testMode: boolean = false): (() =
   return () => {
     console.log('Stopping local motivational messages');
     
-    // Clean up any scheduled notifications
-    Notifications.cancelAllScheduledNotificationsAsync()
-      .then(() => console.log('All scheduled notifications cancelled'))
-      .catch(error => console.error('Error cancelling scheduled notifications:', error));
+    // Clean up only motivational messages
+    cancelNotificationsByType([NotificationType.MOTIVATIONAL, NotificationType.PREMIUM_REMINDER])
+      .then(() => console.log('Motivational messages cancelled'))
+      .catch(error => console.error('Error cancelling motivational messages:', error));
   };
 };
 
@@ -1213,24 +1056,24 @@ const scheduleProductionMotivationalMessages = async () => {
         usedMorningMsgIndex = Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length);
         const morningMsg = MOTIVATIONAL_MESSAGES[usedMorningMsgIndex];
         
-        const morningId = await Notifications.scheduleNotificationAsync({
-          content: {
+        const morningId = await scheduleTypedNotification(
+          {
             title: morningMsg.title,
             body: morningMsg.body,
             data: { 
-              type: 'motivational_message',
               time: 'morning',
               scheduledFor: morningDate.toISOString()
             },
             sound: true,
           },
-          trigger: { 
+          { 
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: morningDate
           },
-        });
+          NotificationType.MOTIVATIONAL
+        );
         
-        //console.log(`Scheduled morning message for ${morningDate.toLocaleString()} with ID ${morningId}`);
+        console.log(`Scheduled morning message for ${morningDate.toLocaleString()} with ID ${morningId}`);
       }
       
       // Second message: Afternoon (2pm-4pm)
@@ -1250,24 +1093,24 @@ const scheduleProductionMotivationalMessages = async () => {
         }
         const afternoonMsg = MOTIVATIONAL_MESSAGES[afternoonMsgIndex];
         
-        const afternoonId = await Notifications.scheduleNotificationAsync({
-          content: {
+        const afternoonId = await scheduleTypedNotification(
+          {
             title: afternoonMsg.title,
             body: afternoonMsg.body,
             data: { 
-              type: 'motivational_message',
               time: 'afternoon',
               scheduledFor: afternoonDate.toISOString()
             },
             sound: true,
           },
-          trigger: { 
+          { 
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: afternoonDate
           },
-        });
+          NotificationType.MOTIVATIONAL
+        );
         
-        //console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId}`);
+        console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId}`);
       }
     }
     
