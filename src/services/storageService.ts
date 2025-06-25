@@ -64,6 +64,7 @@ export const KEYS = {
     USER_NAME: '@ai_wellness_user_name',
     HAS_SEEN_WELCOME: '@ai_wellness_has_seen_welcome',
     INTRO_MESSAGES_COUNT: '@ai_wellness_intro_count',
+    FIRST_ENABLE_DONE: '@ai_wellness_first_enable_done',
   }
 };
 
@@ -833,6 +834,16 @@ export const exportUserProgress = (progress: UserProgress): void => {
  */
 export const clearAllData = async (resetTestingData: boolean = false): Promise<boolean> => {
   try {
+    // Cancel all scheduled notifications first
+    try {
+      const Notifications = await import('expo-notifications');
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      console.log('All scheduled notifications cancelled');
+    } catch (notifError) {
+      console.error('Error cancelling notifications:', notifError);
+      // Continue with data clearing even if notification cancellation fails
+    }
+    
     // Get all known keys from our KEYS object
     const knownKeys = [
       ...Object.values(KEYS.USER),
@@ -853,6 +864,19 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
       '@gamification',
       '@achievements',
       '@challenges'
+    );
+    
+    // Add AI wellness keys to ensure they get cleared
+    if (KEYS.AI_WELLNESS) {
+      knownKeys.push(...Object.values(KEYS.AI_WELLNESS));
+    }
+    knownKeys.push(
+      '@ai_wellness_enabled',
+      '@ai_wellness_has_seen_welcome',
+      '@ai_wellness_show_modal',
+      '@ai_wellness_voice_mode',
+      '@ai_wellness_last_response',
+      '@ai_wellness_regular_scheduled'
     );
     
     // Define testing-related keys to preserve

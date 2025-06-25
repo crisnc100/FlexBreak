@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
     "jsx": "react-native",
     "esModuleInterop": true,
     "resolveJsonModule": true,

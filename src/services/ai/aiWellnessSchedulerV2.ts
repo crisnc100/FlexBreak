@@ -60,7 +60,8 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
             categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
           },
           {
-            seconds: 1  // Immediate notification
+            seconds: 1,  // Immediate notification
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL
           },
           NotificationType.AI_WELLNESS
         );
@@ -96,7 +97,8 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
           categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
         },
         {
-          seconds: 1  // Immediate notification
+          seconds: 1,  // Immediate notification
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL
         },
         NotificationType.AI_WELLNESS
       );
@@ -142,6 +144,13 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
     minimumDaysAhead = 1;
   }
   
+  // For testing/debugging: Allow immediate scheduling on first enable
+  const isFirstEnable = await AsyncStorage.getItem(KEYS.AI_WELLNESS.FIRST_ENABLE_DONE) !== 'true';
+  if (isFirstEnable && isPremium) {
+    minimumDaysAhead = 0; // Allow same-day scheduling for premium users on first enable
+    await AsyncStorage.setItem(KEYS.AI_WELLNESS.FIRST_ENABLE_DONE, 'true');
+  }
+  
   for (const day of checkInDays) {
     // Random time between 11 AM and 4 PM (11:00 - 16:59)
     const randomHour = 11 + Math.floor(Math.random() * 6);
@@ -164,6 +173,12 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
     // Use time interval trigger instead of date trigger to ensure proper scheduling
     const secondsUntilNotification = Math.floor((scheduledDate.getTime() - now.getTime()) / 1000);
     
+    // Ensure we're not scheduling in the past
+    if (secondsUntilNotification < 60) {
+      console.error(`⚠️ Attempted to schedule notification with only ${secondsUntilNotification} seconds - skipping`);
+      continue;
+    }
+    
     const notificationId = await scheduleTypedNotification(
       {
         title: "Time for your wellness check-in 💪",
@@ -172,12 +187,14 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
         data: { 
           userId,
           scheduledFor: scheduledDate.toISOString(),
-          dayOfWeek: day
+          dayOfWeek: day,
+          type: 'ai_wellness_checkin'  // Add explicit type
         },
         categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
       },
       {
-        seconds: secondsUntilNotification
+        date: scheduledDate,  // Use date trigger like motivational messages
+        type: Notifications.SchedulableTriggerInputTypes.DATE
       },
       NotificationType.AI_WELLNESS
     );
@@ -227,12 +244,14 @@ async function scheduleUpgradePrompts(userId: string) {
           body: message.body,
           sound: true,
           data: { 
-            userId
+            userId,
+            type: 'ai_wellness_upgrade'  // Add explicit type
           },
           categoryIdentifier: 'UPGRADE_PROMPT' as any,
         },
         {
-          seconds: secondsUntilNotification
+          date: scheduledDate,  // Use date trigger
+          type: Notifications.SchedulableTriggerInputTypes.DATE
         },
         NotificationType.UPGRADE_PROMPT
       );
@@ -242,6 +261,32 @@ async function scheduleUpgradePrompts(userId: string) {
       console.log(`Skipped upgrade prompt for ${getDayName(day)} - too close to current time`);
     }
   }
+}
+
+export async function debugAIWellnessNotifications() {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const aiNotifications = scheduled.filter(n => 
+    n.content.data?.type === 'ai_wellness_checkin' || 
+    n.content.data?.type === 'ai_wellness_upgrade'
+  );
+  
+  console.log(`\n=== AI Wellness Notifications Debug ===`);
+  console.log(`Total scheduled: ${aiNotifications.length}`);
+  
+  aiNotifications.forEach((n, index) => {
+    const trigger = n.trigger as any;
+    const scheduledDate = trigger?.date ? new Date(trigger.date) : null;
+    const hoursFromNow = scheduledDate ? 
+      (scheduledDate.getTime() - Date.now()) / (1000 * 60 * 60) : 'N/A';
+    
+    console.log(`\n${index + 1}. ${n.content.title}`);
+    console.log(`   Type: ${n.content.data?.type}`);
+    console.log(`   Scheduled: ${scheduledDate ? scheduledDate.toLocaleString() : 'Unknown'}`);
+    console.log(`   Hours from now: ${typeof hoursFromNow === 'number' ? hoursFromNow.toFixed(1) : hoursFromNow}`);
+  });
+  console.log(`\n=====================================\n`);
+  
+  return aiNotifications;
 }
 
 function getNextWeekdayTrigger(

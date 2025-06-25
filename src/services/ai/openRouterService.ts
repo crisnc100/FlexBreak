@@ -85,7 +85,32 @@ class OpenRouterService {
   ): Promise<string> {
     try {
       return await this.chat(messages, options);
-    } catch (error) {
+    } catch (error: any) {
+      // If we get a 404, try with fallback models
+      if (error.message?.includes('404') && !options.triedFallback) {
+        console.log('Model not found, trying fallback models...');
+        
+        const fallbackModels = [
+          'mistralai/mistral-7b-instruct:free',
+          'meta-llama/llama-3-8b-instruct:free',
+          'google/gemma-7b-it:free',
+          'nousresearch/nous-capybara-7b:free'
+        ];
+        
+        for (const fallbackModel of fallbackModels) {
+          try {
+            console.log(`Trying fallback model: ${fallbackModel}`);
+            return await this.chat(messages, { 
+              ...options, 
+              model: fallbackModel,
+              triedFallback: true 
+            });
+          } catch (fallbackError: any) {
+            console.log(`Fallback ${fallbackModel} failed: ${fallbackError.message}`);
+          }
+        }
+      }
+      
       if (retries > 0) {
         console.log(`Retrying... (${retries} attempts left)`);
         await new Promise(resolve => setTimeout(resolve, 1000));

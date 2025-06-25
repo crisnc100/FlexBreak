@@ -15,87 +15,81 @@ export const AIDebugButton: React.FC<AIDebugButtonProps> = ({ visible }) => {
 
   const handleViewSchedule = async () => {
     const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+    
+    // Group notifications by type
     const aiNotifs = allScheduled.filter(n => 
       n.content.data?.type?.includes('ai_wellness') ||
       n.content.title?.includes('AI') ||
       n.content.title?.includes('wellness')
     );
     
-    if (aiNotifs.length === 0) {
-      Alert.alert('No AI Notifications', 'No AI wellness notifications are scheduled');
-      return;
+    const motivationalNotifs = allScheduled.filter(n => 
+      n.content.data?.type === 'motivational_message'
+    );
+    
+    const info = [];
+    
+    if (aiNotifs.length > 0) {
+      info.push(`AI WELLNESS (${aiNotifs.length}):`);
+      aiNotifs.forEach((n, i) => {
+        const trigger = n.trigger as any;
+        let when = 'Unknown';
+        if (trigger?.date) {
+          when = new Date(trigger.date).toLocaleString();
+        } else if (trigger?.seconds) {
+          when = `In ${trigger.seconds} seconds`;
+        }
+        info.push(`${i+1}. ${n.content.title}\n   When: ${when}`);
+      });
     }
     
-    const info = aiNotifs.map((n, i) => {
-      const trigger = n.trigger as any;
-      let when = 'Unknown';
-      if (trigger?.date) {
-        when = new Date(trigger.date).toLocaleString();
-      } else if (trigger?.seconds) {
-        when = `In ${trigger.seconds} seconds`;
-      }
-      return `${i+1}. ${n.content.title}\n   When: ${when}`;
-    }).join('\n\n');
+    if (motivationalNotifs.length > 0) {
+      info.push(`\nMOTIVATIONAL (${motivationalNotifs.length}):`);
+      info.push(`${motivationalNotifs.length} messages scheduled`);
+    }
     
-    Alert.alert(`AI Notifications (${aiNotifs.length})`, info);
+    if (info.length === 0) {
+      Alert.alert('No Notifications', 'No notifications are scheduled');
+    } else {
+      Alert.alert(`Scheduled Notifications (${allScheduled.length} total)`, info.join('\n'));
+    }
   };
 
-  const handleResetAI = async () => {
-    Alert.alert(
-      'Reset AI Wellness',
-      'This will clear all AI notifications and settings. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { cleanupAllAINotifications } = await import('../../../utils/cleanupAINotifications');
-              await cleanupAllAINotifications();
-              
-              await AsyncStorage.removeItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME);
-              await AsyncStorage.removeItem('@ai_wellness_regular_scheduled');
-              await AsyncStorage.removeItem('@ai_wellness_show_modal');
-              await AsyncStorage.removeItem('@ai_wellness_voice_mode');
-              await AsyncStorage.removeItem(KEYS.AI_WELLNESS.ENABLED);
-              
-              Alert.alert('Success', 'AI Wellness has been reset. Toggle it on to start fresh.');
-            } catch (error) {
-              console.error('Error resetting AI wellness:', error);
-              Alert.alert('Error', 'Failed to reset AI wellness');
-            }
-          }
-        }
-      ]
-    );
-  };
 
   const handleTestNotification = async () => {
     try {
-      const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
+      // Import the comprehensive test
+      const { testBackgroundNotifications } = await import('../../../utils/testBackgroundNotifications');
+      await testBackgroundNotifications();
       
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "AI Wellness Check 🤖",
-          body: `Test notification - How are you feeling?`,
-          sound: true,
-          data: { 
-            type: 'ai_wellness_checkin',
-            userId,
-            isTest: true
-          },
-          categoryIdentifier: 'AI_WELLNESS_SIMPLE',
-        },
-        trigger: {
-          seconds: 3
-        }
-      });
-      
-      Alert.alert('Test Sent', 'Notification will appear in 3 seconds');
+      Alert.alert(
+        'Background Test Started', 
+        'Check console for details. Notifications will fire at:\n' +
+        '- 10 seconds\n- 30 seconds\n- 1 minute\n- 2 minutes\n- 5 minutes\n\n' +
+        'Close app after 30s to test background!'
+      );
     } catch (error) {
-      Alert.alert('Error', 'Failed to schedule test notification');
-      console.error('Test notification error:', error);
+      Alert.alert('Error', 'Failed to start test');
+      console.error('Test error:', error);
+    }
+  };
+
+  const handleCheckStatus = async () => {
+    try {
+      const { checkTestStatus } = await import('../../../utils/testBackgroundNotifications');
+      await checkTestStatus();
+      
+      // Also show in alert
+      const all = await Notifications.getAllScheduledNotificationsAsync();
+      const tests = all.filter(n => n.content.data?.isBackgroundTest === true);
+      
+      if (tests.length === 0) {
+        Alert.alert('Test Status', 'No test notifications scheduled');
+      } else {
+        Alert.alert('Test Status', `${tests.length} test notifications still waiting to fire`);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to check status');
     }
   };
 
@@ -111,17 +105,17 @@ export const AIDebugButton: React.FC<AIDebugButtonProps> = ({ visible }) => {
       </TouchableOpacity>
       
       <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: '#E74C3C' }]}
-        onPress={handleResetAI}
-      >
-        <Text style={styles.debugButtonText}>Reset AI Wellness</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
         style={[styles.debugButton, { backgroundColor: '#2ECC71' }]}
         onPress={handleTestNotification}
       >
-        <Text style={styles.debugButtonText}>Test Notification</Text>
+        <Text style={styles.debugButtonText}>Test Background Notifications</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={[styles.debugButton, { backgroundColor: '#E74C3C' }]}
+        onPress={handleCheckStatus}
+      >
+        <Text style={styles.debugButtonText}>Check Test Status</Text>
       </TouchableOpacity>
     </View>
   );

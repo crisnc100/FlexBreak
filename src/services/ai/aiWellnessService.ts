@@ -4,6 +4,7 @@ import { buildUserContext, categorizeInput } from './contextBuilder';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AI_CONFIG } from '../../config/aiConfig';
 import { KEYS } from '../storageService';
+import wellnessMemory from './wellnessMemory';
 
 export interface WellnessResponse {
   response: string;
@@ -35,19 +36,23 @@ export class AIWellnessService {
       
       // Cache functionality removed for MVP simplification
       
-      const effectiveActions = await this.getEffectiveActions(userId);
+      // Get personalized context from wellness memory
+      const personalizedContext = await wellnessMemory.getPersonalizedContext(userId || 'anonymous');
+      
+      // Get user's name from AI wellness storage
+      const userName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
       
       // Prepare messages
       const contextData: any = {
         timeOfDay: context.timeOfDay,
         dayOfWeek: context.dayOfWeek,
-        effectiveActions: effectiveActions.length > 0 ? effectiveActions : undefined,
         isPremium: context.isPremium,
-        isFirstInteraction: context.isFirstInteraction
+        isFirstInteraction: context.isFirstInteraction,
+        personalizedHistory: personalizedContext
       };
       
-      if (context.userName) {
-        contextData.userName = context.userName;
+      if (userName) {
+        contextData.userName = userName;
       }
       
       const messages = [
@@ -93,7 +98,19 @@ export class AIWellnessService {
       
       await this.trackUsage(userId);
       
-      // Analytics tracking removed for MVP
+      // Track the interaction in wellness memory
+      if (userId) {
+        await wellnessMemory.addConversationInsight(userId, {
+          category,
+          solution: suggestedActions?.[0],
+          timeOfDay: context.timeOfDay
+        });
+        
+        // Update memory with user name if we have it
+        if (userName) {
+          await wellnessMemory.updateMemory(userId, { userName });
+        }
+      }
       
       // Note: Regular check-ins are now scheduled in the notification handler
       // after the user responds to the welcome message

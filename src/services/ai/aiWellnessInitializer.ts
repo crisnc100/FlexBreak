@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
-import { scheduleAIWellnessV2, hasSeenAIWelcome, scheduleRegularCheckIns } from './aiWellnessSchedulerV2';
+import { scheduleAIWellnessV2, hasSeenAIWelcome, scheduleRegularCheckIns, cleanupAllAINotifications } from './aiWellnessSchedulerV2';
 import { canScheduleNotifications, markScheduled } from './notificationDebouncer';
+import { getNotificationsByType, NotificationType } from '../../utils/notificationManager';
 
 /**
  * Initialize AI wellness notifications on app startup
@@ -43,9 +44,6 @@ export const initializeAIWellnessOnStartup = async () => {
     console.log(`AI Wellness Init - Enabled: true, Premium: ${isPremium}`);
     
     // Check if we already have notifications scheduled
-    const { getNotificationsByType } = await import('../../utils/notificationManager');
-    const { NotificationType } = await import('../../utils/notificationManager');
-    
     const existingAINotifications = await getNotificationsByType([
       NotificationType.AI_WELLNESS,
       NotificationType.UPGRADE_PROMPT
@@ -62,7 +60,6 @@ export const initializeAIWellnessOnStartup = async () => {
       console.log(`Only ${existingAINotifications.length} AI notifications found, expecting ${expectedCount}. Scheduling...`);
       
       // Clean up partial schedules
-      const { cleanupAllAINotifications } = await import('./aiWellnessSchedulerV2');
       await cleanupAllAINotifications();
       
       // Schedule fresh
@@ -96,9 +93,6 @@ export const checkAndRestoreAfterUpgrade = async () => {
     }
     
     // Check if we only have Wednesday notification (free user pattern)
-    const { getNotificationsByType } = await import('../../utils/notificationManager');
-    const { NotificationType } = await import('../../utils/notificationManager');
-    
     const existingAINotifications = await getNotificationsByType([NotificationType.AI_WELLNESS]);
     
     // If premium user has less than 7 notifications, they might have upgraded
@@ -108,7 +102,6 @@ export const checkAndRestoreAfterUpgrade = async () => {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
       
       // Clean up old notifications
-      const { cleanupAllAINotifications } = await import('./aiWellnessSchedulerV2');
       await cleanupAllAINotifications();
       
       // Schedule daily notifications

@@ -5,16 +5,16 @@ export const AI_CONFIG = {
     apiKey: OPENROUTER_API_KEY,
     baseURL: 'https://openrouter.ai/api/v1/chat/completions',
     appUrl: APP_URL || 'https://flexbreak.app',
-    defaultModel: 'openai/gpt-3.5-turbo',
+    defaultModel: 'mistralai/mistral-7b-instruct:free', // Changed to free model
     maxRetries: 3,
     timeout: 30000, // 30 seconds
   },
   
   models: {
-    fast: 'openai/gpt-3.5-turbo',
-    balanced: 'anthropic/claude-instant-v1',
-    powerful: 'openai/gpt-4-turbo-preview',
-    free: 'meta-llama/llama-2-70b-chat',
+    fast: 'mistralai/mistral-7b-instruct:free',     // Free and fast
+    balanced: 'meta-llama/llama-3-8b-instruct:free', // Free Llama 3
+    powerful: 'anthropic/claude-3-haiku',            // Cheap but powerful ($0.25/1M tokens)
+    free: 'mistralai/mistral-7b-instruct:free',     // Reliable free option
   },
   
   limits: {

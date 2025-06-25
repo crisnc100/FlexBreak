@@ -166,12 +166,20 @@ export async function scheduleTypedNotification(
   trigger: Notifications.NotificationTriggerInput | null,
   type: NotificationType
 ): Promise<string> {
+  // Map NotificationType enum to actual string values
+  const typeString = type === NotificationType.AI_WELLNESS ? 'ai_wellness_checkin' :
+                     type === NotificationType.UPGRADE_PROMPT ? 'ai_wellness_upgrade' :
+                     type === NotificationType.MOTIVATIONAL ? 'motivational_message' :
+                     type === NotificationType.REMINDER ? 'scheduled_reminder' :
+                     type === NotificationType.PREMIUM_REMINDER ? 'premium_reminder' :
+                     type;
+  
   // Ensure the notification has the correct type in data
   const typedContent = {
     ...content,
     data: {
       ...content.data,
-      type
+      type: typeString
     }
   };
   
