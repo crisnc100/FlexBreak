@@ -6,6 +6,7 @@ import { AIWellnessToggle } from './AIWellnessToggle';
 import { AIDebugButton } from './AIDebugButton';
 import { AINameSettings } from './AINameSettings';
 import { AIDataManagement } from './AIDataManagement';
+import { AIScheduleSettings } from './AIScheduleSettings';
 
 export const AIWellnessSettings: React.FC = () => {
   const [aiWellnessEnabled, setAIWellnessEnabled] = useState(false);
@@ -31,6 +32,7 @@ export const AIWellnessSettings: React.FC = () => {
         onToggle={handleToggle}
       />
       <AINameSettings visible={aiWellnessEnabled} />
+      <AIScheduleSettings visible={aiWellnessEnabled} />
       <AIDataManagement visible={aiWellnessEnabled} />
       <AIDebugButton visible={aiWellnessEnabled} />
     </View>
