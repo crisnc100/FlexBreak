@@ -46,12 +46,22 @@ import { WellnessBubble } from './src/components/wellness/WellnessBubble';
 import { setShowAIWellnessModal } from './src/services/notifications/aiNotificationHandler';
 import { ToastProvider } from 'react-native-toast-notifications';
 import { clearDataCleanupNotifications } from './src/utils/clearDataCleanupNotifications';
+// AI Wellness Onboarding imports
+import { useAIWellnessOnboarding } from './src/hooks/useAIWellnessOnboarding';
+import { AIWellnessOnboarding } from './src/components/ai/AIWellnessOnboarding';
+import { useAIWellnessPremiumUpgrade } from './src/hooks/useAIWellnessPremiumUpgrade';
+import { AIWellnessPremiumUpgrade } from './src/components/ai/AIWellnessPremiumUpgrade';
 // Removed non-MVP imports
 // import dataCleanupManager from './src/services/ai/dataCleanupManager';
 // import { checkAndRestoreAISchedule } from './src/services/ai/aiSchedulingPersistence';
 
 // Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
+
+// Import AI Wellness test utilities in development
+if (__DEV__) {
+  import('./src/utils/testing/aiWellnessTestUtils');
+}
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
 import 'firebase/compat/functions';
@@ -367,6 +377,43 @@ function MainApp() {
   // Initialize update notification hook
   const { showModal, updateInfo, checkForUpdates, hideModal } = useUpdateNotification();
   
+  // Initialize AI Wellness onboarding hooks
+  const { 
+    shouldShowOnboarding, 
+    markOnboardingSeen, 
+    dismissOnboarding,
+    forceShowOnboarding 
+  } = useAIWellnessOnboarding();
+  
+  const { 
+    shouldShowUpgrade, 
+    markUpgradeSeen,
+    forceShowUpgrade 
+  } = useAIWellnessPremiumUpgrade();
+  
+  // Set up AI Wellness event listeners
+  useEffect(() => {
+    // AI Wellness enabled event listener
+    const handleAIWellnessEnabled = () => {
+      console.log('AI Wellness enabled event received - showing onboarding');
+      forceShowOnboarding();
+    };
+    
+    // AI Wellness premium upgrade event listener
+    const handleShowPremiumUpgrade = () => {
+      console.log('Show AI Wellness premium upgrade event received');
+      forceShowUpgrade();
+    };
+    
+    gamificationEvents.on('AI_WELLNESS_ENABLED', handleAIWellnessEnabled);
+    gamificationEvents.on('SHOW_AI_WELLNESS_PREMIUM_UPGRADE', handleShowPremiumUpgrade);
+
+    return () => {
+      gamificationEvents.off('AI_WELLNESS_ENABLED', handleAIWellnessEnabled);
+      gamificationEvents.off('SHOW_AI_WELLNESS_PREMIUM_UPGRADE', handleShowPremiumUpgrade);
+    };
+  }, [forceShowOnboarding, forceShowUpgrade]);
+  
   // Set up AI Wellness modal handler with proper cleanup
   useEffect(() => {
     const showModal = () => {
@@ -608,6 +655,19 @@ function MainApp() {
       <WellnessBubble
         visible={showWellnessBubble}
         onClose={() => setShowWellnessBubble(false)}
+      />
+      
+      {/* AI Wellness Onboarding - Shows after splash */}
+      <AIWellnessOnboarding
+        visible={shouldShowOnboarding}
+        onComplete={markOnboardingSeen}
+        onDismiss={dismissOnboarding}
+      />
+      
+      {/* Premium Upgrade Flow - Shows when user upgrades */}
+      <AIWellnessPremiumUpgrade
+        visible={shouldShowUpgrade}
+        onComplete={markUpgradeSeen}
       />
     </Animated.View>
   );

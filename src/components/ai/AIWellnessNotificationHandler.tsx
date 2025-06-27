@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Modal, ScrollView, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Modal, ScrollView, Animated, Alert } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import aiWellnessService from '../../services/ai/aiWellnessService';
@@ -63,6 +63,24 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
       
       const aiMessage = { type: 'ai' as const, text: result.response };
       setConversationHistory(prev => [...prev, aiMessage]);
+      
+      // Check if AI wellness is disabled and show special handling
+      if (result.category === 'disabled') {
+        // Show settings button or close modal after showing message
+        setTimeout(() => {
+          Alert.alert(
+            'AI Wellness Coach Disabled',
+            'Would you like to enable it in settings?',
+            [
+              { text: 'Not Now', style: 'cancel', onPress: onClose },
+              { text: 'Go to Settings', onPress: () => {
+                onClose();
+                // Navigate to settings if you have navigation available
+              }}
+            ]
+          );
+        }, 1500);
+      }
       
       // Animate new message
       Animated.timing(fadeAnim, {

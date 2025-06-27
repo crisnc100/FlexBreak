@@ -136,6 +136,67 @@ export default function SubscriptionModal({
       await soundEffects.playPremiumUnlockedSound().catch(()=>{});
       gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
       await refreshPremiumStatus?.(); refreshAccess?.(); refreshData?.(); refreshTheme?.();
+      
+      // Check if AI Wellness is enabled and show appropriate notification
+      const aiWellnessEnabled = await AsyncStorage.getItem('@ai_wellness_enabled') === 'true';
+      if (aiWellnessEnabled) {
+        // User has AI Wellness enabled - show upgrade notification
+        setTimeout(() => {
+          Alert.alert(
+            '🎉 AI Wellness Coach Upgraded!',
+            'You now get daily wellness check-ins instead of just Wednesdays. Would you like to set your preferred check-in time?',
+            [
+              { 
+                text: 'Not Now', 
+                style: 'cancel'
+              },
+              { 
+                text: 'Set Schedule', 
+                onPress: async () => {
+                  // Clear the "seen" flag and trigger the premium upgrade modal
+                  await AsyncStorage.removeItem('@ai_wellness_premium_upgrade_seen');
+                  console.log('[SubscriptionModal] User wants to set AI wellness schedule');
+                  onClose(); // Close subscription modal first
+                  setTimeout(() => {
+                    // Emit event to show premium upgrade modal
+                    gamificationEvents.emit('SHOW_AI_WELLNESS_PREMIUM_UPGRADE');
+                  }, 500);
+                }
+              }
+            ]
+          );
+        }, 1000);
+      } else {
+        // User doesn't have AI Wellness enabled - offer to enable it
+        setTimeout(() => {
+          Alert.alert(
+            '🤖 Unlock AI Wellness Coach',
+            'As a premium member, you now have full access to your personal AI Wellness Coach with daily check-ins! Would you like to enable it?',
+            [
+              { 
+                text: 'Maybe Later', 
+                style: 'cancel'
+              },
+              { 
+                text: 'Enable Now', 
+                onPress: async () => {
+                  await AsyncStorage.setItem('@ai_wellness_enabled', 'true');
+                  // Mark that user should see onboarding
+                  await AsyncStorage.setItem('@ai_wellness_onboarding_seen', 'false');
+                  console.log('[SubscriptionModal] AI Wellness enabled for new premium user - onboarding will show');
+                  // Force a state refresh to trigger onboarding immediately
+                  onClose();
+                  setTimeout(() => {
+                    // This will trigger the onboarding modal in App.tsx
+                    gamificationEvents.emit('AI_WELLNESS_ENABLED');
+                  }, 500);
+                }
+              }
+            ]
+          );
+        }, 1000);
+      }
+      
       console.log('[SubscriptionModal] Premium unlock completed successfully');
     } catch (error) {
       console.error('[SubscriptionModal] Error during premium unlock:',error);

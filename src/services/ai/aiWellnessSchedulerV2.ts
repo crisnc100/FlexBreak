@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
 import { NotificationType, cancelNotificationsByType, scheduleTypedNotification } from '../../utils/notificationManager';
 import { canScheduleNotifications, markScheduled } from './notificationDebouncer';
+import { generatePersonalizedNotification, generateDefaultNotification } from './notificationMessages';
 
 // Simplified state: just track if user has seen the welcome
 function getDayName(dayNumber: number): string {
@@ -21,7 +22,7 @@ export const cleanupAllAINotifications = async () => {
   console.log('AI notification cleanup complete');
 };
 
-export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welcome_response' | 'upgrade') => {
+export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welcome_response' | 'upgrade' | 'preference_change') => {
   console.log(`AI Wellness V2: Action = ${action}`);
   
   // Check debouncer to prevent spam
@@ -112,6 +113,22 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
         console.log('Updated to daily check-ins for premium user');
       }
       break;
+      
+    case 'preference_change':
+      // User changed their schedule preference
+      console.log('AI Wellness: Handling schedule preference change');
+      
+      // First, cancel all existing AI wellness notifications
+      await cleanupAllAINotifications();
+      console.log('Cancelled all existing AI wellness notifications');
+      
+      // Then reschedule with the new preference
+      const aiEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';
+      if (aiEnabled) {
+        await scheduleRegularCheckIns(isPremium, userId);
+        console.log(`Rescheduled ${isPremium ? 'daily' : 'weekly'} check-ins with new time preference`);
+      }
+      break;
   }
 };
 
@@ -124,6 +141,20 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
     : [3];
     
   console.log(`Scheduling check-ins for ${isPremium ? 'premium' : 'free'} user on days: ${checkInDays.join(', ')}`);
+  
+  // Get user's name and wellness memory for personalized messages
+  const userName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
+  let wellnessMemory: any = null;
+  let memory: any = null;
+  let recentInsights: any[] = [];
+  
+  try {
+    const { default: wellnessMemoryService } = await import('./wellnessMemory');
+    memory = await wellnessMemoryService.getMemory(userId);
+    recentInsights = await wellnessMemoryService.getRecentInsights(userId, 5);
+  } catch (error) {
+    console.log('Could not load wellness memory for personalized notifications');
+  }
   
   // Check current notification count
   const { getNotificationSummary } = await import('../../utils/notificationManager');
@@ -152,9 +183,27 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
   }
   
   for (const day of checkInDays) {
-    // Random time between 11 AM and 4 PM (11:00 - 16:59)
-    const randomHour = 11 + Math.floor(Math.random() * 6);
-    const randomMinute = Math.floor(Math.random() * 60);
+    // Get user's time preference (if premium)
+    let randomHour, randomMinute;
+    const timePreference = isPremium ? await AsyncStorage.getItem(KEYS.AI_WELLNESS.TIME_PREFERENCE) : null;
+    
+    if (!timePreference || timePreference === 'random') {
+      // Default: Random time between 11 AM and 4 PM (11:00 - 16:59)
+      randomHour = 11 + Math.floor(Math.random() * 6);
+      randomMinute = Math.floor(Math.random() * 60);
+    } else {
+      // User selected specific time window
+      const timeWindows: { [key: string]: { start: number, end: number } } = {
+        'morning': { start: 9, end: 11 },
+        'midday': { start: 12, end: 14 },
+        'afternoon': { start: 15, end: 17 },
+        'evening': { start: 18, end: 20 }
+      };
+      
+      const window = timeWindows[timePreference] || timeWindows['random'];
+      randomHour = window.start + Math.floor(Math.random() * (window.end - window.start + 1));
+      randomMinute = Math.floor(Math.random() * 60);
+    }
     
     // Always enforce 24-hour minimum to prevent immediate notifications
     const trigger = getNextWeekdayTrigger(day, randomHour, randomMinute, true, minimumDaysAhead);
@@ -179,10 +228,18 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
       continue;
     }
     
+    // Generate personalized notification message
+    let notificationMessage;
+    if (memory && memory.totalInteractions > 0) {
+      notificationMessage = generatePersonalizedNotification(userName, memory, recentInsights);
+    } else {
+      notificationMessage = generateDefaultNotification(userName);
+    }
+    
     const notificationId = await scheduleTypedNotification(
       {
-        title: "Time for your wellness check-in 💪",
-        body: "How are you feeling today? Tap to chat or use voice 🎙️",
+        title: notificationMessage.title,
+        body: notificationMessage.body,
         sound: true,
         data: { 
           userId,
@@ -200,6 +257,7 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
     );
     
     console.log(`✅ Scheduled check-in for ${getDayName(day)} at ${scheduledDate.toLocaleString()} with ID ${notificationId}`);
+    console.log(`   Message: "${notificationMessage.title}" - "${notificationMessage.body}"`);
     scheduledDays[day.toString()] = { hour: randomHour, minute: randomMinute };
   }
   
@@ -210,14 +268,19 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
 
 async function scheduleUpgradePrompts(userId: string) {
   const promptDays = [1, 5];  // Monday and Friday
+  
+  // Get user's name for personalized upgrade prompts
+  const userName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
+  const name = userName || 'there';
+  
   const messages = [
     {
-      title: "Missing your AI Flex Coach? 💪",
-      body: "Get daily wellness check-ins with premium!"
+      title: `${name}, want daily check-ins? 💙`,
+      body: "Premium members chat with me every day, not just Wednesdays!"
     },
     {
-      title: "Want daily wellness support? 🌟",
-      body: "Premium users get AI check-ins every day!"
+      title: `Missing me, ${name}? 🤗`,
+      body: "Upgrade to premium for daily wellness support and unlimited chats!"
     }
   ];
   

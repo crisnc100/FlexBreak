@@ -122,8 +122,9 @@ export class WellnessMemoryService {
       context += `User's name: ${memory.userName}\n`;
     }
     
-    // Add common issues
+    // Add common issues ONLY if we have actual data
     const topIssues = Object.entries(memory.commonIssues)
+      .filter(([, count]) => count > 0) // Only include issues that have been mentioned
       .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
       .map(([issue]) => issue);
@@ -132,16 +133,19 @@ export class WellnessMemoryService {
       context += `Common concerns: ${topIssues.join(', ')}\n`;
     }
     
-    // Add effective solutions
+    // Add effective solutions ONLY if we have actual data
     if (memory.effectiveSolutions.length > 0) {
       context += `Previously helpful: ${memory.effectiveSolutions.slice(0, 3).join(', ')}\n`;
     }
     
-    // Add time patterns
+    // Add time patterns ONLY if we have actual data
     const currentHour = new Date().getHours();
     const timeOfDay = currentHour < 12 ? 'morning' : currentHour < 17 ? 'afternoon' : 'evening';
-    const energyLevel = memory.energyPatterns[timeOfDay] || 'medium';
-    context += `Usual ${timeOfDay} energy: ${energyLevel}\n`;
+    
+    // Only mention energy patterns if we have data for this time
+    if (memory.energyPatterns[timeOfDay]) {
+      context += `Usual ${timeOfDay} energy: ${memory.energyPatterns[timeOfDay]}\n`;
+    }
     
     // Add recent pattern
     if (recentInsights.length > 0) {
@@ -150,6 +154,11 @@ export class WellnessMemoryService {
       if (daysSinceLastCheckIn > 0) {
         context += `Days since last check-in: ${daysSinceLastCheckIn}\n`;
       }
+    }
+    
+    // If no personalized data yet, return minimal context
+    if (context.trim() === '' || context.trim() === `User's name: ${memory.userName}`) {
+      context = memory.userName ? `User's name: ${memory.userName}\nNew user - no previous wellness data\n` : 'New user - no previous interactions\n';
     }
     
     return context;

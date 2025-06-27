@@ -21,6 +21,16 @@ export class AIWellnessService {
     userId?: string
   ): Promise<WellnessResponse> {
     try {
+      // FIRST check if AI wellness is enabled
+      const isEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';
+      if (!isEnabled) {
+        return {
+          response: "I'm currently disabled! Please turn on AI Wellness Coach in settings to chat with me 🤖",
+          category: 'disabled',
+          suggestedActions: ['Enable AI Wellness']
+        };
+      }
+      
       const accessCheck = await this.checkAccessAndLimits(userId);
       if (!accessCheck.canAccess) {
         return {
@@ -45,7 +55,7 @@ export class AIWellnessService {
       // Prepare messages
       const contextData: any = {
         timeOfDay: context.timeOfDay,
-        dayOfWeek: context.dayOfWeek,
+        // Don't pass dayOfWeek to avoid confusing the AI about Wednesday vs current day
         isPremium: context.isPremium,
         isFirstInteraction: context.isFirstInteraction,
         personalizedHistory: personalizedContext
