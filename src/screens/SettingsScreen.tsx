@@ -5,6 +5,8 @@ import { clearAllData, clearAllPremiumStatus, saveTransitionDuration, getTransit
 import { resetSimulationData } from '../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AIWellnessSettings } from '../components/settings/ai';
+import DataManagement from '../components/settings/DataManagement';
+import DeveloperSection from '../components/settings/DeveloperSection';
 
 import DiagnosticsScreen from './DiagnosticsScreen';
 import { ThemeType, useTheme } from '../context/ThemeContext';
@@ -78,7 +80,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const { isPremium } = usePremium();
   const { isLoading, level } = useGamification();
   const { canAccessFeature, getRequiredLevel, meetsLevelRequirement } = useFeatureAccess();
-  const [showTestingSection, setShowTestingSection] = useState(false);
   const [bobSimulatorModalVisible, setBobSimulatorModalVisible] = useState(false);
   const hasSeenDarkModeUnlock = useRef(false);
   const appVersion = updateService.getCurrentVersion();
@@ -857,138 +858,19 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         
         {/* Developer Section - Only visible in development mode */}
         {__DEV__ && (
-          <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
-            <Text style={[styles.sectionTitle, {color: theme.text}]}>Developer</Text>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => setDiagnosticsModalVisible(true)}
-            >
-              <View style={styles.settingContent}>
-                <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                  <Ionicons name="analytics-outline" size={22} color={theme.accent} />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[styles.settingTitle, {color: theme.text}]}>Diagnostics</Text>
-                  <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Storage and performance monitoring</Text>
-                </View>
-            
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-                style={[
-                  styles.testingButton,
-                  {backgroundColor: '#4A90E2', marginTop: 16}
-                ]}
-                onPress={() => setBobSimulatorModalVisible(true)}
-              >
-                <Ionicons name="flask-outline" size={20} color="#FFF" style={styles.buttonIcon} />
-                <Text style={styles.buttonText}>Access Bob Simulator</Text>
-              </TouchableOpacity>
-               {/* Premium Status Management */}
-               <View style={[styles.premiumStatusContainer, {marginTop: 16, marginBottom: 8}]}>
-                <Text style={[styles.settingTitle, {color: theme.text, marginBottom: 8}]}>Premium Status Management</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary, marginBottom: 12}]}>
-                  Control premium status for testing subscription features
-                </Text>
-                
-                <View style={styles.premiumButtonsRow}>
-                  {/* Grant Premium Status */}
-                  <TouchableOpacity 
-                    style={[
-                      styles.premiumButton,
-                      {backgroundColor: isDark || isSunset ? '#3D5A3D' : '#E8F5E9'},
-                      isPremium && {opacity: 0.5}
-                    ]}
-                    onPress={handleGrantPremiumStatus}
-                    disabled={isPremium}
-                  >
-                    <Ionicons name="star" size={18} color={isDark || isSunset ? '#81C784' : '#4CAF50'} style={styles.premiumButtonIcon} />
-                    <Text style={[styles.premiumButtonText, {color: isDark || isSunset ? '#81C784' : '#4CAF50'}]}>
-                      Grant Premium
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  {/* Clear Premium Status */}
-                  <TouchableOpacity 
-                    style={[
-                      styles.premiumButton,
-                      {backgroundColor: isDark || isSunset ? '#5D3A3A' : '#FFEBEE'},
-                      !isPremium && {opacity: 0.5}
-                    ]}
-                    onPress={handleClearPremiumStatus}
-                    disabled={!isPremium}
-                  >
-                    <Ionicons name="close-circle" size={18} color={isDark || isSunset ? '#EF9A9A' : '#F44336'} style={styles.premiumButtonIcon} />
-                    <Text style={[styles.premiumButtonText, {color: isDark || isSunset ? '#EF9A9A' : '#F44336'}]}>
-                      Clear Premium
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              <TouchableOpacity 
-                style={[styles.settingItem, styles.lastItem]}
-                onPress={handleResetSimulationData}
-              >
-                <View style={styles.settingContent}>
-                  <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#3B2E2E' : '#FFEBEE'}]}>
-                    <Ionicons name="trash-outline" size={22} color="#F44336" />
-                  </View>
-                  <View style={styles.textContainer}>
-                    <Text style={[styles.settingTitle, {color: theme.text}]}>Reset Simulation Data</Text>
-                    <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all simulation data only (for testers)</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.settingItem}
-                onPress={handleResetData}
-              >
-                <View style={styles.settingContent}>
-                  <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#3B2E2E' : '#FFEBEE'}]}>
-                    <Ionicons name="trash-outline" size={22} color="#F44336" />
-                  </View>
-                  <View style={styles.textContainer}>
-                    <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
-                    <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-          </View>
+          <DeveloperSection
+            onOpenDiagnostics={() => setDiagnosticsModalVisible(true)}
+            onOpenBobSimulator={() => setBobSimulatorModalVisible(true)}
+            onGrantPremium={handleGrantPremiumStatus}
+            onClearPremium={handleClearPremiumStatus}
+            onResetSimulationData={handleResetSimulationData}
+            onResetAllData={handleResetData}
+            isPremium={isPremium}
+          />
         )}
         
-        {/* Add testing section at the end of the ScrollView */}
-        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
-          <TouchableOpacity 
-            style={styles.sectionHeader}
-            onPress={() => setShowTestingSection(!showTestingSection)}
-          >
-            <Text style={[styles.sectionTitle, {color: theme.text}]}>Data Management</Text>
-            <Text style={[styles.sectionToggle, {color: theme.textSecondary}]}>{showTestingSection ? '▼' : '►'}</Text>
-          </TouchableOpacity>
-          
-          {showTestingSection && (
-            <View style={styles.testingContainer}>
-              <TouchableOpacity 
-                style={styles.settingItem}
-                onPress={handleResetSimulationData}
-              >
-                <View style={styles.settingContent}>
-                  <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#3B2E2E' : '#FFEBEE'}]}>
-                    <Ionicons name="trash-outline" size={22} color="#F44336" />
-                  </View>
-                  <View style={styles.textContainer}>
-                    <Text style={[styles.settingTitle, {color: theme.text}]}>Reset All Data</Text>
-                    <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Delete all app data and start fresh</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-             
-            </View>
-          )}
-        </View>
+        {/* Data management section */}
+        <DataManagement onResetAllData={handleResetData} />
         
         {/* Version info at bottom */}
         <View style={styles.footer}>
