@@ -115,6 +115,14 @@ export class WellnessMemoryService {
     const memory = await this.getMemory(userId);
     const recentInsights = await this.getRecentInsights(userId, 5);
     
+    console.log('Wellness Memory Debug:', {
+      userId,
+      totalInteractions: memory.totalInteractions,
+      commonIssues: memory.commonIssues,
+      effectiveSolutions: memory.effectiveSolutions,
+      recentInsights: recentInsights.length
+    });
+    
     let context = '';
     
     // Add user name if available

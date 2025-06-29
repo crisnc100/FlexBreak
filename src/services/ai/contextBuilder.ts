@@ -11,6 +11,7 @@ export interface UserContext {
   effectiveSolutions?: string[];
   isPremium?: boolean;
   isFirstInteraction?: boolean;
+  detectedLanguage?: 'en' | 'es' | 'zh';
 }
 
 export const buildUserContext = async (userInput: string, userId?: string): Promise<UserContext> => {
@@ -42,9 +43,31 @@ export const buildUserContext = async (userInput: string, userId?: string): Prom
       const isPremium = await AsyncStorage.getItem('@user_premium') === 'true';
       context.isPremium = isPremium;
       
-      // Check if this is first interaction (greeting words)
-      const greetings = ['hi', 'hello', 'hey', 'welcome', 'start'];
+      // Check if this is first interaction (greeting words in multiple languages)
+      const greetings = [
+        'hi', 'hello', 'hey', 'welcome', 'start',
+        'hola', 'buenos', 'buenas',
+        '你好', '您好', '嗨', '开始'
+      ];
       context.isFirstInteraction = greetings.some(g => userInput.toLowerCase().includes(g));
+      
+      // Detect language from user input
+      // First try to get language from Google Speech API (if voice was used)
+      const googleDetectedLang = await AsyncStorage.getItem('@ai_wellness_detected_language');
+      
+      // Use unified language detection
+      context.detectedLanguage = detectLanguage(userInput, googleDetectedLang || undefined);
+      
+      // Clear Google detection after use
+      if (googleDetectedLang) {
+        await AsyncStorage.removeItem('@ai_wellness_detected_language');
+      }
+      
+      console.log('Language Detection:', { 
+        input: userInput, 
+        googleLang: googleDetectedLang,
+        detected: context.detectedLanguage 
+      });
       
       // Pattern tracking removed for MVP simplification
       // const patternsKey = `@ai_wellness_patterns_${userId}`;
@@ -80,12 +103,17 @@ export const categorizeInput = (input: string): string => {
   const lowerInput = input.toLowerCase();
   
   const categories = {
-    pain: ['pain', 'hurt', 'ache', 'sore'],
-    stress: ['stress', 'anxious', 'overwhelm', 'worry'],
-    fatigue: ['tired', 'exhausted', 'sleepy', 'fatigue'],
-    focus: ['focus', 'concentrate', 'distract'],
-    positive: ['good', 'great', 'fine', 'well']
+    pain: ['pain', 'hurt', 'ache', 'sore', '痛', '疼', '酸痛', '不舒服'],
+    stress: ['stress', 'anxious', 'overwhelm', 'worry', '压力', '焦虑', '紧张', '担心'],
+    fatigue: ['tired', 'exhausted', 'sleepy', 'fatigue', '累', '疲劳', '疲惫', '困'],
+    focus: ['focus', 'concentrate', 'distract', '专注', '集中', '注意力'],
+    positive: ['good', 'great', 'fine', 'well', '好', '很好', '不错', '棒']
   };
+  
+  // Check for exercise-related Chinese keywords
+  if (input.includes('运动') || input.includes('锻炼') || input.includes('脚步')) {
+    return 'general'; // Exercise questions fall under general category
+  }
   
   for (const [category, keywords] of Object.entries(categories)) {
     if (keywords.some(keyword => lowerInput.includes(keyword))) {
@@ -94,4 +122,40 @@ export const categorizeInput = (input: string): string => {
   }
   
   return 'general';
+};
+
+export const detectLanguage = (input: string, googleLang?: string): 'en' | 'es' | 'zh' => {
+  // Priority 1: Google Speech API detection (most accurate for voice)
+  if (googleLang) {
+    if (googleLang.startsWith('es')) return 'es';
+    if (googleLang.startsWith('zh') || googleLang.startsWith('cmn')) return 'zh';
+    if (googleLang.startsWith('en')) return 'en';
+  }
+  
+  const lowerInput = input.toLowerCase();
+  
+  // Priority 2: Chinese characters (very reliable)
+  const chineseChars = /[\u4e00-\u9fff\u3400-\u4dbf]/;
+  if (chineseChars.test(input)) {
+    return 'zh';
+  }
+  
+  // Priority 3: Spanish indicators (expanded list)
+  const spanishWords = [
+    'hola', 'buenos', 'buenas', 'días', 'tardes', 'noches',
+    'como', 'está', 'estoy', 'siento', 'tengo', 'dolor',
+    'cansado', 'cansada', 'bien', 'mal', 'gracias',
+    'duele', 'espalda', 'cuello', 'estómago', 'cabeza',
+    'estrés', 'ansioso', 'fatiga', 'ejercicio', 'caminar'
+  ];
+  
+  const spanishPatterns = /\b(qué|cómo|cuándo|dónde|por qué|está|estoy|tengo|duele|me siento)\b/i;
+  
+  if (spanishPatterns.test(lowerInput) || 
+      spanishWords.some(word => lowerInput.includes(word))) {
+    return 'es';
+  }
+  
+  // Default to English
+  return 'en';
 };

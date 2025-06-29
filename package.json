@@ -34,6 +34,7 @@
     "expo-image-picker": "~16.0.6",
     "expo-in-app-purchases": "^14.5.0",
     "expo-linear-gradient": "~14.0.2",
+    "expo-localization": "^16.1.5",
     "expo-location": "~18.0.10",
     "expo-notifications": "~0.29.14",
     "expo-permissions": "^14.4.0",

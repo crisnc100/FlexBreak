@@ -48,15 +48,27 @@ class OpenRouterService {
     } = options;
     
     try {
+      const requestBody = {
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      };
+      
+      // Debug logging
+      console.log('OpenRouter Request:', {
+        model,
+        messageCount: messages.length,
+        systemPrompt: messages[0]?.content?.substring(0, 100) + '...',
+        userInput: messages.find(m => m.role === 'user')?.content,
+        maxTokens,
+        temperature
+      });
+      
       const response = await fetch(AI_CONFIG.openRouter.baseURL, {
         method: 'POST',
         headers: this.headers,
-        body: JSON.stringify({
-          model,
-          messages,
-          max_tokens: maxTokens,
-          temperature,
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
@@ -65,12 +77,27 @@ class OpenRouterService {
       
       const data: OpenRouterResponse = await response.json();
       
+      console.log('OpenRouter Response:', {
+        model,
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length,
+        messageContent: data.choices?.[0]?.message?.content?.substring(0, 50) + '...',
+        usage: data.usage
+      });
+      
       if (!data.choices || data.choices.length === 0) {
         throw new Error('No response from AI');
       }
       
+      const content = data.choices[0].message.content;
       
-      return data.choices[0].message.content;
+      // Additional validation
+      if (!content || content.trim().length === 0) {
+        console.error('Empty content received from AI model');
+        throw new Error('Empty response from AI');
+      }
+      
+      return content;
       
     } catch (error) {
       console.error('OpenRouter chat error:', error);
@@ -114,6 +141,19 @@ class OpenRouterService {
       if (retries > 0) {
         console.log(`Retrying... (${retries} attempts left)`);
         await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // On last retry, try our free fallback model
+        if (retries === 1 && !options.lastResortTried) {
+          console.log('Last retry - trying free model as fallback');
+          return this.chatWithRetry(messages, { 
+            ...options, 
+            model: AI_CONFIG.models.free,
+            maxTokens: 200,
+            temperature: 0.9,
+            lastResortTried: true 
+          }, retries - 1);
+        }
+        
         return this.chatWithRetry(messages, options, retries - 1);
       }
       throw error;

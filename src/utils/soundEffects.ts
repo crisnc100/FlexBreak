@@ -32,6 +32,34 @@ const soundCache: Record<SoundEffect, Audio.Sound | null> = {
   AInotification1: null,
 };
 
+// Track loading states to prevent race conditions
+const loadingStates: Record<SoundEffect, boolean> = {
+  complete: false,
+  levelUp: false,
+  click: false,
+  timerTick: false,
+  flexSave: false,
+  xpBoost: false,
+  intro: false,
+  premiumUnlocked: false,
+  redeemingChallenge: false,
+  timerTheme2: false,
+  timerTheme1: false,
+  transition1: false,
+  transition2: false,
+  halfway: false,
+  correct: false,
+  incorrect: false,
+  bossRound: false,
+  monstersDestroyed: false,
+  padPlacement: false,
+  roundComplete: false,
+  AInotification1: false,
+};
+
+// Track failed loads to avoid repeated attempts
+const failedLoads: Set<SoundEffect> = new Set();
+
 // Add debounce tracking for sounds that are frequently played
 const soundDebounceMap: Record<SoundEffect, number> = {
   complete: 0,
@@ -69,6 +97,7 @@ const SOUND_ENABLED_KEY = 'app_sound_effects_enabled';
 
 // Default sound is enabled
 let soundEnabled = true;
+let isAudioSessionInitialized = false;
 
 // Map sound types to their URIs
 const soundUris: Record<SoundEffect, any> = {
@@ -96,24 +125,56 @@ const soundUris: Record<SoundEffect, any> = {
 };
 
 /**
- * Initialize the sound system
+ * Initialize the sound system with better error handling
  */
 export const initSoundSystem = async (): Promise<void> => {
   try {
-    // Configure audio mode for iOS and Android
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      allowsRecordingIOS: false,
-      staysActiveInBackground: false,
-      interruptionModeIOS: 1, // DoNotMix
-      interruptionModeAndroid: 1, // DoNotMix
-      shouldDuckAndroid: true,
-    });
+    // Only initialize once
+    if (isAudioSessionInitialized) {
+      console.log('Audio session already initialized');
+      return;
+    }
+
+    // Configure audio mode for iOS and Android with retry logic
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          allowsRecordingIOS: false,
+          staysActiveInBackground: false,
+          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+          shouldDuckAndroid: true,
+        });
+        
+        isAudioSessionInitialized = true;
+        console.log('Audio session initialized successfully');
+        break;
+      } catch (error) {
+        retryCount++;
+        console.warn(`Audio session initialization attempt ${retryCount} failed:`, error);
+        
+        if (retryCount >= maxRetries) {
+          console.error('Failed to initialize audio session after', maxRetries, 'attempts');
+          // Continue without audio session - sounds may still work
+        } else {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
 
     // Load sound preference from storage
-    const storedPreference = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
-    if (storedPreference !== null) {
-      soundEnabled = storedPreference === 'true';
+    try {
+      const storedPreference = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
+      if (storedPreference !== null) {
+        soundEnabled = storedPreference === 'true';
+      }
+    } catch (error) {
+      console.warn('Could not load sound preference, using default:', error);
     }
     
     console.log('Sound effects system initialized, sound enabled:', soundEnabled);
@@ -143,43 +204,113 @@ export const setSoundEnabled = async (enabled: boolean): Promise<void> => {
 };
 
 /**
- * Load and cache a sound for future playback
+ * Load and cache a sound for future playback with improved error handling
  */
-export const loadSound = async (soundName: SoundEffect): Promise<void> => {
+export const loadSound = async (soundName: SoundEffect): Promise<boolean> => {
   try {
     // Skip if this sound is already loaded
     if (soundCache[soundName]) {
-      return;
+      return true;
     }
 
-    // Load the sound file
-    const { sound } = await Audio.Sound.createAsync(soundUris[soundName]);
-    soundCache[soundName] = sound;
-    
-    console.log(`Sound "${soundName}" loaded successfully`);
+    // Skip if already loading (prevent race conditions)
+    if (loadingStates[soundName]) {
+      console.log(`Sound "${soundName}" is already loading, skipping duplicate request`);
+      return false;
+    }
+
+    // Skip if previously failed to load
+    if (failedLoads.has(soundName)) {
+      console.log(`Sound "${soundName}" previously failed to load, skipping`);
+      return false;
+    }
+
+    // Mark as loading
+    loadingStates[soundName] = true;
+
+    try {
+      // Load the sound file with timeout
+      const loadPromise = Audio.Sound.createAsync(
+        soundUris[soundName],
+        { shouldPlay: false }, // Don't auto-play
+        null, // No status update callback needed during loading
+        false // Don't download first (for better performance)
+      );
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Sound loading timeout')), 10000)
+      );
+
+      const { sound } = await Promise.race([loadPromise, timeoutPromise]) as any;
+      
+      // Verify the sound loaded properly
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded) {
+        throw new Error('Sound failed to load properly');
+      }
+
+      soundCache[soundName] = sound;
+      console.log(`Sound "${soundName}" loaded successfully`);
+      return true;
+    } catch (loadError) {
+      // Mark as failed to avoid repeated attempts
+      failedLoads.add(soundName);
+      console.error(`Error loading sound "${soundName}":`, loadError);
+      return false;
+    }
   } catch (error) {
-    console.error(`Error loading sound "${soundName}":`, error);
+    console.error(`Unexpected error loading sound "${soundName}":`, error);
+    return false;
+  } finally {
+    // Always clear loading state
+    loadingStates[soundName] = false;
   }
 };
 
 /**
- * Preload all sounds
+ * Preload all sounds with better error handling and progress tracking
  */
 export const preloadAllSounds = async (): Promise<void> => {
   try {
     const soundNames = Object.keys(soundUris) as SoundEffect[];
+    console.log(`Starting to preload ${soundNames.length} sounds...`);
     
-    // Load all sounds in parallel
-    await Promise.all(soundNames.map(name => loadSound(name)));
+    // Load sounds in smaller batches to avoid overwhelming the system
+    const batchSize = 5;
+    let loadedCount = 0;
+    let failedCount = 0;
     
-    console.log('All sounds preloaded successfully');
+    for (let i = 0; i < soundNames.length; i += batchSize) {
+      const batch = soundNames.slice(i, i + batchSize);
+      
+      const results = await Promise.allSettled(
+        batch.map(name => loadSound(name))
+      );
+      
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value) {
+          loadedCount++;
+        } else {
+          failedCount++;
+          console.warn(`Failed to load sound: ${batch[index]}`);
+        }
+      });
+      
+      // Small delay between batches
+      if (i + batchSize < soundNames.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    console.log(`Sound preloading completed: ${loadedCount} loaded, ${failedCount} failed`);
   } catch (error) {
     console.error('Error preloading sounds:', error);
   }
 };
 
 /**
- * Play a sound effect
+ * Play a sound effect with improved error handling and status checking
  */
 export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<void> => {
   try {
@@ -195,7 +326,6 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
     
     // Check if we're trying to play the sound too soon after the last play
     if (now - soundDebounceMap[soundName] < debounceTime) {
-      // Skip this sound to prevent interruption errors
       return;
     }
     
@@ -203,26 +333,53 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
     soundDebounceMap[soundName] = now;
     
     // Load the sound if not already loaded
-    if (!soundCache[soundName]) {
-      await loadSound(soundName);
+    if (!soundCache[soundName] && !loadingStates[soundName] && !failedLoads.has(soundName)) {
+      const loaded = await loadSound(soundName);
+      if (!loaded) {
+        return; // Skip playing if loading failed
+      }
     }
     
     const sound = soundCache[soundName];
-    if (sound) {
-      // Get the current status
-      const status = await sound.getStatusAsync();
+    if (!sound) {
+      return; // Skip if sound is not available
+    }
+    
+    try {
+      // Get the current status with timeout
+      const statusPromise = sound.getStatusAsync();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Status check timeout')), 2000)
+      );
       
-      // Only attempt to set position if the sound isn't currently playing
-      // This helps prevent the "Seeking interrupted" error
-      if (!status.isLoaded || !status.isPlaying) {
-        // Reset sound to start position
-        await sound.setPositionAsync(0);
-        
-        // Set volume
-        await sound.setVolumeAsync(volume);
-        
-        // Play the sound
+      const status = await Promise.race([statusPromise, timeoutPromise]) as any;
+      
+      // Only proceed if sound is loaded and not currently playing
+      if (status.isLoaded && !status.isPlaying) {
+        // Try to reset position and play, but handle errors gracefully
+        try {
+          await sound.setPositionAsync(0);
+          await sound.setVolumeAsync(Math.max(0, Math.min(1, volume)));
+          await sound.playAsync();
+        } catch (playError) {
+          // If setting position fails, try playing without reset
+          console.warn(`Could not reset position for sound "${soundName}", trying direct play:`, playError);
+          try {
+            await sound.setVolumeAsync(Math.max(0, Math.min(1, volume)));
+            await sound.playAsync();
+          } catch (directPlayError) {
+            console.error(`Failed to play sound "${soundName}":`, directPlayError);
+          }
+        }
+      }
+    } catch (statusError) {
+      console.warn(`Could not check status for sound "${soundName}":`, statusError);
+      // Try to play anyway as a fallback
+      try {
+        await sound.setVolumeAsync(Math.max(0, Math.min(1, volume)));
         await sound.playAsync();
+      } catch (fallbackError) {
+        console.error(`Fallback play failed for sound "${soundName}":`, fallbackError);
       }
     }
   } catch (error) {
@@ -242,7 +399,6 @@ export const playClickSound = async (): Promise<void> => {
   }
 };
 
-
 /**
  * Play completion sound - for completing a routine
  */
@@ -250,7 +406,6 @@ export const playCompletionSound = async (): Promise<void> => {
   await playSound('complete');
 };
 
-/**
 /**
  * Play level up sound - when user levels up
  */
@@ -272,8 +427,8 @@ export const playTimerTheme2Sound = async (): Promise<void> => {
   await playSound('timerTheme2', 0.3);
 };
 
-  /**
-   * Play timer theme 1 sound
+/**
+ * Play timer theme 1 sound
  */
 export const playTransition1Sound = async (): Promise<void> => {
   await playSound('transition1', 0.2);
@@ -281,10 +436,6 @@ export const playTransition1Sound = async (): Promise<void> => {
 export const playTransition2Sound = async (): Promise<void> => {
   await playSound('transition2', 0.2);
 };
-
-/**
- * Play transition 2 sound
- */
 
 /**
  * Play streak flexSave sound
@@ -306,9 +457,6 @@ export const playXpBoostSound = async (): Promise<void> => {
 export const playIntroSound = async (): Promise<void> => {
   await playSound('intro');
 };
-
-/**
- * Play summary theme sound
 
 /**
  * Play halfway sound
@@ -399,6 +547,52 @@ export const playAInotification1Sound = async (): Promise<void> => {
 };
 
 /**
+ * Retry loading failed sounds (useful for recovering from temporary issues)
+ */
+export const retryFailedSounds = async (): Promise<void> => {
+  if (failedLoads.size === 0) {
+    console.log('No failed sounds to retry');
+    return;
+  }
+
+  console.log(`Retrying ${failedLoads.size} failed sounds...`);
+  const failedSounds = Array.from(failedLoads);
+  
+  // Clear the failed list to allow retry attempts
+  failedLoads.clear();
+  
+  let retrySuccessCount = 0;
+  for (const soundName of failedSounds) {
+    const success = await loadSound(soundName);
+    if (success) {
+      retrySuccessCount++;
+    }
+  }
+  
+  console.log(`Sound retry completed: ${retrySuccessCount}/${failedSounds.length} sounds recovered`);
+};
+
+/**
+ * Get sound system status for debugging
+ */
+export const getSoundSystemStatus = () => {
+  const totalSounds = Object.keys(soundUris).length;
+  const loadedSounds = Object.values(soundCache).filter(sound => sound !== null).length;
+  const failedSounds = failedLoads.size;
+  const loadingSounds = Object.values(loadingStates).filter(loading => loading).length;
+  
+  return {
+    totalSounds,
+    loadedSounds,
+    failedSounds,
+    loadingSounds,
+    isAudioSessionInitialized,
+    soundEnabled,
+    failedSoundNames: Array.from(failedLoads)
+  };
+};
+
+/**
  * Cleanup function to unload all sounds and free memory
  */
 export const unloadAllSounds = async (): Promise<void> => {
@@ -409,10 +603,20 @@ export const unloadAllSounds = async (): Promise<void> => {
     for (const name of soundNames) {
       const sound = soundCache[name];
       if (sound) {
-        await sound.unloadAsync();
+        try {
+          await sound.unloadAsync();
+        } catch (error) {
+          console.warn(`Error unloading sound "${name}":`, error);
+        }
         soundCache[name] = null;
       }
     }
+    
+    // Reset all states
+    failedLoads.clear();
+    Object.keys(loadingStates).forEach(key => {
+      loadingStates[key as SoundEffect] = false;
+    });
     
     console.log('All sounds unloaded successfully');
   } catch (error) {

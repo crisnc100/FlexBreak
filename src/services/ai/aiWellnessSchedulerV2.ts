@@ -84,26 +84,34 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
       break;
       
     case 'upgrade':
-      // Send upgrade notification
-      const premiumWelcomeId = await scheduleTypedNotification(
-        {
-          title: "Welcome to Premium! 🌟",
-          body: "You now have daily AI wellness check-ins and unlimited conversations!",
-          sound: true,
-          data: { 
-            userId,
-            isPremiumWelcome: true
-          },
-          categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
-        },
-        {
-          seconds: 1,  // Immediate notification
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL
-        },
-        NotificationType.AI_WELLNESS
-      );
+      // Check if we've already sent a premium welcome notification
+      const hasSeenPremiumWelcome = await AsyncStorage.getItem(KEYS.AI_WELLNESS.PREMIUM_WELCOME_SENT) === 'true';
       
-      console.log(`Scheduled premium welcome notification immediately with ID ${premiumWelcomeId}`);
+      if (!hasSeenPremiumWelcome) {
+        // Send upgrade notification only once
+        const premiumWelcomeId = await scheduleTypedNotification(
+          {
+            title: "Welcome to Premium! 🌟",
+            body: "You now have daily wellness check-ins to keep you healthy and motivated!",
+            sound: true,
+            data: { 
+              userId,
+              isPremiumWelcome: true
+            },
+            categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
+          },
+          {
+            seconds: 1,  // Immediate notification
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL
+          },
+          NotificationType.AI_WELLNESS
+        );
+        
+        console.log(`Scheduled premium welcome notification immediately with ID ${premiumWelcomeId}`);
+        
+        // Mark as sent to prevent duplicates
+        await AsyncStorage.setItem(KEYS.AI_WELLNESS.PREMIUM_WELCOME_SENT, 'true');
+      }
       
       // If AI wellness is enabled, update to daily schedule
       const isEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';

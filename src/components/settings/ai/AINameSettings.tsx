@@ -3,12 +3,15 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
+import { KEYS } from '../../../services/storageService';
 
 interface AINameSettingsProps {
   visible: boolean;
+  onNameSet?: () => void;
+  showAsInput?: boolean;
 }
 
-export const AINameSettings: React.FC<AINameSettingsProps> = ({ visible }) => {
+export const AINameSettings: React.FC<AINameSettingsProps> = ({ visible, onNameSet, showAsInput }) => {
   const [userName, setUserName] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -16,11 +19,15 @@ export const AINameSettings: React.FC<AINameSettingsProps> = ({ visible }) => {
 
   useEffect(() => {
     loadUserName();
-  }, []);
+    // If showAsInput is true, start in editing mode
+    if (showAsInput) {
+      setIsEditing(true);
+    }
+  }, [showAsInput]);
 
   const loadUserName = async () => {
     try {
-      const name = await AsyncStorage.getItem('@ai_wellness_user_name');
+      const name = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
       if (name) {
         setUserName(name);
         setInputValue(name);
@@ -45,10 +52,15 @@ export const AINameSettings: React.FC<AINameSettingsProps> = ({ visible }) => {
     
     try {
       const formattedName = trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1).toLowerCase();
-      await AsyncStorage.setItem('@ai_wellness_user_name', formattedName);
+      await AsyncStorage.setItem(KEYS.AI_WELLNESS.USER_NAME, formattedName);
       setUserName(formattedName);
       setInputValue(formattedName);
       setIsEditing(false);
+      
+      // Call the callback if provided
+      if (onNameSet) {
+        onNameSet();
+      }
     } catch (error) {
       console.error('Error saving name:', error);
       Alert.alert('Error', 'Failed to save your name');
