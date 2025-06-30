@@ -1,4 +1,4 @@
-import { OPENROUTER_API_KEY, APP_URL } from '@env';
+import { OPENROUTER_API_KEY, APP_URL, GOOGLE_SPEECH_API_KEY } from '@env';
 
 export const AI_CONFIG = {
   openRouter: {
@@ -11,27 +11,34 @@ export const AI_CONFIG = {
   },
   
   models: {
-    fast: 'mistralai/mistral-7b-instruct:free',     // Free and fast
-    balanced: 'meta-llama/llama-3-8b-instruct:free', // Free Llama 3
-    powerful: 'anthropic/claude-3-haiku',            // Cheap but powerful ($0.25/1M tokens)
-    free: 'mistralai/mistral-7b-instruct:free',     // Reliable free option
+    fast: 'mistralai/mistral-7b-instruct',           // Mistral 7B - reliable and multilingual
+    balanced: 'meta-llama/llama-3.1-8b-instruct',    // Llama 8B - good balance
+    powerful: 'anthropic/claude-3-haiku',             // Claude Haiku (without version)
+    free: 'mistralai/mistral-7b-instruct:free',      // Free Mistral
   },
   
   limits: {
     free: {
       dailyRequests: 3,      // 3 messages on Wednesdays only
       introMessages: 5,      // Generous intro experience
-      maxInputLength: 150,   // Slightly longer inputs allowed
-      maxOutputTokens: 150,
+      maxInputLength: 500,   // Allow longer inputs
+      maxOutputTokens: 150,  // Concise responses
     },
     premium: {
       dailyRequests: 15,     // 15 message exchanges per day as per requirements
-      maxInputLength: 300,
-      maxOutputTokens: 200,
+      maxInputLength: 1000,  // Much more flexible
+      maxOutputTokens: 200,  // Still concise but with more detail
     }
   },
   
   // Note: The actual system prompt is in promptTemplates.ts
   // This is kept for backwards compatibility
   SYSTEM_PROMPT: `You are a caring wellness coach for FlexBreak app.`
+};
+
+// Export individual config values
+export default {
+  OPENROUTER_API_KEY,
+  GOOGLE_SPEECH_API_KEY: GOOGLE_SPEECH_API_KEY || '',
+  HTTP_REFERER: APP_URL || 'https://flexbreak.app',
 };

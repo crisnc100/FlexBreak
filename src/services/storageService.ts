@@ -66,6 +66,7 @@ export const KEYS = {
     INTRO_MESSAGES_COUNT: '@ai_wellness_intro_count',
     FIRST_ENABLE_DONE: '@ai_wellness_first_enable_done',
     TIME_PREFERENCE: '@ai_wellness_time_preference',
+    PREMIUM_WELCOME_SENT: '@ai_wellness_premium_welcome_sent',
   }
 };
 

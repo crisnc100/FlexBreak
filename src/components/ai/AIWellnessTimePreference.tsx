@@ -17,33 +17,33 @@ const TIME_OPTIONS: TimeOption[] = [
   {
     id: 'random',
     icon: '🎲',
-    title: 'Surprise me!',
-    subtitle: 'Random between 11am-4pm',
+    title: 'Surprise me daily!',
+    subtitle: 'Random time between 11am-4pm each day',
     recommended: true
   },
   {
     id: 'morning',
     icon: '🌅',
-    title: 'Morning',
-    subtitle: '9-11 AM'
+    title: 'Morning Boost',
+    subtitle: 'Between 9-11 AM daily'
   },
   {
     id: 'midday',
     icon: '☀️',
-    title: 'Midday',
-    subtitle: '12-2 PM'
+    title: 'Lunch Break',
+    subtitle: 'Between 12-2 PM daily'
   },
   {
     id: 'afternoon',
     icon: '🌆',
-    title: 'Afternoon',
-    subtitle: '3-5 PM'
+    title: 'Afternoon Check',
+    subtitle: 'Between 3-5 PM daily'
   },
   {
     id: 'evening',
     icon: '🌙',
-    title: 'Evening',
-    subtitle: '6-8 PM'
+    title: 'Evening Wind-down',
+    subtitle: 'Between 6-8 PM daily'
   }
 ];
 
@@ -71,7 +71,7 @@ export const AIWellnessTimePreference: React.FC<AIWellnessTimePreferenceProps> =
         When should I check in with you? ⏰
       </Text>
       <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-        You'll get one check-in per day
+        As a premium member, you'll get daily check-ins!
       </Text>
 
       <View style={styles.optionsContainer}>
@@ -117,7 +117,7 @@ export const AIWellnessTimePreference: React.FC<AIWellnessTimePreferenceProps> =
       </View>
 
       <Text style={[styles.note, { color: theme.textSecondary }]}>
-        💡 Random times prevent notification fatigue and feel more natural
+        💡 Random times prevent notification fatigue and feel more natural throughout your week
       </Text>
     </View>
   );
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   optionsContainer: {
-    gap: 12,
+    marginTop: 20,
   },
   option: {
     borderRadius: 12,

@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../services/storageService';
 import { AIWellnessTimePreference } from './AIWellnessTimePreference';
 import { scheduleAIWellnessV2 } from '../../services/ai/aiWellnessSchedulerV2';
+import { AINameSettings } from '../settings/ai/AINameSettings';
 
 interface AIWellnessPremiumUpgradeProps {
   visible: boolean;
@@ -20,9 +21,14 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
   const [showTimePreference, setShowTimePreference] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [userName, setUserName] = useState<string>('');
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [showEnablePrompt, setShowEnablePrompt] = useState(false);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [needsName, setNeedsName] = useState(false);
 
   useEffect(() => {
     if (visible) {
+      checkAIStatus();
       loadUserName();
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -32,23 +38,69 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
     }
   }, [visible]);
 
+  const checkAIStatus = async () => {
+    try {
+      if (KEYS.AI_WELLNESS.ENABLED) {
+        const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';
+        setAiEnabled(enabled);
+        // If AI is not enabled, show the enable prompt first
+        setShowEnablePrompt(!enabled);
+      }
+    } catch (error) {
+      console.error('Error checking AI status:', error);
+    }
+  };
+
   const loadUserName = async () => {
-    const name = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
-    setUserName(name || 'there');
+    try {
+      if (KEYS.AI_WELLNESS.USER_NAME) {
+        const name = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
+        setUserName(name || '');
+        setNeedsName(!name || name.trim().length === 0);
+      }
+    } catch (error) {
+      console.error('Error loading user name:', error);
+    }
+  };
+
+  const handleEnableAI = async () => {
+    // Enable AI Wellness
+    await AsyncStorage.setItem(KEYS.AI_WELLNESS.ENABLED, 'true');
+    setAiEnabled(true);
+    setShowEnablePrompt(false);
+    
+    // Don't schedule notifications yet - wait until setup is complete
   };
 
   const handleContinue = () => {
+    // Check if we need to collect name first
+    if (needsName) {
+      setShowNamePrompt(true);
+    } else {
+      setShowTimePreference(true);
+    }
+  };
+
+  const handleNameSet = async () => {
+    // Reload the name after it's been set
+    await loadUserName();
+    setShowNamePrompt(false);
     setShowTimePreference(true);
   };
 
   const handleTimePreferenceSet = async (timePreference: string) => {
-    // Re-schedule with new premium settings
+    // Now schedule with the welcome notification and new premium settings
     await scheduleAIWellnessV2('upgrade');
     onComplete();
   };
 
   const handleSkip = async () => {
-    // Still need to reschedule for premium even if keeping random times
+    if (!aiEnabled) {
+      // If they skip without enabling AI, just close
+      onComplete();
+      return;
+    }
+    // User chose to keep random times - schedule with premium upgrade
     await scheduleAIWellnessV2('upgrade');
     onComplete();
   };
@@ -68,17 +120,133 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
             styles.content, 
             { 
               backgroundColor: theme.background,
-              opacity: fadeAnim 
+              opacity: fadeAnim
             }
           ]}
         >
-          {!showTimePreference ? (
+          {showEnablePrompt ? (
             <>
-              {/* Celebration Header */}
+              {/* Enable AI Prompt */}
               <View style={[styles.header, { backgroundColor: theme.accent + '10' }]}>
                 <Text style={styles.celebrationEmoji}>🎉</Text>
                 <Text style={[styles.celebrationText, { color: theme.accent }]}>
                   Welcome to Premium!
+                </Text>
+              </View>
+
+              <View style={styles.contentContainer}>
+                <View style={[styles.iconContainer, { backgroundColor: theme.accent + '20' }]}>
+                  <Text style={styles.iconEmoji}>🤖</Text>
+                </View>
+
+                <Text style={[styles.title, { color: theme.text }]}>
+                  Unlock Your AI Flex Coach
+                </Text>
+
+                <Text style={[styles.description, { color: theme.textSecondary }]}>
+                  As a premium member, you get daily AI wellness check-ins to help you stay healthy and motivated!
+                </Text>
+
+                {/* Benefits */}
+                <View style={styles.featureContainer}>
+                  <View style={styles.featureItem}>
+                    <View style={[styles.featureBadge, { backgroundColor: theme.cardBackground }]}>
+                      <Text style={styles.featureEmoji}>💬</Text>
+                    </View>
+                    <View style={styles.featureContent}>
+                      <Text style={[styles.featureTitle, { color: theme.text }]}>
+                        Daily Check-ins
+                      </Text>
+                      <Text style={[styles.featureDescription, { color: theme.textSecondary }]}>
+                        Personalized wellness advice every day
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.featureItem}>
+                    <View style={[styles.featureBadge, { backgroundColor: theme.cardBackground }]}>
+                      <Text style={styles.featureEmoji}>🌐</Text>
+                    </View>
+                    <View style={styles.featureContent}>
+                      <Text style={[styles.featureTitle, { color: theme.text }]}>
+                        Multilingual Support
+                      </Text>
+                      <Text style={[styles.featureDescription, { color: theme.textSecondary }]}>
+                        Chat in English, Spanish, or Mandarin
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.featureItem}>
+                    <View style={[styles.featureBadge, { backgroundColor: theme.cardBackground }]}>
+                      <Text style={styles.featureEmoji}>🎯</Text>
+                    </View>
+                    <View style={styles.featureContent}>
+                      <Text style={[styles.featureTitle, { color: theme.text }]}>
+                        Smart Reminders
+                      </Text>
+                      <Text style={[styles.featureDescription, { color: theme.textSecondary }]}>
+                        Remembers your wellness patterns
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Actions */}
+                <TouchableOpacity
+                  style={[styles.primaryButton, { backgroundColor: theme.accent }]}
+                  onPress={handleEnableAI}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    Enable AI Flex Coach
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={handleSkip}
+                >
+                  <Text style={[styles.secondaryButtonText, { color: theme.textSecondary }]}>
+                    Maybe later
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : showNamePrompt ? (
+            <>
+              {/* Name Collection */}
+              <View style={[styles.header, { backgroundColor: theme.accent + '10' }]}>
+                <Text style={styles.celebrationEmoji}>👋</Text>
+                <Text style={[styles.celebrationText, { color: theme.accent }]}>
+                  Let's Get Personal
+                </Text>
+              </View>
+
+              <View style={styles.contentContainer}>
+                <Text style={[styles.title, { color: theme.text }]}>
+                  What should I call you?
+                </Text>
+
+                <Text style={[styles.description, { color: theme.textSecondary }]}>
+                  Adding your name helps me provide more personalized wellness advice
+                </Text>
+
+                <View style={styles.nameInputContainer}>
+                  <AINameSettings 
+                    visible={true} 
+                    onNameSet={handleNameSet}
+                    showAsInput={true}
+                  />
+                </View>
+              </View>
+            </>
+          ) : !showTimePreference ? (
+            <>
+              {/* Celebration Header */}
+              <View style={[styles.header, { backgroundColor: theme.accent + '10' }]}>
+                <Text style={styles.celebrationEmoji}>✨</Text>
+                <Text style={[styles.celebrationText, { color: theme.accent }]}>
+                  AI Flex Coach Activated!
                 </Text>
               </View>
 
@@ -89,17 +257,17 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
                 </View>
 
                 <Text style={[styles.title, { color: theme.text }]}>
-                  {userName}, your AI Flex Coach just got better!
+                  {userName ? `${userName}, your AI coach is ready!` : 'Your AI coach is ready!'}
                 </Text>
 
                 <Text style={[styles.description, { color: theme.textSecondary }]}>
-                  You now have daily wellness check-ins instead of just Wednesdays
+                  You now have daily wellness check-ins to keep you healthy and motivated
                 </Text>
 
                 {/* New Features */}
                 <View style={styles.featureContainer}>
                   <View style={styles.featureItem}>
-                    <View style={[styles.featureBadge, { backgroundColor: theme.surface }]}>
+                    <View style={[styles.featureBadge, { backgroundColor: theme.cardBackground }]}>
                       <Text style={styles.featureEmoji}>📅</Text>
                     </View>
                     <View style={styles.featureContent}>
@@ -113,7 +281,7 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
                   </View>
 
                   <View style={styles.featureItem}>
-                    <View style={[styles.featureBadge, { backgroundColor: theme.surface }]}>
+                    <View style={[styles.featureBadge, { backgroundColor: theme.cardBackground }]}>
                       <Text style={styles.featureEmoji}>⏰</Text>
                     </View>
                     <View style={styles.featureContent}>
@@ -127,7 +295,7 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
                   </View>
 
                   <View style={styles.featureItem}>
-                    <View style={[styles.featureBadge, { backgroundColor: theme.surface }]}>
+                    <View style={[styles.featureBadge, { backgroundColor: theme.cardBackground }]}>
                       <Text style={styles.featureEmoji}>💬</Text>
                     </View>
                     <View style={styles.featureContent}>
@@ -162,9 +330,9 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
               </View>
             </>
           ) : (
-            <>
+            <View style={{ flex: 1 }}>
               {/* Header with Back Button */}
-              <View style={[styles.timePreferenceHeader, { backgroundColor: theme.surface }]}>
+              <View style={[styles.timePreferenceHeader, { backgroundColor: theme.cardBackground }]}>
                 <TouchableOpacity 
                   style={styles.backButton}
                   onPress={() => setShowTimePreference(false)}
@@ -179,8 +347,8 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
               
               {/* Time Preference Component */}
               <ScrollView 
+                style={styles.timePreferenceContainer}
                 showsVerticalScrollIndicator={false}
-                style={styles.timePreferenceScroll}
                 contentContainerStyle={styles.timePreferenceContent}
               >
                 <AIWellnessTimePreference
@@ -188,7 +356,7 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
                   currentPreference="random"
                 />
               </ScrollView>
-            </>
+            </View>
           )}
         </Animated.View>
       </View>
@@ -206,13 +374,15 @@ const styles = StyleSheet.create({
   content: {
     width: '90%',
     maxWidth: 400,
-    maxHeight: '85%',
+    height: '80%',
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 25,
     elevation: 10,
+    overflow: 'hidden',
+    display: 'flex',
   },
   header: {
     paddingVertical: 16,
@@ -318,10 +488,14 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  timePreferenceScroll: {
+  timePreferenceContainer: {
     flex: 1,
   },
   timePreferenceContent: {
     paddingBottom: 20,
+  },
+  nameInputContainer: {
+    width: '100%',
+    marginTop: 20,
   },
 });

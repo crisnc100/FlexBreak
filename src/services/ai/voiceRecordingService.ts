@@ -1,5 +1,7 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import googleSpeechService from './googleSpeechService';
 
 class VoiceRecordingService {
   private recording: Audio.Recording | null = null;
@@ -77,40 +79,62 @@ class VoiceRecordingService {
 
   async transcribeAudio(audioUri: string): Promise<string | null> {
     try {
-      // For now, return a simulated transcription
-      // In production, you would:
-      // 1. Convert audio to appropriate format if needed
-      // 2. Send to transcription service (OpenAI Whisper, Google Speech-to-Text, etc.)
-      // 3. Return the transcribed text
-      
       console.log('Transcribing audio from:', audioUri);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use English with auto-detection of Spanish and Mandarin
+      const languageCode = 'en-US';
       
-      // In real implementation:
-      // const audioFile = await FileSystem.readAsStringAsync(audioUri, { encoding: FileSystem.EncodingType.Base64 });
-      // const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Authorization': `Bearer ${API_KEY}`,
-      //     'Content-Type': 'multipart/form-data',
-      //   },
-      //   body: formData with audio file
-      // });
-      // const { text } = await response.json();
-      // return text;
+      console.log('Using language code:', languageCode);
       
-      // For now, return simulated transcription based on random scenarios
-      const scenarios = [
-        "I'm feeling pretty good today, just a bit tired from work.",
-        "My neck is really sore from sitting at my desk all day.",
-        "I'm stressed about deadlines but trying to stay positive.",
-        "Feeling great! Did some stretches earlier and it helped a lot.",
-        "My back is aching, I think I need to improve my posture.",
-      ];
+      // Try Google Speech API first
+      // To enable: Add your API key to src/config/aiConfig.ts
+      const { default: config } = await import('../../config/aiConfig');
       
-      return scenarios[Math.floor(Math.random() * scenarios.length)];
+      console.log('Google Speech API Key exists:', !!config.GOOGLE_SPEECH_API_KEY);
+      console.log('Key length:', config.GOOGLE_SPEECH_API_KEY?.length);
+      
+      if (config.GOOGLE_SPEECH_API_KEY) {
+        try {
+          googleSpeechService.setApiKey(config.GOOGLE_SPEECH_API_KEY);
+          const result = await googleSpeechService.transcribeAudio(audioUri, languageCode);
+          
+          // Clean up the audio file
+          try {
+            await FileSystem.deleteAsync(audioUri, { idempotent: true });
+          } catch (err) {
+            console.log('Could not delete audio file:', err);
+          }
+          
+          if (result && result.text) {
+            console.log('Got transcription:', result.text);
+            // Store the detected language from Google for context building
+            if (result.detectedLanguage) {
+              await AsyncStorage.setItem('@ai_wellness_detected_language', result.detectedLanguage);
+            }
+            return result.text;
+          } else {
+            console.log('No transcription returned from Google Speech');
+          }
+        } catch (error) {
+          console.error('Error calling Google Speech:', error);
+        }
+      }
+      
+      // Fallback message if no API key configured
+      const messages = {
+        'en-US': "To enable voice: Add Google Speech API key in settings.",
+        'es-ES': "Para activar voz: Añade clave API de Google Speech en configuración.",
+        'zh-CN': "启用语音：在设置中添加 Google Speech API 密钥。"
+      };
+      
+      // Clean up the audio file
+      try {
+        await FileSystem.deleteAsync(audioUri, { idempotent: true });
+      } catch (err) {
+        console.log('Could not delete audio file:', err);
+      }
+      
+      return messages[languageCode] || messages['en-US'];
     } catch (error) {
       console.error('Failed to transcribe audio:', error);
       return null;

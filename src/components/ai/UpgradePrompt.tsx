@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { usePremium } from '../../context/PremiumContext';
+import SubscriptionModal from '../SubscriptionModal';
 
 interface UpgradePromptProps {
   visible: boolean;
@@ -18,7 +19,8 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
   onUpgrade
 }) => {
   const { theme } = useTheme();
-  const { showSubscriptionModal } = usePremium();
+  const { isPremium } = usePremium();
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const getContent = () => {
     switch (reason) {
@@ -71,64 +73,76 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
     if (onUpgrade) {
       onUpgrade();
     } else {
-      showSubscriptionModal();
+      setShowSubscriptionModal(true);
     }
   };
 
+  const handleSubscriptionModalClose = () => {
+    setShowSubscriptionModal(false);
+  };
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View style={[styles.container, { backgroundColor: theme.surface }]}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-          >
-            <Ionicons name="close" size={24} color={theme.textSecondary} />
-          </TouchableOpacity>
+    <>
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <View style={styles.overlay}>
+          <View style={[styles.container, { backgroundColor: theme.cardBackground }]}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+            >
+              <Ionicons name="close" size={24} color={theme.textSecondary} />
+            </TouchableOpacity>
 
-          <View style={styles.iconContainer}>
-            <Ionicons name={content.icon as any} size={48} color={theme.accent} />
+            <View style={styles.iconContainer}>
+              <Ionicons name={content.icon as any} size={48} color={theme.accent} />
+            </View>
+
+            <Text style={[styles.title, { color: theme.text }]}>{content.title}</Text>
+            <Text style={[styles.message, { color: theme.textSecondary }]}>{content.message}</Text>
+
+            <View style={styles.benefitsContainer}>
+              <Text style={[styles.benefitsTitle, { color: theme.text }]}>
+                Upgrade to Premium for:
+              </Text>
+              {content.benefits.map((benefit, index) => (
+                <View key={index} style={styles.benefitRow}>
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Text style={[styles.benefitText, { color: theme.text }]}>{benefit}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.upgradeButton, { backgroundColor: theme.accent }]}
+              onPress={handleUpgrade}
+            >
+              <Ionicons name="sparkles" size={20} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.upgradeButtonText}>{content.cta}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.laterButton}
+              onPress={onClose}
+            >
+              <Text style={[styles.laterButtonText, { color: theme.textSecondary }]}>
+                Maybe Later
+              </Text>
+            </TouchableOpacity>
           </View>
-
-          <Text style={[styles.title, { color: theme.text }]}>{content.title}</Text>
-          <Text style={[styles.message, { color: theme.textSecondary }]}>{content.message}</Text>
-
-          <View style={styles.benefitsContainer}>
-            <Text style={[styles.benefitsTitle, { color: theme.text }]}>
-              Upgrade to Premium for:
-            </Text>
-            {content.benefits.map((benefit, index) => (
-              <View key={index} style={styles.benefitRow}>
-                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                <Text style={[styles.benefitText, { color: theme.text }]}>{benefit}</Text>
-              </View>
-            ))}
-          </View>
-
-          <TouchableOpacity
-            style={[styles.upgradeButton, { backgroundColor: theme.accent }]}
-            onPress={handleUpgrade}
-          >
-            <Ionicons name="sparkles" size={20} color="#FFF" style={{ marginRight: 8 }} />
-            <Text style={styles.upgradeButtonText}>{content.cta}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.laterButton}
-            onPress={onClose}
-          >
-            <Text style={[styles.laterButtonText, { color: theme.textSecondary }]}>
-              Maybe Later
-            </Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        visible={showSubscriptionModal}
+        onClose={handleSubscriptionModalClose}
+      />
+    </>
   );
 };
 

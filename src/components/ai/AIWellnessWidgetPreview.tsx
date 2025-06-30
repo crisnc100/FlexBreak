@@ -17,42 +17,13 @@ export const AIWellnessWidgetPreview: React.FC = () => {
         Home Screen Widget Preview
       </Text>
       
-      {/* iOS Widget Preview */}
-      <View style={styles.previewContainer}>
-        <Text style={[styles.platformLabel, { color: theme.textSecondary }]}>
-          iOS Widget (Small)
-        </Text>
-        <View style={[styles.widget, styles.iosWidget, { backgroundColor: theme.surface }]}>
-          <View style={styles.widgetHeader}>
-            <Text style={[styles.widgetTime, { color: theme.textSecondary }]}>2:30 PM</Text>
-            <Text style={styles.widgetEmoji}>🤖</Text>
-          </View>
-          <Text style={[styles.widgetGreeting, { color: theme.text }]}>
-            Hi {userName}! 👋
-          </Text>
-          <Text style={[styles.widgetQuestion, { color: theme.text }]}>
-            How's your back today?
-          </Text>
-          <View style={styles.quickResponses}>
-            <TouchableOpacity style={[styles.quickButton, { backgroundColor: theme.accent + '20' }]}>
-              <Text style={styles.quickButtonEmoji}>😊</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickButton, { backgroundColor: theme.accent + '20' }]}>
-              <Text style={styles.quickButtonEmoji}>😓</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickButton, { backgroundColor: theme.accent + '20' }]}>
-              <Text style={styles.quickButtonEmoji}>💬</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      {/* iOS Widget Medium - Primary Style */}
+      <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 16 }]}>
+        iOS Home Screen Widget
+      </Text>
 
-      {/* iOS Widget Medium */}
       <View style={styles.previewContainer}>
-        <Text style={[styles.platformLabel, { color: theme.textSecondary }]}>
-          iOS Widget (Medium)
-        </Text>
-        <View style={[styles.widget, styles.iosWidgetMedium, { backgroundColor: theme.surface }]}>
+        <View style={[styles.widget, styles.iosWidgetMedium, { backgroundColor: theme.cardBackground }]}>
           <View style={styles.widgetRow}>
             <View style={styles.widgetLeft}>
               <Text style={[styles.widgetGreeting, { color: theme.text }]}>
@@ -77,7 +48,7 @@ export const AIWellnessWidgetPreview: React.FC = () => {
               <Ionicons name="chatbubble" size={16} color="#FFF" />
               <Text style={styles.actionButtonText}>Chat</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }]}>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.cardBackground, borderWidth: 1, borderColor: theme.border }]}>
               <Ionicons name="mic" size={16} color={theme.text} />
               <Text style={[styles.actionButtonText, { color: theme.text }]}>Voice</Text>
             </TouchableOpacity>
@@ -86,30 +57,43 @@ export const AIWellnessWidgetPreview: React.FC = () => {
       </View>
 
       {/* Android Widget */}
+      <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 32, marginBottom: 16 }]}>
+        Android Home Screen Widget
+      </Text>
+      
       <View style={styles.previewContainer}>
-        <Text style={[styles.platformLabel, { color: theme.textSecondary }]}>
-          Android Widget
-        </Text>
-        <View style={[styles.widget, styles.androidWidget, { backgroundColor: theme.surface }]}>
+        <View style={[styles.widget, styles.androidWidget, { backgroundColor: theme.cardBackground }]}>
           <View style={styles.androidHeader}>
-            <Text style={[styles.androidTitle, { color: theme.text }]}>
-              AI Flex Coach
-            </Text>
-            <Text style={styles.widgetEmoji}>💪</Text>
+            <View>
+              <Text style={[styles.androidTitle, { color: theme.text }]}>
+                AI Flex Coach
+              </Text>
+              <Text style={[styles.androidTime, { color: theme.textSecondary }]}>
+                Last check-in: 2 hours ago
+              </Text>
+            </View>
+            <Text style={styles.widgetEmoji}>🤖</Text>
           </View>
-          <Text style={[styles.widgetQuestion, { color: theme.text, fontSize: 14 }]}>
-            {userName}, how are you feeling?
+          
+          <Text style={[styles.widgetQuestion, { color: theme.text, fontSize: 15, marginVertical: 16 }]}>
+            {userName ? `Hi ${userName}! Ready for your wellness check-in?` : 'Ready for your wellness check-in?'}
           </Text>
-          <View style={styles.androidButtons}>
-            <TouchableOpacity style={[styles.androidButton, { backgroundColor: theme.accent + '20' }]}>
-              <Text style={[styles.androidButtonText, { color: theme.accent }]}>😊 Great</Text>
+          
+          <View style={styles.androidActionButtons}>
+            <TouchableOpacity style={[styles.androidActionButton, { backgroundColor: theme.accent }]}>
+              <Ionicons name="chatbubble-outline" size={20} color="#FFF" />
+              <Text style={styles.androidActionText}>Chat</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.androidButton, { backgroundColor: theme.accent + '20' }]}>
-              <Text style={[styles.androidButtonText, { color: theme.accent }]}>😓 Tired</Text>
+            <TouchableOpacity style={[styles.androidActionButton, { backgroundColor: theme.accent }]}>
+              <Ionicons name="mic-outline" size={20} color="#FFF" />
+              <Text style={styles.androidActionText}>Voice</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.androidButton, { backgroundColor: theme.accent + '20' }]}>
-              <Text style={[styles.androidButtonText, { color: theme.accent }]}>🤕 Sore</Text>
-            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.androidFooter}>
+            <Text style={[styles.androidFooterText, { color: theme.textSecondary }]}>
+              Tap to open FlexBreak
+            </Text>
           </View>
         </View>
       </View>
@@ -124,22 +108,25 @@ export const AIWellnessWidgetPreview: React.FC = () => {
         <Text style={[styles.platformLabel, { color: theme.textSecondary }]}>
           Siri Shortcuts
         </Text>
-        <View style={[styles.smartHomeCard, { backgroundColor: theme.surface }]}>
+        <View style={[styles.smartHomeCard, { backgroundColor: theme.cardBackground }]}>
           <View style={styles.siriIcon}>
             <Ionicons name="mic-circle" size={40} color="#007AFF" />
           </View>
           <View style={styles.siriContent}>
             <Text style={[styles.siriCommand, { color: theme.text }]}>
-              "Hey Siri, check in with FlexBreak"
+              "Hey Siri, start my FlexBreak wellness check"
             </Text>
             <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
-              Siri: "How are you feeling today?"
+              Opens FlexBreak AI Coach directly
             </Text>
-            <Text style={[styles.userResponse, { color: theme.accent }]}>
-              You: "My back is sore"
+            
+            <View style={styles.divider} />
+            
+            <Text style={[styles.siriCommand, { color: theme.text }]}>
+              "Hey Siri, my back hurts"
             </Text>
             <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
-              Siri: "Try the cat-cow stretch for 30 seconds..."
+              FlexBreak: "I'll guide you through a 2-minute back relief routine"
             </Text>
           </View>
         </View>
@@ -150,7 +137,7 @@ export const AIWellnessWidgetPreview: React.FC = () => {
         <Text style={[styles.platformLabel, { color: theme.textSecondary }]}>
           Google Assistant
         </Text>
-        <View style={[styles.smartHomeCard, { backgroundColor: theme.surface }]}>
+        <View style={[styles.smartHomeCard, { backgroundColor: theme.cardBackground }]}>
           <View style={styles.googleIcon}>
             <View style={[styles.googleDot, { backgroundColor: '#4285F4' }]} />
             <View style={[styles.googleDot, { backgroundColor: '#EA4335' }]} />
@@ -159,10 +146,19 @@ export const AIWellnessWidgetPreview: React.FC = () => {
           </View>
           <View style={styles.siriContent}>
             <Text style={[styles.siriCommand, { color: theme.text }]}>
-              "OK Google, tell FlexBreak I'm stressed"
+              "OK Google, open FlexBreak wellness coach"
             </Text>
             <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
-              Opening FlexBreak with your message...
+              Launches AI Coach with voice input ready
+            </Text>
+            
+            <View style={styles.divider} />
+            
+            <Text style={[styles.siriCommand, { color: theme.text }]}>
+              "OK Google, I need a stress relief exercise"
+            </Text>
+            <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
+              FlexBreak: "Starting 3-minute breathing exercise..."
             </Text>
           </View>
         </View>
@@ -172,7 +168,7 @@ export const AIWellnessWidgetPreview: React.FC = () => {
       <View style={[styles.noteCard, { backgroundColor: theme.accent + '10', borderColor: theme.accent + '30' }]}>
         <Ionicons name="information-circle" size={20} color={theme.accent} />
         <Text style={[styles.noteText, { color: theme.text }]}>
-          Widgets and voice assistants will be available in a future update
+          Home screen widgets and voice assistant integration coming soon!
         </Text>
       </View>
     </ScrollView>
@@ -216,7 +212,7 @@ const styles = StyleSheet.create({
   },
   androidWidget: {
     width: 320,
-    minHeight: 120,
+    minHeight: 160,
   },
   widgetHeader: {
     flexDirection: 'row',
@@ -321,6 +317,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
+  androidTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  androidActionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  androidActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  androidActionText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  androidFooter: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    paddingTop: 12,
+    alignItems: 'center',
+  },
+  androidFooterText: {
+    fontSize: 11,
+  },
   smartHomeCard: {
     borderRadius: 12,
     padding: 16,
@@ -373,5 +401,10 @@ const styles = StyleSheet.create({
   noteText: {
     flex: 1,
     fontSize: 13,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    marginVertical: 12,
   },
 });

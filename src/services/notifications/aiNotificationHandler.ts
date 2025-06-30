@@ -126,10 +126,11 @@ export const setupAINotificationHandlers = () => {
           if (userMessage) {
             // Mood tracking removed for MVP
             
-            // Process with AI
+            // Process with AI (mark as notification for concise response)
             const result = await aiWellnessService.processWellnessCheckIn(
               userMessage,
-              data.userId
+              data.userId,
+              true  // isNotification flag
             );
             
             // For welcome messages (both regular and premium), send the response as a notification
@@ -163,7 +164,10 @@ export const setupAINotificationHandlers = () => {
             
             // If the app is in foreground, show the bubble
             if (showAIWellnessModal) {
-              showAIWellnessModal();
+              // Add small delay to ensure app state is ready
+              setTimeout(() => {
+                showAIWellnessModal();
+              }, 200);
             }
             
             // Disable effectiveness checks - they're annoying
@@ -214,7 +218,10 @@ export const setupAINotificationHandlers = () => {
           
           // Show the wellness bubble with the response
           if (showAIWellnessModal) {
-            showAIWellnessModal();
+            // Add small delay to ensure app state is ready
+            setTimeout(() => {
+              showAIWellnessModal();
+            }, 200);
           }
           
           // Disable effectiveness checks - they're annoying

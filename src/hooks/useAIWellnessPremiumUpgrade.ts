@@ -16,32 +16,36 @@ export const useAIWellnessPremiumUpgrade = () => {
     checkUpgradeEligibility();
   }, [isPremium]);
 
+
   const checkUpgradeEligibility = async () => {
     try {
-      // Check if AI wellness is enabled
-      const aiEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';
-      if (!aiEnabled) {
-        return;
-      }
-
-      // Check if user has already seen premium upgrade
-      const hasSeenPremiumUpgrade = await AsyncStorage.getItem('@ai_wellness_premium_upgrade_seen') === 'true';
-      if (hasSeenPremiumUpgrade) {
-        return;
-      }
-
       // Get stored premium status
       const storedPremiumStatus = await AsyncStorage.getItem('@last_premium_status');
       const wasNotPremium = storedPremiumStatus === 'false';
-
-      // User just upgraded to premium
-      // Only check upgrade after we have a previous status stored (not on first app load)
-      if (isPremium && wasNotPremium && storedPremiumStatus !== null) {
-        console.log('[AI Wellness] User upgraded to premium - showing upgrade modal');
-        // Delay showing the modal to avoid conflicts with subscription modal
-        setTimeout(() => {
-          setShouldShowUpgrade(true);
-        }, 2000);
+      
+      // Check if user has already seen premium upgrade
+      const hasSeenPremiumUpgrade = await AsyncStorage.getItem('@ai_wellness_premium_upgrade_seen') === 'true';
+      
+      // Show upgrade modal if:
+      // 1. User is premium 
+      // 2. User hasn't seen the upgrade modal yet
+      // 3. Either they just upgraded OR they're an existing premium user
+      if (isPremium && !hasSeenPremiumUpgrade) {
+        // Case 1: User just upgraded to premium (was not premium before)
+        if (wasNotPremium && storedPremiumStatus !== null) {
+          console.log('[AI Wellness] User upgraded to premium - showing upgrade modal');
+          // Delay showing the modal to avoid conflicts with subscription modal
+          setTimeout(() => {
+            setShouldShowUpgrade(true);
+          }, 2000);
+        }
+        // Case 2: Existing premium user who hasn't seen the modal
+        else if (storedPremiumStatus === null || storedPremiumStatus === 'true') {
+          console.log('[AI Wellness] Premium user - showing AI wellness upgrade modal');
+          setTimeout(() => {
+            setShouldShowUpgrade(true);
+          }, 1000);
+        }
       }
 
       // Update stored status
@@ -63,9 +67,17 @@ export const useAIWellnessPremiumUpgrade = () => {
     setShouldShowUpgrade(true);
   };
 
+  // Reset upgrade seen status (for testing)
+  const resetUpgradeSeen = async () => {
+    await AsyncStorage.removeItem('@ai_wellness_premium_upgrade_seen');
+    await AsyncStorage.removeItem('@last_premium_status');
+    console.log('[AI Wellness] Reset premium upgrade status');
+  };
+
   return {
     shouldShowUpgrade,
     markUpgradeSeen,
-    forceShowUpgrade
+    forceShowUpgrade,
+    resetUpgradeSeen
   };
 };

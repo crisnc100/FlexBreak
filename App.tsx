@@ -42,11 +42,10 @@ import { videoLoaderService } from './src/services/videoLoaderService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
 import { AIWellnessModal } from './src/components/ai/AIWellnessNotificationHandler';
-import { WellnessBubble } from './src/components/wellness/WellnessBubble';
+import { FlexChatModal } from './src/components/wellness/FlexChatModal';
 import { setShowAIWellnessModal } from './src/services/notifications/aiNotificationHandler';
 import { ToastProvider } from 'react-native-toast-notifications';
 import { clearDataCleanupNotifications } from './src/utils/clearDataCleanupNotifications';
-// AI Wellness Onboarding imports
 import { useAIWellnessOnboarding } from './src/hooks/useAIWellnessOnboarding';
 import { AIWellnessOnboarding } from './src/components/ai/AIWellnessOnboarding';
 import { useAIWellnessPremiumUpgrade } from './src/hooks/useAIWellnessPremiumUpgrade';
@@ -57,11 +56,6 @@ import { AIWellnessPremiumUpgrade } from './src/components/ai/AIWellnessPremiumU
 
 // Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
-
-// Import AI Wellness test utilities in development
-if (__DEV__) {
-  import('./src/utils/testing/aiWellnessTestUtils');
-}
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
 import 'firebase/compat/functions';
@@ -372,7 +366,7 @@ function MainApp() {
   const fadeInAnim = useRef(new Animated.Value(0)).current;
   const { recentAchievement, clearRecentAchievement } = useAchievements();
   const [showAIModal, setShowAIModal] = useState(false);
-  const [showWellnessBubble, setShowWellnessBubble] = useState(false);
+  const [showFlexChat, setShowFlexChat] = useState(false);
   
   // Initialize update notification hook
   const { showModal, updateInfo, checkForUpdates, hideModal } = useUpdateNotification();
@@ -417,10 +411,21 @@ function MainApp() {
   // Set up AI Wellness modal handler with proper cleanup
   useEffect(() => {
     const showModal = () => {
-      console.log('AI Wellness triggered - showing bubble');
-      setShowWellnessBubble(true);
-      // Don't show the old modal anymore
-      setShowAIModal(false);
+      console.log('AI Wellness triggered - showing FlexChat');
+      // Prevent showing modal if already visible
+      setShowFlexChat(current => {
+        if (current) {
+          console.log('FlexChat already visible, skipping');
+          return current;
+        }
+        // Add a small delay to prevent UI conflicts when tapping notification
+        setTimeout(() => {
+          setShowFlexChat(true);
+          // Don't show the old modal anymore
+          setShowAIModal(false);
+        }, 100);
+        return current;
+      });
     };
     setShowAIWellnessModal(showModal);
     
@@ -430,8 +435,8 @@ function MainApp() {
       const hasStoredResponse = await AsyncStorage.getItem('@ai_wellness_last_response');
       
       if (shouldShow === 'true' || hasStoredResponse) {
-        console.log('Found pending AI Wellness flag or stored response - showing bubble');
-        setShowWellnessBubble(true);
+        console.log('Found pending AI Wellness flag or stored response - showing FlexChat');
+        setShowFlexChat(true);
         await AsyncStorage.removeItem('@ai_wellness_show_modal');
       }
     };
@@ -558,19 +563,47 @@ function MainApp() {
     initApp();
   }, [showIntro, checkForUpdates]);
   
-  // Initialize sound effects system (but don't play intro here - we'll play it in the intro screens)
+  // Initialize sound effects system with better error handling and retry logic
   useEffect(() => {
     const initSounds = async () => {
       try {
+        console.log('Initializing sound system...');
+        
         // Initialize sound system with user preferences
         await soundEffects.initSoundSystem();
         
         // Preload all sound effects for faster playback
         await soundEffects.preloadAllSounds();
         
-        // Don't play intro sound here - it will be played by the intro screens
+        // Log the status after preloading
+        const status = soundEffects.getSoundSystemStatus();
+        console.log('Sound system status after preload:', status);
+        
+        // If some sounds failed to load, try again after a delay
+        if (status.failedSounds > 0) {
+          console.log(`${status.failedSounds} sounds failed to load, retrying in 5 seconds...`);
+          setTimeout(async () => {
+            try {
+              await soundEffects.retryFailedSounds();
+              const retryStatus = soundEffects.getSoundSystemStatus();
+              console.log('Sound system status after retry:', retryStatus);
+            } catch (retryError) {
+              console.error('Error during sound retry:', retryError);
+            }
+          }, 5000);
+        }
+        
+        console.log('Sound system initialization completed');
       } catch (error) {
         console.error('Error initializing sound effects system:', error);
+        
+        // Try a simplified initialization as fallback
+        try {
+          console.log('Attempting simplified sound initialization...');
+          await soundEffects.initSoundSystem();
+        } catch (fallbackError) {
+          console.error('Fallback sound initialization also failed:', fallbackError);
+        }
       }
     };
     
@@ -578,7 +611,9 @@ function MainApp() {
     
     // Cleanup sounds when app is unmounted
     return () => {
-      soundEffects.unloadAllSounds();
+      soundEffects.unloadAllSounds().catch(error => {
+        console.error('Error during sound cleanup:', error);
+      });
     };
   }, []);
   
@@ -651,10 +686,10 @@ function MainApp() {
         onClose={() => setShowAIModal(false)}
       />
       
-      {/* Wellness Bubble - New experience */}
-      <WellnessBubble
-        visible={showWellnessBubble}
-        onClose={() => setShowWellnessBubble(false)}
+      {/* FlexChat Modal - New experience */}
+      <FlexChatModal
+        visible={showFlexChat}
+        onClose={() => setShowFlexChat(false)}
       />
       
       {/* AI Wellness Onboarding - Shows after splash */}
