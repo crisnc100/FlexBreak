@@ -9,5 +9,12 @@
       "Bash(ls:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "sequential-thinking",
+    "browser-tools",
+    "supabase",
+    "brave-search",
+    "Framelink Figma MCP"
+  ]
 }
