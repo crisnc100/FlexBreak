@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
 import { NotificationType, cancelNotificationsByType, scheduleTypedNotification } from '../../utils/notificationManager';
+import { enhancedNotificationService } from '../notifications/EnhancedNotificationService';
 import { canScheduleNotifications, markScheduled } from './notificationDebouncer';
 import { generatePersonalizedNotification, generateDefaultNotification } from './notificationMessages';
 
@@ -244,25 +245,40 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
       notificationMessage = generateDefaultNotification(userName);
     }
     
-    const notificationId = await scheduleTypedNotification(
-      {
-        title: notificationMessage.title,
-        body: notificationMessage.body,
-        sound: true,
-        data: { 
-          userId,
-          scheduledFor: scheduledDate.toISOString(),
-          dayOfWeek: day,
-          type: 'ai_wellness_checkin'  // Add explicit type
+    const notificationId = await enhancedNotificationService.createEnhancedNotification({
+      userId,
+      userName: userName || undefined,
+      message: notificationMessage.body,
+      scheduledTime: scheduledDate,
+      soundType: 'default',
+      data: {
+        dayOfWeek: day,
+        scheduledFor: scheduledDate.toISOString(),
+        isPremium,
+        category: 'ai_wellness',
+      },
+    }).catch(async (error) => {
+      console.error('[AI Scheduler] Failed to create enhanced notification:', error);
+      return scheduleTypedNotification(
+        {
+          title: notificationMessage.title,
+          body: notificationMessage.body,
+          sound: true,
+          data: {
+            userId,
+            scheduledFor: scheduledDate.toISOString(),
+            dayOfWeek: day,
+            type: 'ai_wellness_checkin'
+          },
+          categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
         },
-        categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
-      },
-      {
-        date: scheduledDate,  // Use date trigger like motivational messages
-        type: Notifications.SchedulableTriggerInputTypes.DATE
-      },
-      NotificationType.AI_WELLNESS
-    );
+        {
+          date: scheduledDate,
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+        },
+        NotificationType.AI_WELLNESS
+      );
+    });
     
     console.log(`✅ Scheduled check-in for ${getDayName(day)} at ${scheduledDate.toLocaleString()} with ID ${notificationId}`);
     console.log(`   Message: "${notificationMessage.title}" - "${notificationMessage.body}"`);
@@ -359,6 +375,26 @@ export async function debugAIWellnessNotifications() {
   
   return aiNotifications;
 }
+
+export const triggerImmediateWellnessCheckIn = async (userId: string, userName?: string) => {
+  try {
+    const notificationId = await enhancedNotificationService.createEnhancedNotification({
+      userId,
+      userName,
+      soundType: 'default',
+      data: {
+        triggered: 'manual',
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    console.log('[AI Scheduler] Immediate check-in triggered:', notificationId);
+    return notificationId;
+  } catch (error) {
+    console.error('[AI Scheduler] Failed to trigger immediate check-in:', error);
+    throw error;
+  }
+};
 
 function getNextWeekdayTrigger(
   targetDay: number, 

@@ -42,7 +42,8 @@
       },
       "env": {
         "EXPO_PUBLIC_ENABLE_PROGUARD": "true",
-        "EXPO_PUBLIC_ENABLE_HERMES": "true"
+        "EXPO_PUBLIC_ENABLE_HERMES": "true",
+        "EXPO_PUBLIC_ENABLE_ENHANCED_NOTIFICATIONS": "true"
       }
     },
     "testflight": {

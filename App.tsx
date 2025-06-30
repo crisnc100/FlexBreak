@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated, Dimensions, Pressable } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, CommonActions } from '@react-navigation/native';
+import { navigationRef } from './src/navigation/NavigationService';
+import { useEnhancedNotifications } from './src/hooks/useEnhancedNotifications';
+import * as Linking from 'expo-linking';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -88,17 +91,13 @@ type RootStackParamList = {
 };
 
 // Create a navigation ref that can be used outside of React components
-export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+// Deprecated internal navigationRef; use NavigationService instead
 
 // Note: Notification handler is configured in src/utils/notifications.ts
 
 // Function to navigate from anywhere
 export function navigateFromAnywhere(name: keyof RootStackParamList, params?: any) {
-  if (navigationRef.isReady()) {
-    navigationRef.navigate(name, params);
-  } else {
-    console.error('[Global Navigation] Navigation not initialized yet');
-  }
+  navigate(name, params);
 }
 
 // Function to force navigation by resetting the stack
@@ -117,7 +116,9 @@ export function forceNavigate(name: keyof RootStackParamList, params?: any) {
 
 // Helper function to navigate from outside a navigation component (for compatibility)
 function navigate(name: keyof RootStackParamList, params?: any) {
-  navigateFromAnywhere(name, params);
+  if (navigationRef.isReady()) {
+    navigationRef.navigate(name as never, params as never);
+  }
 }
 
 // Global initialization flags to prevent multiple initializations
@@ -127,6 +128,9 @@ let isMotivationalMessagesInitialized = false;
 export default function App() {
   // Disable console logs in production
   disableConsoleLogsInProduction();
+
+  // Initialize enhanced notifications
+  const { isInitialized: notificationsReady } = useEnhancedNotifications();
   
   // Mark app start time for performance measurement
   performance.markAppStart();
@@ -160,6 +164,35 @@ export default function App() {
     };
 
     initializeVideoLoader();
+  }, []);
+
+  useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      const { hostname, path, queryParams } = Linking.parse(url);
+      if (hostname === 'ai-wellness') {
+        if (path === 'voice') {
+          navigationRef.current?.navigate('AIWellnessVoice', {
+            conversationId: queryParams?.conversationId,
+            userId: queryParams?.userId,
+          });
+        } else if (path === 'chat') {
+          navigationRef.current?.navigate('AIWellnessChat', {
+            conversationId: queryParams?.conversationId,
+            userId: queryParams?.userId,
+          });
+        }
+      }
+    };
+
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    return () => subscription.remove();
   }, []);
   
   return (

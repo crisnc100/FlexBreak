@@ -15,9 +15,14 @@
       "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"],
+        "UIBackgroundModes": ["fetch", "remote-notification"],
+        "NSUserNotificationAlertStyle": "banner",
         "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested.",
         "NSMicrophoneUsageDescription": "FlexBreak needs access to your microphone for voice responses to the AI Wellness Coach."
+      },
+      "entitlements": {
+        "com.apple.developer.usernotifications.communication": true,
+        "com.apple.developer.usernotifications.time-sensitive": true
       },
       "splash": {
         "xib": "./ios/FlexBreak/SplashScreen.storyboard"
@@ -29,11 +34,15 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "useNextNotificationsApi": true,
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "NOTIFICATIONS",
+        "VIBRATE",
+        "USE_FULL_SCREEN_INTENT"
       ],
       "versionCode": 3,
       "enableProguardInReleaseBuilds": true,
@@ -45,8 +54,12 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/potentialLogo2.png",
-          "color": "#ffffff"
+          "icon": "./assets/notification-icon.png",
+          "color": "#4A90E2",
+          "sounds": [
+            "./assets/sounds/AInotification1.mp3"
+          ],
+          "mode": "production"
         }
       ]
     ],
