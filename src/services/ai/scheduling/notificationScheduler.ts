@@ -1,9 +1,9 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KEYS } from '../storageService';
-import { NotificationType, cancelNotificationsByType, scheduleTypedNotification } from '../../utils/notificationManager';
-import { canScheduleNotifications, markScheduled } from './notificationDebouncer';
-import { generatePersonalizedNotification, generateDefaultNotification } from './notificationMessages';
+import { KEYS } from '../../storageService';
+import { NotificationType, cancelNotificationsByType, scheduleTypedNotification } from '../../../utils/notificationManager';
+// Notification debouncer will be merged into this file
+import { generatePersonalizedNotification, generateDefaultNotification, convertImprovedMemoryToCompat } from './notificationMessages';
 
 // Simplified state: just track if user has seen the welcome
 function getDayName(dayNumber: number): string {
@@ -152,24 +152,23 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
   
   // Get user's name and wellness memory for personalized messages
   const userName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
-  let wellnessMemory: any = null;
   let memory: any = null;
   let recentInsights: any[] = [];
   
   try {
-    const { default: wellnessMemoryService } = await import('./wellnessMemory');
-    memory = await wellnessMemoryService.getMemory(userId);
-    recentInsights = await wellnessMemoryService.getRecentInsights(userId, 5);
+    const { default: improvedMemoryService } = await import('../memory/memoryService');
+    memory = await improvedMemoryService.getMemory(userId);
+    recentInsights = await improvedMemoryService.getRecentInsights(userId, 5);
   } catch (error) {
-    console.log('Could not load wellness memory for personalized notifications');
+    console.log('Could not load improved memory for personalized notifications');
   }
   
   // Check current notification count
-  const { getNotificationSummary } = await import('../../utils/notificationManager');
+  const { getNotificationSummary } = await import('../../../utils/notificationManager');
   const summary = await getNotificationSummary();
-  const totalScheduled = Object.values(summary).reduce((sum, count) => sum + count, 0);
+  const totalScheduled = Object.values(summary).reduce((sum: number, count: number) => sum + count, 0);
   
-  if (totalScheduled > 50) {
+  if (totalScheduled && totalScheduled > 50) {
     console.warn(`Already have ${totalScheduled} notifications scheduled. Consider cleanup.`);
   }
   
@@ -238,8 +237,10 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
     
     // Generate personalized notification message
     let notificationMessage;
-    if (memory && memory.totalInteractions > 0) {
-      notificationMessage = generatePersonalizedNotification(userName, memory, recentInsights);
+    if (memory && memory.usage?.totalInteractions > 0) {
+      // Convert improvedMemory format to compatibility format
+      const compatMemory = convertImprovedMemoryToCompat(memory);
+      notificationMessage = generatePersonalizedNotification(userName, compatMemory, recentInsights);
     } else {
       notificationMessage = generateDefaultNotification(userName);
     }
@@ -413,3 +414,32 @@ function getNextWeekdayTrigger(
     repeats: false
   };
 }
+
+/**
+ * Notification Debouncer (merged from notificationDebouncer.ts)
+ * Prevents notification spam by ensuring scheduling functions aren't called repeatedly
+ */
+const lastScheduled = new Map<string, number>();
+const DEBOUNCE_TIME = 60000; // 1 minute minimum between scheduling attempts
+
+export const canScheduleNotifications = (type: string): boolean => {
+  const now = Date.now();
+  const lastTime = lastScheduled.get(type) || 0;
+  
+  if (now - lastTime < DEBOUNCE_TIME) {
+    console.log(`Skipping ${type} scheduling - already scheduled ${Math.round((now - lastTime) / 1000)}s ago`);
+    return false;
+  }
+  
+  return true;
+};
+
+export const markScheduled = (type: string): void => {
+  lastScheduled.set(type, Date.now());
+  console.log(`Marked ${type} as scheduled at ${new Date().toLocaleTimeString()}`);
+};
+
+export const resetDebouncer = (): void => {
+  lastScheduled.clear();
+  console.log('Notification debouncer reset');
+};

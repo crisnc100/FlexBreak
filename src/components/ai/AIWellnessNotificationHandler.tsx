@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Modal, ScrollView, Animated, Alert } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import aiWellnessService from '../../services/ai/aiWellnessService';
+import aiWellnessService from '../../services/ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../services/storageService';
 import { usePremium } from '../../context/PremiumContext';
@@ -162,7 +162,7 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
             showsVerticalScrollIndicator={false}
           >
             {/* Initial message */}
-            <View style={[styles.aiMessageBubble, { backgroundColor: theme.surface }]}>
+            <View style={[styles.aiMessageBubble, { backgroundColor: theme.background }]}>
               <Text style={[styles.messageText, { color: theme.text }]}>
                 Hey! How are you feeling today? 💪
               </Text>
@@ -175,7 +175,7 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
                 style={[
                   msg.type === 'user' ? styles.userMessageBubble : styles.aiMessageBubble,
                   { 
-                    backgroundColor: msg.type === 'user' ? theme.accent : theme.surface,
+                    backgroundColor: msg.type === 'user' ? theme.accent : theme.background,
                     opacity: index === conversationHistory.length - 1 ? fadeAnim : 1 
                   }
                 ]}
@@ -191,7 +191,7 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
 
             {/* Loading indicator */}
             {isLoading && (
-              <View style={[styles.aiMessageBubble, { backgroundColor: theme.surface }]}>
+              <View style={[styles.aiMessageBubble, { backgroundColor: theme.background }]}>
                 <View style={styles.typingIndicator}>
                   <Text style={[styles.typingDot, { color: theme.textSecondary }]}>●</Text>
                   <Text style={[styles.typingDot, { color: theme.textSecondary }]}>●</Text>
@@ -212,7 +212,7 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
                   <TouchableOpacity
                     key={index}
                     style={[styles.quickResponseButton, { 
-                      backgroundColor: theme.surface,
+                      backgroundColor: theme.background,
                       borderColor: theme.border 
                     }]}
                     onPress={() => handleQuickResponse(response)}
@@ -231,7 +231,7 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
           <View style={[styles.inputContainer, { borderTopColor: theme.border }]}>
             <TextInput
               style={[styles.input, { 
-                backgroundColor: theme.surface, 
+                backgroundColor: theme.background, 
                 color: theme.text,
                 borderColor: theme.border 
               }]}

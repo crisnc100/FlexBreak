@@ -1,4 +1,48 @@
-import { WellnessMemory, ConversationInsight } from './wellnessMemory';
+// Types for notification generation
+interface WellnessMemoryCompat {
+  commonIssues: { [category: string]: number };
+  lastCheckIn: number;
+  totalInteractions: number;
+}
+
+interface ConversationInsight {
+  category: string;
+  solution?: string;
+  effectiveness?: 'helped' | 'somewhat' | 'not_really';
+  timestamp: number;
+  timeOfDay: string;
+}
+
+// Helper to convert improvedMemory format to compatibility format
+export const convertImprovedMemoryToCompat = (improvedMemory: any): WellnessMemoryCompat => {
+  // Count issues from patterns
+  const commonIssues: { [category: string]: number } = {};
+  
+  if (improvedMemory.wellness_data?.patterns) {
+    improvedMemory.wellness_data.patterns.forEach((pattern: any) => {
+      if (pattern.type) {
+        commonIssues[pattern.type] = pattern.frequency || 1;
+      }
+    });
+  }
+  
+  // Add physical issues to common issues
+  if (improvedMemory.wellness_data?.physical_issues) {
+    improvedMemory.wellness_data.physical_issues.forEach((issue: any) => {
+      const category = issue.issue.toLowerCase().includes('back') ? 'back_pain' :
+                      issue.issue.toLowerCase().includes('neck') ? 'neck_pain' :
+                      issue.issue.toLowerCase().includes('stress') ? 'stress' :
+                      issue.issue.toLowerCase().includes('tired') ? 'fatigue' : 'general';
+      commonIssues[category] = (commonIssues[category] || 0) + issue.mentions;
+    });
+  }
+  
+  return {
+    commonIssues,
+    lastCheckIn: improvedMemory.usage?.lastCheckIn || 0,
+    totalInteractions: improvedMemory.usage?.totalInteractions || 0
+  };
+}
 
 interface NotificationMessage {
   title: string;
@@ -14,7 +58,7 @@ const getTimeGreeting = (): string => {
 };
 
 // Get the most common issue from recent insights
-const getMostCommonIssue = (memory: WellnessMemory): string | null => {
+const getMostCommonIssue = (memory: WellnessMemoryCompat): string | null => {
   const issues = Object.entries(memory.commonIssues)
     .sort(([, a], [, b]) => b - a);
   
@@ -42,7 +86,7 @@ const getDaysSinceLastCheckIn = (lastCheckIn: number): number => {
 
 export const generatePersonalizedNotification = (
   userName: string | null,
-  memory: WellnessMemory,
+  memory: WellnessMemoryCompat,
   recentInsights: ConversationInsight[]
 ): NotificationMessage => {
   const greeting = getTimeGreeting();
@@ -110,13 +154,7 @@ export const generatePersonalizedNotification = (
     });
   }
   
-  // If user has been consistent
-  if (memory.consistencyScore > 70) {
-    messages.push({
-      title: `${name}, you're doing great! 🌟`,
-      body: `Your consistency is ${memory.consistencyScore}%! How are you feeling today?`
-    });
-  }
+
   
   // Randomly select a message
   return messages[Math.floor(Math.random() * messages.length)];

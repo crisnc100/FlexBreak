@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { KEYS } from '../../services/storageService';
-import { scheduleAIWellnessV2, debugAIWellnessNotifications } from '../../services/ai/aiWellnessSchedulerV2';
-import wellnessMemory from '../../services/ai/wellnessMemory';
+import { scheduleAIWellnessV2, debugAIWellnessNotifications } from '../../services/ai/scheduling/notificationScheduler';
+import memoryService from '../../services/ai/memory/memoryService';
 
 /**
  * Testing utilities for AI Wellness Coach
@@ -20,7 +20,7 @@ export const AIWellnessTestUtils = {
     
     // Clear wellness memory
     const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-    await wellnessMemory.clearMemory(userId);
+    await memoryService.clearMemory(userId);
     
     // Cancel all notifications
     const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
@@ -48,7 +48,7 @@ export const AIWellnessTestUtils = {
       case 'returning':
         // User with some history
         await AsyncStorage.setItem(KEYS.AI_WELLNESS.USER_NAME, 'TestUser');
-        await wellnessMemory.addConversationInsight(userId, {
+        await memoryService.addConversationInsight(userId, {
           category: 'back_pain',
           solution: 'cat-cow stretch',
           effectiveness: 'helped',
@@ -65,7 +65,7 @@ export const AIWellnessTestUtils = {
       case 'heavy_user':
         // User with lots of history
         for (let i = 0; i < 20; i++) {
-          await wellnessMemory.addConversationInsight(userId, {
+          await memoryService.addConversationInsight(userId, {
             category: ['back_pain', 'stress', 'fatigue'][i % 3],
             solution: ['stretches', 'breathing', 'walk'][i % 3],
             effectiveness: 'helped',
@@ -117,7 +117,7 @@ export const AIWellnessTestUtils = {
       hasSeenWelcome: await AsyncStorage.getItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME) === 'true',
       isPremium: await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true',
       timePreference: await AsyncStorage.getItem(KEYS.AI_WELLNESS.TIME_PREFERENCE),
-      memory: await wellnessMemory.getMemory(userId),
+      memory: await memoryService.getMemory(userId),
       scheduledNotifications: await debugAIWellnessNotifications()
     };
     

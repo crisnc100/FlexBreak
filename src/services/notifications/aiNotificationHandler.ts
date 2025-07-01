@@ -1,12 +1,12 @@
 import * as Notifications from 'expo-notifications';
-import aiWellnessService from '../ai/aiWellnessService';
+import aiWellnessService from '../ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
 // Removed non-MVP imports
 // import ConversationAnalytics from '../ai/conversationAnalytics';
 // import { MoodTracker } from '../ai/moodTracker';
 // import { scheduleDataRetentionCleanup, scheduleRegularCheckInsAfterWelcome } from '../ai/aiWellnessScheduler';
-import { scheduleAIWellnessV2 } from '../ai/aiWellnessSchedulerV2';
+import { scheduleAIWellnessV2 } from '../ai/scheduling/notificationScheduler';
 
 export const configureAINotifications = async () => {
   // Don't schedule data retention cleanup as a notification
@@ -151,7 +151,7 @@ export const setupAINotificationHandlers = () => {
                 },
                 trigger: {
                   seconds: 2 // Send after 2 seconds
-                }
+                } as Notifications.TimeIntervalTriggerInput
               });
             }
             
@@ -230,7 +230,7 @@ export const setupAINotificationHandlers = () => {
           // If this was a response to the welcome message, schedule regular check-ins
           if (data.isWelcome) {
             console.log('User responded to welcome - scheduling regular check-ins');
-            await scheduleRegularCheckInsAfterWelcome();
+            await scheduleAIWellnessV2('welcome_response');
           }
         } else {
           // User just tapped notification without selecting an action
@@ -239,7 +239,7 @@ export const setupAINotificationHandlers = () => {
           // If this was the welcome notification, schedule regular check-ins
           if (data.isWelcome) {
             console.log('User tapped welcome notification - scheduling regular check-ins');
-            await scheduleRegularCheckInsAfterWelcome();
+            await scheduleAIWellnessV2('welcome_response');
           }
           
           // Show the wellness bubble instead of sending another notification

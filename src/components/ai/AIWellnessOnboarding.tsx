@@ -15,7 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../services/storageService';
-import { scheduleAIWellnessV2 } from '../../services/ai/aiWellnessSchedulerV2';
+import { scheduleAIWellnessV2 } from '../../services/ai/scheduling/notificationScheduler';
 import { AIWellnessTimePreference } from './AIWellnessTimePreference';
 import { usePremium } from '../../context/PremiumContext';
 
@@ -191,7 +191,7 @@ export const AIWellnessOnboarding: React.FC<AIWellnessOnboardingProps> = ({
               
               <TextInput
                 style={[styles.nameInput, { 
-                  backgroundColor: theme.surface,
+                  backgroundColor: theme.background,
                   borderColor: theme.border,
                   color: theme.text
                 }]}

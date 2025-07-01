@@ -250,11 +250,11 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         if (status) {
           // Check if AI wellness is already enabled and needs daily scheduling
-          const { checkAndRestoreAfterUpgrade } = await import('../services/ai/aiWellnessInitializer');
-          await checkAndRestoreAfterUpgrade();
+          const systemInitializer = (await import('../services/ai/config/systemInitializer')).default;
+          await systemInitializer.checkAndRestoreAfterUpgrade();
           
           // Also send the upgrade welcome message
-          const { scheduleAIWellnessV2 } = await import('../services/ai/aiWellnessSchedulerV2');
+          const { scheduleAIWellnessV2 } = await import('../services/ai/scheduling/notificationScheduler');
           await scheduleAIWellnessV2('upgrade');
         } else {
           // Downgrade handling not needed for MVP

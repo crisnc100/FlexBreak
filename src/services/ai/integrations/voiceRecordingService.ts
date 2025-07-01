@@ -2,6 +2,7 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import googleSpeechService from './googleSpeechService';
+import { rateLimiter } from '../utils/reliabilityService';
 
 class VoiceRecordingService {
   private recording: Audio.Recording | null = null;
@@ -35,10 +36,32 @@ class VoiceRecordingService {
         playThroughEarpieceAndroid: false,
       });
 
-      // Create and start recording
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      // Create and start recording with optimized settings for speech
+      const recordingOptions = {
+        isMeteringEnabled: true,
+        android: {
+          extension: '.m4a',
+          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          sampleRate: 16000, // Optimal for speech recognition
+          numberOfChannels: 1, // Mono is sufficient for voice
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.m4a',
+          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+          audioQuality: Audio.IOSAudioQuality.HIGH,
+          sampleRate: 16000, // Match Google Speech requirements
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      };
+      
+      const { recording } = await Audio.Recording.createAsync(recordingOptions);
       
       this.recording = recording;
       console.log('Recording started');
@@ -81,6 +104,21 @@ class VoiceRecordingService {
     try {
       console.log('Transcribing audio from:', audioUri);
       
+      // Check rate limit for voice transcription
+      const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
+      const rateCheck = await rateLimiter.checkLimit('voice_transcription', userId);
+      
+      if (!rateCheck.allowed) {
+        // Clean up the audio file
+        try {
+          await FileSystem.deleteAsync(audioUri, { idempotent: true });
+        } catch (err) {
+          console.log('Could not delete audio file:', err);
+        }
+        
+        return `Too many voice requests. Please try again in ${rateCheck.retryAfter} seconds.`;
+      }
+      
       // Use English with auto-detection of Spanish and Mandarin
       const languageCode = 'en-US';
       
@@ -88,7 +126,7 @@ class VoiceRecordingService {
       
       // Try Google Speech API first
       // To enable: Add your API key to src/config/aiConfig.ts
-      const { default: config } = await import('../../config/aiConfig');
+      const { default: config } = await import('../../../config/aiConfig');
       
       console.log('Google Speech API Key exists:', !!config.GOOGLE_SPEECH_API_KEY);
       console.log('Key length:', config.GOOGLE_SPEECH_API_KEY?.length);
@@ -105,27 +143,32 @@ class VoiceRecordingService {
             console.log('Could not delete audio file:', err);
           }
           
-          if (result && result.text) {
+          if (result && result.text && result.text.trim().length > 0) {
             console.log('Got transcription:', result.text);
+            console.log('Detected language from Google:', result.detectedLanguage);
+            
             // Store the detected language from Google for context building
             if (result.detectedLanguage) {
-              await AsyncStorage.setItem('@ai_wellness_detected_language', result.detectedLanguage);
+              // Add some validation - don't trust obviously wrong language detections
+              const text = result.text.toLowerCase();
+              const isLikelyEnglish = /\b(hi|hello|my|neck|back|sore|leg|tired|help)\b/.test(text);
+              
+              if (isLikelyEnglish && result.detectedLanguage.startsWith('cmn')) {
+                console.warn('Google detected Chinese but text appears to be English, ignoring language detection');
+                // Don't store the wrong language
+              } else {
+                await AsyncStorage.setItem('@ai_wellness_detected_language', result.detectedLanguage);
+              }
             }
-            return result.text;
+            return result.text.trim();
           } else {
             console.log('No transcription returned from Google Speech');
+            return null; // Return null for empty transcriptions
           }
         } catch (error) {
           console.error('Error calling Google Speech:', error);
         }
       }
-      
-      // Fallback message if no API key configured
-      const messages = {
-        'en-US': "To enable voice: Add Google Speech API key in settings.",
-        'es-ES': "Para activar voz: Añade clave API de Google Speech en configuración.",
-        'zh-CN': "启用语音：在设置中添加 Google Speech API 密钥。"
-      };
       
       // Clean up the audio file
       try {
@@ -134,7 +177,9 @@ class VoiceRecordingService {
         console.log('Could not delete audio file:', err);
       }
       
-      return messages[languageCode] || messages['en-US'];
+      // Return null if no API key configured - don't send a message
+      console.log('No Google Speech API key configured, voice feature disabled');
+      return null;
     } catch (error) {
       console.error('Failed to transcribe audio:', error);
       return null;

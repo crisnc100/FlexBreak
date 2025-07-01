@@ -22,10 +22,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import aiWellnessService from '../../services/ai/aiWellnessService';
+import aiWellnessService from '../../services/ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import voiceRecordingService from '../../services/ai/voiceRecordingService';
-import wellnessMemory from '../../services/ai/wellnessMemory';
+import voiceRecordingService from '../../services/ai/integrations/voiceRecordingService';
+import memoryService from '../../services/ai/memory/memoryService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MIN_HEIGHT = 120;
@@ -37,7 +37,7 @@ interface Message {
   type: 'user' | 'ai';
   message: string;
   timestamp: Date;
-  suggestedActions?: string[];
+  // suggestedActions removed - no longer showing quick reply buttons
 }
 
 interface FlexChatModalProps {
@@ -54,6 +54,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
   const [isRecording, setIsRecording] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [showVoiceIntro, setShowVoiceIntro] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Animation values
@@ -62,6 +63,11 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
   const contentHeight = useRef(new Animated.Value(MAX_HEIGHT * 0.7)).current;
   const collapseAnim = useRef(new Animated.Value(1)).current;
   const recordingPulse = useRef(new Animated.Value(1)).current;
+  const voiceButtonGlow = useRef(new Animated.Value(0)).current;
+  const voiceButtonScale = useRef(new Animated.Value(1)).current;
+  const soundWave1 = useRef(new Animated.Value(0)).current;
+  const soundWave2 = useRef(new Animated.Value(0)).current;
+  const soundWave3 = useRef(new Animated.Value(0)).current;
 
   // Pan responder for drag to dismiss/collapse
   const panResponder = useRef(
@@ -123,8 +129,46 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     if (visible && !isLoading) {
       loadInitialState();
       animateIn();
+      startVoiceButtonGlow();
     }
   }, [visible]);
+
+  // Voice button glow animation
+  const startVoiceButtonGlow = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(voiceButtonGlow, {
+          toValue: 0.6,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(voiceButtonGlow, {
+          toValue: 0,
+          duration: 3000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
+
+  // Subtle intro animation for voice button when showing intro
+  useEffect(() => {
+    if (showVoiceIntro) {
+      // Just a gentle single pulse
+      Animated.sequence([
+        Animated.timing(voiceButtonScale, {
+          toValue: 1.05,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(voiceButtonScale, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showVoiceIntro]);
 
   const loadInitialState = async () => {
     try {
@@ -138,7 +182,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
             type: 'ai',
             message: response,
             timestamp: new Date(timestamp),
-            suggestedActions: ['I feel better now', 'Tell me more', 'Suggest a stretch'],
+            // suggestedActions removed
           };
           setMessages([aiMessage]);
         }
@@ -146,20 +190,29 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       } else {
         // Load greeting message
         const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-        const memory = await wellnessMemory.getMemory(userId);
+        const memory = await memoryService.getMemory(userId);
         const userName = await AsyncStorage.getItem('@ai_wellness_user_name');
         
         const greeting = userName ? `Hi ${userName}! 👋` : 'Hi there! 👋';
-        const followUp = memory.totalInteractions > 0 
+        const followUp = memory.usage.totalInteractions > 0 
           ? "How have you been feeling since our last check-in?"
           : "How are you feeling today? I'm here to help you stay active and energized!";
+        
+        // Check if this is first time seeing voice feature
+        const hasSeenVoiceIntro = await AsyncStorage.getItem('@ai_wellness_voice_intro_seen');
+        let voiceIntro = '';
+        if (!hasSeenVoiceIntro) {
+          voiceIntro = '\n\n🎤 ✨ NEW: Try speaking to me! Tap the glowing microphone button to use your voice instead of typing. Just like having a conversation with a real wellness coach!';
+          await AsyncStorage.setItem('@ai_wellness_voice_intro_seen', 'true');
+          setShowVoiceIntro(true);
+        }
         
         const welcomeMessage: Message = {
           id: Date.now().toString(),
           type: 'ai',
-          message: `${greeting}\n\n${followUp}`,
+          message: `${greeting}\n\n${followUp}${voiceIntro}`,
           timestamp: new Date(),
-          suggestedActions: ['Feeling good 😊', 'A bit tired 😴', 'Need a stretch 🤸'],
+          // suggestedActions removed
         };
         setMessages([welcomeMessage]);
       }
@@ -259,7 +312,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         type: 'ai',
         message: result.response,
         timestamp: new Date(),
-        suggestedActions: result.suggestedActions || ['Tell me more', 'Suggest a stretch', 'That helps!'],
+        // suggestedActions removed
       };
       
       setMessages(prev => [...prev, aiMessage]);
@@ -292,7 +345,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         setIsLoading(true);
         const transcribedText = await voiceRecordingService.transcribeAudio(audioUri);
         
-        if (transcribedText) {
+        if (transcribedText && transcribedText.trim().length > 0) {
           // Check if it's a temporary message
           if (transcribedText.includes("coming soon") || transcribedText.includes("disponible pronto")) {
             Alert.alert(
@@ -301,15 +354,12 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
               [{ text: "OK" }]
             );
           } else {
-            // Real transcription
+            // Real transcription - send it
             await handleSend(transcribedText);
           }
         } else {
-          Alert.alert(
-            "Voice Error",
-            "Could not process voice recording. Please try typing instead.",
-            [{ text: "OK" }]
-          );
+          // Silent fail - no alert needed, just don't send anything
+          console.log('No speech detected or transcription failed silently');
         }
         setIsLoading(false);
       }
@@ -320,21 +370,43 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       
       if (started) {
         setIsRecording(true);
-        // Start pulse animation
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(recordingPulse, {
-              toValue: 1.5,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            Animated.timing(recordingPulse, {
-              toValue: 1,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
+        setShowVoiceIntro(false); // Hide intro once they start using voice
+        
+        // Start subtle recording animations
+        Animated.parallel([
+          // Gentle pulse animation for the button
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(recordingPulse, {
+                toValue: 1.1,
+                duration: 1000,
+                useNativeDriver: true,
+              }),
+              Animated.timing(recordingPulse, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+              }),
+            ])
+          ),
+          // Subtle sound wave animations
+          Animated.loop(
+            Animated.stagger(300, [
+              Animated.sequence([
+                Animated.timing(soundWave1, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+                Animated.timing(soundWave1, { toValue: 0, duration: 800, useNativeDriver: true }),
+              ]),
+              Animated.sequence([
+                Animated.timing(soundWave2, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+                Animated.timing(soundWave2, { toValue: 0, duration: 800, useNativeDriver: true }),
+              ]),
+              Animated.sequence([
+                Animated.timing(soundWave3, { toValue: 0.2, duration: 800, useNativeDriver: true }),
+                Animated.timing(soundWave3, { toValue: 0, duration: 800, useNativeDriver: true }),
+              ]),
+            ])
+          ),
+        ]).start();
       } else {
         Alert.alert(
           "Recording Failed",
@@ -345,10 +417,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     }
   };
 
-  const handleSuggestedAction = (action: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    handleSend(action);
-  };
+  // handleSuggestedAction removed - no longer needed
 
   const modalHeight = isCollapsed ? COLLAPSED_HEIGHT : MAX_HEIGHT * 0.7;
 
@@ -463,30 +532,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                           </View>
                         )}
                       </View>
-                      
-                      {/* Suggested Actions */}
-                      {msg.type === 'ai' && msg.suggestedActions && (
-                        <View style={styles.suggestedActions}>
-                          {msg.suggestedActions.map((action, index) => (
-                            <TouchableOpacity
-                              key={index}
-                              style={[
-                                styles.actionChip,
-                                { 
-                                  backgroundColor: isDark ? 'rgba(74, 222, 128, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                                  borderColor: '#4ade80',
-                                }
-                              ]}
-                              onPress={() => handleSuggestedAction(action)}
-                              disabled={isLoading}
-                            >
-                              <Text style={[styles.actionText, { color: '#22c55e' }]}>
-                                {action}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
+                      {/* Suggested Actions removed - users type their own responses */}
                     </View>
                   ))}
                   
@@ -502,13 +548,23 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
 
                 {/* Recording Indicator */}
                 {isRecording && (
-                  <LinearGradient
-                    colors={['rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.05)']}
-                    style={styles.recordingIndicator}
-                  >
-                    <Animated.View style={[styles.recordingDot, { transform: [{ scale: recordingPulse }] }]} />
-                    <Text style={styles.recordingText}>Recording... Tap mic to send</Text>
-                  </LinearGradient>
+                  <View style={styles.recordingIndicator}>
+                    <LinearGradient
+                      colors={['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.08)']}
+                      style={styles.recordingIndicatorContent}
+                    >
+                      <View style={styles.recordingIconContainer}>
+                        <Animated.View style={[
+                          styles.recordingDot, 
+                          { opacity: recordingPulse }
+                        ]} />
+                        <Ionicons name="radio-outline" size={16} color="#ef4444" style={{ marginLeft: 4 }} />
+                      </View>
+                      <Text style={styles.recordingText}>
+                        🎙️ Listening... Tap mic to send
+                      </Text>
+                    </LinearGradient>
+                  </View>
                 )}
 
                 {/* Input Area */}
@@ -519,16 +575,95 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                 }]}>
                     <TouchableOpacity 
                       onPress={handleVoiceRecord}
-                      style={[
-                        styles.voiceButton,
-                        isRecording && styles.voiceButtonActive
-                      ]}
+                      style={styles.voiceButtonContainer}
+                      activeOpacity={0.8}
                     >
-                      <Ionicons 
-                        name={isRecording ? "mic" : "mic-outline"} 
-                        size={24} 
-                        color={isRecording ? '#ef4444' : '#4ade80'} 
-                      />
+                      <Animated.View style={[
+                        styles.voiceButtonWrapper,
+                        {
+                          transform: [
+                            { scale: recordingPulse },
+                            { scale: voiceButtonScale }
+                          ]
+                        }
+                      ]}>
+                        {/* Glow effect */}
+                        <Animated.View style={[
+                          styles.voiceButtonGlow,
+                          {
+                            opacity: isRecording ? 0 : voiceButtonGlow,
+                            backgroundColor: showVoiceIntro ? '#4ade80' : 'transparent'
+                          }
+                        ]} />
+                        
+                        {/* Main button */}
+                        <LinearGradient
+                          colors={isRecording 
+                            ? ['#ef4444', '#dc2626'] 
+                            : showVoiceIntro 
+                              ? ['#4ade80', '#22c55e', '#16a34a']
+                              : ['#4ade80', '#22c55e']
+                          }
+                          style={[
+                            styles.voiceButton,
+                            isRecording && styles.voiceButtonActive
+                          ]}
+                        >
+                          <Ionicons 
+                            name={isRecording ? "mic" : "mic"} 
+                            size={isRecording ? 28 : 26} 
+                            color="#ffffff" 
+                          />
+                        </LinearGradient>
+                        
+                        {/* Recording sound waves */}
+                        {isRecording && (
+                          <View style={styles.soundWaves}>
+                            <Animated.View style={[
+                              styles.soundWave,
+                              { 
+                                opacity: soundWave1,
+                                transform: [{ scale: soundWave1.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [1, 1.8]
+                                })}]
+                              }
+                            ]} />
+                            <Animated.View style={[
+                              styles.soundWave,
+                              { 
+                                opacity: soundWave2,
+                                transform: [{ scale: soundWave2.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [1, 2.2]
+                                })}]
+                              }
+                            ]} />
+                            <Animated.View style={[
+                              styles.soundWave,
+                              { 
+                                opacity: soundWave3,
+                                transform: [{ scale: soundWave3.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [1, 2.6]
+                                })}]
+                              }
+                            ]} />
+                          </View>
+                        )}
+                        
+                        {/* NEW badge for voice intro */}
+                        {showVoiceIntro && !isRecording && (
+                          <View style={styles.newBadge}>
+                            <LinearGradient
+                              colors={['#fbbf24', '#f59e0b']}
+                              style={styles.newBadgeGradient}
+                            >
+                              <Text style={styles.newBadgeText}>NEW</Text>
+                            </LinearGradient>
+                          </View>
+                        )}
+                      </Animated.View>
                     </TouchableOpacity>
 
                     <TextInput
@@ -536,7 +671,12 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                         color: theme.text,
                         backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
                       }]}
-                      placeholder={isRecording ? "Recording... Tap mic to stop" : "Type your message..."}
+                      placeholder={isRecording 
+                        ? "🎙️ Recording... Tap mic to stop" 
+                        : showVoiceIntro 
+                          ? "Try voice! 🎤 Or type here..."
+                          : "Type your message or use voice 🎤"
+                      }
                       placeholderTextColor={theme.textSecondary}
                       value={message}
                       onChangeText={setMessage}
@@ -699,21 +839,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  suggestedActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-    gap: 8,
-  },
-  actionChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  actionText: {
-    fontSize: 13,
-  },
+  // Styles removed - no longer showing suggested actions
+  // suggestedActions: {
+  //   flexDirection: 'row',
+  //   flexWrap: 'wrap',
+  //   marginTop: 8,
+  //   gap: 8,
+  // },
+  // actionChip: {
+  //   paddingHorizontal: 14,
+  //   paddingVertical: 8,
+  //   borderRadius: 16,
+  //   borderWidth: 1,
+  // },
+  // actionText: {
+  //   fontSize: 13,
+  // },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -732,16 +873,72 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
   },
-  voiceButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  voiceButtonContainer: {
+    marginRight: 12,
+    position: 'relative',
+  },
+  voiceButtonWrapper: {
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+  },
+  voiceButtonGlow: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    opacity: 0.3,
+  },
+  voiceButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   voiceButtonActive: {
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    shadowColor: '#ef4444',
+    shadowOpacity: 0.5,
+  },
+  soundWaves: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  soundWave: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#ef4444',
+  },
+  newBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    zIndex: 10,
+  },
+  newBadgeGradient: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  newBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
   },
   input: {
     flex: 1,
@@ -775,25 +972,37 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   recordingIndicator: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  recordingIndicatorContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: 16,
   },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ef4444',
+  recordingIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginRight: 8,
   },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ef4444',
+  },
   recordingText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#ef4444',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });

@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
-import aiWellnessService from '../../../services/ai/aiWellnessService';
-import wellnessMemory from '../../../services/ai/wellnessMemory';
+import aiWellnessService from '../../../services/ai/core/aiWellnessService';
+import memoryService from '../../../services/ai/memory/memoryService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../../services/storageService';
 
@@ -24,10 +24,10 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
   const loadDataStats = async () => {
     try {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-      const memory = await wellnessMemory.getMemory(userId);
+      const memory = await memoryService.getMemory(userId);
       setDataStats({
-        interactions: memory.totalInteractions,
-        lastCheckIn: memory.lastCheckIn ? new Date(memory.lastCheckIn).toLocaleDateString() : 'Never'
+        interactions: memory.usage.totalInteractions,
+        lastCheckIn: memory.usage.lastCheckIn ? new Date(memory.usage.lastCheckIn).toLocaleDateString() : 'Never'
       });
     } catch (error) {
       console.error('Error loading data stats:', error);
@@ -42,8 +42,8 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
       
       // Get wellness memory data
-      const memory = await wellnessMemory.getMemory(userId);
-      const insights = await wellnessMemory.getRecentInsights(userId, 50);
+      const memory = await memoryService.getMemoryWithCompatibility(userId);
+      const insights = await memoryService.getRecentInsights(userId, 50);
       const userName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
       
       const exportData = {
@@ -113,7 +113,7 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
               const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
               
               // Clear all wellness memory
-              await wellnessMemory.clearMemory(userId);
+              await memoryService.clearMemory(userId);
               
               // Clear AI wellness settings
               await AsyncStorage.multiRemove([
@@ -125,8 +125,8 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
                 '@ai_wellness_voice_mode'
               ]);
               
-              // Clear conversation history from service
-              await aiWellnessService.clearConversationHistory(userId);
+              // Clear conversation history from AsyncStorage
+              await AsyncStorage.removeItem(`@ai_wellness_conversation_${userId}`);
               
               Alert.alert(
                 'Data Deleted',

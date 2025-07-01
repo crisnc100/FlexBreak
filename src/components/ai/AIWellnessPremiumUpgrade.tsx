@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../services/storageService';
 import { AIWellnessTimePreference } from './AIWellnessTimePreference';
-import { scheduleAIWellnessV2 } from '../../services/ai/aiWellnessSchedulerV2';
+import { scheduleAIWellnessV2 } from '../../services/ai/scheduling/notificationScheduler';
 import { AINameSettings } from '../settings/ai/AINameSettings';
 
 interface AIWellnessPremiumUpgradeProps {

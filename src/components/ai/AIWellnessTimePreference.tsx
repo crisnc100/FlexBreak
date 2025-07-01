@@ -81,7 +81,7 @@ export const AIWellnessTimePreference: React.FC<AIWellnessTimePreferenceProps> =
             style={[
               styles.option,
               { 
-                backgroundColor: theme.surface,
+                backgroundColor: theme.background,
                 borderColor: selected === option.id ? theme.accent : theme.border,
                 borderWidth: selected === option.id ? 2 : 1
               }

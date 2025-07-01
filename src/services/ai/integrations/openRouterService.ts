@@ -1,4 +1,5 @@
-import { AI_CONFIG } from '../../config/aiConfig';
+import { AI_CONFIG } from '../../../config/aiConfig';
+import { retryUtil, errorHandler } from '../utils/reliabilityService';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -110,53 +111,43 @@ class OpenRouterService {
     options: any = {},
     retries: number = AI_CONFIG.openRouter.maxRetries
   ): Promise<string> {
+    const fallbackModels = [
+      AI_CONFIG.models.fast,
+      'mistralai/mistral-7b-instruct:free',
+      'meta-llama/llama-3-8b-instruct:free',
+      'google/gemma-7b-it:free'
+    ];
+    
+    // Try primary model with retry
+    const primaryFn = async () => this.chat(messages, options);
+    
+    // Create fallback functions
+    const fallbackFns = fallbackModels.map(model => 
+      async () => this.chat(messages, { ...options, model })
+    );
+    
     try {
-      return await this.chat(messages, options);
-    } catch (error: any) {
-      // If we get a 404, try with fallback models
-      if (error.message?.includes('404') && !options.triedFallback) {
-        console.log('Model not found, trying fallback models...');
-        
-        const fallbackModels = [
-          'mistralai/mistral-7b-instruct:free',
-          'meta-llama/llama-3-8b-instruct:free',
-          'google/gemma-7b-it:free',
-          'nousresearch/nous-capybara-7b:free'
-        ];
-        
-        for (const fallbackModel of fallbackModels) {
-          try {
-            console.log(`Trying fallback model: ${fallbackModel}`);
-            return await this.chat(messages, { 
-              ...options, 
-              model: fallbackModel,
-              triedFallback: true 
-            });
-          } catch (fallbackError: any) {
-            console.log(`Fallback ${fallbackModel} failed: ${fallbackError.message}`);
-          }
+      // Try primary model first
+      const result = await retryUtil.withRetry(primaryFn, 'openrouter_chat');
+      if (result.success) {
+        return result.data!;
+      }
+      
+      // Try fallback models one by one
+      for (const fallbackFn of fallbackFns) {
+        try {
+          return await fallbackFn();
+        } catch (fallbackError) {
+          continue; // Try next fallback
         }
       }
       
-      if (retries > 0) {
-        console.log(`Retrying... (${retries} attempts left)`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // On last retry, try our free fallback model
-        if (retries === 1 && !options.lastResortTried) {
-          console.log('Last retry - trying free model as fallback');
-          return this.chatWithRetry(messages, { 
-            ...options, 
-            model: AI_CONFIG.models.free,
-            maxTokens: 200,
-            temperature: 0.9,
-            lastResortTried: true 
-          }, retries - 1);
-        }
-        
-        return this.chatWithRetry(messages, options, retries - 1);
-      }
-      throw error;
+      // All attempts failed, throw the original error
+      throw result.error;
+    } catch (error) {
+      // If all attempts fail, throw user-friendly error
+      const errorContext = await errorHandler.handleError(error, 'openrouter_chat');
+      throw new Error(errorContext.userMessage);
     }
   }
 }

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CONTEXT_TEMPLATE } from './promptTemplates';
+import { CONTEXT_TEMPLATE } from './core/promptManager';
 
 export interface UserContext {
   message: string;
@@ -125,22 +125,15 @@ export const categorizeInput = (input: string): string => {
 };
 
 export const detectLanguage = (input: string, googleLang?: string): 'en' | 'es' | 'zh' => {
-  // Priority 1: Google Speech API detection (most accurate for voice)
-  if (googleLang) {
-    if (googleLang.startsWith('es')) return 'es';
-    if (googleLang.startsWith('zh') || googleLang.startsWith('cmn')) return 'zh';
-    if (googleLang.startsWith('en')) return 'en';
-  }
-  
   const lowerInput = input.toLowerCase();
   
-  // Priority 2: Chinese characters (very reliable)
+  // Priority 1: Chinese characters (most reliable indicator)
   const chineseChars = /[\u4e00-\u9fff\u3400-\u4dbf]/;
   if (chineseChars.test(input)) {
     return 'zh';
   }
   
-  // Priority 3: Spanish indicators (expanded list)
+  // Priority 2: Spanish indicators (check before trusting Google)
   const spanishWords = [
     'hola', 'buenos', 'buenas', 'días', 'tardes', 'noches',
     'como', 'está', 'estoy', 'siento', 'tengo', 'dolor',
@@ -154,6 +147,38 @@ export const detectLanguage = (input: string, googleLang?: string): 'en' | 'es' 
   if (spanishPatterns.test(lowerInput) || 
       spanishWords.some(word => lowerInput.includes(word))) {
     return 'es';
+  }
+  
+  // Priority 3: English indicators (common wellness-related words)
+  const englishWords = [
+    'hi', 'hello', 'hey', 'good', 'morning', 'afternoon', 'evening',
+    'my', 'neck', 'back', 'pain', 'hurt', 'sore', 'tired', 'stress',
+    'help', 'feel', 'feeling', 'better', 'worse', 'thanks', 'thank',
+    'yes', 'no', 'okay', 'fine', 'great', 'bad', 'leg', 'arm'
+  ];
+  
+  const hasEnglishWords = englishWords.some(word => lowerInput.includes(word));
+  
+  // Priority 4: Google Speech API detection (only trust if content matches)
+  if (googleLang) {
+    // Verify Google's detection against actual content
+    if (googleLang.startsWith('zh') || googleLang.startsWith('cmn')) {
+      // Only trust Chinese detection if there are actual Chinese characters
+      // or if there are no clear English/Spanish words
+      if (!hasEnglishWords && !spanishWords.some(word => lowerInput.includes(word))) {
+        return 'zh';
+      }
+    }
+    
+    if (googleLang.startsWith('es') && 
+        (spanishPatterns.test(lowerInput) || spanishWords.some(word => lowerInput.includes(word)))) {
+      return 'es';
+    }
+    
+    // For English, trust Google if there are English words present
+    if (googleLang.startsWith('en') && hasEnglishWords) {
+      return 'en';
+    }
   }
   
   // Default to English

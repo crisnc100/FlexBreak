@@ -19,10 +19,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
-import aiWellnessService from '../../services/ai/aiWellnessService';
+import aiWellnessService from '../../services/ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { MoodTracker } from '../../services/ai/moodTracker'; // Removed for MVP
-import voiceRecordingService from '../../services/ai/voiceRecordingService';
+import voiceRecordingService from '../../services/ai/integrations/voiceRecordingService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BUBBLE_SIZE = 65;
@@ -305,7 +305,7 @@ export const WellnessBubble: React.FC<WellnessBubbleProps> = ({
         <View style={[
           styles.blurContainer, 
           { 
-            backgroundColor: theme.isDark ? '#2C2C2E' : (theme.name === 'sunset' ? '#4A3C28' : '#6366F1'), // Indigo for calm wellness
+            backgroundColor: '#6366F1', // Indigo for calm wellness
             width: currentWidth,
             height: currentHeight,
           }

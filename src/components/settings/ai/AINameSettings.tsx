@@ -117,7 +117,7 @@ export const AINameSettings: React.FC<AINameSettingsProps> = ({ visible, onNameS
         <View style={styles.editRow}>
           <TextInput
             style={[styles.input, { 
-              backgroundColor: theme.inputBackground || theme.background, 
+              backgroundColor: theme.background, 
               color: theme.text,
               borderColor: theme.border
             }]}

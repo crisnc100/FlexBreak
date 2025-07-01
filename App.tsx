@@ -472,10 +472,9 @@ function MainApp() {
         // Clear any data cleanup notifications
         await clearDataCleanupNotifications();
         
-        // Initialize AI wellness notifications if enabled
-        // This ensures notifications are scheduled for users who have AI wellness enabled
-        const { initializeAIWellnessOnStartup } = await import('./src/services/ai/aiWellnessInitializer');
-        await initializeAIWellnessOnStartup();
+        // Initialize AI wellness system (includes notifications)
+        const systemInitializer = (await import('./src/services/ai/config/systemInitializer')).default;
+        await systemInitializer.initialize();
         
         // Get notification permissions (both systems need this)
         const permissionsGranted = await notifications.requestNotificationsPermissions();

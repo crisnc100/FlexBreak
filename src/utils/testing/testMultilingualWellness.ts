@@ -1,6 +1,6 @@
 // Test script for multilingual wellness coach
-import aiWellnessService from '../../services/ai/aiWellnessService';
-import simpleMemory from '../../services/ai/simpleMemory';
+import aiWellnessService from '../../services/ai/core/aiWellnessService';
+import improvedMemoryService from '../../services/ai/memory/memoryService';
 import { detectLanguage } from '../../services/ai/contextBuilder';
 
 export const testMultilingualWellness = async () => {
@@ -39,16 +39,16 @@ export const testMultilingualWellness = async () => {
   console.log('2️⃣ Testing Memory System:\n');
   
   // Add some test data
-  await simpleMemory.addPhysicalIssue(testUserId, 'back pain');
-  await simpleMemory.addStressPattern(testUserId, 'work deadlines');
-  await simpleMemory.addEffectiveSolution(testUserId, 'neck stretches');
-  await simpleMemory.addGoal(testUserId, 'stay active');
+  await improvedMemoryService.addPhysicalIssue(testUserId, 'back pain');
+  await improvedMemoryService.addStressPattern(testUserId, 'work deadlines');
+  await improvedMemoryService.addEffectiveSolution(testUserId, 'neck stretches');
+  await improvedMemoryService.addGoal(testUserId, 'stay active');
   
   // Test context building in different languages
   const contexts = {
-    en: await simpleMemory.buildContext(testUserId, 'en'),
-    es: await simpleMemory.buildContext(testUserId, 'es'),
-    zh: await simpleMemory.buildContext(testUserId, 'zh')
+    en: await improvedMemoryService.buildContext(testUserId, 'en'),
+    es: await improvedMemoryService.buildContext(testUserId, 'es'),
+    zh: await improvedMemoryService.buildContext(testUserId, 'zh')
   };
   
   console.log('Context in English:', contexts.en);

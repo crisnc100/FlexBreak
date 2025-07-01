@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { usePremium } from '../../../context/PremiumContext';
 import { KEYS } from '../../../services/storageService';
-import { scheduleAIWellnessV2 } from '../../../services/ai/aiWellnessSchedulerV2';
+import { scheduleAIWellnessV2 } from '../../../services/ai/scheduling/notificationScheduler';
 import * as Notifications from 'expo-notifications';
 
 interface AIScheduleSettingsProps {

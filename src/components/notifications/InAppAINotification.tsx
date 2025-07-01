@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Animated, KeyboardAvoidingView
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import aiWellnessService from '../../services/ai/aiWellnessService';
+import aiWellnessService from '../../services/ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useToast } from 'react-native-toast-notifications';
 

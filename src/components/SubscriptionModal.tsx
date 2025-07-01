@@ -140,32 +140,17 @@ export default function SubscriptionModal({
       // Check if AI Wellness is enabled and show appropriate notification
       const aiWellnessEnabled = await AsyncStorage.getItem('@ai_wellness_enabled') === 'true';
       if (aiWellnessEnabled) {
-        // User has AI Wellness enabled - show upgrade notification
-        setTimeout(() => {
-          Alert.alert(
-            '🎉 AI Wellness Coach Upgraded!',
-            'You now get daily wellness check-ins instead of just Wednesdays. Would you like to set your preferred check-in time?',
-            [
-              { 
-                text: 'Not Now', 
-                style: 'cancel'
-              },
-              { 
-                text: 'Set Schedule', 
-                onPress: async () => {
-                  // Clear the "seen" flag and trigger the premium upgrade modal
-                  await AsyncStorage.removeItem('@ai_wellness_premium_upgrade_seen');
-                  console.log('[SubscriptionModal] User wants to set AI wellness schedule');
-                  onClose(); // Close subscription modal first
-                  setTimeout(() => {
-                    // Emit event to show premium upgrade modal
-                    gamificationEvents.emit('SHOW_AI_WELLNESS_PREMIUM_UPGRADE');
-                  }, 500);
-                }
-              }
-            ]
-          );
-        }, 1000);
+        // User has AI Wellness enabled - trigger the modern premium upgrade modal
+        setTimeout(async () => {
+          // Clear the "seen" flag and trigger the premium upgrade modal
+          await AsyncStorage.removeItem('@ai_wellness_premium_upgrade_seen');
+          console.log('[SubscriptionModal] Triggering AI wellness premium upgrade modal');
+          onClose(); // Close subscription modal first
+          setTimeout(() => {
+            // Emit event to show premium upgrade modal
+            gamificationEvents.emit('SHOW_AI_WELLNESS_PREMIUM_UPGRADE');
+          }, 500);
+        }, 800);
       } else {
         // User doesn't have AI Wellness enabled - offer to enable it
         setTimeout(() => {

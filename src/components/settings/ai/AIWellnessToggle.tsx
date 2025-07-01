@@ -5,7 +5,7 @@ import { usePremium } from '../../../context/PremiumContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../../services/storageService';
 // Using only V2 scheduler for MVP
-import { scheduleAIWellnessV2 } from '../../../services/ai/aiWellnessSchedulerV2';
+import { scheduleAIWellnessV2 } from '../../../services/ai/scheduling/notificationScheduler';
 import { Toast } from 'react-native-toast-notifications';
 import * as Notifications from 'expo-notifications';
 
