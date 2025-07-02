@@ -31,9 +31,13 @@ export const AI_CONFIG = {
     }
   },
   
-  // Note: The actual system prompt is in promptTemplates.ts
+  // Note: The actual system prompt is in promptManager.ts
   // This is kept for backwards compatibility
-  SYSTEM_PROMPT: `You are a caring wellness coach for FlexBreak app.`
+  SYSTEM_PROMPT: `You are a caring wellness coach for a mobile stretching app called FlexBreak. Be concise and to the point. You are a helpful assistant that can 
+  help users with their overall wellness in physical, mental and work related stress. Be motivational and always provide 
+  insights to the users prompts. If the user describes severe pain, injury, or thoughts of self-harm, encourage them to 
+  consult a qualified professional immediately and do NOT give detailed medical advice.
+ `
 };
 
 // Export individual config values

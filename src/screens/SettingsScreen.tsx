@@ -8,18 +8,17 @@ import { AIWellnessSettings } from '../components/settings/ai';
 import DataManagement from '../components/settings/DataManagement';
 import DeveloperSection from '../components/settings/DeveloperSection';
 import AboutSection from '../components/settings/AboutSection';
+import LegalSection from '../components/settings/LegalSection';
+import ThemeSection from '../components/settings/ThemeSection';
 
 import DiagnosticsScreen from './DiagnosticsScreen';
-import { ThemeType, useTheme } from '../context/ThemeContext';
-import { useFeatureAccess } from '../hooks/progress/useFeatureAccess';
-import { useGamification } from '../hooks/progress/useGamification';
+import { useTheme } from '../context/ThemeContext';
 import { usePremium } from '../context/PremiumContext';
-import ThemePreview from '../components/ThemePreview';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { ThemedText, ThemedCard } from '../components/common';
+import { ThemedText } from '../components/common';
 import { Toast } from 'react-native-toast-notifications';
-import FitnessDisclaimer from '../components/notices/FitnessDisclaimer';
-import NonMedicalNotice from '../components/notices/NonMedicalNotice';
+import FitnessDisclaimer from '../components/settings/notices/FitnessDisclaimer';
+import NonMedicalNotice from '../components/settings/notices/NonMedicalNotice';
 import { BobSimulatorAccessModal } from '../components/testing';
 import * as soundEffects from '../utils/soundEffects';
 import * as storageService from '../services/storageService';
@@ -37,50 +36,13 @@ interface SettingsScreenProps {
   onClose?: () => void;
 }
 
-// Simple cross-platform progress bar component
-interface ProgressBarProps {
-  progress: number;
-  color: string;
-  style?: any;
-}
-
-const ProgressBar: React.FC<ProgressBarProps> = ({ progress, color, style }) => {
-  return (
-    <View style={[progressBarStyles.container, style]}>
-      <View 
-        style={[
-          progressBarStyles.progress, 
-          { 
-            width: `${Math.min(100, Math.max(0, progress * 100))}%`,
-            backgroundColor: color
-          }
-        ]} 
-      />
-    </View>
-  );
-};
-
-const progressBarStyles = StyleSheet.create({
-  container: {
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progress: {
-    height: '100%',
-  },
-});
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) => {
   const [diagnosticsModalVisible, setDiagnosticsModalVisible] = useState(false);
   const [privacyPolicyModalVisible, setPrivacyPolicyModalVisible] = useState(false);
-  const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
-  const { theme, themeType, setThemeType, toggleTheme, isDark, isSunset, canUseDarkTheme, canUseSunsetTheme } = useTheme();
+  const { theme, isDark, isSunset } = useTheme();
   const { isPremium } = usePremium();
-  const { isLoading, level } = useGamification();
-  const { canAccessFeature, getRequiredLevel, meetsLevelRequirement } = useFeatureAccess();
   const [bobSimulatorModalVisible, setBobSimulatorModalVisible] = useState(false);
   const hasSeenDarkModeUnlock = useRef(false);
   const appVersion = updateService.getCurrentVersion();
@@ -90,7 +52,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
   const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(true);
   const [badgeCount, setBadgeCount] = useState(0);
   const { showModal, updateInfo, checkForUpdates, hideModal } = useUpdateNotification();
-  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
   
   // Load transition duration on mount
   useEffect(() => {
@@ -162,39 +123,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     setSubscriptionModalVisible(false);
   };
   
-  // Function to send email to support
-  const handleContactSupport = () => {
-    Linking.openURL('mailto:flexbreakapp@gmail.com?subject=FlexBreak%20Support%20Request');
-  };
-
-  // Function to open website
-  const handleOpenWebsite = () => {
-    Linking.openURL('https://flexbreak-support-hub.com');
-  };
-
-  // Handle check for updates
-  const handleCheckForUpdates = async () => {
-    setCheckingForUpdates(true);
-    try {
-      const info = await updateService.checkForUpdate(true); // Force check
-      if (!info.isUpdateAvailable) {
-        Alert.alert(
-          'No Updates Available',
-          `You're running the latest version (${info.currentVersion})`,
-          [{ text: 'OK' }]
-        );
-      }
-      // If update is available, the modal will be shown automatically by the hook
-    } catch (error) {
-      Alert.alert(
-        'Update Check Failed',
-        'Unable to check for updates. Please try again later.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setCheckingForUpdates(false);
-    }
-  };
 
   // Handle reset data
   const handleResetData = async () => {
@@ -276,121 +204,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
     );
   };
 
-  // Handle theme type selection
-  const handleThemeTypeSelection = (type: ThemeType) => {
-    if (type === 'dark') {
-      if (!canUseDarkTheme) {
-        // If user doesn't have access to dark theme, show appropriate message
-        if (!isPremium) {
-          Alert.alert(
-            'Premium Feature',
-            'Dark theme requires a premium subscription. Unlock all premium features to access dark theme.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Upgrade', style: 'default', onPress: () => handleOpenSubscription() }
-            ]
-          );
-        } else {
-          Alert.alert(
-            'Dark Theme Locked',
-            'Dark theme is unlocked at level 2. Keep stretching to unlock it!',
-            [{ text: 'OK' }]
-          );
-        }
-        return;
-      }
-      
-      // For dark theme, directly set to dark theme instead of using toggleTheme
-      if (themeType !== 'dark') {
-        console.log('Settings screen: Directly setting dark theme');
-        setThemeType('dark');
-        return;
-      }
-    } else if (type === 'sunset') {
-      if (!canUseSunsetTheme) {
-        // For sunset theme, don't tell them exactly how many achievements are needed
-        Alert.alert(
-          'Hidden Theme Locked',
-          'Continue collecting achievement badges to unlock this special theme.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-      
-      // For sunset theme toggle
-      if (themeType !== 'sunset') {
-        console.log('Settings screen: Toggling to sunset theme');
-        setThemeType('sunset');
-        return;
-      }
-    } else if (themeType === 'dark' && type === 'light' || themeType === 'sunset' && type === 'light') {
-      // If switching from dark/sunset to light, also use setThemeType directly
-      console.log('Settings screen: Toggling to light theme');
-      setThemeType('light');
-      return;
-    }
-  };
-
-  // Function to render the progress to the next level for premium users
-  const renderLevelProgress = () => {
-    const requiredLevel = getRequiredLevel('dark_theme');
-    const progress = level / requiredLevel;
-    
-    return (
-      <View style={styles.levelProgressContainer}>
-        <View style={styles.levelProgressTextContainer}>
-          <ThemedText style={styles.levelProgressText}>
-            Level {level} / {requiredLevel}
-          </ThemedText>
-          <ThemedText type="accent" bold>
-            {Math.round(progress * 100)}%
-          </ThemedText>
-        </View>
-        <ProgressBar
-          progress={progress}
-          color={theme.accent}
-          style={styles.progressBar}
-        />
-        <ThemedText type="secondary" style={styles.unlockTip}>
-          Continue stretching to reach level {requiredLevel} and unlock dark mode
-        </ThemedText>
-      </View>
-    );
-  };
-  
-  // Function to render the premium upsell card
-  const renderPremiumUpsell = () => {
-    return (
-      <ThemedCard style={styles.premiumUpsellCard}>
-        <View style={styles.premiumUpsellHeader}>
-          <Ionicons name="star" size={22} color="#FFD700" />
-          <ThemedText bold style={styles.premiumUpsellTitle}>Premium Feature</ThemedText>
-        </View>
-        
-        <View style={styles.premiumFeatureItem}>
-          <View style={styles.premiumFeatureIcon}>
-            <Ionicons name="moon" size={18} color="#BB86FC" />
-          </View>
-          <ThemedText>Dark Mode</ThemedText>
-          <View style={styles.premiumLockBadge}>
-            <Ionicons name="lock-closed" size={12} color="#FFF" />
-          </View>
-        </View>
-        
-        <ThemedText type="secondary" style={styles.premiumUpsellDescription}>
-          Upgrade to Premium to unlock Dark Mode (requires Level {getRequiredLevel('dark_theme')})
-        </ThemedText>
-        
-        <TouchableOpacity 
-          style={styles.premiumUpsellButton}
-          onPress={handleOpenSubscription}
-        >
-          <ThemedText style={styles.premiumUpsellButtonText}>Upgrade to Premium</ThemedText>
-        </TouchableOpacity>
-      </ThemedCard>
-    );
-  };
-  
   // Function to open subscription management page
   const openSubscriptionManagement = () => {
     if (Platform.OS === 'ios') {
@@ -509,150 +322,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         showsVerticalScrollIndicator={false}
       >
         {/* Theme Section */}
-        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
-          <Text style={[styles.sectionTitle, {color: theme.text}]}>Appearance</Text>
-          
-          {/* Theme selection */}
-          <View style={styles.settingItem}>
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isSunset ? '#462639' : (isDark || isSunset ? '#2D2D2D' : '#E3F2FD')}]}>
-                <Ionicons 
-                  name={isSunset ? "partly-sunny" : (isDark || isSunset ? "moon" : "sunny")} 
-                  size={22} 
-                  color={isSunset ? "#FF8C5A" : (isDark ? "#BB86FC" : "#FF9800")} 
-                />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>App Theme</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
-                  {canAccessFeature('dark_theme') || canUseSunsetTheme
-                    ? 'Choose how the app looks' 
-                    : isPremium && !meetsLevelRequirement('dark_theme')
-                      ? `Dark mode unlocks at level ${getRequiredLevel('dark_theme')} (Current: ${level})`
-                      : 'Premium feature - Dark mode unlocks at level 2'}
-                </Text>
-              </View>
-            </View>
-          </View>
-          
-          {/* Theme options */}
-          {(canAccessFeature('dark_theme') || canUseSunsetTheme) && (
-            <View style={styles.themeOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.themeOption, 
-                  themeType === 'light' && styles.themeOptionSelected,
-                  {backgroundColor: themeType === 'light' ? theme.accent + '20' : theme.backgroundLight}
-                ]}
-                onPress={() => handleThemeTypeSelection('light')}
-              >
-                <View style={[styles.themeIconContainer, {backgroundColor: isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
-                  <Ionicons name="sunny" size={22} color="#FF9800" />
-                </View>
-                <Text style={[styles.themeOptionText, {color: theme.text}]}>Light</Text>
-                {themeType === 'light' && (
-                  <View style={styles.selectedIndicator}>
-                    <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              {canAccessFeature('dark_theme') && (
-                <TouchableOpacity
-                  style={[
-                    styles.themeOption, 
-                    themeType === 'dark' && styles.themeOptionSelected,
-                    {backgroundColor: themeType === 'dark' ? theme.accent + '20' : theme.backgroundLight}
-                  ]}
-                  onPress={() => handleThemeTypeSelection('dark')}
-                >
-                  <View style={[styles.themeIconContainer, {backgroundColor: isDark || isSunset ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)'}]}>
-                    <Ionicons name="moon" size={22} color={isDark || isSunset ? "#BB86FC" : "#673AB7"} />
-                  </View>
-                  <Text style={[styles.themeOptionText, {color: theme.text}]}>Dark</Text>
-                  {themeType === 'dark' && (
-                    <View style={styles.selectedIndicator}>
-                      <Ionicons name="checkmark-circle" size={16} color={theme.accent} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )}
-              
-              {canUseSunsetTheme && (
-                <TouchableOpacity
-                  style={[
-                    styles.themeOption, 
-                    themeType === 'sunset' && styles.themeOptionSelected,
-                    {backgroundColor: themeType === 'sunset' ? '#FF8C5A20' : theme.backgroundLight}
-                  ]}
-                  onPress={() => handleThemeTypeSelection('sunset')}
-                >
-                  <View style={[styles.themeIconContainer, {backgroundColor: isSunset ? 'rgba(255, 140, 90, 0.2)' : 'rgba(255, 255, 255, 0.5)'}]}>
-                    <Ionicons name="partly-sunny" size={22} color="#FF8C5A" />
-                  </View>
-                  <Text style={[styles.themeOptionText, {color: theme.text}]}>Sunset</Text>
-                  {themeType === 'sunset' && (
-                    <View style={styles.selectedIndicator}>
-                      <Ionicons name="checkmark-circle" size={16} color="#FF8C5A" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )}
-              
-             
-            </View>
-          )}
-          
-          {/* Enhanced Premium/Level lock for dark theme */}
-          {!canAccessFeature('dark_theme') && (
-            <>
-              {/* Show different UI based on premium status */}
-              {!isPremium ? (
-                renderPremiumUpsell()
-              ) : !meetsLevelRequirement('dark_theme') ? (
-                <>
-                  <View style={styles.darkModeLockContainer}>
-                    <View style={styles.darkModeLockHeaderRow}>
-                      <Ionicons name="moon" size={24} color="#BB86FC" />
-                      <ThemedText bold size={16} style={styles.darkModeLockTitle}>
-                        Dark Mode
-                      </ThemedText>
-                      <View style={styles.lockBadge}>
-                        <Ionicons name="lock-closed" size={16} color="#FFFFFF" />
-                      </View>
-                    </View>
-                    {renderLevelProgress()}
-                  </View>
-                </>
-              ) : (
-                <View style={styles.comingSoonContainer}>
-                  <Text style={styles.comingSoonBadge}>Coming Soon</Text>
-                  <ThemedText type="secondary">
-                    Dark mode is coming soon to your account
-                  </ThemedText>
-                </View>
-              )}
-            </>
-          )}
-          
-          {/* Sunset theme lock info - only shown if user has some badges but can't access the theme yet */}
-          {!canUseSunsetTheme && badgeCount > 0 && (
-            <View style={styles.sunsetModeLockContainer}>
-              <View style={styles.sunsetModeLockHeaderRow}>
-                <Ionicons name="partly-sunny" size={24} color="#FF8C5A" />
-                <ThemedText bold size={16} style={styles.sunsetModeLockTitle}>
-                  Hidden Theme
-                </ThemedText>
-                <View style={[styles.lockBadge, { backgroundColor: '#FF8C5A' }]}>
-                  <Ionicons name="trophy" size={16} color="#FFFFFF" />
-                </View>
-              </View>
-              <ThemedText type="secondary" style={styles.unlockTip}>
-                Continue collecting achievements to unlock a special theme
-              </ThemedText>
-            </View>
-          )}
-        </View>
+        <ThemeSection 
+          onOpenSubscription={handleOpenSubscription}
+          badgeCount={badgeCount}
+        />
         
         {/* Workout Settings Section */}
         {renderWorkoutSettings()}
@@ -717,55 +390,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         {/* About Section */}
         <AboutSection
           appVersion={appVersion}
-          onCheckForUpdates={handleCheckForUpdates}
-          checkingForUpdates={checkingForUpdates}
-          onOpenHelp={() => setHelpModalVisible(true)}
-          onOpenWebsite={handleOpenWebsite}
-          onContactSupport={handleContactSupport}
         />
         
         {/* Legal Information Section */}
-        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
-          <Text style={[styles.sectionTitle, {color: theme.text}]}>Legal Information</Text>
-          
-          {/* Fitness Disclaimer */}
-          <TouchableOpacity 
-            style={styles.settingItem} 
-            onPress={() => setFitnessDisclaimerModalVisible(true)}
-          >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="fitness-outline" size={22} color={theme.accent} />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Fitness Disclaimer</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
-                  View important health and safety information
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-          
-          {/* Non-Medical Notice */}
-          <TouchableOpacity 
-            style={[styles.settingItem, styles.lastItem]} 
-            onPress={() => setNonMedicalNoticeModalVisible(true)}
-          >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="information-circle-outline" size={22} color={theme.accent} />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Non-Medical Notice</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
-                  Information regarding wellness content
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-        </View>
+        <LegalSection />
         
         {/* Developer Section - Only visible in development mode */}
         {__DEV__ && (
@@ -810,191 +438,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         </View>
       </Modal>
       
-      {/* Privacy Policy Modal */}
-      <Modal
-        animationType="slide"
-        transparent={false}
-        visible={privacyPolicyModalVisible}
-        onRequestClose={() => setPrivacyPolicyModalVisible(false)}
-      >
-        <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
-          <View style={[styles.modalHeader, {borderBottomColor: theme.border, backgroundColor: theme.cardBackground}]}>
-            <TouchableOpacity 
-              onPress={() => setPrivacyPolicyModalVisible(false)}
-              style={styles.modalCloseButton}
-              hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
-            >
-              <Ionicons name="arrow-back" size={24} color={theme.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, {color: theme.text}]}>Privacy Policy</Text>
-            <View style={styles.headerRight} />
-          </View>
-          
-          <ScrollView style={[styles.container, {padding: 16}]}>
-            <ThemedText style={styles.policyTitle} bold size={22}>
-              FlexBreak Privacy Policy
-            </ThemedText>
-            <ThemedText style={styles.policyDate} type="secondary">
-              Last Updated: April 14, 2025
-            </ThemedText>
-            
-            <ThemedText style={styles.policySection} bold size={18}>
-              1. Introduction
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              FlexBreak is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and share your personal information when you use our application.
-            </ThemedText>
-            
-            <ThemedText style={styles.policySection} bold size={18}>
-              2. Information We Collect
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              We collect information that you provide directly to us, such as when you create an account, subscribe to our service, or contact us for support. This may include your name, email address, and payment information.
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              We also automatically collect certain information when you use our app, including:
-            </ThemedText>
-            <View style={styles.bulletList}>
-              <ThemedText style={styles.bulletItem}>• Device information (model, operating system)</ThemedText>
-              <ThemedText style={styles.bulletItem}>• Usage statistics and exercise data</ThemedText>
-              <ThemedText style={styles.bulletItem}>• Performance and error data</ThemedText>
-            </View>
-            
-            <ThemedText style={styles.policySection} bold size={18}>
-              3. How We Use Your Information
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              We use the information we collect to:
-            </ThemedText>
-            <View style={styles.bulletList}>
-              <ThemedText style={styles.bulletItem}>• Provide and maintain our services</ThemedText>
-              <ThemedText style={styles.bulletItem}>• Process transactions and send related information</ThemedText>
-              <ThemedText style={styles.bulletItem}>• Send you technical notices and support messages</ThemedText>
-              <ThemedText style={styles.bulletItem}>• Improve and personalize your experience</ThemedText>
-            </View>
-            
-            <ThemedText style={styles.policySection} bold size={18}>
-              4. Data Storage and Security
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              We take the security of your data seriously and implement appropriate measures to protect your information. Your personal data is stored securely and is only accessible to authorized personnel.
-            </ThemedText>
-            
-            <ThemedText style={styles.policySection} bold size={18}>
-              5. Your Rights
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              You have the right to access, correct, or delete your personal information. You can manage your account settings within the app or contact us directly for assistance.
-            </ThemedText>
-            
-            <ThemedText style={styles.policySection} bold size={18}>
-              6. Changes to This Policy
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy in the app and updating the "Last Updated" date.
-            </ThemedText>
-            
-            <ThemedText style={styles.policySection} bold size={18}>
-              7. Contact Us
-            </ThemedText>
-            <ThemedText style={styles.policyText}>
-              If you have any questions about this Privacy Policy, please contact us at:
-            </ThemedText>
-            <ThemedText style={[styles.policyText, {marginBottom: 30}]}>
-              privacy@flexbreak.com
-            </ThemedText>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+     
       
-      {/* Help Modal */}
-      <Modal
-        animationType="slide"
-        transparent={false}
-        visible={helpModalVisible}
-        onRequestClose={() => setHelpModalVisible(false)}
-      >
-        <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.background}]}>
-          <View style={[styles.modalHeader, {borderBottomColor: theme.border, backgroundColor: theme.cardBackground}]}>
-            <TouchableOpacity 
-              onPress={() => setHelpModalVisible(false)}
-              style={styles.modalCloseButton}
-              hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
-            >
-              <Ionicons name="arrow-back" size={24} color={theme.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, {color: theme.text}]}>Help & Support</Text>
-            <View style={styles.headerRight} />
-          </View>
-          
-          <ScrollView style={[styles.container, {padding: 16}]}>
-            <ThemedText style={styles.helpTitle} bold size={20}>
-              Frequently Asked Questions
-            </ThemedText>
-            
-            <ThemedText style={styles.helpQuestion} bold>
-              How do I start a stretching routine?
-            </ThemedText>
-            <ThemedText style={styles.helpAnswer}>
-              From the home screen, tap on "Start Stretching" or select a specific routine from the routines tab. Follow the on-screen instructions for each stretch.
-            </ThemedText>
-            
-            <ThemedText style={styles.helpQuestion} bold>
-              Can I create custom routines?
-            </ThemedText>
-            <ThemedText style={styles.helpAnswer}>
-              Yes! Go to the Routines tab and tap "Create New" to build your own custom routine with stretches of your choice.
-            </ThemedText>
-            
-            <ThemedText style={styles.helpQuestion} bold>
-              How do I track my progress?
-            </ThemedText>
-            <ThemedText style={styles.helpAnswer}>
-              Your progress is automatically tracked in the Stats tab. You can view your daily and weekly stretching minutes, completed routines, and streaks.
-            </ThemedText>
-            
-            <ThemedText style={styles.helpQuestion} bold>
-              What is the Premium subscription?
-            </ThemedText>
-            <ThemedText style={styles.helpAnswer}>
-              Premium gives you access to all stretching routines, removes ads, enables dark mode (at level 2), and unlocks custom routine creation. Subscribe in the app settings.
-            </ThemedText>
-            
-            <ThemedText style={styles.helpQuestion} bold>
-              How do I set up stretch reminders?
-            </ThemedText>
-            <ThemedText style={styles.helpAnswer}>
-              Go to the Reminders tab and tap "Add Reminder". Choose your preferred time and frequency, and ensure notifications are enabled for the app in your device settings.
-            </ThemedText>
-            
-            <View style={styles.helpDivider} />
-            
-            <ThemedText style={styles.helpTitle} bold size={20}>
-              Contact Support
-            </ThemedText>
-            <ThemedText style={styles.helpContactText}>
-              Need additional help? Our support team is ready to assist you:
-            </ThemedText>
-            
-            <TouchableOpacity 
-              style={[styles.helpContactButton, {backgroundColor: theme.accent}]}
-              onPress={handleContactSupport}
-            >
-              <Ionicons name="mail-outline" size={20} color="#FFF" style={{marginRight: 8}} />
-              <Text style={styles.helpContactButtonText}>Email Support</Text>
-            </TouchableOpacity>
-            
-            <ThemedText style={styles.helpResponseTime} type="secondary">
-              We typically respond within 24 hours on business days.
-            </ThemedText>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
       
       {/* Subscription Modal */}
       <SubscriptionModal
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
+        isFromSettings={true}
       />
       
       {/* Fitness Disclaimer Modal */}
@@ -1154,145 +605,6 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
   },
-  themeOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 0,
-  },
-  themeOption: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'column',
-    alignItems: 'center',
-    width: '30%',
-    position: 'relative',
-  },
-  themeOptionSelected: {
-    borderColor: '#4CAF50',
-    borderWidth: 1,
-  },
-  themeIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  themeOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  selectedIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  darkModeLockContainer: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: 'rgba(187, 134, 252, 0.05)',
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#BB86FC',
-  },
-  darkModeLockHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  darkModeLockTitle: {
-    marginLeft: 8,
-    flex: 1,
-  },
-  lockBadge: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  levelProgressContainer: {
-    marginTop: 8,
-  },
-  levelProgressTextContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  levelProgressText: {
-    fontSize: 14,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 12,
-  },
-  unlockTip: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  premiumUpsellCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-  },
-  premiumUpsellHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  premiumUpsellTitle: {
-    fontSize: 18,
-    marginLeft: 8,
-    color: '#FFD700',
-  },
-  premiumFeatureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(187, 134, 252, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  premiumFeatureIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(187, 134, 252, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  premiumLockBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FF9800',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 'auto',
-  },
-  premiumUpsellDescription: {
-    marginBottom: 16,
-    fontSize: 14,
-  },
-  premiumUpsellButton: {
-    backgroundColor: '#FF9800',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  premiumUpsellButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1380,42 +692,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   
-  // Help screen styles
-  helpTitle: {
-    marginBottom: 20,
-  },
-  helpQuestion: {
-    marginBottom: 8,
-  },
-  helpAnswer: {
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  helpDivider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 24,
-  },
-  helpContactText: {
-    marginBottom: 16,
-  },
-  helpContactButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  helpContactButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  helpResponseTime: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1658,25 +934,6 @@ const styles = StyleSheet.create({
   premiumButtonText: {
     fontWeight: '600',
     fontSize: 14,
-  },
-  sunsetModeLockContainer: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: 'rgba(255, 140, 90, 0.05)',
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF8C5A',
-  },
-  sunsetModeLockHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sunsetModeLockTitle: {
-    marginLeft: 8,
-    flex: 1,
-    color: '#FF8C5A',
   },
 });
 

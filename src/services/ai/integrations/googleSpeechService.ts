@@ -35,7 +35,7 @@ class GoogleSpeechService {
       // OPTIMIZED: Use cheaper, faster model and settings
       const request = {
         config: {
-          encoding: 'MP3',
+          encoding: 'LINEAR16',
           sampleRateHertz: 16000, // Reduced for cost efficiency
           languageCode: languageCode || 'en-US',
           alternativeLanguageCodes: ['es-ES', 'zh-CN'],
@@ -99,7 +99,14 @@ class GoogleSpeechService {
       }
 
       const result = await response.json();
-      console.log('API Response:', JSON.stringify(result, null, 2));
+      console.log('Got response from Google Speech API');
+      console.log('API Response:', result);
+      
+      // Debug: Check if we have any results at all
+      if (!result.results || result.results.length === 0) {
+        console.log('No results in API response - audio may be too quiet or unclear');
+        console.log('Full response structure:', JSON.stringify(result, null, 2));
+      }
       
       // Get all transcriptions and combine them
       let fullTranscription = '';

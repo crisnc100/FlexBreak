@@ -103,9 +103,32 @@ export const setupAINotificationHandlers = () => {
               }
               break;
             case 'VOICE_REPLY':
-              // This opens the app with voice recording intent
-              console.log('Voice reply requested - opening bubble with voice');
+              // Voice reply from notification - show immediate feedback then open app
+              console.log('Voice reply requested from notification');
+              
+              // Send immediate feedback notification
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: "🎙️ Voice Reply Ready",
+                  body: "Opening FlexBreak for voice recording...",
+                  sound: false,
+                  data: { 
+                    type: 'ai_wellness_voice_feedback',
+                    userId: data.userId
+                  },
+                },
+                trigger: {
+                  seconds: 1
+                } as Notifications.TimeIntervalTriggerInput
+              });
+              
+              // Set voice mode flag and open app
               await AsyncStorage.setItem('@ai_wellness_voice_mode', 'true');
+              await AsyncStorage.setItem('@ai_wellness_voice_context', JSON.stringify({
+                originalNotification: data,
+                timestamp: Date.now()
+              }));
+              
               if (showAIWellnessModal) {
                 showAIWellnessModal();
               }
@@ -157,9 +180,11 @@ export const setupAINotificationHandlers = () => {
             
             // Always store the response for the bubble to show
             await AsyncStorage.setItem('@ai_wellness_last_response', JSON.stringify({
-              response: result.response,
+              response: result.response, // Store full response
               suggestedActions: result.suggestedActions,
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              fromNotification: true, // Flag to indicate this came from notification
+              truncatedForNotification: result.response.length > 180 // Flag if response was truncated
             }));
             
             // If the app is in foreground, show the bubble
@@ -210,10 +235,12 @@ export const setupAINotificationHandlers = () => {
           
           // Store response and show in app instead of notification
           await AsyncStorage.setItem('@ai_wellness_last_response', JSON.stringify({
-            response: result.response,
+            response: result.response, // Store full response
             suggestedActions: result.suggestedActions,
             category: result.category,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            fromNotification: true, // Flag to indicate this came from notification
+            truncatedForNotification: result.response.length > 180 // Flag if response was truncated
           }));
           
           // Show the wellness bubble with the response

@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as soundEffects from '../../utils/soundEffects';
 import * as Haptics from 'expo-haptics';
-import FitnessDisclaimer, { checkDisclaimerAccepted } from '../notices/FitnessDisclaimer';
+import FitnessDisclaimer, { checkDisclaimerAccepted } from '../settings/notices/FitnessDisclaimer';
 
 const { width, height } = Dimensions.get('window');
 

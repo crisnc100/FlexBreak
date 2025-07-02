@@ -19,6 +19,18 @@ export const useAIWellnessPremiumUpgrade = () => {
 
   const checkUpgradeEligibility = async () => {
     try {
+      // First check if we should show upgrade on this app open (from Settings upgrade)
+      const shouldShowOnNextOpen = await AsyncStorage.getItem('@ai_wellness_show_upgrade_on_next_open');
+      if (shouldShowOnNextOpen === 'true' && isPremium) {
+        await AsyncStorage.removeItem('@ai_wellness_show_upgrade_on_next_open');
+        console.log('[AI Wellness] Showing upgrade modal from Settings upgrade');
+        // Show immediately since app just opened
+        setTimeout(() => {
+          setShouldShowUpgrade(true);
+        }, 1000);
+        return;
+      }
+      
       // Get stored premium status
       const storedPremiumStatus = await AsyncStorage.getItem('@last_premium_status');
       const wasNotPremium = storedPremiumStatus === 'false';

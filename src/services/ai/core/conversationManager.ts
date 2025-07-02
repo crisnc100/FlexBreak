@@ -298,9 +298,30 @@ export class ConversationManager {
       simplified = simplified.replace(/\n+/g, ' ');
       // Clean up spaces
       simplified = simplified.replace(/\s+/g, ' ').trim();
-      // Truncate if still too long
-      if (simplified.length > 100) {
-        simplified = simplified.substring(0, 97) + '...';
+      // Truncate if still too long - use platform limits
+      const maxLength = 180; // Increased from 100 to show more content
+      if (simplified.length > maxLength) {
+        // Find the last complete sentence or phrase within limit
+        const truncated = simplified.substring(0, maxLength);
+        const lastPunctuation = Math.max(
+          truncated.lastIndexOf('.'),
+          truncated.lastIndexOf('!'),
+          truncated.lastIndexOf('?'),
+          truncated.lastIndexOf(',')
+        );
+        
+        if (lastPunctuation > maxLength * 0.7) {
+          // If we found punctuation in the last 30% of the text, use that
+          simplified = truncated.substring(0, lastPunctuation + 1);
+        } else {
+          // Otherwise, find the last complete word
+          const lastSpace = truncated.lastIndexOf(' ');
+          if (lastSpace > maxLength * 0.7) {
+            simplified = truncated.substring(0, lastSpace) + '...';
+          } else {
+            simplified = truncated.substring(0, maxLength - 3) + '...';
+          }
+        }
       }
       return simplified;
     }

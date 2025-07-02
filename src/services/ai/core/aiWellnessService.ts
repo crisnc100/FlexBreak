@@ -26,35 +26,24 @@ export class AIWellnessServiceV2 {
     isNotification: boolean = false
   ): Promise<WellnessResponse> {
     try {
-      // Check rate limits first
-      const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
-      const rateLimitKey = isPremium ? 'ai_chat_premium' : 'ai_chat_free';
-      const rateCheck = await rateLimiter.checkLimit(rateLimitKey, userId || 'anonymous');
-      
-      if (!rateCheck.allowed) {
-        return {
-          response: `${rateCheck.reason} Please try again in ${rateCheck.retryAfter} seconds.`,
-          category: 'rate_limited',
-          suggestedActions: ['Wait a moment']
-        };
-      }
-      
-      // Check cost limits
-      const canUseCost = await costMonitor.canMakeRequest(isPremium);
-      if (!canUseCost) {
-        return {
-          response: "AI service temporarily paused due to usage limits. Please try again tomorrow.",
-          category: 'cost_limit',
-          suggestedActions: ['Try Tomorrow']
-        };
-      }
-      
+      // Check access and limits first (includes day restrictions and daily limits)
       const accessCheck = await this.checkAccessAndLimits(userId);
       if (!accessCheck.canAccess) {
         return {
           response: accessCheck.message || "You've reached your AI wellness limit. Upgrade to premium for unlimited access!",
           category: 'limit_reached',
           suggestedActions: ['Upgrade to Premium']
+        };
+      }
+      
+      // Check cost limits
+      const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
+      const canUseCost = await costMonitor.canMakeRequest(isPremium);
+      if (!canUseCost) {
+        return {
+          response: "AI service temporarily paused due to usage limits. Please try again tomorrow.",
+          category: 'cost_limit',
+          suggestedActions: ['Try Tomorrow']
         };
       }
       
@@ -309,31 +298,63 @@ export class AIWellnessServiceV2 {
     
     const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
     
-    // Check day of week for free users
+    // Check day of week for free users (but allow first welcome interaction)
     if (!isPremium) {
       const today = new Date().getDay();
-      // Wednesday is day 3 (Sunday = 0)
-      if (today !== 3) {
+      
+      // Check if this is their first interaction ever
+      const hasEverUsedKey = `@ai_wellness_first_used_${userId}`;
+      const hasEverUsed = await AsyncStorage.getItem(hasEverUsedKey);
+      
+      // If it's not Wednesday and they've used it before, block access
+      if (today !== 3 && hasEverUsed) {
         return {
           canAccess: false,
           message: "AI Wellness Coach is available on Wednesdays for free users. Upgrade to premium for daily access!"
         };
       }
+      
+      // Mark that they've now used it (for first-time users)
+      if (!hasEverUsed) {
+        await AsyncStorage.setItem(hasEverUsedKey, 'true');
+      }
     }
     
-    // Check daily limits
+    // Check daily limits with special handling for free users
     const dailyLimit = isPremium ? AI_CONFIG.limits.premium.dailyRequests : AI_CONFIG.limits.free.dailyRequests;
     const usageKey = `@ai_wellness_usage_${userId}_${new Date().toDateString()}`;
     const currentUsage = await AsyncStorage.getItem(usageKey);
     const usageCount = currentUsage ? parseInt(currentUsage) : 0;
     
-    if (usageCount >= dailyLimit) {
-      return {
-        canAccess: false,
-        message: isPremium 
-          ? "You've reached your daily limit of 15 AI wellness sessions. Try again tomorrow!"
-          : "You've used all 3 free AI wellness sessions for today. Upgrade to premium for more!"
-      };
+    // For free users, enforce special limits based on first-time use and day
+    if (!isPremium) {
+      const today = new Date().getDay();
+      const hasEverUsedKey = `@ai_wellness_first_used_${userId}`;
+      const hasEverUsed = await AsyncStorage.getItem(hasEverUsedKey);
+      
+      // If it's not Wednesday and they've already used it once today (after their welcome)
+      if (hasEverUsed && today !== 3 && usageCount >= 1) {
+        return {
+          canAccess: false,
+          message: "Thanks for trying AI Wellness Coach! It's available on Wednesdays for free users. Upgrade to premium for daily access!"
+        };
+      }
+      
+      // If it's Wednesday, use normal daily limit
+      if (today === 3 && usageCount >= dailyLimit) {
+        return {
+          canAccess: false,
+          message: "You've used all 3 free AI wellness sessions for today. Upgrade to premium for more!"
+        };
+      }
+    } else {
+      // Premium users - normal daily limit check
+      if (usageCount >= dailyLimit) {
+        return {
+          canAccess: false,
+          message: "You've reached your daily limit of 15 AI wellness sessions. Try again tomorrow!"
+        };
+      }
     }
     
     return { canAccess: true };

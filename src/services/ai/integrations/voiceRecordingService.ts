@@ -20,6 +20,11 @@ class VoiceRecordingService {
 
   async startRecording(): Promise<boolean> {
     try {
+      // Stop any existing recording first
+      if (this.recording) {
+        await this.stopRecording();
+      }
+
       // Request permissions first
       const hasPermission = await this.requestPermissions();
       if (!hasPermission) {
@@ -27,33 +32,36 @@ class VoiceRecordingService {
         return false;
       }
 
-      // Configure audio mode
+      // Configure audio mode with minimal required settings
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
       });
+
+      // Wait longer for audio mode to be properly set on iOS
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Create and start recording with optimized settings for speech
       const recordingOptions = {
         isMeteringEnabled: true,
         android: {
           extension: '.m4a',
-          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          outputFormat: 2, // MPEG_4
+          audioEncoder: 3, // AAC
           sampleRate: 16000, // Optimal for speech recognition
           numberOfChannels: 1, // Mono is sufficient for voice
           bitRate: 128000,
         },
         ios: {
-          extension: '.m4a',
-          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-          audioQuality: Audio.IOSAudioQuality.HIGH,
-          sampleRate: 16000, // Match Google Speech requirements
+          extension: '.caf',
+          outputFormat: 'lpcm',
+          audioQuality: 32,
+          sampleRate: 16000,
           numberOfChannels: 1,
-          bitRate: 128000,
+          bitRate: 16000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
         },
         web: {
           mimeType: 'audio/webm',
@@ -61,13 +69,25 @@ class VoiceRecordingService {
         },
       };
       
+      console.log('Creating recording with options:', recordingOptions);
       const { recording } = await Audio.Recording.createAsync(recordingOptions);
       
       this.recording = recording;
-      console.log('Recording started');
+      console.log('Recording created and started successfully');
       return true;
     } catch (error) {
       console.error('Failed to start recording:', error);
+      this.recording = null;
+      
+      // Reset audio mode on error
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+        });
+      } catch (resetError) {
+        console.error('Failed to reset audio mode:', resetError);
+      }
+      
       return false;
     }
   }
@@ -80,6 +100,10 @@ class VoiceRecordingService {
       }
 
       console.log('Stopping recording...');
+      
+      // Get URI before stopping (in case stopAndUnloadAsync clears it)
+      const uri = this.recording.getURI();
+      
       await this.recording.stopAndUnloadAsync();
       
       // Reset audio mode
@@ -87,7 +111,6 @@ class VoiceRecordingService {
         allowsRecordingIOS: false,
       });
 
-      const uri = this.recording.getURI();
       this.recordingUri = uri;
       this.recording = null;
 
@@ -96,6 +119,16 @@ class VoiceRecordingService {
     } catch (error) {
       console.error('Failed to stop recording:', error);
       this.recording = null;
+      
+      // Try to reset audio mode even on error
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+        });
+      } catch (resetError) {
+        console.error('Failed to reset audio mode after error:', resetError);
+      }
+      
       return null;
     }
   }

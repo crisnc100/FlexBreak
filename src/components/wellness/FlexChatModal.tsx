@@ -175,16 +175,32 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       // Check for stored response from notification
       const storedResponse = await AsyncStorage.getItem('@ai_wellness_last_response');
       if (storedResponse) {
-        const { response, timestamp } = JSON.parse(storedResponse);
+        const { response, timestamp, fromNotification, truncatedForNotification } = JSON.parse(storedResponse);
         if (Date.now() - timestamp < 5 * 60 * 1000) {
+          const messages: Message[] = [];
+          
+          // If response was truncated in notification, show helpful message
+          if (fromNotification && truncatedForNotification) {
+            const truncationNotice: Message = {
+              role: 'assistant',
+              content: '📱 Here\'s my full response (it was shortened in the notification):',
+              timestamp: Date.now(),
+              id: (Date.now() - 1).toString(),
+              quickReplies: []
+            };
+            messages.push(truncationNotice);
+          }
+          
           const aiMessage: Message = {
+            role: 'assistant',
+            content: response,
+            timestamp: Date.now(),
             id: Date.now().toString(),
-            type: 'ai',
-            message: response,
-            timestamp: new Date(timestamp),
-            // suggestedActions removed
+            quickReplies: []
           };
-          setMessages([aiMessage]);
+          messages.push(aiMessage);
+          
+          setMessages(messages);
         }
         await AsyncStorage.removeItem('@ai_wellness_last_response');
       } else {
@@ -221,8 +237,26 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       const voiceMode = await AsyncStorage.getItem('@ai_wellness_voice_mode');
       if (voiceMode === 'true') {
         await AsyncStorage.removeItem('@ai_wellness_voice_mode');
+        
+        // Check if this was from a notification voice reply
+        const voiceContext = await AsyncStorage.getItem('@ai_wellness_voice_context');
+        if (voiceContext) {
+          await AsyncStorage.removeItem('@ai_wellness_voice_context');
+          console.log('Voice reply from notification detected');
+          
+          // Add a helpful message to guide the user
+          const voiceGuidanceMessage: Message = {
+            role: 'assistant',
+            content: '🎙️ Tap the microphone button to start your voice reply!',
+            timestamp: Date.now(),
+            id: Date.now().toString(),
+            quickReplies: []
+          };
+          setMessages(prev => [...prev, voiceGuidanceMessage]);
+        }
+        
         // Auto-start voice recording after a small delay
-        setTimeout(() => handleVoiceRecord(), 500);
+        setTimeout(() => handleVoiceRecord(), 800);
       }
     } catch (error) {
       console.error('Error loading initial state:', error);

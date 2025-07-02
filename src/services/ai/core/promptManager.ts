@@ -6,30 +6,48 @@ import { UserContext } from '../contextBuilder';
 const WELLNESS_COACH_PROMPT = {
   en: `You are FlexBreak's AI wellness coach. {context}
 
-Give ONE practical tip (1-2 sentences). Be direct and actionable.
+PRIORITY: First directly address the user's specific concern or prompt. Mirror their energy level and focus.
 
-For exercises: Use format "Try this: [action]"
-For advice: Start with verb (Stand up, Take 5 breaths, etc.)
+Give ONE practical tip (1-2 sentences) that:
+- Directly responds to what they're asking/feeling
+- Connects wellness to productivity and work performance
+- Is motivational and empowering while maintaining safety
+- Matches their energy (calm if they're stressed, energetic if they need motivation)
 
-Always use the user's name if provided.`,
+For exercises: "Try this: [action] - it'll help you [productivity benefit]"
+For advice: Start with action verb + productivity link
+
+Always use the user's name if provided. Be their wellness partner, not just a coach.`,
   
   es: `Eres el entrenador de bienestar AI de FlexBreak. {context}
 
-Da UN consejo práctico (1-2 frases). Sé directo y accionable.
+PRIORIDAD: Primero aborda directamente la preocupación o solicitud específica del usuario. Refleja su nivel de energía.
 
-Para ejercicios: Usa "Prueba esto: [acción]"
-Para consejos: Empieza con verbo (Levántate, Respira 5 veces, etc.)
+Da UN consejo práctico (1-2 frases) que:
+- Responda directamente a lo que sienten/piden
+- Conecte el bienestar con la productividad y rendimiento laboral
+- Sea motivador y empoderador manteniendo la seguridad
+- Coincida con su energía (calma si están estresados, energético si necesitan motivación)
 
-Siempre usa el nombre del usuario si está disponible.`,
+Para ejercicios: "Prueba esto: [acción] - te ayudará a [beneficio productivo]"
+Para consejos: Empieza con verbo de acción + vínculo productivo
+
+Siempre usa el nombre del usuario si está disponible. Sé su compañero de bienestar, no solo un entrenador.`,
   
   zh: `你是FlexBreak的AI健康教练。{context}
 
-给一个实用建议（1-2句话）。直接且可操作。
+优先事项：首先直接回应用户的具体关注或请求。反映他们的能量水平。
 
-运动建议：用"试试这个：[动作]"
-其他建议：以动词开头（站起来、深呼吸5次等）
+给一个实用建议（1-2句话），要：
+- 直接回应他们的感受/需求
+- 将健康与生产力和工作表现联系起来
+- 激励和赋能，同时保持安全性
+- 匹配他们的能量（如果压力大就冷静，如果需要动力就充满活力）
 
-如果提供了用户名，总是使用它。`
+运动建议："试试这个：[动作] - 这会帮助你[生产力益处]"
+其他建议：以动作动词开头 + 生产力联系
+
+如果提供了用户名，总是使用它。做他们的健康伙伴，而不仅仅是教练。`
 };
 
 const CONTEXT_TEMPLATE = {
@@ -82,28 +100,28 @@ const QUICK_ACTIONS = {
 
 const FALLBACK_RESPONSES = {
   en: {
-    back_pain: "Try this: Stand up, hands on lower back, arch gently 3 times. Add cat-cow stretches for relief.",
-    stress: "Take 5 deep belly breaths right now. Roll your shoulders back 10 times. You've got this!",
-    fatigue: "Stand up and do 10 arm circles. Take 5 deep breaths and grab some water.",
-    focus: "Try 20-20-20: Look 20 feet away for 20 seconds. Then do gentle neck rolls.",
-    positive: "Great to hear! Do a quick stretch to keep that energy flowing.",
-    general: "Stand up and stretch for 30 seconds. Your body will thank you!"
+    back_pain: "Try this: Stand up, hands on lower back, arch gently 3 times - it'll release tension and help you sit comfortably for focused work. Cat-cow stretches boost productivity by 20%!",
+    stress: "Take 5 deep belly breaths right now - it'll reset your mind for clearer thinking. Roll shoulders back 10 times. You've got this, and you'll tackle that task better after!",
+    fatigue: "Stand up and do 10 arm circles - it'll wake up your brain for sharper focus. Deep breaths and water will energize you to power through your work!",
+    focus: "Try 20-20-20: Look 20 feet away for 20 seconds - it'll refresh your eyes for better screen work. Gentle neck rolls prevent tension headaches that kill productivity.",
+    positive: "Fantastic energy! Quick stretch to maintain this momentum - it'll help you stay in the zone and crush your goals today!",
+    general: "Stand up and stretch for 30 seconds - it'll boost your energy and help you work smarter, not harder. Your productivity will thank you!"
   },
   es: {
-    back_pain: "El dolor de espalda es común al estar sentado. Prueba: Levántate, manos en espalda baja, arquea suavemente 3x. Estiramiento gato-vaca por 30 segundos.",
-    stress: "Alivio rápido del estrés: Toma 5 respiraciones profundas. Gira los hombros hacia atrás 10x. Mira lejos de la pantalla por 20 segundos.",
-    fatigue: "¿Cansado? Recarga energía: Levántate, haz 10 círculos con los brazos, respira profundo 5 veces, y si es posible, toma aire fresco o agua.",
-    focus: "¿Necesitas enfocarte? Prueba la regla 20-20-20: Mira algo a 20 pies por 20 segundos. Luego haz 20 giros suaves de cuello.",
-    positive: "¡Qué bueno escuchar eso! Mantén el impulso con un estiramiento rápido para mantener esa buena sensación.",
-    general: "¡Gracias por comunicarte! Recuerda, pequeños descansos de movimiento durante el día hacen gran diferencia. Prueba un estiramiento rápido."
+    back_pain: "Prueba esto: Levántate, manos en espalda baja, arquea suavemente 3x - liberará tensión y te ayudará a trabajar cómodamente. ¡El estiramiento gato-vaca aumenta la productividad un 20%!",
+    stress: "Toma 5 respiraciones profundas ahora - reiniciará tu mente para pensar más claro. Gira hombros 10x. ¡Puedes con esto, y trabajarás mejor después!",
+    fatigue: "Levántate, haz 10 círculos con brazos - despertará tu cerebro para mejor enfoque. ¡Respiración profunda y agua te energizarán para rendir al máximo!",
+    focus: "Prueba 20-20-20: Mira a 20 pies por 20 segundos - refrescará tus ojos para mejor trabajo en pantalla. Los giros de cuello previenen dolores que matan la productividad.",
+    positive: "¡Energía fantástica! Estiramiento rápido para mantener este impulso - te ayudará a mantener el ritmo y lograr tus metas hoy!",
+    general: "Levántate y estírate 30 segundos - aumentará tu energía y te ayudará a trabajar más inteligentemente. ¡Tu productividad te lo agradecerá!"
   },
   zh: {
-    back_pain: "久坐导致背痛很常见。试试：站起来，双手放在下背部，轻轻后弯3次。做猫牛式伸展30秒。设置每小时活动提醒！",
-    stress: "快速缓解压力：深呼吸5次。向后转肩10次。目光离开屏幕20秒。你可以的！",
-    fatigue: "感觉疲劳？快速补充能量：站起来，手臂画圈10次，深呼吸5次，如果可能的话，呼吸新鲜空气或喝水。",
-    focus: "需要重新集中注意力？试试20-20-20法则：看20英尺外的东西20秒。然后轻轻转动脖子20次。",
-    positive: "听到这个真好！做个快速伸展来保持这种良好的感觉。",
-    general: "脚步运动很棒！1. 踵脚活动：脚趾前后上下活动10次 2. 脚踝转圈：左右各转10圈 3. 单脚站立：每脚30秒锻炼平衡。记得定时站起来活动！"
+    back_pain: "试试这个：站起来，双手放下背，轻轻后弯3次 - 这会释放紧张，帮你舒适工作提高专注。猫牛式能提升20%生产力！",
+    stress: "现在深呼吸5次 - 这会重置你的思维，让你思考更清晰。肩膀后转10次。你能行的，之后工作会更出色！",
+    fatigue: "站起来手臂画圈10次 - 这会唤醒大脑，让你更专注。深呼吸加喝水会让你充满能量，高效完成工作！",
+    focus: "试试20-20-20法则：看20英尺外20秒 - 这会让眼睛恢复，更好地进行屏幕工作。颈部转动防止影响生产力的头痛。",
+    positive: "能量满满！快速伸展保持这种势头 - 这会帮你保持状态，今天达成所有目标！",
+    general: "站起来伸展30秒 - 这会提升能量，让你更聪明地工作而不是更辛苦。你的生产力会因此提升！"
   }
 };
 
@@ -258,53 +276,53 @@ export class PromptManager {
     const alternatives = {
       en: {
         back_pain: {
-          physical: "Since stretching didn't help, try applying heat to your lower back for 15 minutes. A hot water bottle or heating pad can relax tight muscles.",
-          positional: "Let's try a different approach: Lie on your back with knees bent and feet flat. Hold for 2 minutes to decompress your spine.",
-          support: "Try using a rolled towel behind your lower back for support while sitting. This maintains the natural curve."
+          physical: "Since stretching didn't help, try heat therapy for 15 minutes - it'll relax muscles so you can work pain-free and maintain focus. Comfort equals productivity!",
+          positional: "Let's reset: Lie on your back, knees bent, for 2 minutes - it'll decompress your spine and help you return to work refreshed and alert.",
+          support: "Try a rolled towel behind your lower back - it'll support proper posture so you can work longer without pain disrupting your flow."
         },
         stress: {
-          breathing: "If breathing exercises aren't working, try progressive muscle relaxation: Tense and release each muscle group for 5 seconds.",
-          movement: "Let's shift gears: Take a 2-minute walk, even if just around your space. Movement can reset your stress response.",
-          sensory: "Try the 5-4-3-2-1 technique: Name 5 things you see, 4 you hear, 3 you feel, 2 you smell, 1 you taste."
+          breathing: "If breathing isn't working, try progressive muscle relaxation - tense and release each muscle for 5 seconds. It'll clear mental fog for better decision-making!",
+          movement: "Let's shift gears: 2-minute walk right now - movement resets your stress hormones and boosts creative problem-solving by 60%!",
+          sensory: "Try 5-4-3-2-1 grounding: Name 5 things you see, 4 you hear, 3 you feel, 2 you smell, 1 you taste - it'll anchor you for laser focus."
         },
         fatigue: {
-          energy: "Since movement didn't energize you, try splashing cold water on your face and wrists. It's an instant wake-up.",
-          nutrition: "Check your hydration: Drink a full glass of water. Dehydration often masks as fatigue.",
-          light: "Increase your light exposure: Step near a window or turn on bright lights. Light signals alertness to your brain."
+          energy: "Since movement didn't work, splash cold water on face and wrists - it's nature's espresso shot! You'll feel alert and ready to tackle your tasks.",
+          nutrition: "Quick energy boost: Drink a full glass of water NOW. Dehydration zaps 30% of your mental performance - hydrate to dominate!",
+          light: "Boost alertness: Get near a window or bright lights for 2 minutes - light triggers your brain's wake-up chemicals for instant clarity!"
         }
       },
       es: {
         back_pain: {
-          physical: "Ya que el estiramiento no ayudó, prueba aplicar calor en la espalda baja por 15 minutos. Una bolsa de agua caliente puede relajar los músculos.",
-          positional: "Intentemos algo diferente: Acuéstate boca arriba con rodillas dobladas. Mantén por 2 minutos para descomprimir la columna.",
-          support: "Prueba usar una toalla enrollada detrás de tu espalda baja al sentarte. Esto mantiene la curva natural."
+          physical: "Ya que el estiramiento no ayudó, prueba calor por 15 minutos - relajará músculos para trabajar sin dolor y mantener el enfoque. ¡Comodidad es productividad!",
+          positional: "Reiniciemos: Acuéstate boca arriba con rodillas dobladas 2 minutos - descomprimirá tu columna y volverás al trabajo renovado y alerta.",
+          support: "Prueba una toalla enrollada en tu espalda baja - apoyará tu postura para trabajar más tiempo sin que el dolor interrumpa tu flujo."
         },
         stress: {
-          breathing: "Si la respiración no funciona, prueba relajación muscular progresiva: Tensa y relaja cada grupo muscular por 5 segundos.",
-          movement: "Cambiemos el enfoque: Camina 2 minutos, aunque sea en tu espacio. El movimiento puede reiniciar tu respuesta al estrés.",
-          sensory: "Prueba la técnica 5-4-3-2-1: Nombra 5 cosas que ves, 4 que oyes, 3 que sientes, 2 que hueles, 1 que saboreas."
+          breathing: "Si respirar no funciona, prueba relajación muscular progresiva - tensa y suelta cada músculo 5 segundos. ¡Despejará tu mente para mejores decisiones!",
+          movement: "Cambiemos: Camina 2 minutos ahora - el movimiento reinicia hormonas del estrés y aumenta la creatividad un 60%!",
+          sensory: "Prueba 5-4-3-2-1: Nombra 5 cosas que ves, 4 que oyes, 3 que sientes, 2 que hueles, 1 que saboreas - te anclará para enfoque láser."
         },
         fatigue: {
-          energy: "Si el movimiento no te energizó, prueba salpicar agua fría en tu cara y muñecas. Es un despertar instantáneo.",
-          nutrition: "Revisa tu hidratación: Bebe un vaso completo de agua. La deshidratación a menudo se disfraza de fatiga.",
-          light: "Aumenta tu exposición a la luz: Acércate a una ventana o enciende luces brillantes. La luz señala alerta a tu cerebro."
+          energy: "Si el movimiento no funcionó, salpica agua fría en cara y muñecas - ¡es el espresso de la naturaleza! Estarás alerta para tus tareas.",
+          nutrition: "Energía rápida: Bebe un vaso completo de agua AHORA. La deshidratación reduce 30% tu rendimiento mental - ¡hidrátate para dominar!",
+          light: "Aumenta alerta: Acércate a ventana o luces brillantes 2 minutos - la luz activa químicos cerebrales para claridad instantánea!"
         }
       },
       zh: {
         back_pain: {
-          physical: "既然伸展没有帮助，试试在下背部热敷15分钟。热水袋或加热垫可以放松紧张的肌肉。",
-          positional: "让我们尝试不同的方法：仰卧，膝盖弯曲，保持2分钟来减压脊柱。",
-          support: "坐着时在下背部放一个卷起的毛巾作支撑。这能保持自然曲线。"
+          physical: "既然伸展没用，试试热敷15分钟 - 这会放松肌肉让你无痛工作保持专注。舒适等于生产力！",
+          positional: "重置一下：仰卧膝盖弯曲2分钟 - 这会减压脊柱，让你精神焕发地回到工作中。",
+          support: "试试在下背放卷起的毛巾 - 这会支撑正确姿势，让你工作更久而不被疼痛打断。"
         },
         stress: {
-          breathing: "如果呼吸练习不管用，试试渐进式肌肉放松：每个肌肉群紧张并放松5秒。",
-          movement: "换个方法：走动2分钟，即使只是在你的空间里。运动可以重置压力反应。",
-          sensory: "试试5-4-3-2-1技巧：说出5个你看到的，4个听到的，3个感觉到的，2个闻到的，1个尝到的。"
+          breathing: "如果呼吸不管用，试试渐进式肌肉放松 - 每个肌肉紧张放松5秒。这会清除脑雾，做出更好决策！",
+          movement: "换个方式：现在就走动2分钟 - 运动重置压力激素，创造力提升60%！",
+          sensory: "试试5-4-3-2-1定心法：说出5个看到的，4个听到的，3个感觉的，2个闻到的，1个尝到的 - 让你激光般专注。"
         },
         fatigue: {
-          energy: "既然运动没有让你精力充沛，试试用冷水洗脸和手腕。这是即时清醒法。",
-          nutrition: "检查你的水分：喝一整杯水。脱水常常表现为疲劳。",
-          light: "增加光照：靠近窗户或打开明亮的灯。光线向大脑发出清醒信号。"
+          energy: "既然运动没用，用冷水洗脸和手腕 - 这是大自然的浓缩咖啡！你会警觉起来准备好应对任务。",
+          nutrition: "快速补充能量：现在就喝一整杯水。脱水会降低30%的脑力 - 补水才能主宰工作！",
+          light: "提升警觉：靠近窗户或明亮灯光2分钟 - 光线触发大脑清醒化学物质，瞬间清晰！"
         }
       }
     };

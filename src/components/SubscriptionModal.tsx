@@ -45,12 +45,14 @@ const TERMS_URL = "https://flexbreak-support-hub.com/";
 interface SubscriptionModalProps {
   visible: boolean;
   onClose: () => void;
+  isFromSettings?: boolean;
 }
 
 /* --- component --- */
 export default function SubscriptionModal({ 
   visible, 
-  onClose 
+  onClose,
+  isFromSettings = false 
 }: SubscriptionModalProps) {
   const {subscriptionDetails,updateSubscription,setPremiumStatus,refreshPremiumStatus,isPremium}=usePremium();
   const {refreshAccess}=useFeatureAccess();
@@ -132,15 +134,51 @@ export default function SubscriptionModal({
           ...cur, rewards:createInitialRewards()
         });
       }
+      // Check if we're upgrading from Settings and set flags BEFORE premium status changes
+      if (isFromSettings) {
+        // Mark that they have already seen the upgrade flow (via Alert in Settings)
+        // This must happen BEFORE setPremiumStatus to prevent the hook from triggering
+        await AsyncStorage.setItem('@ai_wellness_premium_upgrade_seen', 'true');
+      }
+      
       await setPremiumStatus(true);
       await soundEffects.playPremiumUnlockedSound().catch(()=>{});
       gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
       await refreshPremiumStatus?.(); refreshAccess?.(); refreshData?.(); refreshTheme?.();
       
-      // Check if AI Wellness is enabled and show appropriate notification
-      const aiWellnessEnabled = await AsyncStorage.getItem('@ai_wellness_enabled') === 'true';
-      if (aiWellnessEnabled) {
-        // User has AI Wellness enabled - trigger the modern premium upgrade modal
+      // Handle Settings upgrade UI feedback
+      if (isFromSettings) {
+        // DON'T show any modals when upgrading from Settings to avoid conflicts
+        // Just show a simple alert about AI features being available
+        const aiWellnessEnabled = await AsyncStorage.getItem('@ai_wellness_enabled') === 'true';
+        
+        // Close the subscription modal
+        setTimeout(() => {
+          onClose();
+          
+          // Show a simple alert after modal closes
+          setTimeout(() => {
+            if (aiWellnessEnabled) {
+              Alert.alert(
+                '🎉 Premium Activated!',
+                'Your AI Flex Coach now has daily check-ins! Visit AI Wellness settings to customize your experience.',
+                [{ text: 'Got it!', style: 'default' }]
+              );
+            } else {
+              Alert.alert(
+                '🎉 Premium Activated!',
+                'You now have access to AI Flex Coach with daily wellness check-ins! Enable it in AI Wellness settings.',
+                [{ text: 'Got it!', style: 'default' }]
+              );
+            }
+          }, 500);
+        }, 800);
+        
+        console.log('[SubscriptionModal] Upgrading from Settings - showing alert instead of modal');
+      } else {
+        // Normal flow (from home screen, etc.) - safe to show modals
+        const aiWellnessEnabled = await AsyncStorage.getItem('@ai_wellness_enabled') === 'true';
+        
         setTimeout(async () => {
           // Clear the "seen" flag and trigger the premium upgrade modal
           await AsyncStorage.removeItem('@ai_wellness_premium_upgrade_seen');
@@ -151,35 +189,6 @@ export default function SubscriptionModal({
             gamificationEvents.emit('SHOW_AI_WELLNESS_PREMIUM_UPGRADE');
           }, 500);
         }, 800);
-      } else {
-        // User doesn't have AI Wellness enabled - offer to enable it
-        setTimeout(() => {
-          Alert.alert(
-            '🤖 Unlock AI Wellness Coach',
-            'As a premium member, you now have full access to your personal AI Wellness Coach with daily check-ins! Would you like to enable it?',
-            [
-              { 
-                text: 'Maybe Later', 
-                style: 'cancel'
-              },
-              { 
-                text: 'Enable Now', 
-                onPress: async () => {
-                  await AsyncStorage.setItem('@ai_wellness_enabled', 'true');
-                  // Mark that user should see onboarding
-                  await AsyncStorage.setItem('@ai_wellness_onboarding_seen', 'false');
-                  console.log('[SubscriptionModal] AI Wellness enabled for new premium user - onboarding will show');
-                  // Force a state refresh to trigger onboarding immediately
-                  onClose();
-                  setTimeout(() => {
-                    // This will trigger the onboarding modal in App.tsx
-                    gamificationEvents.emit('AI_WELLNESS_ENABLED');
-                  }, 500);
-                }
-              }
-            ]
-          );
-        }, 1000);
       }
       
       console.log('[SubscriptionModal] Premium unlock completed successfully');

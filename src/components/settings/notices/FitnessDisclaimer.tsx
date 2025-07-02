@@ -10,8 +10,8 @@ import {
   Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as storageService from '../../services/storageService';
-import { useTheme } from '../../context/ThemeContext';
+import * as storageService from '../../../services/storageService';
+import { useTheme } from '../../../context/ThemeContext';
 
 // Key for storing disclaimer acceptance in storageService
 const DISCLAIMER_ACCEPTED_KEY = storageService.KEYS.USER_AGREEMENTS.FITNESS_DISCLAIMER_ACCEPTED;
