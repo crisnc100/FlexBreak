@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AIWellnessSettings } from '../components/settings/ai';
 import DataManagement from '../components/settings/DataManagement';
 import DeveloperSection from '../components/settings/DeveloperSection';
+import AboutSection from '../components/settings/AboutSection';
 
 import DiagnosticsScreen from './DiagnosticsScreen';
 import { ThemeType, useTheme } from '../context/ThemeContext';
@@ -714,104 +715,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         </View>
         
         {/* About Section */}
-        <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
-          <Text style={[styles.sectionTitle, {color: theme.text}]}>About</Text>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="information-circle-outline" size={22} color="#2196F3" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>App Version</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>{appVersion}</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.settingItem}
-            onPress={handleCheckForUpdates}
-            disabled={checkingForUpdates}
-          >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="cloud-download-outline" size={22} color="#2196F3" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Check for Updates</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>
-                  {checkingForUpdates ? 'Checking...' : 'See if a new version is available'}
-                </Text>
-              </View>
-            </View>
-            {!checkingForUpdates && <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.settingItem}
-            onPress={() => Linking.openURL('https://flexbreak-privacy-app.netlify.app/')}
-          >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="document-text-outline" size={22} color="#2196F3" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Privacy Policy</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>View our privacy policy website</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.settingItem}
-            onPress={() => setHelpModalVisible(true)}  
-          >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="help-circle-outline" size={22} color="#2196F3" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Help & Support</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Get support and assistance</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.settingItem}
-            onPress={handleOpenWebsite}
-          >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="globe-outline" size={22} color="#2196F3" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Website</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Visit our website</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.settingItem, styles.lastItem]}
-            onPress={handleContactSupport}
-          >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, {backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD'}]}>
-                <Ionicons name="mail-outline" size={22} color="#2196F3" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[styles.settingTitle, {color: theme.text}]}>Contact Us</Text>
-                <Text style={[styles.settingDescription, {color: theme.textSecondary}]}>Send us an email</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-        </View>
+        <AboutSection
+          appVersion={appVersion}
+          onCheckForUpdates={handleCheckForUpdates}
+          checkingForUpdates={checkingForUpdates}
+          onOpenHelp={() => setHelpModalVisible(true)}
+          onOpenWebsite={handleOpenWebsite}
+          onContactSupport={handleContactSupport}
+        />
         
         {/* Legal Information Section */}
         <View style={[styles.section, {backgroundColor: theme.cardBackground}]}>
