@@ -7,6 +7,7 @@ import { usePremium } from '../../../context/PremiumContext';
 import { KEYS } from '../../../services/storageService';
 import { scheduleAIWellnessV2 } from '../../../services/ai/scheduling/notificationScheduler';
 import * as Notifications from 'expo-notifications';
+import SubscriptionModal from '../../SubscriptionModal';
 
 interface AIScheduleSettingsProps {
   visible: boolean;
@@ -25,6 +26,7 @@ export const AIScheduleSettings: React.FC<AIScheduleSettingsProps> = ({ visible 
   const { isPremium } = usePremium();
   const [currentPreference, setCurrentPreference] = useState<string>('random');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -46,7 +48,7 @@ export const AIScheduleSettings: React.FC<AIScheduleSettingsProps> = ({ visible 
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Learn More', onPress: () => {
-            // Navigate to premium upgrade
+            setShowSubscriptionModal(true);
           }}
         ]
       );
@@ -117,6 +119,12 @@ export const AIScheduleSettings: React.FC<AIScheduleSettingsProps> = ({ visible 
           </Text>
         </TouchableOpacity>
       </View>
+      
+      <SubscriptionModal
+        visible={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        isFromSettings={true}
+      />
     </View>
   );
 };

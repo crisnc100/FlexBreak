@@ -32,18 +32,73 @@ const MIN_HEIGHT = 120;
 const MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
 const COLLAPSED_HEIGHT = 80;
 
+// Typewriter effect configuration - EASY TO TOGGLE ON/OFF
+const ENABLE_TYPEWRITER_EFFECT = true; // Set to false to revert to original behavior
+const TYPEWRITER_SPEED = 30; // milliseconds per character (30ms = fast, smooth)
+const ENABLE_HAPTICS = true; // Set to false to disable haptics
+const HAPTIC_INTERVAL = 3; // Haptic feedback every N characters (to reduce battery drain)
+
 interface Message {
   id: string;
   type: 'user' | 'ai';
   message: string;
   timestamp: Date;
   // suggestedActions removed - no longer showing quick reply buttons
+  role?: 'user' | 'assistant'; // Added for compatibility
+  content?: string; // Added for compatibility
+  quickReplies?: any[]; // Added for compatibility
+  isTypewriting?: boolean; // Flag to enable typewriter effect
 }
 
 interface FlexChatModalProps {
   visible: boolean;
   onClose: () => void;
 }
+
+// Typewriter component for animated text
+const TypewriterText: React.FC<{
+  text: string;
+  style: any;
+  onComplete?: () => void;
+  isActive: boolean;
+}> = ({ text, style, onComplete, isActive }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  useEffect(() => {
+    if (!isActive || !ENABLE_TYPEWRITER_EFFECT) {
+      setDisplayedText(text);
+      onComplete?.();
+      return;
+    }
+    
+    setDisplayedText('');
+    setCurrentIndex(0);
+  }, [text, isActive]);
+  
+  useEffect(() => {
+    if (!isActive || !ENABLE_TYPEWRITER_EFFECT || currentIndex >= text.length) {
+      if (currentIndex >= text.length) {
+        onComplete?.();
+      }
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      setDisplayedText(prev => prev + text[currentIndex]);
+      setCurrentIndex(currentIndex + 1);
+      
+      // Haptic feedback at intervals
+      if (ENABLE_HAPTICS && currentIndex % HAPTIC_INTERVAL === 0) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    }, TYPEWRITER_SPEED);
+    
+    return () => clearTimeout(timer);
+  }, [currentIndex, text, isActive, onComplete]);
+  
+  return <Text style={style}>{displayedText}</Text>;
+};
 
 export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }) => {
   const { theme, isDark } = useTheme();
@@ -55,6 +110,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showVoiceIntro, setShowVoiceIntro] = useState(false);
+  const [currentTypewritingId, setCurrentTypewritingId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Animation values
@@ -186,7 +242,10 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
               content: '📱 Here\'s my full response (it was shortened in the notification):',
               timestamp: Date.now(),
               id: (Date.now() - 1).toString(),
-              quickReplies: []
+              quickReplies: [],
+              type: 'ai',
+              message: '📱 Here\'s my full response (it was shortened in the notification):',
+              isTypewriting: false // No typewriter for system messages
             };
             messages.push(truncationNotice);
           }
@@ -196,11 +255,19 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
             content: response,
             timestamp: Date.now(),
             id: Date.now().toString(),
-            quickReplies: []
+            quickReplies: [],
+            type: 'ai',
+            message: response,
+            isTypewriting: ENABLE_TYPEWRITER_EFFECT
           };
           messages.push(aiMessage);
           
           setMessages(messages);
+          
+          // Set this message as currently typewriting
+          if (ENABLE_TYPEWRITER_EFFECT) {
+            setCurrentTypewritingId(aiMessage.id);
+          }
         }
         await AsyncStorage.removeItem('@ai_wellness_last_response');
       } else {
@@ -246,17 +313,51 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
           
           // Add a helpful message to guide the user
           const voiceGuidanceMessage: Message = {
-            role: 'assistant',
-            content: '🎙️ Tap the microphone button to start your voice reply!',
-            timestamp: Date.now(),
             id: Date.now().toString(),
-            quickReplies: []
+            type: 'ai',
+            message: '🎙️ Tap the microphone button to start your voice reply!',
+            timestamp: new Date(),
+            isTypewriting: false // No typewriter for system messages
           };
           setMessages(prev => [...prev, voiceGuidanceMessage]);
         }
         
-        // Auto-start voice recording after a small delay
-        setTimeout(() => handleVoiceRecord(), 800);
+        // Auto-start voice recording after proper delay for audio session setup
+        // Wait for modal animation to complete and audio session to be ready
+        setTimeout(async () => {
+          console.log('[FlexChatModal] Preparing audio session for auto voice recording...');
+          
+          try {
+            // Pre-initialize audio session to ensure it's ready
+            const { Audio } = require('expo-av');
+            await Audio.setAudioModeAsync({
+              allowsRecordingIOS: true,
+              playsInSilentModeIOS: true,
+            });
+            
+            // Small delay after audio mode setup
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            console.log('[FlexChatModal] Auto-starting voice recording from notification');
+            await handleVoiceRecord();
+          } catch (error) {
+            console.log('[FlexChatModal] Voice recording attempt failed:', error);
+            
+            // Show helpful message if auto-start fails
+            const fallbackMessage: Message = {
+              id: Date.now().toString(),
+              type: 'ai',
+              message: '🎙️ Tap the microphone button below to record your voice message!',
+              timestamp: new Date(),
+              isTypewriting: false // No typewriter for system messages
+            };
+            setMessages(prev => {
+              // Remove the previous guidance message if it exists
+              const filtered = prev.filter(msg => !msg.message.includes('Tap the microphone button to start'));
+              return [...filtered, fallbackMessage];
+            });
+          }
+        }, 2500); // 2.5 seconds to ensure everything is ready
       }
     } catch (error) {
       console.error('Error loading initial state:', error);
@@ -346,10 +447,16 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         type: 'ai',
         message: result.response,
         timestamp: new Date(),
+        isTypewriting: ENABLE_TYPEWRITER_EFFECT,
         // suggestedActions removed
       };
       
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Set this message as currently typewriting
+      if (ENABLE_TYPEWRITER_EFFECT) {
+        setCurrentTypewritingId(aiMessage.id);
+      }
       
       // Scroll to bottom
       setTimeout(() => {
@@ -560,9 +667,24 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                           </LinearGradient>
                         ) : (
                           <View style={[styles.aiBubbleContent, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
-                            <Text style={[styles.messageText, { color: theme.text }]}>
-                              {msg.message}
-                            </Text>
+                            {msg.isTypewriting && currentTypewritingId === msg.id ? (
+                              <TypewriterText
+                                text={msg.message}
+                                style={[styles.messageText, { color: theme.text }]}
+                                isActive={true}
+                                onComplete={() => {
+                                  setCurrentTypewritingId(null);
+                                  // Scroll to end when typewriting completes
+                                  setTimeout(() => {
+                                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                                  }, 100);
+                                }}
+                              />
+                            ) : (
+                              <Text style={[styles.messageText, { color: theme.text }]}>
+                                {msg.message}
+                              </Text>
+                            )}
                           </View>
                         )}
                       </View>

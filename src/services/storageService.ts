@@ -872,14 +872,64 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
     if (KEYS.AI_WELLNESS) {
       knownKeys.push(...Object.values(KEYS.AI_WELLNESS));
     }
+    
+    // Comprehensive AI wellness data cleanup
     knownKeys.push(
+      // AI wellness core
       '@ai_wellness_enabled',
       '@ai_wellness_has_seen_welcome',
       '@ai_wellness_show_modal',
       '@ai_wellness_voice_mode',
       '@ai_wellness_last_response',
-      '@ai_wellness_regular_scheduled'
+      '@ai_wellness_regular_scheduled',
+      '@ai_wellness_voice_context',
+      '@ai_wellness_notification_conversation',
+      '@ai_wellness_voice_intro_seen',
+      '@ai_wellness_premium_upgrade_seen',
+      '@ai_wellness_show_upgrade_on_next_open',
+      '@ai_wellness_user_name',
+      '@ai_wellness_time_preference',
+      '@ai_wellness_custom_time',
+      '@ai_wellness_premium_welcome_sent',
+      '@last_premium_status',
+      
+      // AI conversation and session data
+      '@ai_conversation_session_*',
+      '@ai_wellness_session_*',
+      '@ai_wellness_last_interaction',
+      '@ai_wellness_daily_count',
+      '@ai_wellness_weekly_count',
+      
+      // AI memory and insights
+      '@ai_wellness_memory_*',
+      '@ai_wellness_simple_memory_*',
+      '@ai_wellness_insights_*',
+      '@ai_wellness_user_patterns_*',
+      '@ai_wellness_effectiveness_*',
+      
+      // AI cost and rate limiting
+      '@ai_wellness_cost_*',
+      '@ai_wellness_rate_limit_*',
+      '@ai_wellness_last_request_*',
+      
+      // AI notification data
+      '@ai_wellness_notification_*',
+      '@ai_wellness_upgrade_notification_*',
+      '@ai_wellness_check_in_*',
+      '@ai_wellness_follow_up_*',
+      
+      // App state for AI
+      '@app_state'
     );
+    
+    // Add pattern-based AI keys from all existing keys
+    const aiPatterns = [
+      /^@ai_wellness_/,
+      /^@ai_conversation_/,
+      /^@ai_notification_/,
+      /^@ai_cost_/,
+      /^@ai_memory_/
+    ];
     
     // Define testing-related keys to preserve
     const testingKeys = [
@@ -908,6 +958,13 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
     
     // Get all keys from AsyncStorage
     const allKeys = await AsyncStorage.getAllKeys();
+    
+    // Add all AI-related keys found by pattern matching
+    allKeys.forEach(key => {
+      if (aiPatterns.some(pattern => pattern.test(key))) {
+        knownKeys.push(key);
+      }
+    });
     
     // Merge with our known keys list
     const uniqueKeys = [...new Set([...knownKeys, ...allKeys])] as string[];
@@ -1062,7 +1119,7 @@ export const resetSimulationData = async (): Promise<boolean> => {
     const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
     const regularPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
     
-    // Get all keys for simulation data
+    // Get all keys for simulation data including AI wellness
     const simulationKeys = [
       ...Object.values(KEYS.PROGRESS),
       ...Object.values(KEYS.ROUTINES),
@@ -1075,6 +1132,29 @@ export const resetSimulationData = async (): Promise<boolean> => {
       '@achievements',
       '@challenges'
     ];
+    
+    // Add all AI wellness keys for simulation reset
+    const aiWellnessKeys = [
+      '@ai_wellness_enabled',
+      '@ai_wellness_has_seen_welcome',
+      '@ai_wellness_show_modal',
+      '@ai_wellness_voice_mode',
+      '@ai_wellness_last_response',
+      '@ai_wellness_regular_scheduled',
+      '@ai_wellness_voice_context',
+      '@ai_wellness_notification_conversation',
+      '@ai_wellness_voice_intro_seen',
+      '@ai_wellness_premium_upgrade_seen',
+      '@ai_wellness_show_upgrade_on_next_open',
+      '@ai_wellness_user_name',
+      '@ai_wellness_time_preference',
+      '@ai_wellness_custom_time',
+      '@ai_wellness_premium_welcome_sent',
+      '@last_premium_status',
+      '@app_state'
+    ];
+    
+    simulationKeys.push(...aiWellnessKeys);
     
     // Define keys to preserve (testing and premium related)
     const keysToPreserve = [
@@ -1096,10 +1176,36 @@ export const resetSimulationData = async (): Promise<boolean> => {
     // Get all keys from AsyncStorage
     const allKeys = await AsyncStorage.getAllKeys();
     
-    // Filter to get just the keys we want to remove (simulation data)
-    const keysToRemove = allKeys.filter(key => 
-      simulationKeys.includes(key) && !keysToPreserve.includes(key)
-    );
+    // Add AI pattern matching for comprehensive cleanup
+    const aiPatterns = [
+      /^@ai_wellness_/,
+      /^@ai_conversation_/,
+      /^@ai_notification_/,
+      /^@ai_cost_/,
+      /^@ai_memory_/
+    ];
+    
+    // Filter to get just the keys we want to remove (simulation data + AI patterns)
+    const keysToRemove = allKeys.filter(key => {
+      // Remove if it's in simulation keys AND not preserved
+      if (simulationKeys.includes(key) && !keysToPreserve.includes(key)) {
+        return true;
+      }
+      // Also remove if it matches AI patterns AND not preserved
+      if (aiPatterns.some(pattern => pattern.test(key)) && !keysToPreserve.includes(key)) {
+        return true;
+      }
+      return false;
+    });
+    
+    // Explicitly add conversation session keys for common user IDs
+    const commonUserIds = ['anonymous', 'user', 'test', 'demo'];
+    commonUserIds.forEach(userId => {
+      const sessionKey = `@ai_conversation_session_${userId}`;
+      if (!keysToRemove.includes(sessionKey)) {
+        keysToRemove.push(sessionKey);
+      }
+    });
     
     // Clear simulation keys except preserved ones
     await AsyncStorage.multiRemove(keysToRemove);
@@ -1118,7 +1224,61 @@ export const resetSimulationData = async (): Promise<boolean> => {
     await AsyncStorage.removeItem('reminder_message');
     await AsyncStorage.removeItem('firebase_reminder_message');
     
-    console.log('Simulation data reset and custom reminder messages cleared');
+    // Clear AI memory service data
+    try {
+      const memoryService = await import('./ai/memory/memoryService');
+      if (memoryService.default && memoryService.default.clearMemory) {
+        // Clear memory for anonymous user (covers most cases)
+        await memoryService.default.clearMemory('anonymous');
+        // Also try to get actual user ID and clear if available
+        const userId = await AsyncStorage.getItem('@user_id');
+        if (userId && userId !== 'anonymous') {
+          await memoryService.default.clearMemory(userId);
+        }
+      }
+    } catch (error) {
+      console.log('Memory service not available or error clearing:', error);
+    }
+    
+    // Clear conversation manager sessions
+    try {
+      const conversationManager = await import('./ai/core/conversationManager');
+      if (conversationManager.conversationManager) {
+        // Clear common user sessions
+        const userIds = ['anonymous', 'user', 'test', 'demo'];
+        for (const userId of userIds) {
+          await conversationManager.conversationManager.clearSession(userId);
+        }
+        // Also clear actual user ID if exists
+        const actualUserId = await AsyncStorage.getItem('@user_id');
+        if (actualUserId && !userIds.includes(actualUserId)) {
+          await conversationManager.conversationManager.clearSession(actualUserId);
+        }
+      }
+    } catch (error) {
+      console.log('Conversation manager not available or error clearing:', error);
+    }
+    
+    // Cancel all AI wellness notifications
+    try {
+      const Notifications = await import('expo-notifications');
+      const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+      const aiNotificationIds = scheduledNotifications
+        .filter(notif => 
+          notif.content.data?.type?.includes('ai_wellness') ||
+          notif.identifier.includes('ai_wellness')
+        )
+        .map(notif => notif.identifier);
+      
+      for (const id of aiNotificationIds) {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      }
+      console.log(`Cancelled ${aiNotificationIds.length} AI wellness notifications`);
+    } catch (error) {
+      console.log('Error cancelling AI notifications:', error);
+    }
+    
+    console.log('Simulation data reset, AI data cleared, and custom reminder messages cleared');
     
     return true;
   } catch (e) {

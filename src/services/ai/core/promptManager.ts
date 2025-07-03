@@ -6,7 +6,16 @@ import { UserContext } from '../contextBuilder';
 const WELLNESS_COACH_PROMPT = {
   en: `You are FlexBreak's AI wellness coach. {context}
 
+CRITICAL RULES:
+- NEVER use any name unless explicitly provided in the context as "User's name: [name]"
+- NEVER invent or assume names like John, Emily, Alex, etc.
+- If no name is provided, address the user directly without any name
+- Do NOT start responses with "Hey [name]" or "Hi [name]" unless a name is explicitly given
+
 PRIORITY: First directly address the user's specific concern or prompt. Mirror their energy level and focus.
+- If user says "Hi" or greets you, respond with a friendly greeting, not assumptions about their state
+- Do NOT assume they are tired, stressed, or drained unless they explicitly say so
+- Base your response ONLY on what the user actually says, not the time of day
 
 Give ONE practical tip (1-2 sentences) that:
 - Directly responds to what they're asking/feeling
@@ -17,11 +26,20 @@ Give ONE practical tip (1-2 sentences) that:
 For exercises: "Try this: [action] - it'll help you [productivity benefit]"
 For advice: Start with action verb + productivity link
 
-Always use the user's name if provided. Be their wellness partner, not just a coach.`,
+Be their wellness partner, not just a coach.`,
   
   es: `Eres el entrenador de bienestar AI de FlexBreak. {context}
 
+REGLAS CRÍTICAS:
+- NUNCA uses ningún nombre a menos que se proporcione explícitamente en el contexto como "User's name: [nombre]"
+- NUNCA inventes o asumas nombres como John, Emily, Alex, etc.
+- Si no se proporciona nombre, dirígete al usuario directamente sin ningún nombre
+- NO empieces respuestas con "Hola [nombre]" a menos que se dé un nombre explícitamente
+
 PRIORIDAD: Primero aborda directamente la preocupación o solicitud específica del usuario. Refleja su nivel de energía.
+- Si el usuario dice "Hola" o te saluda, responde con un saludo amigable, no con suposiciones sobre su estado
+- NO asumas que están cansados, estresados o agotados a menos que lo digan explícitamente
+- Basa tu respuesta SOLO en lo que el usuario realmente dice, no en la hora del día
 
 Da UN consejo práctico (1-2 frases) que:
 - Responda directamente a lo que sienten/piden
@@ -32,11 +50,20 @@ Da UN consejo práctico (1-2 frases) que:
 Para ejercicios: "Prueba esto: [acción] - te ayudará a [beneficio productivo]"
 Para consejos: Empieza con verbo de acción + vínculo productivo
 
-Siempre usa el nombre del usuario si está disponible. Sé su compañero de bienestar, no solo un entrenador.`,
+Usa el nombre del usuario de forma natural cuando esté disponible. Sé su compañero de bienestar, no solo un entrenador.`,
   
   zh: `你是FlexBreak的AI健康教练。{context}
 
+关键规则：
+- 除非在上下文中明确提供为"User's name: [姓名]"，否则绝不使用任何名字
+- 绝不要编造或假设名字，如John、Emily、Alex等
+- 如果没有提供名字，直接称呼用户，不使用任何名字
+- 除非明确给出名字，否则不要以"嗨[姓名]"开始回复
+
 优先事项：首先直接回应用户的具体关注或请求。反映他们的能量水平。
+- 如果用户说"你好"或打招呼，以友好的问候回应，而不是对他们状态的假设
+- 不要假设他们疲倦、有压力或精疲力竭，除非他们明确说明
+- 只根据用户实际说的话回应，而不是根据一天中的时间
 
 给一个实用建议（1-2句话），要：
 - 直接回应他们的感受/需求
@@ -47,7 +74,7 @@ Siempre usa el nombre del usuario si está disponible. Sé su compañero de bien
 运动建议："试试这个：[动作] - 这会帮助你[生产力益处]"
 其他建议：以动作动词开头 + 生产力联系
 
-如果提供了用户名，总是使用它。做他们的健康伙伴，而不仅仅是教练。`
+在提供了用户名时自然地使用它。做他们的健康伙伴，而不仅仅是教练。`
 };
 
 const CONTEXT_TEMPLATE = {
@@ -144,8 +171,8 @@ export class PromptManager {
     // Build contextual information
     const contextParts: string[] = [];
     
-    // Add user name if available
-    if (context.userContext.userName) {
+    // Add user name if available and not empty
+    if (context.userContext.userName && context.userContext.userName.trim()) {
       contextParts.push(`User's name: ${context.userContext.userName}`);
     }
     
@@ -236,19 +263,19 @@ export class PromptManager {
   private getTimeContext(timeOfDay: string, language: string): string {
     const templates = {
       en: {
-        morning: 'It\'s morning - user may be starting their day',
-        afternoon: 'It\'s afternoon - user may be in mid-workday',
-        evening: 'It\'s evening - user may be winding down'
+        morning: 'Current time: morning',
+        afternoon: 'Current time: afternoon',
+        evening: 'Current time: evening'
       },
       es: {
-        morning: 'Es la mañana - el usuario puede estar comenzando su día',
-        afternoon: 'Es la tarde - el usuario puede estar en medio de su jornada',
-        evening: 'Es la noche - el usuario puede estar relajándose'
+        morning: 'Hora actual: mañana',
+        afternoon: 'Hora actual: tarde',
+        evening: 'Hora actual: noche'
       },
       zh: {
-        morning: '现在是早上 - 用户可能正在开始新的一天',
-        afternoon: '现在是下午 - 用户可能在工作中',
-        evening: '现在是晚上 - 用户可能在放松'
+        morning: '当前时间：早上',
+        afternoon: '当前时间：下午',
+        evening: '当前时间：晚上'
       }
     };
     
@@ -374,17 +401,8 @@ export class PromptManager {
       formatted = tryPrefix + formatted;
     }
     
-    // Add user name if available and not already included
-    if (context.userContext.userName && !formatted.includes(context.userContext.userName)) {
-      const language = context.userContext.detectedLanguage || 'en';
-      const greeting = {
-        en: `${context.userContext.userName}, `,
-        es: `${context.userContext.userName}, `,
-        zh: `${context.userContext.userName}，`
-      }[language];
-      
-      formatted = greeting + formatted.charAt(0).toLowerCase() + formatted.slice(1);
-    }
+    // Do not automatically prepend names - let the AI handle greetings naturally
+    // This prevents awkward constructions like "John, try this exercise..."
     
     return formatted;
   }
