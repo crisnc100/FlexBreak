@@ -23,7 +23,8 @@ export class AIWellnessServiceV2 {
   async processWellnessCheckIn(
     userInput: string,
     userId?: string,
-    isNotification: boolean = false
+    isNotification: boolean = false,
+    isFromModal: boolean = false  // Add flag to distinguish modal from notification
   ): Promise<WellnessResponse> {
     try {
       // Check access and limits first (includes day restrictions and daily limits)
@@ -190,7 +191,8 @@ export class AIWellnessServiceV2 {
       }
       
       // Format the response for better display
-      const formattedResponse = formatAIResponse(aiResponse, isNotification);
+      // Only apply notification truncation for actual notifications, NOT when displayed in modal
+      const formattedResponse = formatAIResponse(aiResponse, isNotification && !isFromModal);
       
       // Extract the main suggestion from the response
       const mainSuggestion = this.extractMainSuggestion(formattedResponse);

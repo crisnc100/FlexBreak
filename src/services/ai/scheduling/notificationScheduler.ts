@@ -257,6 +257,8 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
           type: 'ai_wellness_checkin'  // Add explicit type
         },
         categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        channelId: 'ai_wellness',  // Use the AI wellness channel for Android
       },
       {
         date: scheduledDate,  // Use date trigger like motivational messages

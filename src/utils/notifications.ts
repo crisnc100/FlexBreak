@@ -41,12 +41,17 @@ export async function configureNotifications(): Promise<void> {
       const data = notification.request.content.data;
       const isWelcome = data?.isWelcome || data?.isPremiumWelcome;
       const isGoodbye = data?.isGoodbye;
-      const isAIResponse = data?.type === 'ai_wellness_response' || data?.isWelcomeResponse;
+      const isAIResponse = data?.type === 'ai_wellness_response' || data?.isWelcomeResponse || data?.isResponse;
+      const isAICheckIn = data?.type === 'ai_wellness_checkin';
+      
+      // Log for debugging
+      console.log('Notification handler - type:', data?.type, 'isResponse:', data?.isResponse);
       
       // Allow these notification types to show immediately:
       // 1. Welcome/goodbye messages
       // 2. AI wellness responses (for conversation flow)
-      if (isWelcome || isGoodbye || isAIResponse) {
+      // 3. AI check-ins (so they show when app is killed/background)
+      if (isWelcome || isGoodbye || isAIResponse || isAICheckIn) {
         return {
           shouldShowAlert: true,   // Show these immediately
           shouldPlaySound: true,   // Play sound for these
@@ -54,10 +59,9 @@ export async function configureNotifications(): Promise<void> {
         };
       }
       
-      // SUPPRESS ALL OTHER NOTIFICATIONS WHILE APP IS IN FOREGROUND
-      // This prevents spam from scheduled check-ins and upgrade prompts
+      // For all other notifications in foreground
       return {
-        shouldShowAlert: false,  // Don't show scheduled notifications while app is active
+        shouldShowAlert: false,  // Don't show other notifications while app is active
         shouldPlaySound: false,  // No sounds while in app
         shouldSetBadge: false,
       };
@@ -86,17 +90,34 @@ export const requestNotificationsPermissions = async (): Promise<boolean> => {
     
   let finalStatus = existingStatus;
   
+  // Android requires notification channels to be created
+  if (Platform.OS === 'android') {
+    console.log('Setting up Android notification channels');
+    
+    // Channel for regular reminders
+    await Notifications.setNotificationChannelAsync('reminders', {
+      name: 'Stretch Reminders',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+    
+    // Channel for AI wellness notifications
+    await Notifications.setNotificationChannelAsync('ai_wellness', {
+      name: 'AI Wellness Coach',
+      description: 'AI-powered wellness check-ins and responses',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#4285F4',
+      enableLights: true,
+      enableVibrate: true,
+      showBadge: true,
+      bypassDnd: false,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+  }
+  
   if (existingStatus !== 'granted') {
-      // Android requires extra step to get permission
-      if (Platform.OS === 'android') {
-        console.log('Setting up Android notification channel');
-        await Notifications.setNotificationChannelAsync('reminders', {
-          name: 'Stretch Reminders',
-          importance: Notifications.AndroidImportance.HIGH,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
-        });
-      }
 
       console.log('Requesting permission...');
     const { status } = await Notifications.requestPermissionsAsync();

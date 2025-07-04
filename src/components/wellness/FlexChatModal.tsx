@@ -440,7 +440,8 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     setIsLoading(true);
     try {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-      const result = await aiWellnessService.processWellnessCheckIn(messageText, userId);
+      // Pass isFromModal=true to prevent truncation in modal view
+      const result = await aiWellnessService.processWellnessCheckIn(messageText, userId, false, true);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

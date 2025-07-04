@@ -261,7 +261,12 @@ export const sendPersonalReminders = functionsV2.scheduler.onSchedule(
         }
         
         // Parse reminder time (stored as "HH:MM" in UTC)
-        const [reminderHour, reminderMinute] = time.split(':').map((num: string) => parseInt(num, 10));
+        const timeParts = time.split(':');
+        if (timeParts.length !== 2) {
+          console.log('Invalid time format:', time);
+          continue;
+        }
+        const [reminderHour, reminderMinute] = timeParts.map((num: string) => parseInt(num, 10));
         
         // Detailed logging for debugging
         console.log(`Processing reminder for user ${userId}:`);
@@ -295,14 +300,14 @@ export const sendPersonalReminders = functionsV2.scheduler.onSchedule(
           (
             frequency === 'daily' || 
             (frequency === 'weekdays' && userDay >= 1 && userDay <= 5) ||
-            (frequency === 'custom' && days && days.includes(userDayName))
+            (frequency === 'custom' && Array.isArray(days) && days.includes(userDayName))
           );
         
         console.log(`- Should send reminder now? ${shouldSendReminder}`);
         console.log(`  - Time match: ${reminderHour === userHour && reminderMinute === userMinute}`);
         console.log(`  - Frequency: ${frequency}`);
         if (frequency === 'custom') {
-          console.log(`  - Custom days: [${days}], includes ${userDayName}: ${days.includes(userDayName)}`);
+          console.log(`  - Custom days: [${days}], includes ${userDayName}: ${Array.isArray(days) ? days.includes(userDayName) : false}`);
         }
         
         if (shouldSendReminder) {

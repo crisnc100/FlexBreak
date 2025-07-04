@@ -7,6 +7,7 @@ import unifiedMemoryService from '../memory/memoryService';
 import { scheduleRegularCheckIns, cleanupAllAINotifications, canScheduleNotifications, markScheduled } from '../scheduling/notificationScheduler';
 import { getNotificationsByType, NotificationType } from '../../../utils/notificationManager';
 import { KEYS } from '../../storageService';
+import fcmService from '../../fcmService';
 
 interface InitializationResult {
   success: boolean;
@@ -93,7 +94,22 @@ class AISystemInitializer {
           }
         }
         
-        // 7. Initialize AI wellness notifications
+        // 7. Initialize FCM for cloud-based notification responses
+        try {
+          const fcmAvailable = await fcmService.isAvailable();
+          if (fcmAvailable) {
+            console.log('FCM service initialized successfully');
+            // Pre-fetch token to ensure it's ready when needed
+            await fcmService.getFCMToken();
+          } else {
+            warnings.push('FCM service not available - notification responses will use local processing');
+          }
+        } catch (fcmError) {
+          console.error('FCM initialization error:', fcmError);
+          warnings.push('FCM initialization failed - using fallback notification handling');
+        }
+        
+        // 8. Initialize AI wellness notifications
         const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
         await this.initializeNotifications(isPremium, userId);
       }

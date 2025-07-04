@@ -1,7 +1,9 @@
 import * as Notifications from 'expo-notifications';
+import { Platform, AppState } from 'react-native';
 import aiWellnessService from '../ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
+import fcmService from '../fcmService';
 // Removed non-MVP imports
 // import ConversationAnalytics from '../ai/conversationAnalytics';
 // import { MoodTracker } from '../ai/moodTracker';
@@ -11,6 +13,8 @@ import { scheduleAIWellnessV2 } from '../ai/scheduling/notificationScheduler';
 export const configureAINotifications = async () => {
   // Don't schedule data retention cleanup as a notification
   // It should be handled differently to avoid user-visible notifications
+  
+  console.log('Configuring AI notification categories...');
   
   // Simple notification with text reply and voice option
   await Notifications.setNotificationCategoryAsync('AI_WELLNESS_SIMPLE', [
@@ -72,6 +76,8 @@ export const setShowAIWellnessModal = (fn: () => void) => {
 };
 
 export const setupAINotificationHandlers = () => {
+  // Check for any pending notification responses when app starts
+  checkPendingNotificationResponses();
   // Prevent duplicate handler registration
   if (handlersSetUp) {
     console.log('AI notification handlers already set up, skipping...');
@@ -84,6 +90,11 @@ export const setupAINotificationHandlers = () => {
   // Handle notification responses (when user interacts)
   Notifications.addNotificationResponseReceivedListener(async (response) => {
     try {
+      console.log('=== Notification Response Received ===');
+      console.log('Action Identifier:', response.actionIdentifier);
+      console.log('User Text:', response.userText);
+      console.log('Notification Type:', response.notification.request.content.data?.type);
+      
       const { notification } = response;
       const data = notification.request.content.data;
       
@@ -149,47 +160,85 @@ export const setupAINotificationHandlers = () => {
           if (userMessage) {
             // Mood tracking removed for MVP
             
-            // Process with AI (mark as notification for concise response)
-            const result = await aiWellnessService.processWellnessCheckIn(
-              userMessage,
-              data.userId,
-              true  // isNotification flag
-            );
+            // Check if app is in background/killed - use FCM for better reliability
+            const appState = AppState.currentState;
+            const shouldUseFCM = appState === 'background' || appState === 'inactive';
             
-            // For welcome messages (both regular and premium), send the response as a notification
-            // This ensures the user sees the AI's response
-            if (data.isWelcome || data.isPremiumWelcome) {
-              console.log('Sending AI response notification for welcome message');
+            let result;
+            if (shouldUseFCM && await fcmService.isAvailable()) {
+              console.log('Using FCM for background notification response');
+              // Use cloud function for background processing
+              const fcmResult = await fcmService.handleAINotificationResponse(
+                userMessage,
+                data.userId
+              );
               
-              await Notifications.scheduleNotificationAsync({
-                content: {
-                  title: "AI Flex Coach 🤖",
-                  body: result.response,
-                  sound: true,
-                  data: { 
-                    type: 'ai_wellness_response',
-                    userId: data.userId,
-                    isWelcomeResponse: true
-                  },
-                },
-                trigger: {
-                  seconds: 2 // Send after 2 seconds
-                } as Notifications.TimeIntervalTriggerInput
-              });
+              if (fcmResult.success) {
+                // FCM will send the notification, just store the response
+                result = {
+                  response: fcmResult.response || 'Response sent via notification',
+                  category: 'wellness'
+                };
+              } else {
+                // Fallback to local processing
+                result = await aiWellnessService.processWellnessCheckIn(
+                  userMessage,
+                  data.userId,
+                  true  // isNotification flag
+                );
+              }
+            } else {
+              // Process locally when app is in foreground
+              result = await aiWellnessService.processWellnessCheckIn(
+                userMessage,
+                data.userId,
+                true  // isNotification flag
+              );
             }
             
-            // Always store the response for the bubble to show
+            // Only send local notification if not using FCM
+            if (!shouldUseFCM || !(await fcmService.isAvailable())) {
+              console.log('Sending AI response notification locally');
+              console.log('AI Response:', result.response);
+              
+              try {
+                const notificationId = await Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: "AI Flex Coach 🤖",
+                    body: result.response,
+                    sound: true,
+                    priority: Notifications.AndroidNotificationPriority.HIGH,
+                    channelId: Platform.OS === 'android' ? 'ai_wellness' : undefined,
+                    data: { 
+                      type: 'ai_wellness_checkin',  // Keep same type for continued conversation
+                      userId: data.userId,
+                      isResponse: true
+                    },
+                    categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,  // Allow reply to response
+                  },
+                  trigger: null // Send immediately
+                });
+                
+                console.log('AI response notification scheduled with ID:', notificationId);
+              } catch (notifError) {
+                console.error('Failed to schedule AI response notification:', notifError);
+              }
+            } else {
+              console.log('FCM handled the notification delivery');
+            }
+            
+            // Store the response for app access later if needed
             await AsyncStorage.setItem('@ai_wellness_last_response', JSON.stringify({
-              response: result.response, // Store full response
+              response: result.response,
               suggestedActions: result.suggestedActions,
               timestamp: Date.now(),
-              fromNotification: true, // Flag to indicate this came from notification
-              truncatedForNotification: result.response.length > 180 // Flag if response was truncated
+              fromNotification: true,
+              truncatedForNotification: result.response.length > 180
             }));
             
-            // If the app is in foreground, show the bubble
-            if (showAIWellnessModal) {
-              // Add small delay to ensure app state is ready
+            // Only show the bubble if app is in foreground and user specifically opened it
+            // Don't auto-open for notification replies
+            if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER && showAIWellnessModal) {
               setTimeout(() => {
                 showAIWellnessModal();
               }, 200);
@@ -213,15 +262,16 @@ export const setupAINotificationHandlers = () => {
         if (userInput) {
           console.log(`Processing AI wellness input from user ${data.userId}: "${userInput}"`);
           
-          // Process with AI
+          // Process with AI (mark as notification for concise response)
           const result = await aiWellnessService.processWellnessCheckIn(
             userInput,
-            data.userId
+            data.userId,
+            true  // isNotification flag
           );
           
           // Determine notification title based on response type
-          let notificationTitle = 'Wellness Coach 🤖';
-          let categoryIdentifier = undefined;
+          let notificationTitle = 'AI Flex Coach 🤖';
+          let categoryIdentifier: string | undefined = 'AI_WELLNESS_SIMPLE';
           
           if (result.category === 'limit_reached') {
             notificationTitle = 'Usage Limit Reached 🔒';
@@ -233,19 +283,37 @@ export const setupAINotificationHandlers = () => {
             notificationTitle = 'Welcome! 🌟';
           }
           
-          // Store response and show in app instead of notification
+          // Send AI response as notification for conversation flow
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: notificationTitle,
+              body: result.response,
+              sound: true,
+              data: { 
+                type: 'ai_wellness_checkin',  // Keep same type for continued conversation
+                userId: data.userId,
+                isResponse: true,
+                category: result.category
+              },
+              categoryIdentifier: categoryIdentifier as any,
+            },
+            trigger: {
+              seconds: 2 // Send after 2 seconds
+            } as Notifications.TimeIntervalTriggerInput
+          });
+          
+          // Store response for app access later if needed
           await AsyncStorage.setItem('@ai_wellness_last_response', JSON.stringify({
-            response: result.response, // Store full response
+            response: result.response,
             suggestedActions: result.suggestedActions,
             category: result.category,
             timestamp: Date.now(),
-            fromNotification: true, // Flag to indicate this came from notification
-            truncatedForNotification: result.response.length > 180 // Flag if response was truncated
+            fromNotification: true,
+            truncatedForNotification: result.response.length > 180
           }));
           
-          // Show the wellness bubble with the response
-          if (showAIWellnessModal) {
-            // Add small delay to ensure app state is ready
+          // Only show the bubble if app is in foreground and user specifically opened it
+          if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER && showAIWellnessModal) {
             setTimeout(() => {
               showAIWellnessModal();
             }, 200);
@@ -295,3 +363,62 @@ export const setupAINotificationHandlers = () => {
 };
 
 // Effectiveness tracking removed - not part of MVP
+
+// Function to check for pending notification responses when app launches
+export const checkPendingNotificationResponses = async () => {
+  try {
+    console.log('Checking for pending notification responses...');
+    
+    // Get the last notification response that may have been received while app was killed
+    const lastResponse = await Notifications.getLastNotificationResponseAsync();
+    
+    if (lastResponse) {
+      console.log('Found pending notification response:', lastResponse);
+      
+      const { notification } = lastResponse;
+      const data = notification.request.content.data;
+      
+      if (data?.type === 'ai_wellness_checkin' && lastResponse.userText) {
+        console.log('Processing pending AI wellness response:', lastResponse.userText);
+        
+        // Process the response
+        const result = await aiWellnessService.processWellnessCheckIn(
+          lastResponse.userText,
+          data.userId,
+          true  // isNotification flag
+        );
+        
+        // Send the AI response as a notification
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "AI Flex Coach 🤖",
+            body: result.response,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            channelId: Platform.OS === 'android' ? 'ai_wellness' : undefined,
+            data: { 
+              type: 'ai_wellness_checkin',
+              userId: data.userId,
+              isResponse: true
+            },
+            categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
+          },
+          trigger: null // Send immediately
+        });
+        
+        console.log('Sent pending AI response notification');
+        
+        // Store the response for app access
+        await AsyncStorage.setItem('@ai_wellness_last_response', JSON.stringify({
+          response: result.response,
+          suggestedActions: result.suggestedActions,
+          timestamp: Date.now(),
+          fromNotification: true,
+          fromPendingResponse: true
+        }));
+      }
+    }
+  } catch (error) {
+    console.error('Error checking pending notification responses:', error);
+  }
+};

@@ -15,7 +15,7 @@
       "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"],
+        "UIBackgroundModes": ["remote-notification", "fetch", "processing"],
         "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested.",
         "NSMicrophoneUsageDescription": "FlexBreak needs access to your microphone for voice responses to the AI Wellness Coach."
       },
@@ -33,7 +33,10 @@
         "SCHEDULE_EXACT_ALARM",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
       ],
       "versionCode": 3,
       "enableProguardInReleaseBuilds": true,
