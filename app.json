@@ -13,7 +13,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.cristianortega.flexbreak",
       "buildNumber": "3",
-      "googleServicesFile": "./ios/GoogleService-Info.plist",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification", "fetch", "processing"],
