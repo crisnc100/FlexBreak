@@ -1,0 +1,44 @@
+[debug] [2025-07-06T14:56:33.768Z] ----------------------------------------------------------------------
+[debug] [2025-07-06T14:56:33.770Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\crisn\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js functions:secrets:set OPENROUTER_API_KEY
+[debug] [2025-07-06T14:56:33.770Z] CLI Version:   14.0.0
+[debug] [2025-07-06T14:56:33.770Z] Platform:      win32
+[debug] [2025-07-06T14:56:33.770Z] Node Version:  v22.14.0
+[debug] [2025-07-06T14:56:33.771Z] Time:          Sun Jul 06 2025 10:56:33 GMT-0400 (Eastern Daylight Time)
+[debug] [2025-07-06T14:56:33.771Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-06T14:56:33.773Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2025-07-06T14:56:33.915Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-06T14:56:33.915Z] > authorizing via signed-in user (crisnc100@gmail.com)
+[debug] [2025-07-06T14:56:33.916Z] Checked if tokens are valid: false, expires at: 1751602360599
+[debug] [2025-07-06T14:56:33.916Z] Checked if tokens are valid: false, expires at: 1751602360599
+[debug] [2025-07-06T14:56:33.916Z] > refreshing access token with scopes: []
+[debug] [2025-07-06T14:56:33.916Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-07-06T14:56:33.916Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-07-06T14:56:34.034Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-07-06T14:56:34.034Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2025-07-06T14:56:34.048Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-07-06T14:56:34.048Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-07-06T14:56:34.053Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/secretmanager.googleapis.com [none]
+[debug] [2025-07-06T14:56:34.053Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/secretmanager.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-06T14:56:34.472Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/secretmanager.googleapis.com 200
+[debug] [2025-07-06T14:56:34.473Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/secretmanager.googleapis.com [omitted]
+[debug] [2025-07-06T14:56:34.473Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-06T14:56:34.473Z] > authorizing via signed-in user (crisnc100@gmail.com)
+[debug] [2025-07-06T14:56:34.473Z] [iam] checking project flexbreak-28ad0 for permissions ["firebase.projects.get","secretmanager.secrets.create","secretmanager.secrets.get","secretmanager.secrets.update","secretmanager.versions.add"]
+[debug] [2025-07-06T14:56:34.474Z] Checked if tokens are valid: true, expires at: 1751817393048
+[debug] [2025-07-06T14:56:34.474Z] Checked if tokens are valid: true, expires at: 1751817393048
+[debug] [2025-07-06T14:56:34.474Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions [none]
+[debug] [2025-07-06T14:56:34.474Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-06T14:56:34.475Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions {"permissions":["firebase.projects.get","secretmanager.secrets.create","secretmanager.secrets.get","secretmanager.secrets.update","secretmanager.versions.add"]}
+[debug] [2025-07-06T14:56:34.645Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions 200
+[debug] [2025-07-06T14:56:34.646Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions {"permissions":["firebase.projects.get","secretmanager.secrets.create","secretmanager.secrets.get","secretmanager.secrets.update","secretmanager.versions.add"]}
+[debug] [2025-07-06T14:56:34.647Z] Checked if tokens are valid: true, expires at: 1751817393048
+[debug] [2025-07-06T14:56:34.647Z] Checked if tokens are valid: true, expires at: 1751817393048
+[debug] [2025-07-06T14:56:34.647Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 [none]
+[debug] [2025-07-06T14:56:34.772Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 200
+[debug] [2025-07-06T14:56:34.772Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 {"projectNumber":"1008736824952","projectId":"flexbreak-28ad0","lifecycleState":"ACTIVE","name":"FlexBreak","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-03-22T16:37:50.186858Z"}
+[debug] [2025-07-06T14:56:34.773Z] Checked if tokens are valid: true, expires at: 1751817393048
+[debug] [2025-07-06T14:56:34.773Z] Checked if tokens are valid: true, expires at: 1751817393048
+[debug] [2025-07-06T14:56:34.773Z] >>> [apiv2][query] GET https://secretmanager.googleapis.com/v1/projects/flexbreak-28ad0/secrets/OPENROUTER_API_KEY [none]
+[debug] [2025-07-06T14:56:34.979Z] <<< [apiv2][status] GET https://secretmanager.googleapis.com/v1/projects/flexbreak-28ad0/secrets/OPENROUTER_API_KEY 200
+[debug] [2025-07-06T14:56:34.980Z] <<< [apiv2][body] GET https://secretmanager.googleapis.com/v1/projects/flexbreak-28ad0/secrets/OPENROUTER_API_KEY {"name":"projects/1008736824952/secrets/OPENROUTER_API_KEY","replication":{"automatic":{}},"createTime":"2025-07-04T02:42:27.180053Z","labels":{"firebase-managed":"functions"},"etag":"\"16391171d86ae4\""}

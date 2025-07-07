@@ -71,6 +71,12 @@ if (!firebase.apps.length) {
   // To re-enable, uncomment the code below and configure properly
 }
 
+// Initialize Firebase Messaging for AI notifications (background handling)
+import firebaseMessagingService from './src/services/firebaseMessagingService';
+firebaseMessagingService.initialize().catch(err => {
+  console.log('Firebase Messaging init error (non-critical):', err.message);
+});
+
 // Avoid playing intro sound twice
 let introSoundPlayed = false;
 

@@ -98,7 +98,7 @@ export const TryPremiumBanner: React.FC<TryPremiumBannerProps> = ({
   const getBannerContent = () => {
     if (context === 'completion') {
       return {
-        mainText: 'Great job! Try Premium free for 2 months',
+        mainText: 'Great job! Try Premium free up to 1 month',
         subText: 'Unlock custom routines, advanced analytics & more',
         ctaText: 'Start free trial',
         icon: 'trophy' as const,
@@ -108,7 +108,7 @@ export const TryPremiumBanner: React.FC<TryPremiumBannerProps> = ({
     
     // Home context
     return {
-      mainText: 'Try Premium free for 2 months',
+      mainText: 'Try Premium free up to 1 month',
       subText: 'Custom routines, smart reminders & analytics',
       ctaText: 'Start free trial',
       icon: 'star' as const,

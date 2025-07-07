@@ -35,7 +35,11 @@ config.watchFolders = [
 
 config.resolver.blockList = [
   /node_modules\/firebase-admin\/.*/,
-];
+  // Exclude development/testing tools from production builds
+  process.env.NODE_ENV === 'production' ? /.*\/src\/components\/simulator\/.*/ : null,
+  process.env.NODE_ENV === 'production' ? /.*\/src\/screens\/BobSimulatorScreen\.tsx/ : null,
+  process.env.NODE_ENV === 'production' ? /.*\/src\/components\/testing\/.*/ : null,
+].filter(Boolean);
 
 // Clear cache on each run in development
 if (process.env.NODE_ENV !== 'production') {

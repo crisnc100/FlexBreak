@@ -29,3 +29,7 @@ export * from './sendMotivationalMessages';
 
 // Export AI notification handler functions
 export * from './aiNotificationHandler';
+
+// Export test function
+export * from './testFunction';
+export * from './testNotification';

@@ -4,6 +4,7 @@ import aiWellnessService from '../ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../storageService';
 import fcmService from '../fcmService';
+import firebaseMessagingService from '../firebaseMessagingService';
 // Removed non-MVP imports
 // import ConversationAnalytics from '../ai/conversationAnalytics';
 // import { MoodTracker } from '../ai/moodTracker';
@@ -68,6 +69,12 @@ export const configureAINotifications = async () => {
 // Keep track of whether handlers are already set up
 let handlersSetUp = false;
 
+// Track processed notification IDs to prevent duplicates
+const processedNotificationIds = new Set<string>();
+
+// Track when we last processed notifications to avoid old ones
+let lastProcessedTimestamp = 0;
+
 // Export function to show AI modal - will be called from App.tsx
 export let showAIWellnessModal: (() => void) | null = null;
 
@@ -87,6 +94,14 @@ export const setupAINotificationHandlers = () => {
   handlersSetUp = true;
   console.log('Setting up AI notification handlers...');
   
+  // Clear old processed IDs periodically (every 10 minutes)
+  setInterval(() => {
+    if (processedNotificationIds.size > 100) {
+      processedNotificationIds.clear();
+      console.log('Cleared processed notification IDs cache');
+    }
+  }, 600000); // 10 minutes
+  
   // Handle notification responses (when user interacts)
   Notifications.addNotificationResponseReceivedListener(async (response) => {
     try {
@@ -97,6 +112,16 @@ export const setupAINotificationHandlers = () => {
       
       const { notification } = response;
       const data = notification.request.content.data;
+      const notificationId = notification.request.identifier;
+      
+      // Check if we've already processed this notification
+      if (processedNotificationIds.has(notificationId)) {
+        console.log('Notification already processed, skipping:', notificationId);
+        return;
+      }
+      
+      // Mark as processed
+      processedNotificationIds.add(notificationId);
       
       if (data?.type === 'ai_wellness_checkin') {
         // Handle quick action buttons
@@ -160,17 +185,22 @@ export const setupAINotificationHandlers = () => {
           if (userMessage) {
             // Mood tracking removed for MVP
             
-            // Check if app is in background/killed - use FCM for better reliability
-            const appState = AppState.currentState;
-            const shouldUseFCM = appState === 'background' || appState === 'inactive';
+            // Check if we have a real FCM token for better background handling
+            const realFcmToken = firebaseMessagingService.getCurrentToken();
+            const fcmAvailable = await fcmService.isAvailable();
             
             let result;
-            if (shouldUseFCM && await fcmService.isAvailable()) {
-              console.log('Using FCM for background notification response');
-              // Use cloud function for background processing
+            if (realFcmToken || fcmAvailable) {
+              console.log('Using FCM for notification response');
+              // Use cloud function for all notification processing
+              // Prefer real FCM token over Expo token for AI responses
+              const tokenToUse = realFcmToken || await fcmService.getFCMToken();
+              
               const fcmResult = await fcmService.handleAINotificationResponse(
                 userMessage,
-                data.userId
+                data.userId,
+                undefined,
+                tokenToUse // Pass the best available token
               );
               
               if (fcmResult.success) {
@@ -179,52 +209,63 @@ export const setupAINotificationHandlers = () => {
                   response: fcmResult.response || 'Response sent via notification',
                   category: 'wellness'
                 };
+                console.log('FCM handled the notification delivery successfully');
+                
+                // Store the response but DON'T send a local notification
+                await AsyncStorage.setItem('@ai_wellness_last_response', JSON.stringify({
+                  response: result.response,
+                  suggestedActions: result.suggestedActions,
+                  timestamp: Date.now(),
+                  fromNotification: true,
+                  truncatedForNotification: result.response.length > 180
+                }));
+                
+                // If this was a response to the welcome message, schedule regular check-ins
+                if (data.isWelcome) {
+                  console.log('User responded to welcome - scheduling regular check-ins');
+                  await scheduleAIWellnessV2('welcome_response');
+                }
+                
+                return; // Exit early - FCM handles everything
               } else {
-                // Fallback to local processing
-                result = await aiWellnessService.processWellnessCheckIn(
-                  userMessage,
-                  data.userId,
-                  true  // isNotification flag
-                );
+                console.warn('FCM failed, falling back to local processing');
+                // Fall through to local processing
               }
-            } else {
-              // Process locally when app is in foreground
-              result = await aiWellnessService.processWellnessCheckIn(
-                userMessage,
-                data.userId,
-                true  // isNotification flag
-              );
             }
             
-            // Only send local notification if not using FCM
-            if (!shouldUseFCM || !(await fcmService.isAvailable())) {
-              console.log('Sending AI response notification locally');
-              console.log('AI Response:', result.response);
-              
-              try {
-                const notificationId = await Notifications.scheduleNotificationAsync({
-                  content: {
-                    title: "AI Flex Coach 🤖",
-                    body: result.response,
-                    sound: true,
-                    priority: Notifications.AndroidNotificationPriority.HIGH,
-                    channelId: Platform.OS === 'android' ? 'ai_wellness' : undefined,
-                    data: { 
-                      type: 'ai_wellness_checkin',  // Keep same type for continued conversation
-                      userId: data.userId,
-                      isResponse: true
-                    },
-                    categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,  // Allow reply to response
+            // Only process locally if FCM is not available or failed
+            console.log('Processing notification response locally');
+            result = await aiWellnessService.processWellnessCheckIn(
+              userMessage,
+              data.userId,
+              true  // isNotification flag
+            );
+            
+            // Send local notification
+            console.log('Sending AI response notification locally');
+            console.log('AI Response:', result.response);
+            
+            try {
+              const notificationId = await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: "AI Flex Coach 🤖",
+                  body: result.response,
+                  sound: true,
+                  priority: Notifications.AndroidNotificationPriority.HIGH,
+                  channelId: Platform.OS === 'android' ? 'ai_wellness' : undefined,
+                  data: { 
+                    type: 'ai_wellness_checkin',  // Keep same type for continued conversation
+                    userId: data.userId,
+                    isResponse: true
                   },
-                  trigger: null // Send immediately
-                });
-                
-                console.log('AI response notification scheduled with ID:', notificationId);
-              } catch (notifError) {
-                console.error('Failed to schedule AI response notification:', notifError);
-              }
-            } else {
-              console.log('FCM handled the notification delivery');
+                  categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,  // Allow reply to response
+                },
+                trigger: null // Send immediately
+              });
+              
+              console.log('AI response notification scheduled with ID:', notificationId);
+            } catch (notifError) {
+              console.error('Failed to schedule AI response notification:', notifError);
             }
             
             // Store the response for app access later if needed
@@ -373,15 +414,63 @@ export const checkPendingNotificationResponses = async () => {
     const lastResponse = await Notifications.getLastNotificationResponseAsync();
     
     if (lastResponse) {
+      const { notification } = lastResponse;
+      const notificationDate = notification.date; // Unix timestamp in seconds
+      const currentTime = Date.now() / 1000; // Convert to seconds
+      const timeDiff = currentTime - notificationDate;
+      
+      // Only process notifications from the last 5 minutes (300 seconds)
+      if (timeDiff > 300) {
+        console.log('Ignoring old notification response from', Math.round(timeDiff / 60), 'minutes ago');
+        return;
+      }
+      
       console.log('Found pending notification response:', lastResponse);
       
-      const { notification } = lastResponse;
       const data = notification.request.content.data;
+      const notificationId = notification.request.identifier;
+      
+      // Check if already processed
+      if (processedNotificationIds.has(notificationId)) {
+        console.log('Pending notification already processed, skipping:', notificationId);
+        return;
+      }
+      
+      // Mark as processed
+      processedNotificationIds.add(notificationId);
+      lastProcessedTimestamp = currentTime;
       
       if (data?.type === 'ai_wellness_checkin' && lastResponse.userText) {
         console.log('Processing pending AI wellness response:', lastResponse.userText);
         
-        // Process the response
+        // Try to use FCM first to prevent duplicates
+        const fcmAvailable = await fcmService.isAvailable();
+        
+        if (fcmAvailable) {
+          console.log('Using FCM for pending notification response');
+          const fcmResult = await fcmService.handleAINotificationResponse(
+            lastResponse.userText,
+            data.userId
+          );
+          
+          if (fcmResult.success) {
+            console.log('FCM handled the pending notification successfully');
+            
+            // Store the response for app access
+            await AsyncStorage.setItem('@ai_wellness_last_response', JSON.stringify({
+              response: fcmResult.response || 'Response sent via notification',
+              timestamp: Date.now(),
+              fromNotification: true,
+              fromPendingResponse: true
+            }));
+            
+            return; // FCM handles everything
+          } else {
+            console.warn('FCM failed for pending response, falling back to local');
+          }
+        }
+        
+        // Only process locally if FCM is not available or failed
         const result = await aiWellnessService.processWellnessCheckIn(
           lastResponse.userText,
           data.userId,

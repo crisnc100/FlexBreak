@@ -26,10 +26,10 @@ export class FCMService {
     this.functions = firebase.functions();
     this.firestore = firebase.firestore();
     
-    // Use emulator in development
-    if (__DEV__) {
-      this.functions.useEmulator('localhost', 5001);
-    }
+    // Don't use emulator - we want to test the real cloud functions
+    // if (__DEV__) {
+    //   this.functions.useEmulator('localhost', 5001);
+    // }
   }
 
   static getInstance(): FCMService {
@@ -136,13 +136,17 @@ export class FCMService {
   async handleAINotificationResponse(
     userMessage: string,
     userId: string,
-    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
+    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>,
+    overrideToken?: string | null
   ): Promise<{ success: boolean; response?: string; error?: string }> {
     try {
-      const fcmToken = await this.getFCMToken();
+      // Use provided token or fall back to Expo token
+      const fcmToken = overrideToken || await this.getFCMToken();
       if (!fcmToken) {
         throw new Error('No FCM token available');
       }
+
+      console.log('Using token type:', fcmToken.startsWith('ExponentPushToken') ? 'Expo' : 'FCM');
 
       // Call the cloud function
       const handleAIResponse = this.functions.httpsCallable('handleAINotificationResponse');

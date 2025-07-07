@@ -547,7 +547,9 @@ export default function SubscriptionModal({
         <View style={styles.planFeatures}>
           <View style={styles.featureRow}>
             <Ionicons name="gift" size={16} color="#4CAF50" />
-            <Text style={styles.featureText}>First 2 Months FREE</Text>
+            <Text style={styles.featureText}>
+              {isYearly ? '1 Month FREE' : '2 Weeks FREE'}
+            </Text>
           </View>
           {isVerified && (
             <View style={styles.featureRow}>

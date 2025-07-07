@@ -3,8 +3,8 @@
  * Handles App Check and connection issues gracefully
  */
 
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 import firebaseConfig from '../../firebase.config';
 
 class FirebaseService {
@@ -23,13 +23,13 @@ class FirebaseService {
 
     try {
       // Check if Firebase is already initialized
-      if (getApps().length === 0) {
-        this.app = initializeApp(firebaseConfig);
+      if (!firebase.apps.length) {
+        this.app = firebase.initializeApp(firebaseConfig);
       } else {
-        this.app = getApps()[0];
+        this.app = firebase.apps[0];
       }
       
-      this.db = getFirestore(this.app);
+      this.db = firebase.firestore();
       this.isInitialized = true;
       
       if (__DEV__) {
@@ -53,8 +53,8 @@ class FirebaseService {
     }
 
     try {
-      const emailDocRef = doc(this.db, 'verifiedEmails', email.toLowerCase());
-      const emailDoc = await getDoc(emailDocRef);
+      const emailDocRef = this.db.collection('verifiedEmails').doc(email.toLowerCase());
+      const emailDoc = await emailDocRef.get();
       return emailDoc.exists();
     } catch (error) {
       console.warn('Firebase read failed:', error.message);
@@ -69,16 +69,16 @@ class FirebaseService {
     }
 
     try {
-      const emailDocRef = doc(this.db, 'verifiedEmails', email.toLowerCase());
+      const emailDocRef = this.db.collection('verifiedEmails').doc(email.toLowerCase());
       
       // Use a timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Firebase timeout')), 5000);
       });
       
-      const storePromise = setDoc(emailDocRef, {
+      const storePromise = emailDocRef.set({
         email: email.toLowerCase(),
-        verifiedAt: serverTimestamp(),
+        verifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
         verificationMethod: 'zerobounce',
         userType: userType
       });

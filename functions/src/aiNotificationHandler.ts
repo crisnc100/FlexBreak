@@ -35,13 +35,26 @@ export const handleAINotificationResponse = onCall(
   {
     secrets: ['OPENROUTER_API_KEY'],
     region: 'us-central1',
+    timeoutSeconds: 120, // Increase timeout to 2 minutes
+    memory: '512MiB', // Increase memory (use MiB not MB)
   },
   async (request) => {
     const data = request.data as AINotificationRequest;
     
+    logger.info('Function called with data:', {
+      userId: data?.userId,
+      hasMessage: !!data?.userMessage,
+      hasFcmToken: !!data?.fcmToken,
+    });
+    
     try {
       // Validate request
       if (!data.userId || !data.userMessage || !data.fcmToken) {
+        logger.error('Missing required fields:', {
+          hasUserId: !!data?.userId,
+          hasUserMessage: !!data?.userMessage,
+          hasFcmToken: !!data?.fcmToken,
+        });
         throw new HttpsError(
           'invalid-argument',
           'Missing required fields: userId, userMessage, or fcmToken'
@@ -60,11 +73,14 @@ export const handleAINotificationResponse = onCall(
       // Get API key from secret
       const openRouterApiKey = process.env.OPENROUTER_API_KEY;
       if (!openRouterApiKey) {
+        logger.error('OPENROUTER_API_KEY not found in environment');
         throw new HttpsError(
           'failed-precondition',
           'OpenRouter API key not configured'
         );
       }
+      
+      logger.info('OpenRouter API key found, length:', openRouterApiKey.length);
 
       // Build conversation context
       const messages = [
@@ -83,6 +99,7 @@ ${isPremium ? 'This is a premium user - provide personalized advice.' : 'This is
       ];
 
       // Make API call to OpenRouter
+      logger.info('Making API call to OpenRouter');
       const aiResponse = await axios.post(
         'https://openrouter.ai/api/v1/chat/completions',
         {
@@ -99,7 +116,10 @@ ${isPremium ? 'This is a premium user - provide personalized advice.' : 'This is
             'Content-Type': 'application/json',
           },
         }
-      );
+      ).catch(error => {
+        logger.error('OpenRouter API error:', error.response?.data || error.message);
+        throw error;
+      });
 
       const aiResponseText = aiResponse.data.choices?.[0]?.message?.content;
 
@@ -128,38 +148,126 @@ ${isPremium ? 'This is a premium user - provide personalized advice.' : 'This is
         }
       }
 
-      // Send push notification with AI response
-      const message: admin.messaging.Message = {
-        token: data.fcmToken,
-        notification: {
+      // Send notification based on token type
+      let notificationId: string;
+      
+      // Check if this is an Expo push token or real FCM token
+      if (data.fcmToken.startsWith('ExponentPushToken')) {
+        // Use Expo's push notification service
+        logger.info('Using Expo push notification service');
+        
+        const expoPushMessage = [{
+          to: data.fcmToken,
           title: 'AI Flex Coach 🤖',
           body: formattedResponse,
-        },
-        data: {
-          type: 'ai_wellness_response',
-          userId: data.userId,
-          timestamp: Date.now().toString(),
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              category: 'AI_WELLNESS_SIMPLE',
-              'mutable-content': 1,
+          data: {
+            type: 'ai_wellness_checkin',  // Keep same type for conversation continuity
+            userId: data.userId,
+            timestamp: Date.now().toString(),
+            isResponse: true,
+          },
+          sound: 'default',
+          priority: 'high',
+          channelId: 'ai_wellness',
+          // iOS specific settings to ensure delivery
+          _contentAvailable: true,
+          _displayInForeground: true,
+          categoryId: 'AI_WELLNESS_SIMPLE',
+          // Ensure immediate delivery
+          ttl: 0,
+          expiration: Math.floor(Date.now() / 1000) + 300, // 5 minutes
+        }];
+        
+        const expoPushResponse = await axios.post(
+          'https://exp.host/--/api/v2/push/send',
+          expoPushMessage,
+          {
+            headers: {
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip, deflate',
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        
+        logger.info('Expo push notification sent', { 
+          status: expoPushResponse.status,
+          response: JSON.stringify(expoPushResponse.data)
+        });
+        
+        // Check the response format
+        const pushTicket = expoPushResponse.data?.data?.[0] || expoPushResponse.data;
+        
+        if (pushTicket?.status === 'error') {
+          logger.error('Expo push error:', {
+            message: pushTicket.message,
+            details: pushTicket.details
+          });
+          throw new Error(`Expo push failed: ${pushTicket.message}`);
+        }
+        
+        // Get the push ticket ID for receipt checking
+        const ticketId = pushTicket?.id;
+        if (ticketId) {
+          // Wait a moment then check the receipt
+          setTimeout(async () => {
+            try {
+              const receiptResponse = await axios.post(
+                'https://exp.host/--/api/v2/push/getReceipts',
+                { ids: [ticketId] },
+                {
+                  headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+              logger.info('Expo push receipt:', {
+                ticketId,
+                receipt: JSON.stringify(receiptResponse.data)
+              });
+            } catch (err) {
+              logger.error('Failed to get push receipt:', err);
+            }
+          }, 2000); // Check after 2 seconds
+        }
+        
+        notificationId = ticketId || 'expo-notification';
+        logger.info('AI response notification sent via Expo', { notificationId });
+      } else {
+        // Use Firebase Cloud Messaging for FCM tokens
+        const message: admin.messaging.Message = {
+          token: data.fcmToken,
+          notification: {
+            title: 'AI Flex Coach 🤖',
+            body: formattedResponse,
+          },
+          data: {
+            type: 'ai_wellness_response',
+            userId: data.userId,
+            timestamp: Date.now().toString(),
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: 'default',
+                category: 'AI_WELLNESS_SIMPLE',
+                'mutable-content': 1,
+              },
             },
           },
-        },
-        android: {
-          notification: {
-            channelId: 'ai_wellness',
-            priority: 'high',
-            sound: 'default',
+          android: {
+            notification: {
+              channelId: 'ai_wellness',
+              priority: 'high',
+              sound: 'default',
+            },
           },
-        },
-      };
+        };
 
-      const messageId = await messaging.send(message);
-      logger.info('AI response notification sent', { messageId });
+        notificationId = await messaging.send(message);
+        logger.info('AI response notification sent', { notificationId });
+      }
 
       // Store conversation in Firestore for persistence
       await db.collection('ai_conversations').doc(data.userId).set(
@@ -181,7 +289,7 @@ ${isPremium ? 'This is a premium user - provide personalized advice.' : 'This is
       return {
         success: true,
         response: formattedResponse,
-        messageId,
+        messageId: notificationId,
       };
 
     } catch (error) {
@@ -190,13 +298,33 @@ ${isPremium ? 'This is a premium user - provide personalized advice.' : 'This is
       // Send error notification
       try {
         if (data?.fcmToken) {
-          await messaging.send({
-            token: data.fcmToken,
-            notification: {
-              title: 'AI Flex Coach 🤖',
-              body: "I'm having trouble connecting right now. Please try again later or open the app.",
-            },
-          });
+          if (data.fcmToken.startsWith('ExponentPushToken')) {
+            // Use Expo push service for error notification
+            await axios.post(
+              'https://exp.host/--/api/v2/push/send',
+              {
+                to: data.fcmToken,
+                title: 'AI Flex Coach 🤖',
+                body: "I'm having trouble connecting right now. Please try again later or open the app.",
+                sound: 'default',
+                priority: 'high',
+              },
+              {
+                headers: {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+          } else {
+            await messaging.send({
+              token: data.fcmToken,
+              notification: {
+                title: 'AI Flex Coach 🤖',
+                body: "I'm having trouble connecting right now. Please try again later or open the app.",
+              },
+            });
+          }
         }
       } catch (notifError) {
         logger.error('Failed to send error notification', notifError);
