@@ -45,7 +45,6 @@
     },
     "web": {},
     "plugins": [
-      "./plugins/withFirebaseMessaging",
       "expo-dev-client",
       [
         "expo-notifications",
@@ -53,7 +52,8 @@
           "icon": "./assets/images/potentialLogo2.png",
           "color": "#ffffff"
         }
-      ]
+      ],
+      "./plugins/withReactNativeFirebase.js"
     ],
     "extra": {
       "eas": {
