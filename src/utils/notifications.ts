@@ -42,11 +42,21 @@ export async function configureNotifications(): Promise<void> {
       const isWelcome = data?.isWelcome || data?.isPremiumWelcome;
       const isGoodbye = data?.isGoodbye;
       const isAIResponse = data?.type === 'ai_wellness_response' || data?.isWelcomeResponse;
+      const isAICheckIn = data?.type === 'ai_wellness_checkin';
+      
+      console.log('[notifications.ts] Notification received in foreground:', {
+        title: notification.request.content.title,
+        isWelcome,
+        isAICheckIn,
+        isAIResponse,
+        data
+      });
       
       // Allow these notification types to show immediately:
       // 1. Welcome/goodbye messages
-      // 2. AI wellness responses (for conversation flow)
-      if (isWelcome || isGoodbye || isAIResponse) {
+      // 2. AI wellness check-ins
+      // 3. AI wellness responses (for conversation flow)
+      if (isWelcome || isGoodbye || isAIResponse || isAICheckIn) {
         return {
           shouldShowAlert: true,   // Show these immediately
           shouldPlaySound: true,   // Play sound for these

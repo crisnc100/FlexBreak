@@ -56,7 +56,8 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
             sound: true,
             data: { 
               userId,
-              isWelcome: true
+              isWelcome: true,
+              type: 'ai_wellness_checkin'  // Add type for consistency
             },
             categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
           },
@@ -97,7 +98,8 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
             sound: true,
             data: { 
               userId,
-              isPremiumWelcome: true
+              isPremiumWelcome: true,
+              type: 'ai_wellness_checkin'  // Add type for consistency
             },
             categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
           },

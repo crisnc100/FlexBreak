@@ -50,16 +50,12 @@ import { useAIWellnessOnboarding } from './src/hooks/useAIWellnessOnboarding';
 import { AIWellnessOnboarding } from './src/components/ai/AIWellnessOnboarding';
 import { useAIWellnessPremiumUpgrade } from './src/hooks/useAIWellnessPremiumUpgrade';
 import { AIWellnessPremiumUpgrade } from './src/components/ai/AIWellnessPremiumUpgrade';
-// Removed non-MVP imports
-// import dataCleanupManager from './src/services/ai/dataCleanupManager';
-// import { checkAndRestoreAISchedule } from './src/services/ai/aiSchedulingPersistence';
 
-// Initialize Firebase with Firebase JS SDK
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
 import 'firebase/compat/functions';
-import 'firebase/compat/messaging';
+// import 'firebase/compat/messaging'; // Removed to prevent notification conflicts
 import 'firebase/compat/app-check';
 import firebaseConfig from './firebase.config';
 
@@ -411,33 +407,33 @@ function MainApp() {
   // Set up AI Wellness modal handler with proper cleanup
   useEffect(() => {
     const showModal = () => {
-      console.log('AI Wellness triggered - showing FlexChat');
-      // Prevent showing modal if already visible
-      setShowFlexChat(current => {
-        if (current) {
-          console.log('FlexChat already visible, skipping');
-          return current;
-        }
-        // Add a small delay to prevent UI conflicts when tapping notification
-        setTimeout(() => {
-          setShowFlexChat(true);
-          // Don't show the old modal anymore
-          setShowAIModal(false);
-        }, 100);
-        return current;
-      });
+      console.log('[App.tsx] AI Wellness modal triggered - attempting to show FlexChat');
+      // Don't use functional setState here, just set it directly
+      console.log('[App.tsx] Showing FlexChat modal now');
+      setShowFlexChat(true);
+      // Don't show the old modal anymore
+      setShowAIModal(false);
     };
     setShowAIWellnessModal(showModal);
     
     // Check if we need to show bubble on app focus (fallback)
     const checkModalFlag = async () => {
-      const shouldShow = await AsyncStorage.getItem('@ai_wellness_show_modal');
-      const hasStoredResponse = await AsyncStorage.getItem('@ai_wellness_last_response');
+      // Import KEYS from storageService
+      const { KEYS } = await import('./src/services/storageService');
       
-      if (shouldShow === 'true' || hasStoredResponse) {
-        console.log('Found pending AI Wellness flag or stored response - showing FlexChat');
-        setShowFlexChat(true);
-        await AsyncStorage.removeItem('@ai_wellness_show_modal');
+      // Check if we need to show FlexChat from notification tap
+      const shouldShowFlexChat = await AsyncStorage.getItem('@show_flexchat_on_open');
+      
+      if (shouldShowFlexChat === 'true') {
+        // Check if AI wellness is enabled
+        const aiWellnessEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+        
+        if (aiWellnessEnabled === 'true') {
+          setShowFlexChat(true);
+        }
+        
+        // Clear the flag after handling
+        await AsyncStorage.removeItem('@show_flexchat_on_open');
       }
     };
     
@@ -466,6 +462,9 @@ function MainApp() {
   useEffect(() => {
     const initApp = async () => {
       try {
+        // IMPORTANT: Wait a bit to ensure the modal handler is set up first
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Initialize local notifications system
         await notifications.configureNotifications();
         

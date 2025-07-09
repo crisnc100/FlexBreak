@@ -2,7 +2,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
 import 'firebase/compat/functions';
-import 'firebase/compat/messaging';
+// import 'firebase/compat/messaging'; // Removed to prevent notification conflicts
 import 'firebase/compat/app-check';
 import * as Notifications from 'expo-notifications';
 import * as storageService from '../services/storageService';

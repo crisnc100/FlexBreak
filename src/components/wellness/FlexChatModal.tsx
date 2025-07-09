@@ -182,10 +182,14 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
 
   // Load initial state when modal opens
   useEffect(() => {
+    console.log('[FlexChatModal] useEffect triggered - visible:', visible, 'isLoading:', isLoading);
     if (visible && !isLoading) {
+      console.log('[FlexChatModal] Calling loadInitialState, animateIn, and startVoiceButtonGlow...');
       loadInitialState();
       animateIn();
       startVoiceButtonGlow();
+    } else {
+      console.log('[FlexChatModal] Skipping initialization - conditions not met');
     }
   }, [visible]);
 
@@ -227,140 +231,42 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
   }, [showVoiceIntro]);
 
   const loadInitialState = async () => {
+    console.log('[FlexChatModal] Loading initial state...');
     try {
-      // Check for stored response from notification
-      const storedResponse = await AsyncStorage.getItem('@ai_wellness_last_response');
-      if (storedResponse) {
-        const { response, timestamp, fromNotification, truncatedForNotification } = JSON.parse(storedResponse);
-        if (Date.now() - timestamp < 5 * 60 * 1000) {
-          const messages: Message[] = [];
-          
-          // If response was truncated in notification, show helpful message
-          if (fromNotification && truncatedForNotification) {
-            const truncationNotice: Message = {
-              role: 'assistant',
-              content: '📱 Here\'s my full response (it was shortened in the notification):',
-              timestamp: Date.now(),
-              id: (Date.now() - 1).toString(),
-              quickReplies: [],
-              type: 'ai',
-              message: '📱 Here\'s my full response (it was shortened in the notification):',
-              isTypewriting: false // No typewriter for system messages
-            };
-            messages.push(truncationNotice);
-          }
-          
-          const aiMessage: Message = {
-            role: 'assistant',
-            content: response,
-            timestamp: Date.now(),
-            id: Date.now().toString(),
-            quickReplies: [],
-            type: 'ai',
-            message: response,
-            isTypewriting: ENABLE_TYPEWRITER_EFFECT
-          };
-          messages.push(aiMessage);
-          
-          setMessages(messages);
-          
-          // Set this message as currently typewriting
-          if (ENABLE_TYPEWRITER_EFFECT) {
-            setCurrentTypewritingId(aiMessage.id);
-          }
-        }
-        await AsyncStorage.removeItem('@ai_wellness_last_response');
-      } else {
-        // Load greeting message
-        const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-        const memory = await memoryService.getMemory(userId);
-        const userName = await AsyncStorage.getItem('@ai_wellness_user_name');
-        
-        const greeting = userName ? `Hi ${userName}! 👋` : 'Hi there! 👋';
-        const followUp = memory.usage.totalInteractions > 0 
-          ? "How have you been feeling since our last check-in?"
-          : "How are you feeling today? I'm here to help you stay active and energized!";
-        
-        // Check if this is first time seeing voice feature
-        const hasSeenVoiceIntro = await AsyncStorage.getItem('@ai_wellness_voice_intro_seen');
-        let voiceIntro = '';
-        if (!hasSeenVoiceIntro) {
-          voiceIntro = '\n\n🎤 ✨ NEW: Try speaking to me! Tap the glowing microphone button to use your voice instead of typing. Just like having a conversation with a real wellness coach!';
-          await AsyncStorage.setItem('@ai_wellness_voice_intro_seen', 'true');
-          setShowVoiceIntro(true);
-        }
-        
-        const welcomeMessage: Message = {
-          id: Date.now().toString(),
-          type: 'ai',
-          message: `${greeting}\n\n${followUp}${voiceIntro}`,
-          timestamp: new Date(),
-          // suggestedActions removed
-        };
-        setMessages([welcomeMessage]);
+      // Always load greeting message
+      console.log('[FlexChatModal] Loading greeting message...');
+      const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
+      const memory = await memoryService.getMemory(userId);
+      const userName = await AsyncStorage.getItem('@ai_wellness_user_name');
+      
+      const greeting = userName ? `Hi ${userName}! 👋` : 'Hi there! 👋';
+      const followUp = memory.usage.totalInteractions > 0 
+        ? "How have you been feeling since our last check-in?"
+        : "How are you feeling today? I'm here to help you stay active and energized!";
+      
+      // Check if this is first time seeing voice feature
+      const hasSeenVoiceIntro = await AsyncStorage.getItem('@ai_wellness_voice_intro_seen');
+      let voiceIntro = '';
+      if (!hasSeenVoiceIntro) {
+        voiceIntro = '\n\n🎤 ✨ NEW: Try speaking to me! Tap the glowing microphone button to use your voice instead of typing. Just like having a conversation with a real wellness coach!';
+        await AsyncStorage.setItem('@ai_wellness_voice_intro_seen', 'true');
+        setShowVoiceIntro(true);
       }
+      
+      const welcomeMessage: Message = {
+        id: Date.now().toString(),
+        type: 'ai',
+        message: `${greeting}\n\n${followUp}${voiceIntro}`,
+        timestamp: new Date(),
+        // suggestedActions removed
+      };
+      setMessages([welcomeMessage]);
+      console.log('[FlexChatModal] Set greeting message:', welcomeMessage.message.substring(0, 50) + '...');
 
-      // Check if voice mode was requested
-      const voiceMode = await AsyncStorage.getItem('@ai_wellness_voice_mode');
-      if (voiceMode === 'true') {
-        await AsyncStorage.removeItem('@ai_wellness_voice_mode');
-        
-        // Check if this was from a notification voice reply
-        const voiceContext = await AsyncStorage.getItem('@ai_wellness_voice_context');
-        if (voiceContext) {
-          await AsyncStorage.removeItem('@ai_wellness_voice_context');
-          console.log('Voice reply from notification detected');
-          
-          // Add a helpful message to guide the user
-          const voiceGuidanceMessage: Message = {
-            id: Date.now().toString(),
-            type: 'ai',
-            message: '🎙️ Tap the microphone button to start your voice reply!',
-            timestamp: new Date(),
-            isTypewriting: false // No typewriter for system messages
-          };
-          setMessages(prev => [...prev, voiceGuidanceMessage]);
-        }
-        
-        // Auto-start voice recording after proper delay for audio session setup
-        // Wait for modal animation to complete and audio session to be ready
-        setTimeout(async () => {
-          console.log('[FlexChatModal] Preparing audio session for auto voice recording...');
-          
-          try {
-            // Pre-initialize audio session to ensure it's ready
-            const { Audio } = require('expo-av');
-            await Audio.setAudioModeAsync({
-              allowsRecordingIOS: true,
-              playsInSilentModeIOS: true,
-            });
-            
-            // Small delay after audio mode setup
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            console.log('[FlexChatModal] Auto-starting voice recording from notification');
-            await handleVoiceRecord();
-          } catch (error) {
-            console.log('[FlexChatModal] Voice recording attempt failed:', error);
-            
-            // Show helpful message if auto-start fails
-            const fallbackMessage: Message = {
-              id: Date.now().toString(),
-              type: 'ai',
-              message: '🎙️ Tap the microphone button below to record your voice message!',
-              timestamp: new Date(),
-              isTypewriting: false // No typewriter for system messages
-            };
-            setMessages(prev => {
-              // Remove the previous guidance message if it exists
-              const filtered = prev.filter(msg => !msg.message.includes('Tap the microphone button to start'));
-              return [...filtered, fallbackMessage];
-            });
-          }
-        }, 2500); // 2.5 seconds to ensure everything is ready
-      }
+      // Voice mode from notifications removed - using simplified chat flow
+      // Users can still use voice within the chat by tapping the microphone button
     } catch (error) {
-      console.error('Error loading initial state:', error);
+      console.error('[FlexChatModal] Error loading initial state:', error);
     }
   };
 
