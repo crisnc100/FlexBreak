@@ -16,7 +16,9 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested.",
-        "NSMicrophoneUsageDescription": "FlexBreak needs access to your microphone for voice responses to the AI Wellness Coach."
+        "NSMicrophoneUsageDescription": "FlexBreak needs access to your microphone for voice responses to the AI Wellness Coach.",
+        "NSUserActivityTypes": ["OpenFlexCoachIntent"],
+        "NSSiriUsageDescription": "Use Siri to quickly open your AI Flex Coach for wellness check-ins."
       },
       "splash": {
         "xib": "./ios/FlexBreak/SplashScreen.storyboard"

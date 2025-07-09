@@ -50,6 +50,7 @@ import { useAIWellnessOnboarding } from './src/hooks/useAIWellnessOnboarding';
 import { AIWellnessOnboarding } from './src/components/ai/AIWellnessOnboarding';
 import { useAIWellnessPremiumUpgrade } from './src/hooks/useAIWellnessPremiumUpgrade';
 import { AIWellnessPremiumUpgrade } from './src/components/ai/AIWellnessPremiumUpgrade';
+import * as Linking from 'expo-linking';
 
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
@@ -404,6 +405,32 @@ function MainApp() {
     };
   }, [forceShowOnboarding, forceShowUpgrade]);
   
+  // Handle deep links for Siri/Google Assistant
+  useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      console.log('[App.tsx] Deep link received:', url);
+      // Handle flexbreak-app://flexcoach
+      if (url.includes('flexcoach')) {
+        console.log('[App.tsx] Opening FlexChat from deep link');
+        setShowFlexChat(true);
+      }
+    };
+
+    // Get initial URL
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    // Listen for new URLs
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+  
   // Set up AI Wellness modal handler with proper cleanup
   useEffect(() => {
     const showModal = () => {
@@ -437,13 +464,20 @@ function MainApp() {
       }
     };
     
-    // Check on mount and when app becomes active
-    checkModalFlag();
+    // Only check when app becomes active from background, not on initial mount
+    let isFirstLaunch = true;
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
+      if (nextAppState === 'active' && !isFirstLaunch) {
         checkModalFlag();
-        // Data cleanup removed for MVP
-        // Don't check AI schedule here - it's already done in initApp
+      }
+      isFirstLaunch = false;
+    });
+    
+    // Also check immediately but only if app was opened from a notification
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        console.log('[App.tsx] App was opened from notification, checking modal flag');
+        checkModalFlag();
       }
     });
     
