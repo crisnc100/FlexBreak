@@ -1,4 +1,3 @@
-import * as IntentLauncher from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 
 export const setupSiriShortcuts = async () => {
