@@ -443,46 +443,62 @@ function MainApp() {
     };
     setShowAIWellnessModal(showModal);
     
+    // Set global function for opening FlexChat from anywhere
+    (global as any).openFlexChat = () => setShowFlexChat(true);
+    
     // Check if we need to show bubble on app focus (fallback)
     const checkModalFlag = async () => {
       // Import KEYS from storageService
       const { KEYS } = await import('./src/services/storageService');
       
       // Check if we need to show FlexChat from notification tap
-      const shouldShowFlexChat = await AsyncStorage.getItem('@show_flexchat_on_open');
+      const flagData = await AsyncStorage.getItem('@show_flexchat_on_open');
       
-      if (shouldShowFlexChat === 'true') {
-        // Check if AI wellness is enabled
-        const aiWellnessEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
-        
-        if (aiWellnessEnabled === 'true') {
-          setShowFlexChat(true);
+      if (flagData) {
+        try {
+          const parsed = JSON.parse(flagData);
+          const isRecent = Date.now() - parsed.timestamp < 30000; // 30 seconds
+          
+          if (parsed.value && isRecent) {
+            // Check if AI wellness is enabled
+            const aiWellnessEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+            
+            if (aiWellnessEnabled === 'true') {
+              setShowFlexChat(true);
+            }
+          }
+        } catch (e) {
+          // Handle old format
+          if (flagData === 'true') {
+            const aiWellnessEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+            if (aiWellnessEnabled === 'true') {
+              setShowFlexChat(true);
+            }
+          }
         }
         
-        // Clear the flag after handling
+        // Always clear the flag after checking
         await AsyncStorage.removeItem('@show_flexchat_on_open');
       }
     };
     
     // Only check when app becomes active from background, not on initial mount
     let isFirstLaunch = true;
+    let hasCheckedFlag = false;
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active' && !isFirstLaunch) {
+      if (nextAppState === 'active' && !isFirstLaunch && !hasCheckedFlag) {
         checkModalFlag();
+        hasCheckedFlag = true;
       }
       isFirstLaunch = false;
     });
     
-    // Also check immediately but only if app was opened from a notification
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) {
-        console.log('[App.tsx] App was opened from notification, checking modal flag');
-        checkModalFlag();
-      }
-    });
+    // Don't check on initial app launch - let the notification handler handle it
+    // This prevents stale notifications from opening FlexChat on normal startup
     
     return () => {
       setShowAIWellnessModal(null);
+      (global as any).openFlexChat = null;
       subscription?.remove();
     };
   }, []);
@@ -496,6 +512,22 @@ function MainApp() {
   useEffect(() => {
     const initApp = async () => {
       try {
+        // Clean up any stale flags on app start
+        // Only remove if the flag is older than 60 seconds
+        const flagData = await AsyncStorage.getItem('@show_flexchat_on_open');
+        if (flagData) {
+          try {
+            const parsed = JSON.parse(flagData);
+            if (Date.now() - parsed.timestamp > 60000) {
+              await AsyncStorage.removeItem('@show_flexchat_on_open');
+              console.log('[App.tsx] Cleared stale flexchat flag');
+            }
+          } catch (e) {
+            // Old format, remove it
+            await AsyncStorage.removeItem('@show_flexchat_on_open');
+          }
+        }
+        
         // IMPORTANT: Wait a bit to ensure the modal handler is set up first
         await new Promise(resolve => setTimeout(resolve, 500));
         

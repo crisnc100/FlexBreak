@@ -92,7 +92,10 @@ const handleNotificationResponse = async (response: Notifications.NotificationRe
       } else {
         // Only set flag if we can't open directly (app was killed)
         console.log('Modal handler not available, setting flag for app open');
-        await AsyncStorage.setItem('@show_flexchat_on_open', 'true');
+        await AsyncStorage.setItem('@show_flexchat_on_open', JSON.stringify({
+          timestamp: Date.now(),
+          value: true
+        }));
       }
     } else if (data?.type === 'ai_wellness_upgrade') {
       // Handle upgrade prompt responses
@@ -129,14 +132,32 @@ export const setupAINotificationHandlers = () => {
   // This must be done AFTER setting up the listener and with a small delay
   setTimeout(async () => {
     try {
+      // Check if we've already processed the last notification in this session
+      const processedKey = '@last_notification_processed';
+      const lastProcessed = await AsyncStorage.getItem(processedKey);
+      
       const lastResponse = await Notifications.getLastNotificationResponseAsync();
       console.log('[aiNotificationHandler] Checking last notification response:', !!lastResponse);
+      
       if (lastResponse) {
-        console.log('[aiNotificationHandler] App was opened from notification:', {
-          actionIdentifier: lastResponse.actionIdentifier,
-          notificationData: lastResponse.notification.request.content.data
-        });
-        await handleNotificationResponse(lastResponse);
+        // Create a unique identifier for this notification response
+        const responseId = `${lastResponse.notification.request.identifier}_${lastResponse.notification.date}`;
+        
+        // Only process if we haven't already processed this exact response
+        if (lastProcessed !== responseId) {
+          console.log('[aiNotificationHandler] App was opened from notification:', {
+            actionIdentifier: lastResponse.actionIdentifier,
+            notificationData: lastResponse.notification.request.content.data
+          });
+          
+          // Process the notification
+          await handleNotificationResponse(lastResponse);
+          
+          // Mark this notification as processed
+          await AsyncStorage.setItem(processedKey, responseId);
+        } else {
+          console.log('[aiNotificationHandler] Notification already processed, skipping');
+        }
       }
     } catch (error) {
       console.error('[aiNotificationHandler] Error checking last notification response:', error);

@@ -136,7 +136,7 @@ export const OfficeWorkerVerificationModal: React.FC<OfficeWorkerVerificationMod
               </View>
               <View style={styles.benefitItem}>
                 <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-                <Text style={styles.benefitText}>2 months free trial</Text>
+                <Text style={styles.benefitText}>Free trial included</Text>
               </View>
             </View>
 

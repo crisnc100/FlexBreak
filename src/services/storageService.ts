@@ -813,15 +813,16 @@ export const exportUserProgress = (progress: UserProgress): void => {
   if (Platform.OS === 'web') {
     try {
       const jsonString = JSON.stringify(progress, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
+      const blob = new Blob([jsonString], { type: 'application/json', lastModified: new Date().getTime() });
       const url = URL.createObjectURL(blob);
       
-      const a = document.createElement('a');
+      const doc = (globalThis as any).document;
+      const a = doc.createElement('a');
       a.href = url;
       a.download = 'flexbreak_progress.json';
-      document.body.appendChild(a);
+      doc.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      doc.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
     }

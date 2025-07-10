@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KEYS } from '../../../services/storageService';
 import { AIWellnessToggle } from './AIWellnessToggle';
 import { AIDebugButton } from './AIDebugButton';
 import { AINameSettings } from './AINameSettings';
 import { AIScheduleSettings } from './AIScheduleSettings';
-import { AIWidgetPreviewSection } from './AIWidgetPreviewSection';
+import { SiriShortcutButton } from '../SiriShortcutButton';
 
 export const AIWellnessSettings: React.FC = () => {
   const [aiWellnessEnabled, setAIWellnessEnabled] = useState(false);
@@ -33,7 +33,11 @@ export const AIWellnessSettings: React.FC = () => {
       />
       <AINameSettings visible={aiWellnessEnabled} />
       <AIScheduleSettings visible={aiWellnessEnabled} />
-      <AIWidgetPreviewSection visible={aiWellnessEnabled} />
+      {Platform.OS === 'ios' && aiWellnessEnabled && (
+        <View style={{ marginTop: 16 }}>
+          <SiriShortcutButton />
+        </View>
+      )}
       <AIDebugButton visible={aiWellnessEnabled} />
     </View>
   );

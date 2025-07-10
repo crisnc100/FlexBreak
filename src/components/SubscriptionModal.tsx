@@ -253,7 +253,7 @@ export default function SubscriptionModal({
         // If after 10 seconds we don't get a success, show an error
         setTimeout(() => {
           if (busy) {
-            alert('Purchase failed or timed out. Please try again later.');
+            Alert.alert('Purchase Failed', 'Purchase failed or timed out. Please try again later.');
             setBusy(false);
             appStateSubscription.remove();
           }
@@ -261,7 +261,7 @@ export default function SubscriptionModal({
       }
     } catch (error) {
       console.error('[SubscriptionModal] Purchase error:', error);
-      alert('Purchase failed. Please try again later.');
+      Alert.alert('Purchase Failed', 'Purchase failed. Please try again later.');
       setBusy(false);
       onClose();
     }
@@ -278,7 +278,7 @@ export default function SubscriptionModal({
       await unlockPremiumLocally();
     } else {
       console.log('[SubscriptionModal] No previous purchases found or restore failed');
-      alert('No previous purchases found.');
+      Alert.alert('No Purchases Found', 'No previous purchases found.');
     }
     setBusy(false); onClose();
   };
@@ -547,7 +547,9 @@ export default function SubscriptionModal({
         <View style={styles.planFeatures}>
           <View style={styles.featureRow}>
             <Ionicons name="gift" size={16} color="#4CAF50" />
-            <Text style={styles.featureText}>First 2 Months FREE</Text>
+            <Text style={styles.featureText}>
+              {isYearly ? 'First Month FREE' : 'First 2 Weeks FREE'}
+            </Text>
           </View>
           {isVerified && (
             <View style={styles.featureRow}>

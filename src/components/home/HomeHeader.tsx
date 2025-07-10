@@ -1,7 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, Image, Animated, TouchableWithoutFeedback } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, Animated, TouchableWithoutFeedback, Platform, Easing } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { usePremium } from '../../context/PremiumContext';
+import { KEYS } from '../../services/storageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 
 interface HomeHeaderProps {
@@ -20,43 +22,107 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   const { theme, isDark } = useTheme();
   const { isPremium } = usePremium();
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const shadowOpacity = useRef(new Animated.Value(0)).current;
+  const shadowRadius = useRef(new Animated.Value(0)).current;
   const [animationInProgress, setAnimationInProgress] = useState(false);
+  const [aiWellnessEnabled, setAiWellnessEnabled] = useState(false);
   
+  // Check if AI wellness is enabled
+  useEffect(() => {
+    const checkAiWellness = async () => {
+      const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+      console.log('[HomeHeader] AI Wellness enabled:', enabled);
+      setAiWellnessEnabled(enabled === 'true');
+    };
+    checkAiWellness();
+  }, []);
+  
+  // Check if it's Wednesday for free users
+  const isWednesday = new Date().getDay() === 3;
+  const canAccessFlexChat = aiWellnessEnabled && (isPremium || isWednesday);
+  console.log('[HomeHeader] Can access FlexChat:', canAccessFlexChat, { aiWellnessEnabled, isPremium, isWednesday });
+  
+  // Subtle breathing animation for glow
+  useEffect(() => {
+    if (canAccessFlexChat) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shadowOpacity, {
+            toValue: 0.8,
+            duration: 1500,
+            useNativeDriver: false,
+            easing: Easing.inOut(Easing.ease),
+          }),
+          Animated.timing(shadowOpacity, {
+            toValue: 0.2,
+            duration: 1500,
+            useNativeDriver: false,
+            easing: Easing.inOut(Easing.ease),
+          }),
+        ])
+      ).start();
+    } else {
+      shadowOpacity.setValue(0);
+      shadowRadius.setValue(0);
+    }
+  }, [canAccessFlexChat]);
+
   const handleLogoPress = () => {
     if (animationInProgress) return;
     
-    // Provide subtle haptic feedback
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    setAnimationInProgress(true);
-    
-    // Simple, elegant animation sequence
-    Animated.sequence([
-      // Scale down slightly
-      Animated.timing(scaleAnim, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
+    // Check if we should open FlexChat
+    if (canAccessFlexChat && (global as any).openFlexChat) {
+      // Special haptic feedback for FlexChat
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       
-      // Bounce back slightly larger
-      Animated.spring(scaleAnim, {
-        toValue: 1.05,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
+      setAnimationInProgress(true);
       
-      // Settle back to normal size
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 5,
-        tension: 30,
-        useNativeDriver: true,
-      })
-    ]).start(() => {
-      setAnimationInProgress(false);
-    });
+      // Simple bounce animation
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 5,
+          tension: 40,
+          useNativeDriver: true,
+        })
+      ]).start(() => {
+        setAnimationInProgress(false);
+        // Open FlexChat after animation
+        (global as any).openFlexChat();
+      });
+    } else {
+      // Normal bounce animation
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      setAnimationInProgress(true);
+      
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1.05,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 5,
+          tension: 30,
+          useNativeDriver: true,
+        })
+      ]).start(() => {
+        setAnimationInProgress(false);
+      });
+    }
   };
   
   return (
@@ -75,6 +141,18 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
               source={require('../../../assets/images/potentialLogo2.png')} 
               style={styles.logoImage}
             />
+            {/* Simple animated border */}
+            {canAccessFlexChat && (
+              <Animated.View 
+                style={[
+                  styles.animatedBorder,
+                  {
+                    borderColor: '#4CAF50',
+                    opacity: shadowOpacity,
+                  }
+                ]}
+              />
+            )}
           </Animated.View>
         </TouchableWithoutFeedback>
         
@@ -86,6 +164,12 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
             {subtitle}
           </Text>
+          {/* Show availability info for free users */}
+          {aiWellnessEnabled && !isPremium && (
+            <Text style={[styles.availabilityText, { color: theme.textSecondary }]}>
+              {isWednesday ? '✨ AI Coach available today!' : ''}
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -112,6 +196,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'transparent',
   },
+  animatedBorder: {
+    position: 'absolute',
+    width: 74,
+    height: 74,
+    borderRadius: 19,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
   logoImage: {
     width: 80,
     height: 80,
@@ -134,6 +226,11 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     marginTop: 2,
+  },
+  availabilityText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   }
 });
 
