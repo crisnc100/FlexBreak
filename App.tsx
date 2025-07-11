@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated, Dimensions, Pressable } from 'react-native';
+import { TouchableOpacity, Modal, View, Text, SafeAreaView, StatusBar, AppState, Platform, Animated, Dimensions, Pressable, Alert } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -51,6 +51,7 @@ import { AIWellnessOnboarding } from './src/components/ai/AIWellnessOnboarding';
 import { useAIWellnessPremiumUpgrade } from './src/hooks/useAIWellnessPremiumUpgrade';
 import { AIWellnessPremiumUpgrade } from './src/components/ai/AIWellnessPremiumUpgrade';
 import * as Linking from 'expo-linking';
+import { canAccessFlexCoach } from './src/utils/siriShortcuts';
 
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
@@ -203,6 +204,23 @@ const TabNavigator = () => {
     performance.markComponentRender('TabNavigator');
   }, []);
   
+  // Set up global functions for settings modal management
+  useEffect(() => {
+    (global as any).closeSettingsModal = () => {
+      setSettingsModalVisible(false);
+    };
+    
+    (global as any).isSettingsModalOpen = () => {
+      return settingsModalVisible;
+    };
+    
+    return () => {
+      // Cleanup global functions
+      (global as any).closeSettingsModal = undefined;
+      (global as any).isSettingsModalOpen = undefined;
+    };
+  }, [settingsModalVisible]);
+  
   // Check for reopen_settings flag
   useEffect(() => {
     const checkReopenSettings = async () => {
@@ -221,6 +239,28 @@ const TabNavigator = () => {
     
     checkReopenSettings();
   }, []);
+  
+  // Check if we need to open FlexChat after settings close
+  useEffect(() => {
+    const checkFlexChatFlag = async () => {
+      if (!settingsModalVisible) {
+        // Settings modal just closed, check if we need to open FlexChat
+        const shouldOpenFlexChat = await AsyncStorage.getItem('@flexbreak:open_flexchat_after_settings');
+        if (shouldOpenFlexChat === 'true') {
+          console.log('[TabNavigator] Settings closed, opening FlexChat');
+          await AsyncStorage.removeItem('@flexbreak:open_flexchat_after_settings');
+          // Wait a bit for the settings modal to fully close
+          setTimeout(() => {
+            if ((global as any).openFlexChat) {
+              (global as any).openFlexChat();
+            }
+          }, 500);
+        }
+      }
+    };
+    
+    checkFlexChatFlag();
+  }, [settingsModalVisible]);
   
   // Check if user has access to playlists feature - using useCallback to memoize
   const checkPlaylistAccess = useCallback(async () => {
@@ -364,6 +404,7 @@ function MainApp() {
   const { recentAchievement, clearRecentAchievement } = useAchievements();
   const [showAIModal, setShowAIModal] = useState(false);
   const [showFlexChat, setShowFlexChat] = useState(false);
+  const [pendingFlexChatOpen, setPendingFlexChatOpen] = useState(false);
   
   // Initialize update notification hook
   const { showModal, updateInfo, checkForUpdates, hideModal } = useUpdateNotification();
@@ -407,12 +448,27 @@ function MainApp() {
   
   // Handle deep links for Siri/Google Assistant
   useEffect(() => {
-    const handleDeepLink = (url: string) => {
+    const handleDeepLink = async (url: string) => {
       console.log('[App.tsx] Deep link received:', url);
       // Handle flexbreak-app://flexcoach
       if (url.includes('flexcoach')) {
-        console.log('[App.tsx] Opening FlexChat from deep link');
-        setShowFlexChat(true);
+        console.log('[App.tsx] Checking access for FlexChat from deep link');
+        
+        // Check if user can access Flex Coach
+        const accessCheck = await canAccessFlexCoach();
+        
+        if (accessCheck.canAccess) {
+          console.log('[App.tsx] Access granted, opening FlexChat');
+          setShowFlexChat(true);
+        } else {
+          console.log('[App.tsx] Access denied:', accessCheck.message);
+          // Show alert with access restriction message
+          Alert.alert(
+            'Access Restricted',
+            accessCheck.message || 'Unable to access Flex Coach at this time.',
+            [{ text: 'OK' }]
+          );
+        }
       }
     };
 
@@ -434,17 +490,35 @@ function MainApp() {
   // Set up AI Wellness modal handler with proper cleanup
   useEffect(() => {
     const showModal = () => {
-      console.log('[App.tsx] AI Wellness modal triggered - attempting to show FlexChat');
-      // Don't use functional setState here, just set it directly
-      console.log('[App.tsx] Showing FlexChat modal now');
-      setShowFlexChat(true);
-      // Don't show the old modal anymore
+      console.log('[App.tsx] AI Wellness modal triggered - using safe FlexChat open');
+      // Always close old AI modal
       setShowAIModal(false);
+      // Use the safe version that handles settings modal
+      if ((global as any).openFlexChatSafely) {
+        (global as any).openFlexChatSafely();
+      } else {
+        // Fallback if global function not ready
+        setShowFlexChat(true);
+      }
     };
     setShowAIWellnessModal(showModal);
     
     // Set global function for opening FlexChat from anywhere
-    (global as any).openFlexChat = () => setShowFlexChat(true);
+    (global as any).openFlexChat = () => {
+      setShowFlexChat(true);
+    };
+    
+    // Set a separate function for when we need to handle settings modal conflict
+    (global as any).openFlexChatSafely = () => {
+      // Check if settings modal is open
+      if ((global as any).isSettingsModalOpen && (global as any).isSettingsModalOpen()) {
+        console.log('[App.tsx] Settings modal is open - storing flag to open FlexChat after close');
+        AsyncStorage.setItem('@flexbreak:open_flexchat_after_settings', 'true');
+        (global as any).closeSettingsModal();
+      } else {
+        setShowFlexChat(true);
+      }
+    };
     
     // Check if we need to show bubble on app focus (fallback)
     const checkModalFlag = async () => {

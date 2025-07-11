@@ -22,8 +22,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   const { theme, isDark } = useTheme();
   const { isPremium } = usePremium();
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const shadowOpacity = useRef(new Animated.Value(0)).current;
-  const shadowRadius = useRef(new Animated.Value(0)).current;
+  const logoPulse = useRef(new Animated.Value(1)).current;
   const [animationInProgress, setAnimationInProgress] = useState(false);
   const [aiWellnessEnabled, setAiWellnessEnabled] = useState(false);
   
@@ -42,28 +41,34 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   const canAccessFlexChat = aiWellnessEnabled && (isPremium || isWednesday);
   console.log('[HomeHeader] Can access FlexChat:', canAccessFlexChat, { aiWellnessEnabled, isPremium, isWednesday });
   
-  // Subtle breathing animation for glow
+  // Subtle logo pulse animation
   useEffect(() => {
     if (canAccessFlexChat) {
-      Animated.loop(
+      // Very gentle breathing pulse
+      const pulseAnimation = Animated.loop(
         Animated.sequence([
-          Animated.timing(shadowOpacity, {
-            toValue: 0.8,
-            duration: 1500,
-            useNativeDriver: false,
-            easing: Easing.inOut(Easing.ease),
+          Animated.timing(logoPulse, {
+            toValue: 1.03,
+            duration: 2000,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.quad),
           }),
-          Animated.timing(shadowOpacity, {
-            toValue: 0.2,
-            duration: 1500,
-            useNativeDriver: false,
-            easing: Easing.inOut(Easing.ease),
+          Animated.timing(logoPulse, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.quad),
           }),
         ])
-      ).start();
+      );
+
+      pulseAnimation.start();
+
+      return () => {
+        pulseAnimation.stop();
+      };
     } else {
-      shadowOpacity.setValue(0);
-      shadowRadius.setValue(0);
+      logoPulse.setValue(1);
     }
   }, [canAccessFlexChat]);
 
@@ -77,7 +82,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
       
       setAnimationInProgress(true);
       
-      // Simple bounce animation
+      // Enhanced feedback animation for FlexChat access
       Animated.sequence([
         Animated.timing(scaleAnim, {
           toValue: 0.9,
@@ -133,7 +138,10 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             style={[
               styles.logoContainer,
               {
-                transform: [{ scale: scaleAnim }]
+                transform: [
+                  { scale: scaleAnim },
+                  { scale: logoPulse } // Add subtle pulse when FlexChat available
+                ]
               }
             ]}
           >
@@ -141,18 +149,6 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
               source={require('../../../assets/images/potentialLogo2.png')} 
               style={styles.logoImage}
             />
-            {/* Simple animated border */}
-            {canAccessFlexChat && (
-              <Animated.View 
-                style={[
-                  styles.animatedBorder,
-                  {
-                    borderColor: '#4CAF50',
-                    opacity: shadowOpacity,
-                  }
-                ]}
-              />
-            )}
           </Animated.View>
         </TouchableWithoutFeedback>
         
@@ -194,14 +190,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
-  animatedBorder: {
-    position: 'absolute',
-    width: 74,
-    height: 74,
-    borderRadius: 19,
-    borderWidth: 2,
     backgroundColor: 'transparent',
   },
   logoImage: {

@@ -7,6 +7,7 @@ import { AIDebugButton } from './AIDebugButton';
 import { AINameSettings } from './AINameSettings';
 import { AIScheduleSettings } from './AIScheduleSettings';
 import { SiriShortcutButton } from '../SiriShortcutButton';
+import { WeatherNotificationToggle } from './WeatherNotificationToggle';
 
 export const AIWellnessSettings: React.FC = () => {
   const [aiWellnessEnabled, setAIWellnessEnabled] = useState(false);
@@ -39,6 +40,11 @@ export const AIWellnessSettings: React.FC = () => {
         </View>
       )}
       <AIDebugButton visible={aiWellnessEnabled} />
+      
+      {/* Weather Notifications */}
+      <View style={{ marginTop: 16 }}>
+        <WeatherNotificationToggle />
+      </View>
     </View>
   );
 };

@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 // Notification types
 export enum NotificationType {
   MOTIVATIONAL = 'motivational_message',
+  WEATHER_MOTIVATIONAL = 'weather_motivational',
   AI_WELLNESS = 'ai_wellness_checkin',
   REMINDER = 'scheduled_reminder',
   PREMIUM_REMINDER = 'premium_reminder',
@@ -50,6 +51,8 @@ export function getNotificationType(notification: Notifications.NotificationRequ
   switch (type) {
     case 'motivational_message':
       return NotificationType.MOTIVATIONAL;
+    case 'weather_motivational':
+      return NotificationType.WEATHER_MOTIVATIONAL;
     case 'ai_wellness_checkin':
       return NotificationType.AI_WELLNESS;
     case 'scheduled_reminder':

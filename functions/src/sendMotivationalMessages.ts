@@ -1,5 +1,7 @@
 import * as functionsV2 from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
+import { getWeatherData, categorizeWeather, clearExpiredWeatherCache } from './weatherService';
+import { generateWeatherMessage } from './weatherMessages';
 
 // Initialize admin if not already initialized
 if (!admin.apps.length) {
@@ -53,18 +55,54 @@ export const sendMotivationalMessage = functionsV2.scheduler.onSchedule(
   },
   async (event) => {
     try {
-      // Select a random message
-      const randomIndex = Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length);
-      const message = MOTIVATIONAL_MESSAGES[randomIndex];
+      // Default to regular motivational message
+      let selectedMessage = MOTIVATIONAL_MESSAGES[Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length)];
+      let isWeatherMessage = false;
+      
+      // Try to get weather-based messages for users with location data
+      try {
+        // Get a sample of users with location data
+        const usersWithLocation = await admin.firestore()
+          .collection('user_locations')
+          .where('enabled', '==', true)
+          .limit(1) // Just check if any users have weather enabled
+          .get();
+        
+        if (!usersWithLocation.empty) {
+          // Get a representative location (could be enhanced to get most common location)
+          const sampleUser = usersWithLocation.docs[0].data();
+          const { lat, lon } = sampleUser;
+          
+          if (lat && lon) {
+            // Get weather data
+            const weather = await getWeatherData(lat, lon);
+            
+            if (weather) {
+              // Categorize weather and determine if we should send weather message
+              const category = categorizeWeather(weather);
+              const randomChance = Math.random();
+              
+              // Check if we should send a weather message based on priority
+              if (randomChance < category.messageProbability) {
+                selectedMessage = generateWeatherMessage(weather);
+                isWeatherMessage = true;
+                console.log(`Sending weather message for ${weather.temp}°F ${weather.condition}`);
+              }
+            }
+          }
+        }
+      } catch (weatherError) {
+        console.error('Error getting weather data, falling back to regular message:', weatherError);
+      }
       
       // Create the notification
       const notification: admin.messaging.Message = {
         notification: {
-          title: message.title,
-          body: message.body,
+          title: selectedMessage.title,
+          body: selectedMessage.body,
         },
         data: {
-          type: 'motivational',
+          type: isWeatherMessage ? 'weather_motivational' : 'motivational',
           timestamp: Date.now().toString(),
         },
         android: {
@@ -85,7 +123,7 @@ export const sendMotivationalMessage = functionsV2.scheduler.onSchedule(
       
       // Send the message
       const response = await admin.messaging().send(notification);
-      console.log('Successfully sent message:', response);
+      console.log(`Successfully sent ${isWeatherMessage ? 'weather' : 'regular'} message:`, response);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -510,3 +548,21 @@ export const testPushNotification = functionsV2.https.onCall({
     throw new functionsV2.https.HttpsError('internal', (error as Error).message);
   }
 }); 
+
+/**
+ * Cloud function to clean up expired weather cache daily
+ */
+export const cleanupWeatherCache = functionsV2.scheduler.onSchedule(
+  {
+    schedule: 'every day 03:00',
+    timeZone: 'America/New_York',
+  },
+  async (event) => {
+    try {
+      await clearExpiredWeatherCache();
+      console.log('Weather cache cleanup completed');
+    } catch (error) {
+      console.error('Error cleaning up weather cache:', error);
+    }
+  }
+);

@@ -1,0 +1,267 @@
+[debug] [2025-07-11T03:01:41.381Z] ----------------------------------------------------------------------
+[debug] [2025-07-11T03:01:41.383Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\crisn\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2025-07-11T03:01:41.383Z] CLI Version:   14.0.0
+[debug] [2025-07-11T03:01:41.383Z] Platform:      win32
+[debug] [2025-07-11T03:01:41.383Z] Node Version:  v22.14.0
+[debug] [2025-07-11T03:01:41.383Z] Time:          Thu Jul 10 2025 23:01:41 GMT-0400 (Eastern Daylight Time)
+[debug] [2025-07-11T03:01:41.383Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-11T03:01:41.504Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-11T03:01:41.504Z] > authorizing via signed-in user (crisnc100@gmail.com)
+[debug] [2025-07-11T03:01:41.504Z] [iam] checking project flexbreak-28ad0 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-07-11T03:01:41.505Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:41.505Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:41.505Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions [none]
+[debug] [2025-07-11T03:01:41.506Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:41.506Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-07-11T03:01:41.658Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions 200
+[debug] [2025-07-11T03:01:41.658Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-07-11T03:01:41.660Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:41.660Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:41.660Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/flexbreak-28ad0/serviceAccounts/flexbreak-28ad0@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-07-11T03:01:41.660Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/flexbreak-28ad0/serviceAccounts/flexbreak-28ad0@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-07-11T03:01:41.923Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/flexbreak-28ad0/serviceAccounts/flexbreak-28ad0@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-07-11T03:01:41.924Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/flexbreak-28ad0/serviceAccounts/flexbreak-28ad0@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'flexbreak-28ad0'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] +  functions: Finished running predeploy script. 
+[debug] [2025-07-11T03:01:43.375Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.375Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.375Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 [none]
+[debug] [2025-07-11T03:01:43.475Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 200
+[debug] [2025-07-11T03:01:43.475Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 {"projectNumber":"1008736824952","projectId":"flexbreak-28ad0","lifecycleState":"ACTIVE","name":"FlexBreak","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-03-22T16:37:50.186858Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:43.476Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.476Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.477Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.477Z] Checked if tokens are valid: true, expires at: 1752204908423
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:43.477Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.477Z] Checked if tokens are valid: true, expires at: 1752204908423
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:43.477Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.477Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.477Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudfunctions.googleapis.com [none]
+[debug] [2025-07-11T03:01:43.477Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudfunctions.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:43.479Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/runtimeconfig.googleapis.com [none]
+[debug] [2025-07-11T03:01:43.479Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/runtimeconfig.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:43.480Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudbuild.googleapis.com [none]
+[debug] [2025-07-11T03:01:43.480Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudbuild.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:43.480Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/artifactregistry.googleapis.com [none]
+[debug] [2025-07-11T03:01:43.481Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/artifactregistry.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:43.884Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/runtimeconfig.googleapis.com 200
+[debug] [2025-07-11T03:01:43.884Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/runtimeconfig.googleapis.com [omitted]
+[debug] [2025-07-11T03:01:43.890Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudfunctions.googleapis.com 200
+[debug] [2025-07-11T03:01:43.890Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudfunctions.googleapis.com [omitted]
+[info] +  functions: required API cloudfunctions.googleapis.com is enabled 
+[debug] [2025-07-11T03:01:43.894Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/artifactregistry.googleapis.com 200
+[debug] [2025-07-11T03:01:43.895Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/artifactregistry.googleapis.com [omitted]
+[info] +  artifactregistry: required API artifactregistry.googleapis.com is enabled 
+[debug] [2025-07-11T03:01:43.909Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudbuild.googleapis.com 200
+[debug] [2025-07-11T03:01:43.910Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudbuild.googleapis.com [omitted]
+[info] +  functions: required API cloudbuild.googleapis.com is enabled 
+[debug] [2025-07-11T03:01:43.910Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.911Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:43.911Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/flexbreak-28ad0/adminSdkConfig [none]
+[debug] [2025-07-11T03:01:44.164Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/flexbreak-28ad0/adminSdkConfig 200
+[debug] [2025-07-11T03:01:44.164Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/flexbreak-28ad0/adminSdkConfig {"projectId":"flexbreak-28ad0","storageBucket":"flexbreak-28ad0.firebasestorage.app"}
+[debug] [2025-07-11T03:01:44.165Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.165Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.165Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs [none]
+[debug] [2025-07-11T03:01:44.341Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs 200
+[debug] [2025-07-11T03:01:44.342Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs {"configs":[{"name":"projects/flexbreak-28ad0/configs/openweather"},{"name":"projects/flexbreak-28ad0/configs/openrouter"}]}
+[debug] [2025-07-11T03:01:44.343Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.343Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.343Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.343Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.343Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openweather/variables [none]
+[debug] [2025-07-11T03:01:44.344Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openrouter/variables [none]
+[debug] [2025-07-11T03:01:44.483Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openweather/variables 200
+[debug] [2025-07-11T03:01:44.483Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openweather/variables {"variables":[{"name":"projects/flexbreak-28ad0/configs/openweather/variables/api_key","updateTime":"2025-07-11T02:35:11.464123425Z"}]}
+[debug] [2025-07-11T03:01:44.484Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.484Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.484Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openweather/variables/api_key [none]
+[debug] [2025-07-11T03:01:44.584Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openweather/variables/api_key 200
+[debug] [2025-07-11T03:01:44.585Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openweather/variables/api_key {"name":"projects/flexbreak-28ad0/configs/openweather/variables/api_key","updateTime":"2025-07-11T02:35:11.464123425Z","text":"OPENWEATHER_MAP_API_KEY"}
+[debug] [2025-07-11T03:01:44.630Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openrouter/variables 200
+[debug] [2025-07-11T03:01:44.630Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openrouter/variables {"variables":[{"name":"projects/flexbreak-28ad0/configs/openrouter/variables/api_key","updateTime":"2025-07-04T02:27:43.961618691Z"}]}
+[debug] [2025-07-11T03:01:44.630Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.630Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:44.631Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openrouter/variables/api_key [none]
+[debug] [2025-07-11T03:01:44.720Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openrouter/variables/api_key 200
+[debug] [2025-07-11T03:01:44.721Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/flexbreak-28ad0/configs/openrouter/variables/api_key {"name":"projects/flexbreak-28ad0/configs/openrouter/variables/api_key","updateTime":"2025-07-04T02:27:43.961618691Z","text":"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"}
+[debug] [2025-07-11T03:01:44.724Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-07-11T03:01:45.314Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "lint": "echo 'Skipping linting'",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "firebase-admin": "^11.8.0",
+    "firebase-functions": "^4.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
+[debug] [2025-07-11T03:01:45.314Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[info] i  functions: You are using a version of firebase-functions SDK (4.9.0) that does not have support for the newest Firebase Extensions features. Please update firebase-functions SDK to >=5.1.0 to use them correctly 
+[debug] [2025-07-11T03:01:45.315Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-07-11T03:01:45.322Z] Found firebase-functions binary at 'C:\Users\crisn\GitHub\FlexBreak\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8500
+
+[debug] [2025-07-11T03:01:45.687Z] Got response from /__/functions.yaml {"endpoints":{"sendMotivationalMessage":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"scheduleTrigger":{"schedule":"every 15 minutes","retryConfig":{},"timeZone":"America/New_York"},"entryPoint":"sendMotivationalMessage"},"sendWelcomeNotification":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"eventTrigger":{"eventType":"google.cloud.firestore.document.v1.created","eventFilters":{"database":"(default)","namespace":"(default)"},"eventFilterPathPatterns":{"document":"fcm_tokens/{tokenId}"},"retry":false},"entryPoint":"sendWelcomeNotification"},"sendCustomNotification":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"sendCustomNotification"},"sendPersonalReminders":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"every 1 minutes","retryConfig":{}},"entryPoint":"sendPersonalReminders"},"saveUserReminders":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"saveUserReminders"},"testPushNotification":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"callableTrigger":{},"entryPoint":"testPushNotification"},"cleanupWeatherCache":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"scheduleTrigger":{"schedule":"every day 03:00","retryConfig":{},"timeZone":"America/New_York"},"entryPoint":"cleanupWeatherCache"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}]}
+[info] i  functions: preparing functions directory for uploading... 
+[info] i  functions: packaged C:\Users\crisn\GitHub\FlexBreak\functions (105.93 KB) for uploading 
+[debug] [2025-07-11T03:01:49.757Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:49.757Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:49.757Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v1/projects/flexbreak-28ad0/locations/-/functions [none]
+[debug] [2025-07-11T03:01:50.302Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v1/projects/flexbreak-28ad0/locations/-/functions 200
+[debug] [2025-07-11T03:01:50.302Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v1/projects/flexbreak-28ad0/locations/-/functions {}
+[debug] [2025-07-11T03:01:50.302Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:50.302Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:50.302Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v2/projects/flexbreak-28ad0/locations/-/functions filter=environment%3D%22GEN_2%22
+[debug] [2025-07-11T03:01:50.733Z] <<< [apiv2][status] GET https://cloudfunctions.googleapis.com/v2/projects/flexbreak-28ad0/locations/-/functions 200
+[debug] [2025-07-11T03:01:50.733Z] <<< [apiv2][body] GET https://cloudfunctions.googleapis.com/v2/projects/flexbreak-28ad0/locations/-/functions {}
+[debug] [2025-07-11T03:01:50.734Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:50.734Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:50.735Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/flexbreak-28ad0/databases/(default) [none]
+[debug] [2025-07-11T03:01:51.038Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/flexbreak-28ad0/databases/(default) 200
+[debug] [2025-07-11T03:01:51.038Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/flexbreak-28ad0/databases/(default) {"name":"projects/flexbreak-28ad0/databases/(default)","uid":"8b6e11d2-8d79-4cec-a52b-33c64dc2acfb","createTime":"2025-05-02T13:57:35.197990Z","updateTime":"2025-05-02T13:57:35.197990Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2025-07-11T02:01:51.051013Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"etag":"IInU2cDos44DMI7257e32I0D"}
+[info] i  functions: ensuring required API cloudscheduler.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:51.041Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.041Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.041Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudscheduler.googleapis.com [none]
+[debug] [2025-07-11T03:01:51.041Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudscheduler.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:51.410Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudscheduler.googleapis.com 200
+[debug] [2025-07-11T03:01:51.411Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/cloudscheduler.googleapis.com [omitted]
+[info] +  functions: required API cloudscheduler.googleapis.com is enabled 
+[info] i  functions: ensuring required API run.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:51.413Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.413Z] Checked if tokens are valid: true, expires at: 1752204908423
+[info] i  functions: ensuring required API eventarc.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:51.414Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.414Z] Checked if tokens are valid: true, expires at: 1752204908423
+[info] i  functions: ensuring required API pubsub.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:51.414Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.414Z] Checked if tokens are valid: true, expires at: 1752204908423
+[info] i  functions: ensuring required API storage.googleapis.com is enabled... 
+[debug] [2025-07-11T03:01:51.415Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.415Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.415Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/run.googleapis.com [none]
+[debug] [2025-07-11T03:01:51.415Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/run.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:51.415Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/eventarc.googleapis.com [none]
+[debug] [2025-07-11T03:01:51.415Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/eventarc.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:51.417Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/pubsub.googleapis.com [none]
+[debug] [2025-07-11T03:01:51.417Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/pubsub.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:51.419Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/storage.googleapis.com [none]
+[debug] [2025-07-11T03:01:51.419Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/storage.googleapis.com x-goog-quota-user=projects/flexbreak-28ad0
+[debug] [2025-07-11T03:01:51.777Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/eventarc.googleapis.com 200
+[debug] [2025-07-11T03:01:51.777Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/eventarc.googleapis.com [omitted]
+[info] +  functions: required API eventarc.googleapis.com is enabled 
+[debug] [2025-07-11T03:01:51.780Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/pubsub.googleapis.com 200
+[debug] [2025-07-11T03:01:51.780Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/pubsub.googleapis.com [omitted]
+[info] +  functions: required API pubsub.googleapis.com is enabled 
+[debug] [2025-07-11T03:01:51.790Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/storage.googleapis.com 200
+[debug] [2025-07-11T03:01:51.790Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/storage.googleapis.com [omitted]
+[info] +  functions: required API storage.googleapis.com is enabled 
+[debug] [2025-07-11T03:01:51.861Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/run.googleapis.com 200
+[debug] [2025-07-11T03:01:51.861Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/flexbreak-28ad0/services/run.googleapis.com [omitted]
+[info] +  functions: required API run.googleapis.com is enabled 
+[info] i  functions: generating the service identity for pubsub.googleapis.com... 
+[debug] [2025-07-11T03:01:51.863Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.863Z] Checked if tokens are valid: true, expires at: 1752204908423
+[info] i  functions: generating the service identity for eventarc.googleapis.com... 
+[debug] [2025-07-11T03:01:51.864Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.864Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:51.864Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1beta1/projects/1008736824952/services/pubsub.googleapis.com:generateServiceIdentity [none]
+[debug] [2025-07-11T03:01:51.864Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1beta1/projects/1008736824952/services/eventarc.googleapis.com:generateServiceIdentity [none]
+[debug] [2025-07-11T03:01:52.125Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1beta1/projects/1008736824952/services/pubsub.googleapis.com:generateServiceIdentity 200
+[debug] [2025-07-11T03:01:52.125Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/1008736824952/services/pubsub.googleapis.com:generateServiceIdentity {"name":"operations/finished.DONE_OPERATION","done":true,"response":{"@type":"type.googleapis.com/google.api.serviceusage.v1beta1.ServiceIdentity","email":"service-1008736824952@gcp-sa-pubsub.iam.gserviceaccount.com","uniqueId":"102256118167733369764"}}
+[debug] [2025-07-11T03:01:52.223Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1beta1/projects/1008736824952/services/eventarc.googleapis.com:generateServiceIdentity 200
+[debug] [2025-07-11T03:01:52.223Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1beta1/projects/1008736824952/services/eventarc.googleapis.com:generateServiceIdentity {"name":"operations/finished.DONE_OPERATION","done":true,"response":{"@type":"type.googleapis.com/google.api.serviceusage.v1beta1.ServiceIdentity","email":"service-1008736824952@gcp-sa-eventarc.iam.gserviceaccount.com","uniqueId":"112840227572724596682"}}
+[debug] [2025-07-11T03:01:52.226Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:52.226Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:52.226Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/1008736824952:getIamPolicy [none]
+[debug] [2025-07-11T03:01:52.437Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/1008736824952:getIamPolicy 200
+[debug] [2025-07-11T03:01:52.437Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/1008736824952:getIamPolicy {"version":1,"etag":"BwY21X/+d5E=","bindings":[{"role":"roles/artifactregistry.serviceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-artifactregistry.iam.gserviceaccount.com"]},{"role":"roles/cloudbuild.builds.builder","members":["serviceAccount:1008736824952@cloudbuild.gserviceaccount.com"]},{"role":"roles/cloudbuild.serviceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-cloudbuild.iam.gserviceaccount.com"]},{"role":"roles/cloudfunctions.serviceAgent","members":["serviceAccount:service-1008736824952@gcf-admin-robot.iam.gserviceaccount.com"]},{"role":"roles/cloudscheduler.serviceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-cloudscheduler.iam.gserviceaccount.com"]},{"role":"roles/containerregistry.ServiceAgent","members":["serviceAccount:service-1008736824952@containerregistry.iam.gserviceaccount.com"]},{"role":"roles/editor","members":["serviceAccount:1008736824952-compute@developer.gserviceaccount.com","serviceAccount:1008736824952@cloudservices.gserviceaccount.com","serviceAccount:flexbreak-28ad0@appspot.gserviceaccount.com"]},{"role":"roles/eventarc.eventReceiver","members":["serviceAccount:1008736824952-compute@developer.gserviceaccount.com"]},{"role":"roles/eventarc.serviceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-eventarc.iam.gserviceaccount.com"]},{"role":"roles/firebase.managementServiceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-firebase.iam.gserviceaccount.com"]},{"role":"roles/firebase.sdkAdminServiceAgent","members":["serviceAccount:firebase-adminsdk-fbsvc@flexbreak-28ad0.iam.gserviceaccount.com"]},{"role":"roles/firebaseappcheck.admin","members":["serviceAccount:firebase-adminsdk-fbsvc@flexbreak-28ad0.iam.gserviceaccount.com"]},{"role":"roles/firebasemods.serviceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-firebasemods.iam.gserviceaccount.com"]},{"role":"roles/firebaserules.system","members":["serviceAccount:service-1008736824952@firebase-rules.iam.gserviceaccount.com"]},{"role":"roles/firebasestorage.serviceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-firebasestorage.iam.gserviceaccount.com"]},{"role":"roles/firestore.serviceAgent","members":["serviceAccount:service-1008736824952@gcp-sa-firestore.iam.gserviceaccount.com"]},{"role":"roles/iam.serviceAccountTokenCreator","members":["serviceAccount:firebase-adminsdk-fbsvc@flexbreak-28ad0.iam.gserviceaccount.com","serviceAccount:service-1008736824952@gcp-sa-pubsub.iam.gserviceaccount.com"]},{"role":"roles/owner","members":["user:crisnc100@gmail.com"]},{"role":"roles/run.invoker","members":["serviceAccount:1008736824952-compute@developer.gserviceaccount.com"]},{"role":"roles/run.serviceAgent","members":["serviceAccount:service-1008736824952@serverless-robot-prod.iam.gserviceaccount.com"]},{"role":"roles/storage.admin","members":["serviceAccount:firebase-adminsdk-fbsvc@flexbreak-28ad0.iam.gserviceaccount.com"]}]}
+[debug] [2025-07-11T03:01:52.438Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:52.438Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:52.438Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 [none]
+[debug] [2025-07-11T03:01:52.545Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 200
+[debug] [2025-07-11T03:01:52.545Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/flexbreak-28ad0 {"projectNumber":"1008736824952","projectId":"flexbreak-28ad0","lifecycleState":"ACTIVE","name":"FlexBreak","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-03-22T16:37:50.186858Z"}
+[debug] [2025-07-11T03:01:52.547Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:52.548Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:52.548Z] >>> [apiv2][query] POST https://cloudfunctions.googleapis.com/v2/projects/flexbreak-28ad0/locations/us-central1/functions:generateUploadUrl [none]
+[debug] [2025-07-11T03:01:52.859Z] <<< [apiv2][status] POST https://cloudfunctions.googleapis.com/v2/projects/flexbreak-28ad0/locations/us-central1/functions:generateUploadUrl 200
+[debug] [2025-07-11T03:01:52.860Z] <<< [apiv2][body] POST https://cloudfunctions.googleapis.com/v2/projects/flexbreak-28ad0/locations/us-central1/functions:generateUploadUrl {"uploadUrl":"https://storage.googleapis.com/gcf-v2-uploads-1008736824952.us-central1.cloudfunctions.appspot.com/e367987d-e3be-46ce-b80f-91bb9e79decd.zip?GoogleAccessId=service-1008736824952@gcf-admin-robot.iam.gserviceaccount.com&Expires=1752204712&Signature=WD1bwTMgjiFUQvFANDzfMCQDNdEctvyeVbpNRw2BVSY%2FiQqsq0myeaIcERYOINNft9RFlQzILuwkmHWOXGa4V8c6MZpPMVVPDAvacOFA4VNiMgIZQ6JZ4aXbxKRmBRpLPt5lA%2BoU0tPwGKvqHnjzTlibmlh4xlGhwJ0xPVL5ylnXDiOdSl%2BHgOuz%2BYrV6OotXVmr%2FUqJZo22ACkO%2Bmx1B2Z8DlvzW1nFiFQd3Mcmo5H5dx%2FUPs8fYFLxnmTTOpFb02t7jMk7J%2F7XCMQHRcTml2BA%2FFZdyLH8Zfx9e3DFNtExmBVOwzw1hQPmeIrfmVy8utigBrrL%2BfgOz5QdpqhR5w%3D%3D","storageSource":{"bucket":"gcf-v2-uploads-1008736824952.us-central1.cloudfunctions.appspot.com","object":"e367987d-e3be-46ce-b80f-91bb9e79decd.zip"}}
+[debug] [2025-07-11T03:01:52.861Z] >>> [apiv2][query] PUT https://storage.googleapis.com/gcf-v2-uploads-1008736824952.us-central1.cloudfunctions.appspot.com/e367987d-e3be-46ce-b80f-91bb9e79decd.zip GoogleAccessId=service-1008736824952%40gcf-admin-robot.iam.gserviceaccount.com&Expires=1752204712&Signature=WD1bwTMgjiFUQvFANDzfMCQDNdEctvyeVbpNRw2BVSY%2FiQqsq0myeaIcERYOINNft9RFlQzILuwkmHWOXGa4V8c6MZpPMVVPDAvacOFA4VNiMgIZQ6JZ4aXbxKRmBRpLPt5lA%2BoU0tPwGKvqHnjzTlibmlh4xlGhwJ0xPVL5ylnXDiOdSl%2BHgOuz%2BYrV6OotXVmr%2FUqJZo22ACkO%2Bmx1B2Z8DlvzW1nFiFQd3Mcmo5H5dx%2FUPs8fYFLxnmTTOpFb02t7jMk7J%2F7XCMQHRcTml2BA%2FFZdyLH8Zfx9e3DFNtExmBVOwzw1hQPmeIrfmVy8utigBrrL%2BfgOz5QdpqhR5w%3D%3D
+[debug] [2025-07-11T03:01:52.861Z] >>> [apiv2][body] PUT https://storage.googleapis.com/gcf-v2-uploads-1008736824952.us-central1.cloudfunctions.appspot.com/e367987d-e3be-46ce-b80f-91bb9e79decd.zip [stream]
+[debug] [2025-07-11T03:01:53.165Z] <<< [apiv2][status] PUT https://storage.googleapis.com/gcf-v2-uploads-1008736824952.us-central1.cloudfunctions.appspot.com/e367987d-e3be-46ce-b80f-91bb9e79decd.zip 200
+[debug] [2025-07-11T03:01:53.165Z] <<< [apiv2][body] PUT https://storage.googleapis.com/gcf-v2-uploads-1008736824952.us-central1.cloudfunctions.appspot.com/e367987d-e3be-46ce-b80f-91bb9e79decd.zip [omitted]
+[info] +  functions: functions folder uploaded successfully 
+[info] i  functions: creating Node.js 20 (2nd Gen) function sendMotivationalMessage(us-central1)... 
+[info] i  functions: creating Node.js 20 (2nd Gen) function sendWelcomeNotification(us-central1)... 
+[info] i  functions: creating Node.js 20 (2nd Gen) function sendCustomNotification(us-central1)... 
+[info] i  functions: creating Node.js 20 (2nd Gen) function sendPersonalReminders(us-central1)... 
+[info] i  functions: creating Node.js 20 (2nd Gen) function saveUserReminders(us-central1)... 
+[info] i  functions: creating Node.js 20 (2nd Gen) function testPushNotification(us-central1)... 
+[info] i  functions: creating Node.js 20 (2nd Gen) function cleanupWeatherCache(us-central1)... 
+[debug] [2025-07-11T03:01:53.182Z] Total Function Deployment time: 6
+[debug] [2025-07-11T03:01:53.182Z] 7 Functions Deployed
+[debug] [2025-07-11T03:01:53.182Z] 7 Functions Errored
+[debug] [2025-07-11T03:01:53.182Z] 0 Function Deployments Aborted
+[debug] [2025-07-11T03:01:53.182Z] Average Function Deployment time: 1.8571428571428572
+[info] 
+[info] Functions deploy had errors with the following functions:
+	cleanupWeatherCache(us-central1)
+	saveUserReminders(us-central1)
+	sendCustomNotification(us-central1)
+	sendMotivationalMessage(us-central1)
+	sendPersonalReminders(us-central1)
+	sendWelcomeNotification(us-central1)
+	testPushNotification(us-central1)
+[debug] [2025-07-11T03:01:53.279Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:53.280Z] Checked if tokens are valid: true, expires at: 1752204908423
+[debug] [2025-07-11T03:01:53.280Z] >>> [apiv2][query] GET https://artifactregistry.googleapis.com/v1/projects/flexbreak-28ad0/locations/us-central1/repositories/gcf-artifacts [none]
+[debug] [2025-07-11T03:01:53.558Z] <<< [apiv2][status] GET https://artifactregistry.googleapis.com/v1/projects/flexbreak-28ad0/locations/us-central1/repositories/gcf-artifacts 200
+[debug] [2025-07-11T03:01:53.558Z] <<< [apiv2][body] GET https://artifactregistry.googleapis.com/v1/projects/flexbreak-28ad0/locations/us-central1/repositories/gcf-artifacts {"name":"projects/flexbreak-28ad0/locations/us-central1/repositories/gcf-artifacts","format":"DOCKER","description":"This repository is created and used by Cloud Functions for storing function docker images.","labels":{"goog-managed-by":"cloudfunctions"},"createTime":"2025-05-02T13:58:39.026274Z","updateTime":"2025-07-11T02:45:52.814007Z","mode":"STANDARD_REPOSITORY","cleanupPolicies":{"firebase-functions-cleanup":{"id":"firebase-functions-cleanup","action":"DELETE","condition":{"tagState":"ANY","olderThan":"86400s"}}},"vulnerabilityScanningConfig":{"lastEnableTime":"2025-05-02T13:58:29.706414405Z","enablementState":"SCANNING_DISABLED","enablementStateReason":"API containerscanning.googleapis.com is not enabled."},"satisfiesPzi":true,"registryUri":"us-central1-docker.pkg.dev/flexbreak-28ad0/gcf-artifacts"}
+[debug] [2025-07-11T03:01:53.558Z] Functions deploy failed.
+[debug] [2025-07-11T03:01:53.558Z] {}
+[debug] [2025-07-11T03:01:53.558Z] {}
+[debug] [2025-07-11T03:01:53.558Z] {}
+[debug] [2025-07-11T03:01:53.558Z] {}
+[debug] [2025-07-11T03:01:53.559Z] {}
+[debug] [2025-07-11T03:01:53.559Z] {}
+[debug] [2025-07-11T03:01:53.559Z] {}
+[error] Error: There was an error deploying functions:
+[error] - TypeError Cannot read properties of null (reading 'length')
+[error] - TypeError Cannot read properties of null (reading 'length')
+[error] - TypeError Cannot read properties of null (reading 'length')
+[error] - TypeError Cannot read properties of null (reading 'length')
+[error] - TypeError Cannot read properties of null (reading 'length')
+[error] - TypeError Cannot read properties of null (reading 'length')
+[error] - TypeError Cannot read properties of null (reading 'length')
