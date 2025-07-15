@@ -44,91 +44,10 @@ const MOTIVATIONAL_MESSAGES = [
   }
 ];
 
-/**
- * Cloud function that sends a random motivational message to all users
- * Triggered by a scheduled event (Cloud Scheduler)
- */
-export const sendMotivationalMessage = functionsV2.scheduler.onSchedule(
-  {
-    schedule: 'every 15 minutes',
-    timeZone: 'America/New_York',
-  },
-  async (event) => {
-    try {
-      // Default to regular motivational message
-      let selectedMessage = MOTIVATIONAL_MESSAGES[Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length)];
-      let isWeatherMessage = false;
-      
-      // Try to get weather-based messages for users with location data
-      try {
-        // Get a sample of users with location data
-        const usersWithLocation = await admin.firestore()
-          .collection('user_locations')
-          .where('enabled', '==', true)
-          .limit(1) // Just check if any users have weather enabled
-          .get();
-        
-        if (!usersWithLocation.empty) {
-          // Get a representative location (could be enhanced to get most common location)
-          const sampleUser = usersWithLocation.docs[0].data();
-          const { lat, lon } = sampleUser;
-          
-          if (lat && lon) {
-            // Get weather data
-            const weather = await getWeatherData(lat, lon);
-            
-            if (weather) {
-              // Categorize weather and determine if we should send weather message
-              const category = categorizeWeather(weather);
-              const randomChance = Math.random();
-              
-              // Check if we should send a weather message based on priority
-              if (randomChance < category.messageProbability) {
-                selectedMessage = generateWeatherMessage(weather);
-                isWeatherMessage = true;
-                console.log(`Sending weather message for ${weather.temp}°F ${weather.condition}`);
-              }
-            }
-          }
-        }
-      } catch (weatherError) {
-        console.error('Error getting weather data, falling back to regular message:', weatherError);
-      }
-      
-      // Create the notification
-      const notification: admin.messaging.Message = {
-        notification: {
-          title: selectedMessage.title,
-          body: selectedMessage.body,
-        },
-        data: {
-          type: isWeatherMessage ? 'weather_motivational' : 'motivational',
-          timestamp: Date.now().toString(),
-        },
-        android: {
-          notification: {
-            channelId: 'motivational_messages',
-            priority: 'high',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-            },
-          },
-        },
-        topic: 'all_users', // Send to all subscribed users
-      };
-      
-      // Send the message
-      const response = await admin.messaging().send(notification);
-      console.log(`Successfully sent ${isWeatherMessage ? 'weather' : 'regular'} message:`, response);
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  }
-);
+// REMOVED: sendMotivationalMessage function
+// Motivational messages are now handled locally in the app
+// This respects user preferences and sends notifications at appropriate times
+// (morning 9-11am and afternoon 2-4pm in the user's local timezone)
 
 /**
  * Cloud function to send a welcome notification when a user enables notifications

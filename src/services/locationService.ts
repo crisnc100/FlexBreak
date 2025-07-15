@@ -1,6 +1,4 @@
 import * as Location from 'expo-location';
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 
@@ -117,29 +115,16 @@ export async function getCurrentLocation(): Promise<UserLocation | null> {
  */
 export async function saveLocationToFirestore(location: UserLocation): Promise<boolean> {
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-      console.error('No authenticated user found');
-      return false;
-    }
+    // Since there's no authentication system, we only save locally
+    // The location is already stored in AsyncStorage by setWeatherNotificationsEnabled
     
-    // Save to Firestore
-    await firebase.firestore()
-      .collection('user_locations')
-      .doc(user.uid)
-      .set({
-        ...location,
-        userId: user.uid,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-    
-    // Update local storage
+    // Update last location update timestamp
     await AsyncStorage.setItem(LAST_LOCATION_UPDATE_KEY, Date.now().toString());
     
-    console.log('Location saved to Firestore successfully');
+    console.log('Location saved locally (no auth system in app)');
     return true;
   } catch (error) {
-    console.error('Error saving location to Firestore:', error);
+    console.error('Error saving location:', error);
     return false;
   }
 }

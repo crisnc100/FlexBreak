@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Switch, StyleSheet, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { Toast } from 'react-native-toast-notifications';
+import { useToast } from 'react-native-toast-notifications';
 import { 
   setWeatherNotificationsEnabled, 
   areWeatherNotificationsEnabled,
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export const WeatherNotificationToggle: React.FC = () => {
   const { theme, isDark, isSunset } = useTheme();
+  const toast = useToast();
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -42,29 +43,36 @@ export const WeatherNotificationToggle: React.FC = () => {
       
       if (success) {
         setEnabled(value);
-        Toast.show({
-          type: 'success',
-          text1: value ? 'Weather Notifications Enabled' : 'Weather Notifications Disabled',
-          text2: value ? 'You\'ll receive weather-based wellness reminders' : 'Weather notifications turned off',
-          topOffset: 60,
-        });
+        toast.show(
+          value ? 'Weather Notifications Enabled\nYou\'ll receive weather-based wellness reminders' : 
+                  'Weather Notifications Disabled\nWeather notifications turned off',
+          {
+            type: 'success',
+            placement: 'top',
+            duration: 3000,
+          }
+        );
       } else {
         // Revert the toggle if it failed
-        Toast.show({
-          type: 'error',
-          text1: 'Unable to Enable Weather Notifications',
-          text2: 'Please check your location permissions',
-          topOffset: 60,
-        });
+        toast.show(
+          'Unable to Enable Weather Notifications\nPlease check your location permissions',
+          {
+            type: 'danger',
+            placement: 'top',
+            duration: 4000,
+          }
+        );
       }
     } catch (error) {
       console.error('Error toggling weather notifications:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to update weather notification settings',
-        topOffset: 60,
-      });
+      toast.show(
+        'Error\nFailed to update weather notification settings',
+        {
+          type: 'danger',
+          placement: 'top',
+          duration: 4000,
+        }
+      );
     } finally {
       setLoading(false);
     }
@@ -72,26 +80,26 @@ export const WeatherNotificationToggle: React.FC = () => {
 
   if (isInitializing) {
     return (
-      <View style={styles.container}>
+      <View style={styles.settingRow}>
         <ActivityIndicator size="small" color={theme.accent} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.settingRow}>
       <View style={styles.iconContainer}>
         <View style={[styles.iconBackground, { backgroundColor: isDark || isSunset ? '#2D2D2D' : '#E3F2FD' }]}>
-          <Ionicons name="partly-sunny" size={22} color="#2196F3" />
+          <Ionicons name="partly-sunny" size={24} color="#2196F3" />
         </View>
       </View>
       
-      <View style={styles.textContainer}>
-        <Text style={[styles.title, { color: theme.text }]}>
+      <View style={styles.settingLabelContainer}>
+        <Text style={[styles.settingLabel, { color: theme.text }]}>
           Weather-Based Notifications
         </Text>
-        <Text style={[styles.description, { color: theme.textSecondary }]}>
-          Get wellness reminders based on local weather conditions
+        <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
+          Get wellness reminders based on local weather
         </Text>
       </View>
       
@@ -111,10 +119,11 @@ export const WeatherNotificationToggle: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  settingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
   },
   iconContainer: {
     marginRight: 12,
@@ -126,17 +135,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  textContainer: {
+  settingLabelContainer: {
     flex: 1,
     marginRight: 12,
   },
-  title: {
+  settingLabel: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 4,
   },
-  description: {
+  settingDescription: {
     fontSize: 13,
-    lineHeight: 18,
+    marginTop: 2,
   },
 });

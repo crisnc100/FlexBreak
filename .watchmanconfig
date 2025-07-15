@@ -1,1 +1,9 @@
-{}
+{
+  "ignore_dirs": [
+    ".git",
+    "node_modules",
+    "functions/node_modules",
+    "functions/lib",
+    "functions/.bin"
+  ]
+}

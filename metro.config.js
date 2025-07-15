@@ -35,6 +35,9 @@ config.watchFolders = [
 
 config.resolver.blockList = [
   /node_modules\/firebase-admin\/.*/,
+  /functions\/.*/,  // Exclude entire functions directory
+  /functions\/node_modules\/.*/,  // Explicitly exclude functions node_modules
+  /\.bin\/.*/,  // Exclude all .bin directories
 ];
 
 // Clear cache on each run in development

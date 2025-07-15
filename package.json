@@ -23,6 +23,7 @@
     "@react-navigation/stack": "^7.2.1",
     "@reduxjs/toolkit": "^2.6.1",
     "@zerobounce/zero-bounce-sdk": "^1.1.2",
+    "axios": "^1.10.0",
     "eas-cli": "^16.4.0",
     "expo": "^52.0.16",
     "expo-av": "~15.0.2",
