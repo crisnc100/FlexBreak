@@ -1,5 +1,6 @@
 import { AI_CONFIG } from '../../../config/aiConfig';
 import { retryUtil, errorHandler } from '../utils/reliabilityService';
+import groqService from './groqService';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -139,6 +140,22 @@ class OpenRouterService {
           return await fallbackFn();
         } catch (fallbackError) {
           continue; // Try next fallback
+        }
+      }
+      
+      // If OpenRouter fails completely, try Groq as final fallback
+      if (groqService.isConfigured()) {
+        console.log('OpenRouter failed, attempting Groq fallback...');
+        try {
+          const groqResult = await groqService.chat(messages, {
+            maxTokens: options.maxTokens || 150,
+            temperature: options.temperature || 0.7
+          });
+          console.log('Groq fallback successful');
+          return groqResult;
+        } catch (groqError) {
+          console.error('Groq fallback also failed:', groqError);
+          // Continue to throw the original error
         }
       }
       

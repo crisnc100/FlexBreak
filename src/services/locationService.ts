@@ -167,17 +167,9 @@ export async function setWeatherNotificationsEnabled(enabled: boolean): Promise<
         return false;
       }
     } else {
-      // Disable weather notifications in Firestore
-      const user = firebase.auth().currentUser;
-      if (user) {
-        await firebase.firestore()
-          .collection('user_locations')
-          .doc(user.uid)
-          .update({
-            enabled: false,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          });
-      }
+      // Since there's no authentication system, just disable locally
+      // The AsyncStorage update above handles the local state
+      console.log('Weather notifications disabled locally');
       return true;
     }
   } catch (error) {
@@ -227,25 +219,14 @@ export async function updateLocationIfNeeded(): Promise<void> {
 }
 
 /**
- * Get stored location from Firestore
+ * Get stored location from local storage
  */
 export async function getStoredLocation(): Promise<UserLocation | null> {
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-      return null;
-    }
-    
-    const doc = await firebase.firestore()
-      .collection('user_locations')
-      .doc(user.uid)
-      .get();
-    
-    if (doc.exists) {
-      return doc.data() as UserLocation;
-    }
-    
-    return null;
+    // Since there's no authentication system, we only get from local storage
+    // Weather service already handles this with its own caching
+    console.log('Getting location from local storage (no auth system)');
+    return null; // Weather service handles location storage
   } catch (error) {
     console.error('Error getting stored location:', error);
     return null;

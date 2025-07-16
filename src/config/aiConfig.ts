@@ -1,4 +1,4 @@
-import { OPENROUTER_API_KEY, APP_URL, GOOGLE_SPEECH_API_KEY } from '@env';
+import { OPENROUTER_API_KEY, GROQ_API_KEY, APP_URL, GOOGLE_SPEECH_API_KEY } from '@env';
 
 export const AI_CONFIG = {
   openRouter: {
@@ -6,6 +6,14 @@ export const AI_CONFIG = {
     baseURL: 'https://openrouter.ai/api/v1/chat/completions',
     appUrl: APP_URL || 'https://flexbreak.app',
     defaultModel: 'mistralai/mistral-7b-instruct:free', // Changed to free model
+    maxRetries: 3,
+    timeout: 30000, // 30 seconds
+  },
+  
+  groq: {
+    apiKey: GROQ_API_KEY,
+    baseURL: 'https://api.groq.com/openai/v1/chat/completions',
+    defaultModel: 'mixtral-8x7b-32768', // Fast Groq model
     maxRetries: 3,
     timeout: 30000, // 30 seconds
   },
@@ -43,6 +51,7 @@ export const AI_CONFIG = {
 // Export individual config values
 export default {
   OPENROUTER_API_KEY,
+  GROQ_API_KEY,
   GOOGLE_SPEECH_API_KEY: GOOGLE_SPEECH_API_KEY || '',
   HTTP_REFERER: APP_URL || 'https://flexbreak.app',
 };
