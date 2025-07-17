@@ -1,4 +1,5 @@
 import openRouterService from '../integrations/openRouterService';
+import secureAIService from '../integrations/secureAIService';
 import { buildUserContext, categorizeInput } from '../contextBuilder';
 import { WELLNESS_COACH_PROMPT, FALLBACK_RESPONSES } from './promptManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -137,8 +138,11 @@ export class AIWellnessServiceV2 {
           { role: 'user' as const, content: userInput }
         ];
         
+        // Use secure or direct service based on configuration
+        const aiService = AI_CONFIG.useSecureMode ? secureAIService : openRouterService;
+        
         // Use chatWithRetry which includes built-in retry logic
-        aiResponse = await openRouterService.chatWithRetry(
+        aiResponse = await aiService.chatWithRetry(
           messages,
           {
             model: modelConfig.model,
@@ -165,7 +169,10 @@ export class AIWellnessServiceV2 {
               { role: 'user' as const, content: userInput }
             ];
             
-            aiResponse = await openRouterService.chatWithRetry(
+            // Use the same service (secure or direct) for fallback
+            const aiService = AI_CONFIG.useSecureMode ? secureAIService : openRouterService;
+            
+            aiResponse = await aiService.chatWithRetry(
               fallbackMessages,
               {
                 model: freeModelConfig.model,

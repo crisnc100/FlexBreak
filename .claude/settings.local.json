@@ -6,7 +6,9 @@
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(node:*)",
       "Bash(firebase --version)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(rm:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   },

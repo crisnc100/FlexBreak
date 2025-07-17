@@ -1,19 +1,20 @@
-import { OPENROUTER_API_KEY, GROQ_API_KEY, APP_URL, GOOGLE_SPEECH_API_KEY } from '@env';
+import { APP_URL } from '@env';
 
 export const AI_CONFIG = {
+  // Security configuration - API keys now secure on Firebase Functions
+  useSecureMode: true, // Always true - using Firebase Functions
+  
   openRouter: {
-    apiKey: OPENROUTER_API_KEY,
-    baseURL: 'https://openrouter.ai/api/v1/chat/completions',
+    // API key now securely managed by Firebase Functions
     appUrl: APP_URL || 'https://flexbreak.app',
-    defaultModel: 'mistralai/mistral-7b-instruct:free', // Changed to free model
+    defaultModel: 'meta-llama/llama-3.1-8b-instruct:free', // Default model
     maxRetries: 3,
     timeout: 30000, // 30 seconds
   },
   
   groq: {
-    apiKey: GROQ_API_KEY,
-    baseURL: 'https://api.groq.com/openai/v1/chat/completions',
-    defaultModel: 'mixtral-8x7b-32768', // Fast Groq model
+    // API key now securely managed by Firebase Functions
+    defaultModel: 'llama3-8b-8192', // Groq fallback model
     maxRetries: 3,
     timeout: 30000, // 30 seconds
   },
@@ -48,10 +49,8 @@ export const AI_CONFIG = {
  `
 };
 
-// Export individual config values
+// Export individual config values (API keys now secure on Firebase Functions)
 export default {
-  OPENROUTER_API_KEY,
-  GROQ_API_KEY,
-  GOOGLE_SPEECH_API_KEY: GOOGLE_SPEECH_API_KEY || '',
+  // API keys removed - now securely managed by Firebase Functions
   HTTP_REFERER: APP_URL || 'https://flexbreak.app',
 };

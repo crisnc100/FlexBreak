@@ -1,5 +1,7 @@
-import { AI_CONFIG } from '../../../config/aiConfig';
 import { retryUtil, errorHandler } from '../utils/reliabilityService';
+import firebase from 'firebase/compat/app';
+import { auth, functions } from '../../../config/firebase';
+import { AI_CONFIG } from '../../../config/aiConfig';
 import groqService from './groqService';
 
 interface ChatMessage {
@@ -24,15 +26,10 @@ interface OpenRouterResponse {
 }
 
 class OpenRouterService {
-  private headers: HeadersInit;
+  private aiChatFunction;
   
   constructor() {
-    this.headers = {
-      'Authorization': `Bearer ${AI_CONFIG.openRouter.apiKey}`,
-      'HTTP-Referer': AI_CONFIG.openRouter.appUrl,
-      'X-Title': 'FlexBreak Wellness Coach',
-      'Content-Type': 'application/json',
-    };
+    this.aiChatFunction = functions.httpsCallable('aiChat');
   }
   
   async chat(
@@ -44,21 +41,16 @@ class OpenRouterService {
     } = {}
   ): Promise<string> {
     const {
-      model = AI_CONFIG.openRouter.defaultModel,
+      model = 'meta-llama/llama-3.1-8b-instruct:free',
       maxTokens = 150,
       temperature = 0.7
     } = options;
     
     try {
-      const requestBody = {
-        model,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-      };
-      
+      // No authentication required for this app
+
       // Debug logging
-      console.log('OpenRouter Request:', {
+      console.log('AI Chat Request:', {
         model,
         messageCount: messages.length,
         systemPrompt: messages[0]?.content?.substring(0, 100) + '...',
@@ -67,31 +59,29 @@ class OpenRouterService {
         temperature
       });
       
-      const response = await fetch(AI_CONFIG.openRouter.baseURL, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(requestBody),
+      // Call Firebase function instead of direct API
+      const result = await this.aiChatFunction({
+        messages,
+        options: {
+          model,
+          maxTokens,
+          temperature
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`OpenRouter API error: ${response.status}`);
-      }
+      const data = result.data as { success: boolean; data?: string; error?: string };
       
-      const data: OpenRouterResponse = await response.json();
-      
-      console.log('OpenRouter Response:', {
-        model,
-        hasChoices: !!data.choices,
-        choicesLength: data.choices?.length,
-        messageContent: data.choices?.[0]?.message?.content?.substring(0, 50) + '...',
-        usage: data.usage
+      console.log('AI Chat Response:', {
+        success: data.success,
+        hasData: !!data.data,
+        error: data.error
       });
       
-      if (!data.choices || data.choices.length === 0) {
-        throw new Error('No response from AI');
+      if (!data.success || !data.data) {
+        throw new Error(data.error || 'No response from AI');
       }
       
-      const content = data.choices[0].message.content;
+      const content = data.data;
       
       // Additional validation
       if (!content || content.trim().length === 0) {

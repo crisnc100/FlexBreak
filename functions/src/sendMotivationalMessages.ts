@@ -1,7 +1,9 @@
 import * as functionsV2 from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
-import { getWeatherData, categorizeWeather, clearExpiredWeatherCache } from './weatherService';
-import { generateWeatherMessage } from './weatherMessages';
+import { clearExpiredWeatherCache } from './weatherService';
+// Unused weather imports - keeping for future use
+// import { getWeatherData, categorizeWeather } from './weatherService';
+// import { generateWeatherMessage } from './weatherMessages';
 
 // Initialize admin if not already initialized
 if (!admin.apps.length) {
@@ -9,7 +11,8 @@ if (!admin.apps.length) {
 }
 
 // Collection of motivational messages for stretching/breaks
-const MOTIVATIONAL_MESSAGES = [
+// Currently not used - keeping for future reference
+/* const MOTIVATIONAL_MESSAGES = [
   {
     title: "Time for a quick stretch!",
     body: "Take a 5-minute break to reset your focus and energy."
@@ -42,7 +45,7 @@ const MOTIVATIONAL_MESSAGES = [
     title: "FlexBreak reminder",
     body: "Take a moment to breathe deeply and stretch your body."
   }
-];
+]; */
 
 // REMOVED: sendMotivationalMessage function
 // Motivational messages are now handled locally in the app

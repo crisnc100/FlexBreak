@@ -1,4 +1,5 @@
-import { AI_CONFIG } from '../../../config/aiConfig';
+import firebase from 'firebase/compat/app';
+import { auth, functions } from '../../../config/firebase';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -26,13 +27,10 @@ interface GroqResponse {
 }
 
 class GroqService {
-  private headers: HeadersInit;
+  private aiChatFunction;
   
   constructor() {
-    this.headers = {
-      'Authorization': `Bearer ${AI_CONFIG.groq.apiKey}`,
-      'Content-Type': 'application/json',
-    };
+    this.aiChatFunction = functions.httpsCallable('aiChat');
   }
   
   async chat(
@@ -44,53 +42,45 @@ class GroqService {
     } = {}
   ): Promise<string> {
     const {
-      model = AI_CONFIG.groq.defaultModel,
+      model = 'llama3-8b-8192',
       maxTokens = 150,
       temperature = 0.7
     } = options;
     
     try {
-      const requestBody = {
-        model,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-      };
-      
+      // No authentication required for this app
+
       // Debug logging
-      console.log('Groq Request:', {
+      console.log('AI Chat Request (Groq fallback):', {
         model,
         messageCount: messages.length,
         maxTokens,
         temperature
       });
       
-      const response = await fetch(AI_CONFIG.groq.baseURL, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(requestBody),
+      // Call Firebase function (same as OpenRouter - the function handles fallback)
+      const result = await this.aiChatFunction({
+        messages,
+        options: {
+          model,
+          maxTokens,
+          temperature
+        }
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Groq API error response:', errorText);
-        throw new Error(`Groq API error: ${response.status} - ${errorText}`);
-      }
+      const data = result.data as { success: boolean; data?: string; error?: string };
       
-      const data: GroqResponse = await response.json();
-      
-      console.log('Groq Response:', {
-        model,
-        hasChoices: !!data.choices,
-        choicesLength: data.choices?.length,
-        usage: data.usage
+      console.log('AI Chat Response (Groq):', {
+        success: data.success,
+        hasData: !!data.data,
+        error: data.error
       });
       
-      if (!data.choices || data.choices.length === 0) {
-        throw new Error('No response from Groq AI');
+      if (!data.success || !data.data) {
+        throw new Error(data.error || 'No response from AI');
       }
       
-      const content = data.choices[0].message.content;
+      const content = data.data;
       
       // Additional validation
       if (!content || content.trim().length === 0) {
@@ -107,7 +97,8 @@ class GroqService {
   }
   
   isConfigured(): boolean {
-    return !!AI_CONFIG.groq.apiKey && AI_CONFIG.groq.apiKey.length > 0;
+    // Always configured now - API keys are secure on Firebase
+    return true;
   }
 }
 

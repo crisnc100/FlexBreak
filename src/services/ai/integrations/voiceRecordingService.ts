@@ -1,7 +1,7 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import googleSpeechService from './googleSpeechService';
+import secureGoogleSpeechService from './secureGoogleSpeechService';
 import { rateLimiter } from '../utils/reliabilityService';
 
 class VoiceRecordingService {
@@ -157,17 +157,10 @@ class VoiceRecordingService {
       
       console.log('Using language code:', languageCode);
       
-      // Try Google Speech API first
-      // To enable: Add your API key to src/config/aiConfig.ts
-      const { default: config } = await import('../../../config/aiConfig');
-      
-      console.log('Google Speech API Key exists:', !!config.GOOGLE_SPEECH_API_KEY);
-      console.log('Key length:', config.GOOGLE_SPEECH_API_KEY?.length);
-      
-      if (config.GOOGLE_SPEECH_API_KEY) {
-        try {
-          googleSpeechService.setApiKey(config.GOOGLE_SPEECH_API_KEY);
-          const result = await googleSpeechService.transcribeAudio(audioUri, languageCode);
+      // Try secure Google Speech API first (server-side key)
+      try {
+        console.log('Using secure Google Speech API (server-side)');
+        const result = await secureGoogleSpeechService.transcribeAudio(audioUri, languageCode);
           
           // Clean up the audio file
           try {
@@ -198,9 +191,8 @@ class VoiceRecordingService {
             console.log('No transcription returned from Google Speech');
             return null; // Return null for empty transcriptions
           }
-        } catch (error) {
-          console.error('Error calling Google Speech:', error);
-        }
+      } catch (error) {
+        console.error('Error calling secure Google Speech:', error);
       }
       
       // Clean up the audio file

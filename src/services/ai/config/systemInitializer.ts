@@ -65,10 +65,8 @@ class AISystemInitializer {
       // Note: cleanupExpired method no longer exists in new rateLimiter
       // Rate limits auto-expire based on time windows
       
-      // 4. Check if we have valid API keys
-      if (!AI_CONFIG.openRouter.apiKey) {
-        errors.push('OpenRouter API key is not configured');
-      }
+      // 4. API keys are now securely managed by Firebase Functions
+      console.log('API keys are securely managed by Firebase Functions');
       
       // 5. Load and validate user settings
       const aiEnabled = await AsyncStorage.getItem('@ai_wellness_enabled');
@@ -103,7 +101,7 @@ class AISystemInitializer {
         success: errors.length === 0,
         errorCount: errors.length,
         warningCount: warnings.length,
-        apiKeyConfigured: !!AI_CONFIG.openRouter.apiKey
+        apiKeyConfigured: true // API keys now secure on Firebase
       });
       
       this.initialized = true;
@@ -165,8 +163,8 @@ class AISystemInitializer {
       const rateLimitStatus = await rateLimiter.getRateLimitStatus('ai_chat_free', 'health_check');
       const rateLimitHealthy = rateLimitStatus.remaining > 0;
       
-      // Check API key
-      const apiHealthy = !!AI_CONFIG.openRouter.apiKey && AI_CONFIG.openRouter.apiKey.length > 10;
+      // API keys are now secure on Firebase Functions
+      const apiHealthy = true;
       
       const allHealthy = configHealthy && costHealthy && rateLimitHealthy && apiHealthy;
       
