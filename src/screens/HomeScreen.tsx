@@ -389,6 +389,11 @@ export default function HomeScreen() {
                 'Local notifications scheduled for the next 30 days. Open the app periodically to keep them active.',
                 [{ text: 'OK' }]
               );
+              
+              // Smart weather notification prompt after enabling reminders
+              setTimeout(async () => {
+                await notifications.requestWeatherNotificationsPermission();
+              }, 1000); // Small delay to avoid alert overlap
             } else {
               Alert.alert('Error', 'Failed to schedule reminders. Please try again.');
               setReminderEnabled(false);

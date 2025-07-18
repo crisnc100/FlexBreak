@@ -505,12 +505,12 @@ export default function SubscriptionModal({
     ? getProductsForUser(userType as 'office' | 'student')
     : getProductsForUser(null);
   
-  console.log('[SubscriptionModal] Product IDs for user:', {
-    verificationStatus,
-    userType,
-    productIds,
-    allProducts: products?.map(p => p.productId)
-  });
+  //console.log('[SubscriptionModal] Product IDs for user:', {
+  //  verificationStatus,
+  //  userType,
+  //  productIds,
+  //  allProducts: products?.map(p => p.productId)
+  //});
   
   const monthly=products?.find(p=>p.productId===productIds.monthly);
   const yearly =products?.find(p=>p.productId===productIds.yearly);

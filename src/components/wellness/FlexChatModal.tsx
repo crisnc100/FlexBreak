@@ -258,7 +258,6 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         type: 'ai',
         message: `${greeting}\n\n${followUp}${voiceIntro}`,
         timestamp: new Date(),
-        // suggestedActions removed
       };
       setMessages([welcomeMessage]);
       console.log('[FlexChatModal] Set greeting message:', welcomeMessage.message.substring(0, 50) + '...');

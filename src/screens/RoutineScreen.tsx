@@ -18,7 +18,7 @@ import XpNotificationManager from '../components/notifications/XpNotificationMan
 import { useRoutineParams } from '../hooks/routines/useRoutineParams';
 import { useRoutineStorage } from '../hooks/routines/useRoutineStorage';
 import { useRoutineSuggestions } from '../hooks/routines/useRoutineSuggestions';
-import { useGamification } from '../hooks/progress/useGamification';
+import { useGamification, gamificationEvents } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
 
 // Import XP boost manager

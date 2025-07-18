@@ -50,20 +50,25 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
         exportDate: new Date().toISOString(),
         userData: {
           name: userName || 'Not provided',
-          totalInteractions: memory.totalInteractions,
-          consistencyScore: memory.consistencyScore,
-          lastCheckIn: memory.lastCheckIn ? new Date(memory.lastCheckIn).toISOString() : null
+          totalInteractions: memory.usage?.totalInteractions || 0,
+          weeklyCount: memory.usage?.weeklyCount || 0,
+          lastCheckIn: memory.usage?.lastCheckIn ? new Date(memory.usage.lastCheckIn).toISOString() : null,
+          language: memory.language || 'en',
+          isPremium: memory.usage?.isPremium || false
         },
-        patterns: {
-          commonIssues: memory.commonIssues,
-          effectiveSolutions: memory.effectiveSolutions,
-          energyPatterns: memory.energyPatterns
+        wellnessData: {
+          physicalIssues: memory.wellness_data?.physical_issues || [],
+          effectiveSolutions: memory.wellness_data?.effective_solutions || [],
+          patterns: memory.wellness_data?.patterns || [],
+          goals: memory.wellness_data?.goals || []
         },
+        preferences: memory.preferences || {},
         recentInteractions: insights.map(i => ({
-          date: new Date(i.timestamp).toISOString(),
-          category: i.category,
-          timeOfDay: i.timeOfDay,
-          solution: i.solution
+          date: i.timestamp ? new Date(i.timestamp).toISOString() : new Date().toISOString(),
+          type: i.type || 'unknown',
+          content: i.content || '',
+          context: i.context || '',
+          confidence: i.confidence || 0
         }))
       };
       
@@ -76,8 +81,10 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
         `Data ready for export:\n\n` +
         `• Name: ${exportData.userData.name}\n` +
         `• Total check-ins: ${exportData.userData.totalInteractions}\n` +
-        `• Consistency: ${exportData.userData.consistencyScore}%\n` +
-        `• Data spans: ${insights.length} interactions`,
+        `• Weekly interactions: ${exportData.userData.weeklyCount}\n` +
+        `• Physical issues tracked: ${exportData.wellnessData.physicalIssues.length}\n` +
+        `• Effective solutions: ${exportData.wellnessData.effectiveSolutions.length}\n` +
+        `• Data spans: ${insights.length} insights`,
         [
           {
             text: 'Copy to Clipboard',
@@ -120,9 +127,17 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
                 KEYS.AI_WELLNESS.ENABLED,
                 KEYS.AI_WELLNESS.HAS_SEEN_WELCOME,
                 KEYS.AI_WELLNESS.USER_NAME,
+                KEYS.AI_WELLNESS.LAST_CHECKIN,
+                KEYS.AI_WELLNESS.WEEKLY_USAGE,
+                KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT,
+                KEYS.AI_WELLNESS.FIRST_ENABLE_DONE,
+                KEYS.AI_WELLNESS.TIME_PREFERENCE,
+                KEYS.AI_WELLNESS.PREMIUM_WELCOME_SENT,
                 '@ai_wellness_last_response',
                 '@ai_wellness_show_modal',
-                '@ai_wellness_voice_mode'
+                '@ai_wellness_voice_mode',
+                '@ai_wellness_detected_language',
+                '@show_flexchat_on_open'
               ]);
               
               // Clear conversation history from AsyncStorage
@@ -186,11 +201,6 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
         <Text style={[styles.sectionSubtitle, { color: theme.textSecondary, marginTop: 12, marginBottom: 8 }]}>
           Data Management
         </Text>
-        {dataStats && (
-          <Text style={[styles.statsText, { color: theme.textSecondary }]}>
-            {dataStats.interactions} check-ins • Last: {dataStats.lastCheckIn}
-          </Text>
-        )}
       </View>
 
       {/* Export Data */}

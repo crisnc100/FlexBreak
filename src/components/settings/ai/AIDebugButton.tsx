@@ -56,46 +56,11 @@ export const AIDebugButton: React.FC<AIDebugButtonProps> = ({ visible }) => {
   };
 
 
-  const handleTestNotification = async () => {
-    try {
-      // Import the comprehensive test
-      const { testBackgroundNotifications } = await import('../../../utils/testBackgroundNotifications');
-      await testBackgroundNotifications();
-      
-      Alert.alert(
-        'Background Test Started', 
-        'Check console for details. Notifications will fire at:\n' +
-        '- 10 seconds\n- 30 seconds\n- 1 minute\n- 2 minutes\n- 5 minutes\n\n' +
-        'Close app after 30s to test background!'
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start test');
-      console.error('Test error:', error);
-    }
-  };
 
-  const handleCheckStatus = async () => {
-    try {
-      const { checkTestStatus } = await import('../../../utils/testBackgroundNotifications');
-      await checkTestStatus();
-      
-      // Also show in alert
-      const all = await Notifications.getAllScheduledNotificationsAsync();
-      const tests = all.filter(n => n.content.data?.isBackgroundTest === true);
-      
-      if (tests.length === 0) {
-        Alert.alert('Test Status', 'No test notifications scheduled');
-      } else {
-        Alert.alert('Test Status', `${tests.length} test notifications still waiting to fire`);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to check status');
-    }
-  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>AI Debug Tools</Text>
+      {/*<Text style={styles.title}>AI Debug Tools</Text>*/}
       
       <TouchableOpacity
         style={[styles.debugButton, { backgroundColor: '#3498DB' }]}
@@ -104,19 +69,6 @@ export const AIDebugButton: React.FC<AIDebugButtonProps> = ({ visible }) => {
         <Text style={styles.debugButtonText}>View Schedule</Text>
       </TouchableOpacity>
       
-      <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: '#2ECC71' }]}
-        onPress={handleTestNotification}
-      >
-        <Text style={styles.debugButtonText}>Test Background Notifications</Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={[styles.debugButton, { backgroundColor: '#E74C3C' }]}
-        onPress={handleCheckStatus}
-      >
-        <Text style={styles.debugButtonText}>Check Test Status</Text>
-      </TouchableOpacity>
     </View>
   );
 };

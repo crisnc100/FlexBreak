@@ -22,6 +22,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { createThemedStyles } from '../../utils/themeUtils';
 import { useRefresh } from '../../context/RefreshContext';
 import { Toast } from 'react-native-toast-notifications';
+import { gamificationEvents } from '../../hooks/progress/useGamification';
 
 import {
   CompletedRoutineProps as CompletedRoutinePropsType,
@@ -81,6 +82,7 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
 
   /* Get the actual number of stretches completed */
   const routineLength = savedStretches.length;
+
 
   /* Check for newly unlocked sunset theme access */
   useEffect(() => {
@@ -185,6 +187,13 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
     triggerRefresh();
     onShowDashboard();
     navigateTo('Home');
+    
+    // Emit routine completed event for AI Wellness onboarding
+    // This is done here to ensure the user has finished viewing the completion flow
+    setTimeout(() => {
+      console.log('[CompletedRoutine] Emitting ROUTINE_COMPLETED event after navigation');
+      gamificationEvents.emit('ROUTINE_COMPLETED');
+    }, 500); // Small delay to ensure navigation completes
   };
 
   const saveToFavorites = async () => {
@@ -282,6 +291,13 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
         onPress={() => {
           triggerRefresh();
           onShowDashboard();
+          
+          // Emit routine completed event for AI Wellness onboarding
+          // This handles when user taps anywhere to continue
+          setTimeout(() => {
+            console.log('[CompletedRoutine] Emitting ROUTINE_COMPLETED event after tap to continue');
+            gamificationEvents.emit('ROUTINE_COMPLETED');
+          }, 500); // Small delay to ensure navigation completes
         }}
       >
         <RoutineCompletionFlow

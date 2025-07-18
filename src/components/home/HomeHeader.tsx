@@ -39,7 +39,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   // Check if it's Wednesday for free users
   const isWednesday = new Date().getDay() === 3;
   const canAccessFlexChat = aiWellnessEnabled && (isPremium || isWednesday);
-  console.log('[HomeHeader] Can access FlexChat:', canAccessFlexChat, { aiWellnessEnabled, isPremium, isWednesday });
+  //console.log('[HomeHeader] Can access FlexChat:', canAccessFlexChat, { aiWellnessEnabled, isPremium, isWednesday });
   
   // Subtle logo pulse animation
   useEffect(() => {

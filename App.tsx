@@ -414,7 +414,8 @@ function MainApp() {
     shouldShowOnboarding, 
     markOnboardingSeen, 
     dismissOnboarding,
-    forceShowOnboarding 
+    forceShowOnboarding,
+    recheckEligibility 
   } = useAIWellnessOnboarding();
   
   const { 
@@ -437,14 +438,26 @@ function MainApp() {
       forceShowUpgrade();
     };
     
+    // Listen for routine completion to check if onboarding should show
+    const handleRoutineCompleted = () => {
+      console.log('Routine completed - checking AI Wellness onboarding eligibility');
+      // Add a delay to ensure the routine is saved to storage first
+      setTimeout(() => {
+        console.log('Rechecking eligibility after delay');
+        recheckEligibility();
+      }, 1000);
+    };
+
     gamificationEvents.on('AI_WELLNESS_ENABLED', handleAIWellnessEnabled);
     gamificationEvents.on('SHOW_AI_WELLNESS_PREMIUM_UPGRADE', handleShowPremiumUpgrade);
+    gamificationEvents.on('ROUTINE_COMPLETED', handleRoutineCompleted);
 
     return () => {
       gamificationEvents.off('AI_WELLNESS_ENABLED', handleAIWellnessEnabled);
       gamificationEvents.off('SHOW_AI_WELLNESS_PREMIUM_UPGRADE', handleShowPremiumUpgrade);
+      gamificationEvents.off('ROUTINE_COMPLETED', handleRoutineCompleted);
     };
-  }, [forceShowOnboarding, forceShowUpgrade]);
+  }, [forceShowOnboarding, forceShowUpgrade, recheckEligibility]);
   
   // Handle deep links for Siri/Google Assistant
   useEffect(() => {

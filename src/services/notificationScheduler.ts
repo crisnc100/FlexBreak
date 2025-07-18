@@ -126,6 +126,7 @@ export async function scheduleAdvancedReminders(
 export async function scheduleProductionMotivationalMessages(): Promise<void> {
   try {
     // Check if weather notifications are enabled
+    // When enabled, messages will be a mix of weather and motivational based on probability
     const weatherEnabled = await areWeatherNotificationsEnabled();
     let weatherData: WeatherData | null = null;
     

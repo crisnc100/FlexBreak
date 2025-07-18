@@ -6,7 +6,6 @@ import { AIWellnessToggle } from './AIWellnessToggle';
 import { AIDebugButton } from './AIDebugButton';
 import { AINameSettings } from './AINameSettings';
 import { AIScheduleSettings } from './AIScheduleSettings';
-import { SiriShortcutButton } from '../SiriShortcutButton';
 import { WeatherNotificationToggle } from './WeatherNotificationToggle';
 
 export const AIWellnessSettings: React.FC = () => {
@@ -36,10 +35,9 @@ export const AIWellnessSettings: React.FC = () => {
       <AIScheduleSettings visible={aiWellnessEnabled} />
       {Platform.OS === 'ios' && aiWellnessEnabled && (
         <View style={{ marginTop: 16 }}>
-          <SiriShortcutButton />
         </View>
       )}
-      <AIDebugButton visible={aiWellnessEnabled} />
+      {/*<AIDebugButton visible={aiWellnessEnabled} />*/}
       
       {/* Weather Notifications */}
       <View style={{ marginTop: 16 }}>

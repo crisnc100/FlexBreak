@@ -11,6 +11,8 @@ import AboutSection from '../components/settings/AboutSection';
 import LegalSection from '../components/settings/LegalSection';
 import ThemeSection from '../components/settings/ThemeSection';
 
+
+
 import DiagnosticsScreen from './DiagnosticsScreen';
 import { useTheme } from '../context/ThemeContext';
 import { usePremium } from '../context/PremiumContext';
@@ -397,15 +399,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
         
         {/* Developer Section - Only visible in development mode */}
         {__DEV__ && (
-          <DeveloperSection
-            onOpenDiagnostics={() => setDiagnosticsModalVisible(true)}
-            onOpenBobSimulator={() => setBobSimulatorModalVisible(true)}
-            onGrantPremium={handleGrantPremiumStatus}
-            onClearPremium={handleClearPremiumStatus}
-            onResetSimulationData={handleResetSimulationData}
-            onResetAllData={handleResetData}
-            isPremium={isPremium}
-          />
+          <>
+            <DeveloperSection
+              onOpenDiagnostics={() => setDiagnosticsModalVisible(true)}
+              onOpenBobSimulator={() => setBobSimulatorModalVisible(true)}
+              onGrantPremium={handleGrantPremiumStatus}
+              onClearPremium={handleClearPremiumStatus}
+              onResetSimulationData={handleResetSimulationData}
+              onResetAllData={handleResetData}
+              isPremium={isPremium}
+            />
+          </>
         )}
         
         {/* Data management section */}

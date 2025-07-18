@@ -122,6 +122,79 @@ export const requestNotificationsPermissions = async (): Promise<boolean> => {
 };
 
 /**
+ * Request location permission for weather notifications
+ * Shows a smart prompt to users when they first enable notifications
+ */
+export const requestWeatherNotificationsPermission = async (): Promise<void> => {
+  const { Alert } = require('react-native');
+  const { checkLocationPermission, requestLocationPermission, setWeatherNotificationsEnabled } = await import('../services/locationService');
+  
+  try {
+    // Check if location permission is already granted
+    const hasLocation = await checkLocationPermission();
+    
+    if (!hasLocation) {
+      // Show smart permission prompt
+      Alert.alert(
+        "Enhance Your Notifications 🌤️",
+        "Would you like weather-based wellness reminders? FlexBreak can tailor messages based on your local weather conditions.",
+        [
+          { 
+            text: "Not Now", 
+            style: "cancel",
+            onPress: () => {
+              console.log('User declined weather notifications');
+            }
+          },
+          { 
+            text: "Enable Weather", 
+            onPress: async () => {
+              const granted = await requestLocationPermission();
+              if (granted) {
+                // Enable weather notifications
+                await setWeatherNotificationsEnabled(true);
+                console.log('Weather notifications enabled via smart prompt');
+              } else {
+                console.log('Location permission denied');
+              }
+            }
+          }
+        ],
+        { cancelable: true }
+      );
+    } else {
+      // Location already granted, check if weather notifications are enabled
+      const { areWeatherNotificationsEnabled } = await import('../services/locationService');
+      const weatherEnabled = await areWeatherNotificationsEnabled();
+      
+      if (!weatherEnabled) {
+        // Ask if they want to enable weather notifications
+        Alert.alert(
+          "Weather Notifications Available 🌤️",
+          "You have location access! Would you like to receive weather-based wellness reminders?",
+          [
+            { 
+              text: "Not Now", 
+              style: "cancel"
+            },
+            { 
+              text: "Enable", 
+              onPress: async () => {
+                await setWeatherNotificationsEnabled(true);
+                console.log('Weather notifications enabled (location already granted)');
+              }
+            }
+          ],
+          { cancelable: true }
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Error in smart weather permission request:', error);
+  }
+};
+
+/**
  * Save reminder days
  * @param days Array of day identifiers (e.g., ['mon', 'wed', 'fri'])
  */

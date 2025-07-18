@@ -44,8 +44,8 @@ export const WeatherNotificationToggle: React.FC = () => {
       if (success) {
         setEnabled(value);
         toast.show(
-          value ? 'Weather Notifications Enabled\nYou\'ll receive weather-based wellness reminders' : 
-                  'Weather Notifications Disabled\nWeather notifications turned off',
+          value ? 'Weather Notifications Enabled\nYour reminders will now include weather-based messages' : 
+                  'Weather Notifications Disabled\nYou\'ll receive standard wellness reminders only',
           {
             type: 'success',
             placement: 'top',
@@ -99,7 +99,7 @@ export const WeatherNotificationToggle: React.FC = () => {
           Weather-Based Notifications
         </Text>
         <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
-          Get wellness reminders based on local weather
+          Mix weather insights with your wellness reminders
         </Text>
       </View>
       
