@@ -182,6 +182,14 @@ export const getProducts = async () => {
       
       const { results } = await InAppPurchases.getProductsAsync(productIDs);
       console.log('IAP products loaded:', results);
+      console.log('IAP product details:', results.map(p => ({
+        productId: p.productId,
+        price: p.price,
+        priceAmountMicros: p.priceAmountMicros,
+        priceCurrencyCode: p.priceCurrencyCode,
+        title: p.title,
+        description: p.description
+      })));
       return results;
     } catch (error) {
       console.error('Failed to get products:', error);

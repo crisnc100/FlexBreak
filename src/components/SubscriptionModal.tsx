@@ -307,6 +307,9 @@ export default function SubscriptionModal({
       switch (result.status) {
         case 'approved':
           console.log('[SubscriptionModal] Processing approved verification');
+          // Store verification locally
+          await ZeroBounceVerificationService.markEmailAsUsed(result.details.email);
+          
           Alert.alert(
             '✅ Verification Successful!',
             result.message + '\n\nYour 60% discount is now active!',
@@ -324,6 +327,10 @@ export default function SubscriptionModal({
                   setUserType(verificationData.userType || null);
                   setShowVerificationPromo(false);
                   console.log('[SubscriptionModal] Verification status refreshed:', verificationData);
+                  
+                  // Force refresh products to get discounted prices
+                  console.log('[SubscriptionModal] Triggering product refresh for discounted prices...');
+                  setProducts(null); // Clear products to trigger reload
                 };
                 refreshVerification();
               }
@@ -416,26 +423,65 @@ export default function SubscriptionModal({
       setIsVerifying(false);
 
       if (result.success) {
-        Alert.alert(
-          '✅ Verification Successful!',
-          result.message,
-          [{ 
-            text: 'Great!', 
-            onPress: async () => {
-              console.log('[SubscriptionModal] Code verification successful');
-              setShowCodeInput(false);
-              setShowVerificationForm(false);
-              setOneTimeCode('');
-              setVerificationEmail('');
-              
-              // Refresh verification status
-              const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
-              setVerificationStatus(verificationData.isVerified ? 'verified' : null);
-              setUserType(verificationData.userType || null);
-              setShowVerificationPromo(false);
-            }
-          }]
-        );
+        // Check if this is a free premium code
+        if (result.codeType === 'free_premium') {
+          Alert.alert(
+            '🎉 Congratulations!',
+            result.message,
+            [{ 
+              text: 'Awesome!', 
+              onPress: async () => {
+                console.log('[SubscriptionModal] Free premium code redeemed successfully');
+                setShowCodeInput(false);
+                setShowVerificationForm(false);
+                setOneTimeCode('');
+                setVerificationEmail('');
+                
+                // Close the modal and refresh premium status
+                await refreshPremiumStatus();
+                onClose();
+                
+                // Show a success message after closing
+                setTimeout(() => {
+                  Alert.alert(
+                    '🎊 Premium Activated!',
+                    `You now have full access to all premium features for ${result.premiumDuration} days!\n\nEnjoy unlimited AI wellness coaching, dark mode, and more!`,
+                    [{ text: 'Start Using Premium' }]
+                  );
+                }, 500);
+              }
+            }]
+          );
+        } else {
+          // Regular discount code
+          Alert.alert(
+            '✅ Verification Successful!',
+            result.message,
+            [{ 
+              text: 'Great!', 
+              onPress: async () => {
+                console.log('[SubscriptionModal] Code verification successful');
+                setShowCodeInput(false);
+                setShowVerificationForm(false);
+                setOneTimeCode('');
+                setVerificationEmail('');
+                
+                // Store verification locally (one-time code already stores in Firebase)
+                await ZeroBounceVerificationService.markEmailAsUsed(verificationEmail.trim());
+                
+                // Refresh verification status
+                const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
+                setVerificationStatus(verificationData.isVerified ? 'verified' : null);
+                setUserType(verificationData.userType || null);
+                setShowVerificationPromo(false);
+                
+                // Force refresh products to get discounted prices
+                console.log('[SubscriptionModal] Triggering product refresh for discounted prices...');
+                setProducts(null); // Clear products to trigger reload
+              }
+            }]
+          );
+        }
       } else {
         Alert.alert(
           '❌ Verification Failed',
@@ -458,6 +504,13 @@ export default function SubscriptionModal({
   const productIds = verificationStatus === 'verified' 
     ? getProductsForUser(userType as 'office' | 'student')
     : getProductsForUser(null);
+  
+  console.log('[SubscriptionModal] Product IDs for user:', {
+    verificationStatus,
+    userType,
+    productIds,
+    allProducts: products?.map(p => p.productId)
+  });
   
   const monthly=products?.find(p=>p.productId===productIds.monthly);
   const yearly =products?.find(p=>p.productId===productIds.yearly);

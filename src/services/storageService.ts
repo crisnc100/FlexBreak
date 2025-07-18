@@ -185,11 +185,35 @@ export const getIsPremium = async (): Promise<boolean> => {
     const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
     const testingPremiumAccess = await AsyncStorage.getItem('@flexbreak:testing_premium_access');
     
+    // Check for free premium code status
+    const freePremiumStatus = await AsyncStorage.getItem('@flexbreak:premium_status');
+    const premiumExpiryDate = await AsyncStorage.getItem('@flexbreak:premium_expiry_date');
+    
+    // Check if free premium is still valid
+    let hasValidFreePremium = false;
+    if (freePremiumStatus === 'true' && premiumExpiryDate) {
+      const expiryDate = new Date(premiumExpiryDate);
+      const now = new Date();
+      hasValidFreePremium = now < expiryDate;
+      
+      if (!hasValidFreePremium) {
+        // Free premium expired, clean up
+        await AsyncStorage.multiRemove([
+          '@flexbreak:premium_status',
+          '@flexbreak:premium_type',
+          '@flexbreak:premium_email',
+          '@flexbreak:premium_start_date',
+          '@flexbreak:premium_expiry_date'
+        ]);
+      }
+    }
+    
     // User has premium if ANY premium flag is true
     const hasPremium = 
       isPremium || 
       testingPremium === 'true' || 
-      testingPremiumAccess === 'true';
+      testingPremiumAccess === 'true' ||
+      hasValidFreePremium;
     
     return hasPremium;
   } catch (error) {

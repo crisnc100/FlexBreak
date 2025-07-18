@@ -56,7 +56,7 @@ export const verifyOfficeWorkerEmail = onCall(async (request): Promise<EmailVeri
   try {
     // Step 1: Check if email was already used
     const existingUser = await admin.firestore()
-      .collection('verified_emails')
+      .collection('verifiedEmails')
       .where('email', '==', cleanEmail)
       .limit(1)
       .get();
@@ -139,7 +139,7 @@ export const verifyOfficeWorkerEmail = onCall(async (request): Promise<EmailVeri
       // ZeroBounce status interpretation
       if (validation.status === 'valid' && validation.sub_status !== 'role_based') {
         // Store verified email (Admin SDK has full privileges)
-        await admin.firestore().collection('verified_emails').add({
+        await admin.firestore().collection('verifiedEmails').add({
           email: cleanEmail,
           userId: userId,
           verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -188,7 +188,7 @@ export const verifyOfficeWorkerEmail = onCall(async (request): Promise<EmailVeri
 
     if (isLikelyBusiness) {
       // Store verified email (Admin SDK has full privileges)
-      await admin.firestore().collection('verified_emails').add({
+      await admin.firestore().collection('verifiedEmails').add({
         email: cleanEmail,
         userId: userId,
         verifiedAt: admin.firestore.FieldValue.serverTimestamp(),

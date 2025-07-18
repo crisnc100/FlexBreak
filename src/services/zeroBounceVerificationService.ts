@@ -54,8 +54,7 @@ export class ZeroBounceVerificationService {
   }
 
   /**
-   * Mark email as used to prevent reuse (local storage only)
-   * The Firebase Function handles server-side storage
+   * Mark email as used to prevent reuse (local storage + Firebase)
    */
   static async markEmailAsUsed(email: string): Promise<void> {
     try {
@@ -77,6 +76,19 @@ export class ZeroBounceVerificationService {
       await AsyncStorage.setItem('@flexbreak:user_email', cleanEmail);
       await AsyncStorage.setItem('@flexbreak:verification_method', 'zerobounce');
       await AsyncStorage.setItem('@flexbreak:verification_date', timestamp);
+      
+      // Also try to store in Firebase for persistence
+      // This is a backup in case the Firebase Function didn't store it
+      try {
+        const stored = await firebaseService.storeEmail(cleanEmail, 'office');
+        if (stored) {
+          console.log('[ZeroBounce] Email stored in Firebase successfully');
+        } else {
+          console.log('[ZeroBounce] Firebase storage unavailable, using local storage only');
+        }
+      } catch (fbError) {
+        console.log('[ZeroBounce] Firebase storage failed, continuing with local storage', fbError);
+      }
       
     } catch (error) {
       console.error('Error storing verification locally:', error);
