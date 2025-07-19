@@ -51,8 +51,7 @@
           "sounds": ["./assets/sounds/AInotification1.mp3"]
         }
       ],
-      "./plugins/withSiriShortcuts",
-      "./plugins/withNotificationSounds"
+      "./plugins/withSiriShortcuts"
     ],
     "extra": {
       "eas": {
