@@ -1,8 +1,8 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
-import 'firebase/compat/functions';
 import 'firebase/compat/app-check';
+import { functions } from '../config/firebase';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationType, cancelNotificationsByType } from './notificationManager';

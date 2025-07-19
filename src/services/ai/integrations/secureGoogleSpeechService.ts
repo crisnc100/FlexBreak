@@ -1,12 +1,12 @@
 import firebase from 'firebase/compat/app';
-import 'firebase/compat/functions';
+import { functions } from '../../../config/firebase';
 import * as FileSystem from 'expo-file-system';
 
 class SecureGoogleSpeechService {
   private transcribeFunction: any;
 
   constructor() {
-    this.transcribeFunction = firebase.functions().httpsCallable('transcribeAudio');
+    this.transcribeFunction = functions.httpsCallable('transcribeAudio');
   }
 
   async transcribeAudio(audioUri: string, languageCode?: string): Promise<{ text: string; detectedLanguage?: string } | null> {

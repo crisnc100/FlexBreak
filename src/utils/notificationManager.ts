@@ -177,9 +177,16 @@ export async function scheduleTypedNotification(
                      type === NotificationType.PREMIUM_REMINDER ? 'premium_reminder' :
                      type;
   
+  // Use custom sound for AI wellness notifications
+  let sound = content.sound;
+  if (type === NotificationType.AI_WELLNESS || type === NotificationType.UPGRADE_PROMPT) {
+    sound = 'AInotification1.mp3';
+  }
+  
   // Ensure the notification has the correct type in data
   const typedContent = {
     ...content,
+    sound,
     data: {
       ...content.data,
       type: typeString

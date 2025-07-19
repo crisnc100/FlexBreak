@@ -1,7 +1,7 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
-import 'firebase/compat/functions';
 import 'firebase/compat/firestore';
+import { functions } from '../../../config/firebase';
 import { retryUtil, errorHandler } from '../utils/reliabilityService';
 
 interface ChatMessage {
@@ -20,7 +20,7 @@ class SecureAIService {
 
   constructor() {
     // Get reference to the Firebase Function
-    this.aiChatFunction = firebase.functions().httpsCallable('aiChat');
+    this.aiChatFunction = functions.httpsCallable('aiChat');
   }
 
   async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {

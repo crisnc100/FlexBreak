@@ -15,17 +15,10 @@ config.resolver.nodeModulesPaths = [
 ];
 
 // Add additional server options for React Native Firebase if needed
-config.resolver.extraNodeModules = new Proxy(
-  {},
-  {
-    get: (target, name) => {
-      if (name === 'firebase') {
-        return `${__dirname}/node_modules/firebase`;
-      }
-      return undefined;
-    },
-  },
-);
+config.resolver.extraNodeModules = {
+  'firebase': path.resolve(__dirname, 'node_modules/firebase'),
+  'firebase/compat/functions': path.resolve(__dirname, 'node_modules/firebase/compat/functions'),
+};
 
 // Exclude firebase-admin from Metro file watching (dev dependency only)
 config.watchFolders = [

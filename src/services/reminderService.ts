@@ -1,5 +1,5 @@
 import firebase from 'firebase/compat/app';
-import 'firebase/compat/functions';
+import { functions } from '../config/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as storageService from './storageService';
@@ -130,7 +130,7 @@ async function saveToFirebase(
     
     // Fall back to original method with App Check
     console.log('Falling back to original method...');
-    const saveFunction = firebase.functions().httpsCallable('saveUserReminders');
+    const saveFunction = functions.httpsCallable('saveUserReminders');
     const result = await saveFunction({
       token,
       enabled: settings.enabled,

@@ -1,5 +1,5 @@
 import firebase from 'firebase/compat/app';
-import 'firebase/compat/functions';
+import { functions } from '../config/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseService } from './firebaseService';
 
@@ -26,7 +26,7 @@ export class ZeroBounceVerificationService {
   static async verifyOfficeWorkerEmail(email: string): Promise<EmailVerificationResult> {
     try {
       // Call Firebase Function for secure email verification
-      const verifyEmailFunction = firebase.functions().httpsCallable('verifyOfficeWorkerEmail');
+      const verifyEmailFunction = functions.httpsCallable('verifyOfficeWorkerEmail');
       const result = await verifyEmailFunction({ email });
       
       return result.data as EmailVerificationResult;

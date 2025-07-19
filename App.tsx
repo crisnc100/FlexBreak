@@ -56,7 +56,6 @@ import { canAccessFlexCoach } from './src/utils/siriShortcuts';
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
-import 'firebase/compat/functions';
 // import 'firebase/compat/messaging'; // Removed to prevent notification conflicts
 import 'firebase/compat/app-check';
 import firebaseConfig from './firebase.config';

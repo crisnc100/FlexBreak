@@ -47,10 +47,12 @@
         "expo-notifications",
         {
           "icon": "./assets/images/potentialLogo2.png",
-          "color": "#ffffff"
+          "color": "#ffffff",
+          "sounds": ["./assets/sounds/AInotification1.mp3"]
         }
       ],
-      "./plugins/withSiriShortcuts"
+      "./plugins/withSiriShortcuts",
+      "./plugins/withNotificationSounds"
     ],
     "extra": {
       "eas": {
