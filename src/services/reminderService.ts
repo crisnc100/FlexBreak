@@ -1,5 +1,5 @@
 import firebase from 'firebase/compat/app';
-import { functions } from '../config/firebase';
+import 'firebase/compat/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as storageService from './storageService';
@@ -93,57 +93,34 @@ async function saveToFirebase(
   premiumLevel: number,
   timeZoneOffset: number
 ): Promise<void> {
-  // Create a separate Firebase app instance to bypass App Check
   try {
-    // Create a unique ID for this instance
-    const uniqueId = 'direct-' + Date.now();
+    // Get current user
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
     
-    // Initialize a temporary app without App Check
-    const directApp = firebase.initializeApp(
-      firebase.app().options,
-      uniqueId
-    );
+    // Save directly to Firestore instead of using functions
+    await firebase.firestore().collection('user_reminders')
+      .doc(currentUser.uid)
+      .set({
+        userId: currentUser.uid,
+        token,
+        enabled: settings.enabled,
+        time: settings.time,
+        frequency: settings.frequency,
+        days: settings.days,
+        message: settings.message,
+        timeZoneOffset,
+        isPremium,
+        premiumLevel,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
     
-    // Get functions from this app
-    const directFunctions = directApp.functions();
-    const saveFunction = directFunctions.httpsCallable('saveUserReminders');
-    
-    // Call the function
-    const result = await saveFunction({
-      token,
-      enabled: settings.enabled,
-      time: settings.time,
-      frequency: settings.frequency,
-      days: settings.days,
-      message: settings.message,
-      timeZoneOffset,
-      isPremium,
-      premiumLevel
-    });
-    
-    console.log('Firebase reminder settings saved successfully:', result.data);
-    
-    // Clean up the temporary app
-    directApp.delete();
-  } catch (directError) {
-    console.error('Error with direct Firebase call:', directError);
-    
-    // Fall back to original method with App Check
-    console.log('Falling back to original method...');
-    const saveFunction = functions.httpsCallable('saveUserReminders');
-    const result = await saveFunction({
-      token,
-      enabled: settings.enabled,
-      time: settings.time,
-      frequency: settings.frequency,
-      days: settings.days,
-      message: settings.message,
-      timeZoneOffset,
-      isPremium,
-      premiumLevel
-    });
-    
-    console.log('Firebase reminder settings saved successfully with fallback:', result.data);
+    console.log('Reminder settings saved to Firestore successfully');
+  } catch (error) {
+    console.error('Error saving to Firestore:', error);
+    throw error;
   }
 }
 

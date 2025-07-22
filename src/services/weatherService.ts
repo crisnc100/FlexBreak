@@ -169,3 +169,37 @@ export function generateWeatherMessage(weather: WeatherData): { title: string; b
     body: "Great day for movement! Take a stretch break and feel the difference!"
   };
 }
+
+/**
+ * Clean up expired weather cache
+ * This runs client-side when the app starts or resumes
+ */
+export async function cleanupWeatherCache(): Promise<void> {
+  try {
+    const cachedData = await AsyncStorage.getItem(WEATHER_CACHE_KEY);
+    if (cachedData) {
+      const cache = JSON.parse(cachedData);
+      const now = Date.now();
+      
+      // Remove cache if it's older than 24 hours
+      if (now - cache.timestamp > 24 * 60 * 60 * 1000) {
+        await AsyncStorage.removeItem(WEATHER_CACHE_KEY);
+        console.log('Cleaned up expired weather cache');
+      }
+    }
+  } catch (error) {
+    console.error('Error cleaning up weather cache:', error);
+  }
+}
+
+/**
+ * Clear all weather cache (useful for testing)
+ */
+export async function clearWeatherCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(WEATHER_CACHE_KEY);
+    console.log('Weather cache cleared');
+  } catch (error) {
+    console.error('Error clearing weather cache:', error);
+  }
+}

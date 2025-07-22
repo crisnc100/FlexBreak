@@ -145,18 +145,23 @@ export default function App() {
     };
   }, []);
 
-  // Initialize video loader service
+  // Initialize video loader service and cleanup weather cache
   useEffect(() => {
-    const initializeVideoLoader = async () => {
+    const initializeServices = async () => {
       try {
+        // Initialize video loader
         await videoLoaderService.initialize();
         console.log('✅ Video loader service initialized');
+        
+        // Clean up expired weather cache
+        const { cleanupWeatherCache } = await import('./src/services/weatherService');
+        await cleanupWeatherCache();
       } catch (error) {
         console.error('❌ Failed to initialize video loader service:', error);
       }
     };
 
-    initializeVideoLoader();
+    initializeServices();
   }, []);
   
   return (

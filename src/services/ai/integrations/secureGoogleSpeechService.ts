@@ -1,14 +1,8 @@
 import firebase from 'firebase/compat/app';
-import { functions } from '../../../config/firebase';
+import { EDGE_FUNCTIONS, SUPABASE_ANON_KEY } from '../../../config/supabase';
 import * as FileSystem from 'expo-file-system';
 
 class SecureGoogleSpeechService {
-  private transcribeFunction: any;
-
-  constructor() {
-    this.transcribeFunction = functions.httpsCallable('transcribeAudio');
-  }
-
   async transcribeAudio(audioUri: string, languageCode?: string): Promise<{ text: string; detectedLanguage?: string } | null> {
     try {
       console.log('Starting secure Google Speech transcription...');
@@ -27,33 +21,39 @@ class SecureGoogleSpeechService {
       
       console.log('Audio format detected:', { encoding, sampleRate, isIOS });
 
-      // Call Firebase Function
-      const result = await this.transcribeFunction({
-        audioBase64,
-        languageCode,
-        encoding,
-        sampleRate
+      // Call Supabase Edge Function
+      const currentUser = firebase.auth().currentUser;
+      const response = await fetch(EDGE_FUNCTIONS.SPEECH_TRANSCRIPTION, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          audioBase64,
+          languageCode,
+          encoding,
+          sampleRate,
+          userId: currentUser?.uid || 'anonymous'
+        })
       });
 
-      if (!result.data.success) {
-        console.error('Transcription failed:', result.data.error);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('Transcription failed:', result.error);
         return null;
       }
 
       console.log('Transcription successful');
       return {
-        text: result.data.text,
-        detectedLanguage: result.data.detectedLanguage
+        text: result.text,
+        detectedLanguage: result.detectedLanguage
       };
 
     } catch (error: any) {
       console.error('Secure Google Speech error:', error);
-      
-      // Handle specific Firebase Function errors
-      if (error.code === 'unauthenticated') {
-        console.log('Note: Speech transcription is available without authentication');
-      }
-      
       return null;
     }
   }

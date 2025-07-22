@@ -8,7 +8,8 @@
       "Bash(firebase --version)",
       "Bash(ls:*)",
       "Bash(rm:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "mcp__supabase__get_project_url"
     ],
     "deny": []
   },

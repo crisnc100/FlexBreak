@@ -1,7 +1,7 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
-import { functions } from '../../../config/firebase';
+import { EDGE_FUNCTIONS, SUPABASE_ANON_KEY } from '../../../config/supabase';
 import { retryUtil, errorHandler } from '../utils/reliabilityService';
 
 interface ChatMessage {
@@ -16,13 +16,6 @@ interface ChatOptions {
 }
 
 class SecureAIService {
-  private aiChatFunction: any;
-
-  constructor() {
-    // Get reference to the Firebase Function
-    this.aiChatFunction = functions.httpsCallable('aiChat');
-  }
-
   async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
     try {
       // No authentication required for this app
@@ -33,30 +26,39 @@ class SecureAIService {
         ...options
       });
 
-      // Call the Firebase Function
-      const result = await this.aiChatFunction({
-        messages,
-        options,
-        userId: currentUser?.uid || 'anonymous'
+      // Call the Supabase Edge Function
+      const response = await fetch(EDGE_FUNCTIONS.AI_CHAT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          messages,
+          options,
+          userId: currentUser?.uid || 'anonymous'
+        })
       });
 
-      if (!result.data.success) {
-        throw new Error(result.data.error || 'AI service error');
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error(result.error || 'Daily limit reached');
+        }
+        throw new Error(result.error || 'AI service error');
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'AI service error');
       }
 
       console.log('Secure AI Response received');
-      return result.data.data;
+      return result.data;
 
     } catch (error: any) {
       console.error('Secure AI chat error:', error);
-      
-      // Handle specific Firebase Function errors
-      if (error.code === 'resource-exhausted') {
-        throw new Error(error.message || 'Daily limit reached');
-      } else if (error.code === 'invalid-argument') {
-        throw new Error('Invalid request format');
-      }
-      
       throw error;
     }
   }

@@ -1,5 +1,5 @@
 import firebase from 'firebase/compat/app';
-import { functions } from '../config/firebase';
+import { EDGE_FUNCTIONS, SUPABASE_ANON_KEY } from '../config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseService } from './firebaseService';
 
@@ -21,30 +21,37 @@ export class ZeroBounceVerificationService {
   
   /**
    * Verify if an office worker email is legitimate and unused
-   * Now uses Firebase Function to keep API key secure
+   * Now uses Supabase Edge Function to keep API key secure
    */
   static async verifyOfficeWorkerEmail(email: string): Promise<EmailVerificationResult> {
     try {
-      // Call Firebase Function for secure email verification
-      const verifyEmailFunction = functions.httpsCallable('verifyOfficeWorkerEmail');
-      const result = await verifyEmailFunction({ email });
-      
-      return result.data as EmailVerificationResult;
-    } catch (error: any) {
-      console.error('Email verification error:', error);
-      
-      // Handle Firebase Function errors
-      if (error.code === 'unauthenticated') {
+      // Call Supabase Edge Function for secure email verification
+      const currentUser = firebase.auth().currentUser;
+      const response = await fetch(EDGE_FUNCTIONS.EMAIL_VERIFICATION, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          email,
+          userId: currentUser?.uid || 'anonymous'
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
         return {
           status: 'error',
-          message: 'Please sign in to verify your email'
-        };
-      } else if (error.code === 'invalid-argument') {
-        return {
-          status: 'rejected',
-          message: 'Invalid email format'
+          message: result.message || 'Verification temporarily unavailable'
         };
       }
+      
+      return result as EmailVerificationResult;
+    } catch (error: any) {
+      console.error('Email verification error:', error);
       
       return {
         status: 'error',
