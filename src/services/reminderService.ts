@@ -94,17 +94,19 @@ async function saveToFirebase(
   timeZoneOffset: number
 ): Promise<void> {
   try {
-    // Get current user
-    const currentUser = firebase.auth().currentUser;
-    if (!currentUser) {
-      throw new Error('User not authenticated');
+    // For anonymous users, generate a device-specific ID
+    let userId = await AsyncStorage.getItem('@flexbreak:device_id');
+    if (!userId) {
+      // Generate a unique device ID
+      userId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await AsyncStorage.setItem('@flexbreak:device_id', userId);
     }
     
-    // Save directly to Firestore instead of using functions
+    // Save directly to Firestore
     await firebase.firestore().collection('user_reminders')
-      .doc(currentUser.uid)
+      .doc(userId)
       .set({
-        userId: currentUser.uid,
+        userId,
         token,
         enabled: settings.enabled,
         time: settings.time,

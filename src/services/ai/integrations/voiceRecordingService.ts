@@ -36,10 +36,13 @@ class VoiceRecordingService {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: false, // Ensure we're not trying to record in background
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
       });
 
       // Wait longer for audio mode to be properly set on iOS
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Create and start recording with optimized settings for speech
       const recordingOptions = {

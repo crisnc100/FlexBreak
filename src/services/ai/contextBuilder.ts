@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CONTEXT_TEMPLATE } from './core/promptManager';
+import { buildAppContextForAI, buildUserProgressContext } from './config/appContext';
 
 export interface UserContext {
   message: string;
@@ -12,6 +13,7 @@ export interface UserContext {
   isPremium?: boolean;
   isFirstInteraction?: boolean;
   detectedLanguage?: 'en' | 'es' | 'zh';
+  appContext?: string; // New: app-specific context
 }
 
 export const buildUserContext = async (userInput: string, userId?: string): Promise<UserContext> => {
@@ -83,6 +85,41 @@ export const buildUserContext = async (userInput: string, userId?: string): Prom
       //   const effective = JSON.parse(effectiveData);
       //   context.effectiveSolutions = effective.slice(-3); // Last 3 effective solutions
       // }
+      
+      // Load app-specific context
+      try {
+        // Get user progress data using storageService
+        const { getUserProgress } = await import('../../services/storageService');
+        const userProgress = await getUserProgress();
+        
+        // Get favorite body area from routinesByArea statistics
+        let favoriteBodyArea: string | undefined;
+        if (userProgress.statistics?.routinesByArea) {
+          // Find the most used body area
+          const bodyAreaEntries = Object.entries(userProgress.statistics.routinesByArea);
+          if (bodyAreaEntries.length > 0) {
+            favoriteBodyArea = bodyAreaEntries
+              .sort(([,a], [,b]) => b - a)[0]?.[0];
+          }
+        }
+        
+        // Build progress context with real data
+        const progressContext = buildUserProgressContext(
+          userProgress.level || 1,
+          userProgress.statistics?.currentStreak || 0,
+          userProgress.statistics?.totalRoutines || 0,
+          favoriteBodyArea,
+          userProgress.totalXP || 0
+        );
+        
+        // Create app context string
+        context.appContext = buildAppContextForAI(progressContext, isPremium);
+        
+      } catch (appContextError) {
+        console.log('Error loading app context:', appContextError);
+        // Fallback to basic app context
+        context.appContext = buildAppContextForAI(undefined, context.isPremium || false);
+      }
     } catch (error) {
       console.log('Error loading user context:', error);
     }

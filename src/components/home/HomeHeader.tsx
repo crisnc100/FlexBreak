@@ -5,6 +5,7 @@ import { usePremium } from '../../context/PremiumContext';
 import { KEYS } from '../../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface HomeHeaderProps {
   title?: string;
@@ -26,15 +27,23 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   const [animationInProgress, setAnimationInProgress] = useState(false);
   const [aiWellnessEnabled, setAiWellnessEnabled] = useState(false);
   
-  // Check if AI wellness is enabled
+  // Check if AI wellness is enabled - check on mount and when screen is focused
+  const checkAiWellness = async () => {
+    const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+    console.log('[HomeHeader] AI Wellness enabled:', enabled);
+    setAiWellnessEnabled(enabled === 'true');
+  };
+  
   useEffect(() => {
-    const checkAiWellness = async () => {
-      const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
-      console.log('[HomeHeader] AI Wellness enabled:', enabled);
-      setAiWellnessEnabled(enabled === 'true');
-    };
     checkAiWellness();
   }, []);
+  
+  // Re-check when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      checkAiWellness();
+    }, [])
+  );
   
   // Check if it's Wednesday for free users
   const isWednesday = new Date().getDay() === 3;
@@ -74,6 +83,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
   const handleLogoPress = () => {
     if (animationInProgress) return;
+    
+    console.log('[HomeHeader] Logo pressed, canAccessFlexChat:', canAccessFlexChat, 'aiWellnessEnabled:', aiWellnessEnabled);
     
     // Check if we should open FlexChat
     if (canAccessFlexChat && (global as any).openFlexChat) {

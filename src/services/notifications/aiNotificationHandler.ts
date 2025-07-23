@@ -143,6 +143,26 @@ export const setupAINotificationHandlers = () => {
         // Create a unique identifier for this notification response
         const responseId = `${lastResponse.notification.request.identifier}_${lastResponse.notification.date}`;
         
+        // Check if this is a stale notification (older than 5 minutes)
+        const notificationAge = Date.now() - lastResponse.notification.date;
+        if (notificationAge > 300000) { // 5 minutes
+          console.log('[aiNotificationHandler] Ignoring stale notification (older than 5 minutes)');
+          return;
+        }
+        
+        // Check if AI wellness is enabled before processing old notifications
+        const aiWellnessEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+        const data = lastResponse.notification.request.content.data || {};
+        const isAIWellnessNotification = data?.type === 'ai_wellness_checkin' || data?.isWelcome || data?.isPremiumWelcome;
+        
+        // If it's an AI wellness notification and AI wellness is disabled, don't process it
+        if (isAIWellnessNotification && aiWellnessEnabled !== 'true' && !data?.isWelcome && !data?.isPremiumWelcome) {
+          console.log('[aiNotificationHandler] AI wellness is disabled, not processing old AI wellness notification');
+          // Still mark it as processed so we don't check it again
+          await AsyncStorage.setItem(processedKey, responseId);
+          return;
+        }
+        
         // Only process if we haven't already processed this exact response
         if (lastProcessed !== responseId) {
           console.log('[aiNotificationHandler] App was opened from notification:', {

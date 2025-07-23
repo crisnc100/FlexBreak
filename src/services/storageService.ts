@@ -4,6 +4,7 @@ import { ProgressEntry, RoutineParams, BodyArea, Duration, Position } from '../t
 import { UserProgress } from '../utils/progress/types';
 import { INITIAL_USER_PROGRESS } from '../utils/progress/constants';
 import { streakEvents, STREAK_UPDATED_EVENT } from '../utils/progress/modules/streakManager';
+import { clearAllAINotifications, clearAllNotifications } from '../utils/clearAllNotifications';
 // ========== STORAGE KEYS ==========
 export const KEYS = {
   USER: {
@@ -918,6 +919,18 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
       '@ai_wellness_premium_welcome_sent',
       '@last_premium_status',
       
+      // FlexChat modal and related data
+      '@show_flexchat_on_open',
+      '@flexbreak:open_flexchat_after_settings',
+      '@flexbreak:device_id',
+      '@ai_wellness_last_toggle',
+      '@ai_wellness_toggle_count',
+      '@last_notification_processed',
+      '@ai_wellness_onboarding_seen',
+      '@ai_wellness_first_enable_done',
+      '@ai_wellness_intro_count',
+      '@ai_wellness_detected_language',
+      
       // AI conversation and session data
       '@ai_conversation_session_*',
       '@ai_wellness_session_*',
@@ -1176,7 +1189,18 @@ export const resetSimulationData = async (): Promise<boolean> => {
       '@ai_wellness_custom_time',
       '@ai_wellness_premium_welcome_sent',
       '@last_premium_status',
-      '@app_state'
+      '@app_state',
+      // FlexChat modal related
+      '@show_flexchat_on_open',
+      '@flexbreak:open_flexchat_after_settings',
+      '@flexbreak:device_id',
+      '@ai_wellness_last_toggle',
+      '@ai_wellness_toggle_count',
+      '@last_notification_processed',
+      '@ai_wellness_onboarding_seen',
+      '@ai_wellness_first_enable_done',
+      '@ai_wellness_intro_count',
+      '@ai_wellness_detected_language'
     ];
     
     simulationKeys.push(...aiWellnessKeys);

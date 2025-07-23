@@ -384,12 +384,6 @@ export default function HomeScreen() {
             const success = await firebaseReminders.saveReminderSettings(settings);
             
             if (success) {
-              Alert.alert(
-                'Reminders Enabled', 
-                'Local notifications scheduled for the next 30 days. Open the app periodically to keep them active.',
-                [{ text: 'OK' }]
-              );
-              
               // Smart weather notification prompt after enabling reminders
               setTimeout(async () => {
                 await notifications.requestWeatherNotificationsPermission();

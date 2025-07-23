@@ -410,6 +410,14 @@ function MainApp() {
   const [showFlexChat, setShowFlexChat] = useState(false);
   const [pendingFlexChatOpen, setPendingFlexChatOpen] = useState(false);
   
+  // Debug logging for FlexChat state changes
+  useEffect(() => {
+    console.log('[App.tsx] showFlexChat state changed to:', showFlexChat);
+    if (showFlexChat) {
+      console.trace('[App.tsx] FlexChat opened from:');
+    }
+  }, [showFlexChat]);
+  
   // Initialize update notification hook
   const { showModal, updateInfo, checkForUpdates, hideModal } = useUpdateNotification();
   
@@ -476,7 +484,7 @@ function MainApp() {
         
         if (accessCheck.canAccess) {
           console.log('[App.tsx] Access granted, opening FlexChat');
-          setShowFlexChat(true);
+          setShowFlexChatRef.current(true);
         } else {
           console.log('[App.tsx] Access denied:', accessCheck.message);
           // Show alert with access restriction message

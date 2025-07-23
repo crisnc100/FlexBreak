@@ -26,6 +26,7 @@ import aiWellnessService from '../../services/ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import voiceRecordingService from '../../services/ai/integrations/voiceRecordingService';
 import memoryService from '../../services/ai/memory/memoryService';
+import { KEYS } from '../../services/storageService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MIN_HEIGHT = 120;
@@ -111,6 +112,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showVoiceIntro, setShowVoiceIntro] = useState(false);
   const [currentTypewritingId, setCurrentTypewritingId] = useState<string | null>(null);
+  const [aiWellnessEnabled, setAiWellnessEnabled] = useState<boolean | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Animation values
@@ -185,6 +187,14 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     console.log('[FlexChatModal] useEffect triggered - visible:', visible, 'isLoading:', isLoading);
     if (visible && !isLoading) {
       console.log('[FlexChatModal] Calling loadInitialState, animateIn, and startVoiceButtonGlow...');
+      
+      // Check AI Wellness status
+      const checkAIWellnessStatus = async () => {
+        const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+        setAiWellnessEnabled(enabled === 'true');
+      };
+      checkAIWellnessStatus();
+      
       loadInitialState();
       animateIn();
       startVoiceButtonGlow();
@@ -489,6 +499,55 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
             activeOpacity={1}
           />
         </Animated.View>
+        
+        {/* Show different content based on AI Wellness status */}
+        {aiWellnessEnabled === false ? (
+          // AI Wellness is disabled - show enable message
+          <View style={[styles.disabledContainer, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+            <View style={styles.disabledContent}>
+              <View style={[styles.iconContainer, { backgroundColor: theme.accent + '20' }]}>
+                <Ionicons name="chatbubbles-outline" size={48} color={theme.accent} />
+              </View>
+              
+              <Text style={[styles.disabledTitle, { color: theme.text }]}>
+                AI Flex Coach is Disabled
+              </Text>
+              
+              <Text style={[styles.disabledMessage, { color: theme.textSecondary }]}>
+                To chat with your AI wellness coach, please enable it in settings.
+              </Text>
+              
+              <TouchableOpacity
+                style={[styles.enableButton, { backgroundColor: theme.accent }]}
+                onPress={() => {
+                  // Close modal and set flag to open settings
+                  onClose();
+                  setTimeout(() => {
+                    AsyncStorage.setItem('@flexbreak:reopen_settings', 'true');
+                    // Navigate to settings if navigation is available
+                    if ((global as any).navigateToSettings) {
+                      (global as any).navigateToSettings();
+                    }
+                  }, 300);
+                }}
+              >
+                <Text style={styles.enableButtonText}>Go to Settings</Text>
+                <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={onClose}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          // AI Wellness is enabled - show normal chat interface
+          <>
 
         {/* Chat Modal */}
         <Animated.View
@@ -779,6 +838,8 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
             )}
           </View>
         </Animated.View>
+        </>
+        )}
       </View>
     </Modal>
   );
@@ -1065,5 +1126,68 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#ef4444',
     fontWeight: '600',
+  },
+  // Disabled state styles
+  disabledContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    minHeight: 350,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  disabledContent: {
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 40,
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  disabledTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  disabledMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  enableButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  enableButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  cancelButtonText: {
+    fontSize: 16,
   },
 });

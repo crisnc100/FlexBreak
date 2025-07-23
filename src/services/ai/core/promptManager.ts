@@ -176,6 +176,11 @@ export class PromptManager {
       contextParts.push(`User's name: ${context.userContext.userName}`);
     }
     
+    // Add app context if available
+    if (context.userContext.appContext) {
+      contextParts.push(context.userContext.appContext);
+    }
+    
     // Add conversation history if this is a follow-up
     if (context.isFollowUp && context.conversationHistory.length > 0) {
       const recentExchange = this.formatRecentExchange(context.conversationHistory, language);
