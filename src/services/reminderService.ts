@@ -14,8 +14,6 @@ import { STORAGE_KEYS, DEFAULTS } from '../constants/reminderDefaults';
  */
 export async function saveReminderSettings(settings: ReminderSettings): Promise<boolean> {
   try {
-    console.log('Saving reminder settings to Firebase:', settings);
-    
     // First save locally
     await saveLocalReminderSettings(settings);
     
@@ -36,7 +34,6 @@ export async function saveReminderSettings(settings: ReminderSettings): Promise<
         
         // Get the device's timezone offset in minutes
         const timeZoneOffset = new Date().getTimezoneOffset();
-        console.log(`Device timezone offset: ${timeZoneOffset} minutes from UTC`);
         
         // Save to Firebase
         await saveToFirebase(settings, token, isPremium, premiumLevel, timeZoneOffset);
@@ -46,7 +43,6 @@ export async function saveReminderSettings(settings: ReminderSettings): Promise<
           try {
             // Schedule local reminders based on premium level
             await scheduleAdvancedReminders(settings, premiumLevel);
-            console.log('Advanced reminders scheduled based on premium level:', premiumLevel);
           } catch (scheduleError) {
             console.error('Error scheduling advanced reminders:', scheduleError);
           }
@@ -118,8 +114,6 @@ async function saveToFirebase(
         premiumLevel,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-    
-    console.log('Reminder settings saved to Firestore successfully');
   } catch (error) {
     console.error('Error saving to Firestore:', error);
     throw error;
@@ -140,8 +134,6 @@ async function scheduleLocalReminderFallback(settings: ReminderSettings): Promis
       },
       trigger: null, // null trigger for immediate notification
     });
-    
-    console.log('Local reminder notification sent as Firebase fallback');
   } catch (error) {
     console.error('Error sending local reminder notification:', error);
     throw error;

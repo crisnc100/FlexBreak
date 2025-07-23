@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { NotificationType, scheduleTypedNotification } from '../utils/notificationManager';
+import { NotificationType, scheduleTypedNotification, cancelNotificationsByType } from '../utils/notificationManager';
 import { ReminderSettings } from '../types/reminders';
 import { getNextDayOfWeek, dayStringToNumber } from '../utils/dateUtils';
 import { getRandomMotivationalMessage, getRandomMotivationalMessageExcluding } from '../constants/motivationalMessages';
@@ -7,6 +7,14 @@ import { getCurrentLocation, areWeatherNotificationsEnabled } from './locationSe
 import { getWeatherData, generateWeatherMessage, WeatherData } from './weatherService';
 import { shouldShowWeatherMessage } from '../utils/weatherUtils';
 import { NOTIFICATION_TIMES } from '../constants/reminderDefaults';
+
+/**
+ * Helper function to get day name from day number
+ */
+function getDayName(dayNumber: number): string {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[dayNumber] || 'Unknown';
+}
 
 /**
  * Schedule multiple reminders based on user's premium level
@@ -17,15 +25,16 @@ export async function scheduleAdvancedReminders(
   premiumLevel: number = 0
 ): Promise<string[]> {
   try {
-    console.log('Scheduling advanced reminders based on premium level:', premiumLevel);
-    
     const scheduledNotificationIds: string[] = [];
     
     // Only schedule if reminders are enabled
     if (!settings.enabled) {
-      console.log('Reminders are disabled, not scheduling any');
       return scheduledNotificationIds;
     }
+    
+    // IMPORTANT: Cancel all existing reminder notifications before scheduling new ones
+    // This prevents duplicate notifications when settings are changed
+    await cancelNotificationsByType([NotificationType.REMINDER, NotificationType.PREMIUM_REMINDER]);
     
     // Parse the primary reminder time
     const [hours, minutes] = settings.time.split(':').map(num => parseInt(num, 10));
@@ -50,39 +59,37 @@ export async function scheduleAdvancedReminders(
         break;
     }
     
-    console.log(`Scheduling reminders for days: ${selectedDays.join(', ')}`);
-    
     // Schedule for each selected day
     for (const dayOfWeek of selectedDays) {
       // Calculate next occurrence
       const nextDate = getNextDayOfWeek(dayOfWeek, hours, minutes);
       const secondsTillReminder = Math.max(1, Math.floor((nextDate.getTime() - new Date().getTime()) / 1000));
       
-      console.log(`Scheduling for ${nextDate.toLocaleString()} (${secondsTillReminder} seconds from now)`);
-      
-      // Create the notification
-      const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
+      // Create the notification with proper type
+      const notificationId = await scheduleTypedNotification(
+        {
           title: 'FlexBreak Reminder',
           body: settings.message || 'Time for your daily stretch!',
-          data: { type: 'scheduled_reminder', dayOfWeek },
+          data: { 
+            type: 'scheduled_reminder', 
+            dayOfWeek,
+            scheduledFor: nextDate.toISOString()
+          },
           sound: true,
         },
-        trigger: { 
+        { 
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: secondsTillReminder,
         },
-      });
+        NotificationType.REMINDER
+      );
       
       scheduledNotificationIds.push(notificationId);
-      console.log(`Scheduled notification ${notificationId} for ${nextDate.toLocaleString()}`);
     }
     
     // For premium level 3+, add additional reminders if configured
     if (premiumLevel >= 3) {
-      console.log('Premium level 3+ detected, scheduling additional reminders');
-      
-      // Example: Add an additional reminder 2 hours after the main one for premium users
+      // Add an additional reminder 2 hours after the main one for premium users
       for (const dayOfWeek of selectedDays) {
         // Calculate next occurrence with +2 hours offset
         const nextDate = getNextDayOfWeek(dayOfWeek, hours + 2, minutes);
@@ -90,28 +97,29 @@ export async function scheduleAdvancedReminders(
         
         // Only schedule if it's more than 1 hour from the first reminder
         if (secondsTillReminder > 3600) {
-          console.log(`Scheduling premium reminder for ${nextDate.toLocaleString()}`);
-          
-          const notificationId = await Notifications.scheduleNotificationAsync({
-            content: {
+          const notificationId = await scheduleTypedNotification(
+            {
               title: 'FlexBreak Premium Reminder',
               body: settings.message || 'Time for another stretch break!',
-              data: { type: 'premium_reminder', dayOfWeek },
+              data: { 
+                type: 'premium_reminder', 
+                dayOfWeek,
+                scheduledFor: nextDate.toISOString()
+              },
               sound: true,
             },
-            trigger: { 
+            { 
               type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
               seconds: secondsTillReminder,
             },
-          });
+            NotificationType.PREMIUM_REMINDER
+          );
           
           scheduledNotificationIds.push(notificationId);
-          console.log(`Scheduled premium notification ${notificationId} for ${nextDate.toLocaleString()}`);
         }
       }
     }
     
-    console.log(`Successfully scheduled ${scheduledNotificationIds.length} reminders`);
     return scheduledNotificationIds;
   } catch (error) {
     console.error('Error scheduling advanced reminders:', error);
@@ -250,5 +258,53 @@ async function scheduleAfternoonMessage(
     );
     
     console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId}`);
+  }
+}
+
+/**
+ * Debug function to check for duplicate reminder notifications
+ */
+export async function debugReminderNotifications(): Promise<void> {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const reminders = scheduled.filter(n => {
+      const type = n.content.data?.type;
+      return type === 'scheduled_reminder' || type === 'premium_reminder';
+    });
+    
+    console.log(`Total reminder notifications: ${reminders.length}`);
+    
+    // Group by trigger time to find duplicates
+    const byTriggerTime: { [key: string]: any[] } = {};
+    
+    reminders.forEach((n) => {
+      const trigger = n.trigger as any;
+      let triggerTime = 'Unknown';
+      
+      if (trigger?.type === 'timeInterval' && trigger.seconds) {
+        const scheduledDate = new Date(Date.now() + trigger.seconds * 1000);
+        triggerTime = scheduledDate.toISOString();
+      } else if (trigger?.date) {
+        triggerTime = new Date(trigger.date).toISOString();
+      }
+      
+      if (!byTriggerTime[triggerTime]) {
+        byTriggerTime[triggerTime] = [];
+      }
+      byTriggerTime[triggerTime].push(n);
+    });
+    
+    // Report duplicates only
+    const duplicates = Object.entries(byTriggerTime).filter(([_, notifications]) => notifications.length > 1);
+    if (duplicates.length > 0) {
+      console.log(`⚠️ Found duplicate notifications:`);
+      duplicates.forEach(([time, notifications]) => {
+        console.log(`${notifications.length} notifications at ${new Date(time).toLocaleString()}`);
+      });
+    }
+    
+    return;
+  } catch (error) {
+    console.error('Error debugging reminder notifications:', error);
   }
 }
