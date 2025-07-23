@@ -35,7 +35,9 @@ const COLLAPSED_HEIGHT = 80;
 
 // Typewriter effect configuration - EASY TO TOGGLE ON/OFF
 const ENABLE_TYPEWRITER_EFFECT = true; // Set to false to revert to original behavior
-const TYPEWRITER_SPEED = 30; // milliseconds per character (30ms = fast, smooth)
+const TYPEWRITER_BASE_SPEED = 30; // Base speed for short messages
+const TYPEWRITER_FAST_SPEED = 15; // Faster speed for long messages
+const TYPEWRITER_THRESHOLD = 100; // Character count to switch to fast speed
 const ENABLE_HAPTICS = true; // Set to false to disable haptics
 const HAPTIC_INTERVAL = 3; // Haptic feedback every N characters (to reduce battery drain)
 
@@ -93,7 +95,7 @@ const TypewriterText: React.FC<{
       if (ENABLE_HAPTICS && currentIndex % HAPTIC_INTERVAL === 0) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-    }, TYPEWRITER_SPEED);
+    }, text.length > TYPEWRITER_THRESHOLD ? TYPEWRITER_FAST_SPEED : TYPEWRITER_BASE_SPEED);
     
     return () => clearTimeout(timer);
   }, [currentIndex, text, isActive, onComplete]);

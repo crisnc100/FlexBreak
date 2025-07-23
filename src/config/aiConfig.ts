@@ -31,12 +31,12 @@ export const AI_CONFIG = {
       dailyRequests: 3,      // 3 messages on Wednesdays only
       introMessages: 5,      // Generous intro experience
       maxInputLength: 500,   // Allow longer inputs
-      maxOutputTokens: 150,  // Concise responses
+      maxOutputTokens: 250,  // Increased to prevent cutoffs
     },
     premium: {
       dailyRequests: 15,     // 15 message exchanges per day as per requirements
       maxInputLength: 1000,  // Much more flexible
-      maxOutputTokens: 200,  // Still concise but with more detail
+      maxOutputTokens: 300,  // Increased for better responses
     }
   },
   

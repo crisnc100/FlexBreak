@@ -368,18 +368,26 @@ export class AIWellnessServiceV2 {
   }
   
   private getModelConfig(language: string, isPremium: boolean) {
+    // Base token limits
+    const baseTokens = isPremium ? AI_CONFIG.limits.premium.maxOutputTokens : AI_CONFIG.limits.free.maxOutputTokens;
+    
+    // Just use base tokens - no multiplication needed
+    // Free: 250 tokens, Premium: 300 tokens
+    // This is enough to prevent cutoffs while keeping responses concise
+    const maxTokens = baseTokens;
+    
     // Use Claude Haiku for Chinese, otherwise use based on premium status
     if (language === 'zh') {
       return {
         model: AI_CONFIG.models.powerful,
-        maxTokens: isPremium ? AI_CONFIG.limits.premium.maxOutputTokens : AI_CONFIG.limits.free.maxOutputTokens
+        maxTokens
       };
     }
     
     // Use balanced model for premium, free model for free users
     return {
       model: isPremium ? AI_CONFIG.models.balanced : AI_CONFIG.models.free,
-      maxTokens: isPremium ? AI_CONFIG.limits.premium.maxOutputTokens : AI_CONFIG.limits.free.maxOutputTokens
+      maxTokens
     };
   }
   
