@@ -27,14 +27,14 @@ export async function scheduleAdvancedReminders(
   try {
     const scheduledNotificationIds: string[] = [];
     
-    // Only schedule if reminders are enabled
+    // IMPORTANT: Always cancel all existing reminder notifications first
+    // This ensures notifications are cancelled when reminders are disabled
+    await cancelNotificationsByType([NotificationType.REMINDER, NotificationType.PREMIUM_REMINDER]);
+    
+    // Only schedule new notifications if reminders are enabled
     if (!settings.enabled) {
       return scheduledNotificationIds;
     }
-    
-    // IMPORTANT: Cancel all existing reminder notifications before scheduling new ones
-    // This prevents duplicate notifications when settings are changed
-    await cancelNotificationsByType([NotificationType.REMINDER, NotificationType.PREMIUM_REMINDER]);
     
     // Parse the primary reminder time
     const [hours, minutes] = settings.time.split(':').map(num => parseInt(num, 10));

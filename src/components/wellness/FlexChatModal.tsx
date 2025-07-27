@@ -32,6 +32,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MIN_HEIGHT = 120;
 const MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
 const COLLAPSED_HEIGHT = 80;
+const CONVERSATION_EXPIRY_HOURS = 2; // Conversations expire after 2 hours
 
 // Typewriter effect configuration - EASY TO TOGGLE ON/OFF
 const ENABLE_TYPEWRITER_EFFECT = true; // Set to false to revert to original behavior
@@ -115,6 +116,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
   const [showVoiceIntro, setShowVoiceIntro] = useState(false);
   const [currentTypewritingId, setCurrentTypewritingId] = useState<string | null>(null);
   const [aiWellnessEnabled, setAiWellnessEnabled] = useState<boolean | null>(null);
+  const [conversationLoaded, setConversationLoaded] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Animation values
@@ -242,11 +244,68 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     }
   }, [showVoiceIntro]);
 
+  // Save conversation to AsyncStorage
+  const saveConversation = async (messagesToSave: Message[]) => {
+    try {
+      const conversationData = {
+        messages: messagesToSave,
+        lastUpdated: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem('@flexchat_conversation', JSON.stringify(conversationData));
+    } catch (error) {
+      console.error('[FlexChatModal] Error saving conversation:', error);
+    }
+  };
+
+  // Load conversation from AsyncStorage
+  const loadSavedConversation = async (): Promise<Message[] | null> => {
+    try {
+      const savedData = await AsyncStorage.getItem('@flexchat_conversation');
+      if (!savedData) return null;
+      
+      const conversationData = JSON.parse(savedData);
+      const lastUpdated = new Date(conversationData.lastUpdated);
+      const now = new Date();
+      const hoursSinceLastUpdate = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60);
+      
+      // If conversation is too old, return null
+      if (hoursSinceLastUpdate > CONVERSATION_EXPIRY_HOURS) {
+        await AsyncStorage.removeItem('@flexchat_conversation');
+        return null;
+      }
+      
+      // Convert saved messages back to proper Message objects
+      return conversationData.messages.map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp),
+      }));
+    } catch (error) {
+      console.error('[FlexChatModal] Error loading conversation:', error);
+      return null;
+    }
+  };
+
   const loadInitialState = async () => {
     console.log('[FlexChatModal] Loading initial state...');
     try {
-      // Always load greeting message
-      console.log('[FlexChatModal] Loading greeting message...');
+      // Check for saved conversation first
+      const savedMessages = await loadSavedConversation();
+      
+      if (savedMessages && savedMessages.length > 0) {
+        // Resume previous conversation
+        console.log('[FlexChatModal] Resuming previous conversation with', savedMessages.length, 'messages');
+        setMessages(savedMessages);
+        setConversationLoaded(true);
+        
+        // Scroll to bottom after a delay
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 300);
+        return;
+      }
+      
+      // No saved conversation, create new greeting
+      console.log('[FlexChatModal] Starting new conversation...');
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
       const memory = await memoryService.getMemory(userId);
       const userName = await AsyncStorage.getItem('@ai_wellness_user_name');
@@ -272,10 +331,8 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         timestamp: new Date(),
       };
       setMessages([welcomeMessage]);
+      setConversationLoaded(true);
       console.log('[FlexChatModal] Set greeting message:', welcomeMessage.message.substring(0, 50) + '...');
-
-      // Voice mode from notifications removed - using simplified chat flow
-      // Users can still use voice within the chat by tapping the microphone button
     } catch (error) {
       console.error('[FlexChatModal] Error loading initial state:', error);
     }
@@ -311,8 +368,9 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setMessages([]);
+      // Don't clear messages - they'll be saved
       setIsCollapsed(false);
+      setConversationLoaded(false);
       onClose();
     });
   };
@@ -346,7 +404,11 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       message: messageText,
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    
+    // Save conversation after adding user message
+    await saveConversation(updatedMessages);
 
     // Scroll to bottom
     setTimeout(() => {
@@ -368,7 +430,11 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         // suggestedActions removed
       };
       
-      setMessages(prev => [...prev, aiMessage]);
+      const updatedMessagesWithAI = [...messages, userMessage, aiMessage];
+      setMessages(updatedMessagesWithAI);
+      
+      // Save conversation after AI response
+      await saveConversation(updatedMessagesWithAI);
       
       // Set this message as currently typewriting
       if (ENABLE_TYPEWRITER_EFFECT) {
@@ -386,7 +452,9 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         message: "I'm having trouble connecting. Please try again!",
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      const updatedMessagesWithError = [...messages, userMessage, errorMessage];
+      setMessages(updatedMessagesWithError);
+      await saveConversation(updatedMessagesWithError);
     } finally {
       setIsLoading(false);
     }
@@ -556,6 +624,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
           style={[
             styles.modal,
             {
+              backgroundColor: theme.background,
               height: keyboardHeight > 0 ? SCREEN_HEIGHT * 0.95 : modalHeight + insets.bottom,
               transform: [{ translateY: slideAnim }],
             },
@@ -589,13 +658,29 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={toggleCollapse} style={styles.collapseButton}>
-                  <Ionicons 
-                    name={isCollapsed ? "chevron-up" : "chevron-down"} 
-                    size={24} 
-                    color={isDark ? '#ffffff' : '#1a1a2e'} 
-                  />
-                </TouchableOpacity>
+                <View style={styles.headerRight}>
+                  {/* New conversation button - only show if there's an existing conversation */}
+                  {messages.length > 1 && !isCollapsed && (
+                    <TouchableOpacity 
+                      onPress={async () => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        await AsyncStorage.removeItem('@flexchat_conversation');
+                        setConversationLoaded(false);
+                        await loadInitialState();
+                      }} 
+                      style={styles.newChatButton}
+                    >
+                      <Ionicons name="refresh-outline" size={20} color={isDark ? '#ffffff' : '#1a1a2e'} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={toggleCollapse} style={styles.collapseButton}>
+                    <Ionicons 
+                      name={isCollapsed ? "chevron-up" : "chevron-down"} 
+                      size={24} 
+                      color={isDark ? '#ffffff' : '#1a1a2e'} 
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
             </LinearGradient>
 
@@ -614,6 +699,14 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
+                  {/* Show continuation indicator if resuming conversation */}
+                  {conversationLoaded && messages.length > 1 && (
+                    <View style={styles.continuationIndicator}>
+                      <Text style={[styles.continuationText, { color: theme.textSecondary }]}>
+                        Continuing previous conversation...
+                      </Text>
+                    </View>
+                  )}
                   {messages.map((msg) => (
                     <View key={msg.id} style={styles.messageWrapper}>
                       <View
@@ -632,11 +725,11 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                             </Text>
                           </LinearGradient>
                         ) : (
-                          <View style={[styles.aiBubbleContent, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
+                          <View style={[styles.aiBubbleContent, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.03)' }]}>
                             {msg.isTypewriting && currentTypewritingId === msg.id ? (
                               <TypewriterText
                                 text={msg.message}
-                                style={[styles.messageText, { color: theme.text }]}
+                                style={[styles.messageText, { color: isDark ? '#ffffff' : theme.text }]}
                                 isActive={true}
                                 onComplete={() => {
                                   setCurrentTypewritingId(null);
@@ -647,7 +740,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                                 }}
                               />
                             ) : (
-                              <Text style={[styles.messageText, { color: theme.text }]}>
+                              <Text style={[styles.messageText, { color: isDark ? '#ffffff' : theme.text }]}>
                                 {msg.message}
                               </Text>
                             )}
@@ -670,9 +763,9 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
 
                 {/* Recording Indicator */}
                 {isRecording && (
-                  <View style={styles.recordingIndicator}>
+                  <View style={[styles.recordingIndicator, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }]}>
                     <LinearGradient
-                      colors={['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.08)']}
+                      colors={isDark ? ['rgba(239, 68, 68, 0.25)', 'rgba(239, 68, 68, 0.15)'] : ['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.08)']}
                       style={styles.recordingIndicatorContent}
                     >
                       <View style={styles.recordingIconContainer}>
@@ -692,7 +785,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                 {/* Input Area */}
                 <View style={[styles.inputContainer, { 
                   backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                  borderColor: isDark ? 'rgba(74, 222, 128, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                  borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
                   marginBottom: keyboardHeight > 0 ? keyboardHeight - insets.bottom : 0,
                 }]}>
                     <TouchableOpacity 
@@ -830,12 +923,12 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
             {/* Minimized Bar */}
             {isCollapsed && (
               <TouchableOpacity 
-                style={styles.minimizedBar}
+                style={[styles.minimizedBar, { backgroundColor: isDark ? 'rgba(74, 222, 128, 0.1)' : 'rgba(34, 197, 94, 0.1)' }]}
                 onPress={toggleCollapse}
                 activeOpacity={0.8}
               >
                 <Text style={styles.minimizedText}>Tap to continue conversation</Text>
-                <Ionicons name="chatbubble-ellipses" size={20} color="#FFFFFF" />
+                <Ionicons name="chatbubble-ellipses" size={20} color="#4ade80" />
               </TouchableOpacity>
             )}
           </View>
@@ -860,7 +953,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: '#000',
@@ -924,6 +1016,14 @@ const styles = StyleSheet.create({
   },
   collapseButton: {
     padding: 4,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  newChatButton: {
+    padding: 4,
+    marginRight: 8,
   },
   chatContainer: {
     flex: 1,
@@ -995,7 +1095,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
   },
   voiceButtonContainer: {
     marginRight: 12,
@@ -1092,7 +1191,7 @@ const styles = StyleSheet.create({
   },
   minimizedText: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: '#4ade80',
     fontWeight: '500',
   },
   recordingIndicator: {
@@ -1191,5 +1290,14 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 16,
+  },
+  continuationIndicator: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  continuationText: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

@@ -144,6 +144,7 @@ export default function SubscriptionModal({
       await setPremiumStatus(true);
       await soundEffects.playPremiumUnlockedSound().catch(()=>{});
       gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
+      gamificationEvents.emit('SUBSCRIPTION_UPDATED'); // Ensure HomeHeader updates immediately
       await refreshPremiumStatus?.(); refreshAccess?.(); refreshData?.(); refreshTheme?.();
       
       // Handle Settings upgrade UI feedback
