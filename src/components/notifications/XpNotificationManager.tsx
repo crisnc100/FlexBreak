@@ -12,10 +12,13 @@ const NOTIFIED_ACHIEVEMENTS_KEY = 'notifiedAchievements';
 interface XpNotificationManagerProps {
   // Controls whether to show level-up notifications when already shown in the routine screen
   showLevelUpInRoutine?: boolean;
+  // Controls whether to show achievement notifications (useful when achievements are shown elsewhere)
+  showAchievementNotifications?: boolean;
 }
 
 const XpNotificationManager: React.FC<XpNotificationManagerProps> = ({ 
-  showLevelUpInRoutine = true 
+  showLevelUpInRoutine = true,
+  showAchievementNotifications = true
 }) => {
   const { 
     recentlyUnlockedAchievements,
@@ -48,43 +51,46 @@ const XpNotificationManager: React.FC<XpNotificationManagerProps> = ({
   // Process newly unlocked achievements
   useEffect(() => {
     if (recentlyUnlockedAchievements && recentlyUnlockedAchievements.length > 0) {
-      // Filter out achievements that have already been notified
-      const newAchievements = recentlyUnlockedAchievements.filter(
-        achievement => !notifiedAchievements.includes(achievement.id)
-      );
-      
-      if (newAchievements.length > 0) {
-        // Update local state with new notifications
-        setNotifications(prev => [
-          ...prev,
-          ...newAchievements.map(achievement => ({
-            id: `achievement_${achievement.id}_${Date.now()}`,
-            type: 'achievement',
-            data: achievement
-          }))
-        ]);
+      // Only show achievement notifications if enabled
+      if (showAchievementNotifications) {
+        // Filter out achievements that have already been notified
+        const newAchievements = recentlyUnlockedAchievements.filter(
+          achievement => !notifiedAchievements.includes(achievement.id)
+        );
         
-        // Mark these achievements as notified
-        const updatedNotifiedAchievements = [
-          ...notifiedAchievements,
-          ...newAchievements.map(a => a.id)
-        ];
-        
-        setNotifiedAchievements(updatedNotifiedAchievements);
-        
-        // Save to AsyncStorage
-        AsyncStorage.setItem(
-          NOTIFIED_ACHIEVEMENTS_KEY, 
-          JSON.stringify(updatedNotifiedAchievements)
-        ).catch(error => {
-          console.error('Error saving notified achievements:', error);
-        });
+        if (newAchievements.length > 0) {
+          // Update local state with new notifications
+          setNotifications(prev => [
+            ...prev,
+            ...newAchievements.map(achievement => ({
+              id: `achievement_${achievement.id}_${Date.now()}`,
+              type: 'achievement',
+              data: achievement
+            }))
+          ]);
+          
+          // Mark these achievements as notified
+          const updatedNotifiedAchievements = [
+            ...notifiedAchievements,
+            ...newAchievements.map(a => a.id)
+          ];
+          
+          setNotifiedAchievements(updatedNotifiedAchievements);
+          
+          // Save to AsyncStorage
+          AsyncStorage.setItem(
+            NOTIFIED_ACHIEVEMENTS_KEY, 
+            JSON.stringify(updatedNotifiedAchievements)
+          ).catch(error => {
+            console.error('Error saving notified achievements:', error);
+          });
+        }
       }
       
-      // Dismiss the notifications in the gamification system
+      // Always dismiss the notifications in the gamification system to prevent duplication
       dismissNotifications();
     }
-  }, [recentlyUnlockedAchievements, notifiedAchievements, dismissNotifications]);
+  }, [recentlyUnlockedAchievements, notifiedAchievements, dismissNotifications, showAchievementNotifications]);
   
   // Add a mechanism to track notification groups by source more robustly
   const isNotificationDuplicate = (type: string, data: any): boolean => {

@@ -206,7 +206,7 @@ export class ConversationManager {
     isFollowUp: boolean;
   }> {
     const session = await this.getOrCreateSession(userId);
-    const recentMessages = session.messages.slice(-5);
+    const recentMessages = session.messages.slice(-10); // Get more messages for better context
     
     // Get current sentiment from last user message
     const lastUserMessage = [...session.messages].reverse().find(m => m.role === 'user');

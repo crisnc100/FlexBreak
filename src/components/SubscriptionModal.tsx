@@ -25,7 +25,6 @@ import { useFeatureAccess, PREMIUM_STATUS_CHANGED } from '../hooks/progress/useF
 import { useGamification } from '../hooks/progress/useGamification';
 import { useTheme } from '../context/ThemeContext';
 import { gamificationEvents } from '../hooks/progress/useGamification';
-import { ZeroBounceVerificationService } from '../services/zeroBounceVerificationService';
 import { oneTimeCodeService } from '../services/oneTimeCodeService';
 
 
@@ -67,9 +66,7 @@ export default function SubscriptionModal({
   
   // Verification flow state
   const [showVerificationForm, setShowVerificationForm] = useState(false);
-  const [verificationEmail, setVerificationEmail] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [showCodeInput, setShowCodeInput] = useState(false);
   const [oneTimeCode, setOneTimeCode] = useState('');
 
   /* Check verification status */
@@ -78,18 +75,20 @@ export default function SubscriptionModal({
     
     const checkVerificationStatus = async () => {
       try {
-        const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
+        // Check if user has a verification code status
+        const codeStatus = await AsyncStorage.getItem('@flexbreak:verification_status');
+        const userType = await AsyncStorage.getItem('@flexbreak:user_type');
         
-        setVerificationStatus(verificationData.isVerified ? 'verified' : null);
-        setUserType(verificationData.userType || null);
+        setVerificationStatus(codeStatus === 'verified' ? 'verified' : null);
+        setUserType(userType || null);
         
         // Show verification promo if not verified and not premium
-        const shouldShowPromo = !verificationData.isVerified && !isPremium;
+        const shouldShowPromo = codeStatus !== 'verified' && !isPremium;
         setShowVerificationPromo(shouldShowPromo);
         
         console.log('[SubscriptionModal] Verification check:', {
-          isVerified: verificationData.isVerified,
-          userType: verificationData.userType,
+          isVerified: codeStatus === 'verified',
+          userType,
           isPremium,
           showVerificationPromo: shouldShowPromo
         });
@@ -284,124 +283,6 @@ export default function SubscriptionModal({
     setBusy(false); onClose();
   };
 
-  // Handle verification submission
-  const handleVerificationSubmit = async () => {
-    if (!verificationEmail.trim()) {
-      Alert.alert('Missing Email', 'Please enter your work email address.');
-      return;
-    }
-
-    if (!verificationEmail.includes('@') || !verificationEmail.includes('.')) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
-
-    setIsVerifying(true);
-    console.log('[SubscriptionModal] Starting verification for:', verificationEmail);
-
-    try {
-      const result = await ZeroBounceVerificationService.verifyOfficeWorkerEmail(verificationEmail.trim());
-      console.log('[SubscriptionModal] Verification result received:', result);
-      
-      setIsVerifying(false);
-
-      switch (result.status) {
-        case 'approved':
-          console.log('[SubscriptionModal] Processing approved verification');
-          // Store verification locally
-          await ZeroBounceVerificationService.markEmailAsUsed(result.details.email);
-          
-          Alert.alert(
-            '✅ Verification Successful!',
-            result.message + '\n\nYour 60% discount is now active!',
-            [{ 
-              text: 'Great!', 
-              onPress: () => {
-                console.log('[SubscriptionModal] User acknowledged verification success');
-                setShowVerificationForm(false);
-                setVerificationEmail('');
-                // Refresh verification status to show discount
-                const refreshVerification = async () => {
-                  console.log('[SubscriptionModal] Refreshing verification status...');
-                  const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
-                  setVerificationStatus(verificationData.isVerified ? 'verified' : null);
-                  setUserType(verificationData.userType || null);
-                  setShowVerificationPromo(false);
-                  console.log('[SubscriptionModal] Verification status refreshed:', verificationData);
-                  
-                  // Force refresh products to get discounted prices
-                  console.log('[SubscriptionModal] Triggering product refresh for discounted prices...');
-                  setProducts(null); // Clear products to trigger reload
-                };
-                refreshVerification();
-              }
-            }]
-          );
-          break;
-
-        case 'already_used':
-          Alert.alert(
-            '⚠️ Email Already Used',
-            result.message + '\n\nIf this is your email and you\'re having issues, contact: flexbreakapp@gmail.com',
-            [{ text: 'OK' }]
-          );
-          break;
-
-        case 'rejected':
-          const isPersonalEmail = result.message.includes('Personal email') || result.message.includes('work email');
-          Alert.alert(
-            '❌ Verification Failed',
-            result.message + (isPersonalEmail 
-              ? '\n\nIf this IS your work email, please contact us for manual verification and we\'ll send you a verification code.' 
-              : '\n\nFor manual verification, email flexbreakapp@gmail.com with your work details to receive a verification code.'),
-            [
-              { text: 'Try Again', style: 'cancel' },
-              { 
-                text: isPersonalEmail ? 'Contact Support' : 'Email Support', 
-                onPress: () => {
-                  const subject = 'FlexBreak Office Worker Verification Request - Code Needed';
-                  const body = isPersonalEmail 
-                    ? `Hi FlexBreak Team,\n\nI tried to verify my work email (${verificationEmail}) but it was rejected as a personal email. However, this IS my work email address.\n\nPlease send me a verification code for the 60% office worker discount.\n\nThank you!`
-                    : `Hi FlexBreak Team,\n\nI need a verification code for the 60% office worker discount.\n\nMy work email: ${verificationEmail}\nCompany: [Please fill in your company name]\nJob title: [Please fill in your job title]\n\nThank you!`;
-                  
-                  const mailto = `mailto:flexbreakapp@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                  Linking.openURL(mailto).catch(err => {
-                    console.error('Error opening email client:', err);
-                    Alert.alert('Error', 'Could not open email client. Please manually email flexbreakapp@gmail.com');
-                  });
-                }
-              }
-            ]
-          );
-          break;
-
-        case 'error':
-          Alert.alert(
-            '⚠️ Service Unavailable',
-            result.message,
-            [{ text: 'Try Again' }]
-          );
-          break;
-
-        default:
-          console.warn('[SubscriptionModal] Unexpected verification result status:', result.status);
-          Alert.alert(
-            'Unexpected Result',
-            'Verification completed but with unexpected status. Please contact support.',
-            [{ text: 'OK' }]
-          );
-          break;
-      }
-    } catch (error) {
-      console.error('[SubscriptionModal] Verification error:', error);
-      setIsVerifying(false);
-      Alert.alert(
-        'Error',
-        'Something went wrong during verification. Please try again.',
-        [{ text: 'Try Again' }]
-      );
-    }
-  };
 
   // Handle one-time code submission
   const handleCodeSubmit = async () => {
@@ -410,16 +291,11 @@ export default function SubscriptionModal({
       return;
     }
 
-    if (!verificationEmail.trim() || !verificationEmail.includes('@')) {
-      Alert.alert('Missing Email', 'Please enter a valid email address.');
-      return;
-    }
-
     setIsVerifying(true);
     console.log('[SubscriptionModal] Attempting one-time code verification');
 
     try {
-      const result = await oneTimeCodeService.redeemCode(oneTimeCode.trim(), verificationEmail.trim());
+      const result = await oneTimeCodeService.redeemCode(oneTimeCode.trim(), '');
       
       setIsVerifying(false);
 
@@ -433,10 +309,8 @@ export default function SubscriptionModal({
               text: 'Awesome!', 
               onPress: async () => {
                 console.log('[SubscriptionModal] Free premium code redeemed successfully');
-                setShowCodeInput(false);
                 setShowVerificationForm(false);
                 setOneTimeCode('');
-                setVerificationEmail('');
                 
                 // Close the modal and refresh premium status
                 await refreshPremiumStatus();
@@ -462,18 +336,19 @@ export default function SubscriptionModal({
               text: 'Great!', 
               onPress: async () => {
                 console.log('[SubscriptionModal] Code verification successful');
-                setShowCodeInput(false);
                 setShowVerificationForm(false);
                 setOneTimeCode('');
-                setVerificationEmail('');
                 
                 // Store verification locally (one-time code already stores in Firebase)
-                await ZeroBounceVerificationService.markEmailAsUsed(verificationEmail.trim());
+                // Store verification status locally
+                await AsyncStorage.setItem('@flexbreak:verification_status', 'verified');
+                await AsyncStorage.setItem('@flexbreak:user_type', 'discounted');
+                await AsyncStorage.setItem('@flexbreak:verification_date', new Date().toISOString());
                 
                 // Refresh verification status
-                const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
-                setVerificationStatus(verificationData.isVerified ? 'verified' : null);
-                setUserType(verificationData.userType || null);
+                //const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
+                //setVerificationStatus(verificationData.isVerified ? 'verified' : null);
+                //setUserType(verificationData.userType || null);
                 setShowVerificationPromo(false);
                 
                 // Force refresh products to get discounted prices
@@ -536,8 +411,8 @@ export default function SubscriptionModal({
       return {
         icon: 'checkmark-circle',
         color: '#4CAF50',
-        title: '60% Discount Active!',
-        subtitle: 'Your verification is approved'
+        title: 'Discount Active!',
+        subtitle: 'Your special pricing is applied'
       };
     }
     if (verificationStatus === 'pending') {
@@ -545,15 +420,15 @@ export default function SubscriptionModal({
         icon: 'time',
         color: '#FF9500',
         title: 'Verification Under Review',
-        subtitle: 'You\'ll get 60% off when approved'
+        subtitle: 'You\'ll get discount when approved'
       };
     }
     if (showVerificationPromo) {
       return {
         icon: 'gift',
         color: '#007AFF',
-        title: 'Office Workers',
-        subtitle: 'Get 60% off with quick verification!'
+        title: 'Special Discount Available',
+        subtitle: 'Enter a code for discounted pricing'
       };
     }
     return null;
@@ -608,7 +483,7 @@ export default function SubscriptionModal({
           {isVerified && (
             <View style={styles.featureRow}>
               <Ionicons name="pricetag" size={16} color="#4CAF50" />
-              <Text style={styles.featureText}>60% Office Worker Discount Applied!</Text>
+              <Text style={styles.featureText}>Special Discount Applied!</Text>
             </View>
           )}
           <View style={styles.featureRow}>
@@ -675,16 +550,16 @@ export default function SubscriptionModal({
               </View>
             )}
 
-            {/* Verification Form */}
+            {/* Direct to code input when Verify button is clicked */}
             {showVerificationForm && (
               <View style={styles.verificationForm}>
                 <View style={styles.verificationFormHeader}>
-                  <Ionicons name="mail" size={24} color="#2196F3" />
-                  <Text style={styles.verificationFormTitle}>Enter Work Email</Text>
+                  <Ionicons name="key" size={24} color="#2196F3" />
+                  <Text style={styles.verificationFormTitle}>Enter Verification Code</Text>
                   <TouchableOpacity 
                     onPress={() => {
                       setShowVerificationForm(false);
-                      setVerificationEmail('');
+                      setOneTimeCode('');
                       setIsVerifying(false);
                     }}
                     style={styles.verificationFormClose}
@@ -694,150 +569,60 @@ export default function SubscriptionModal({
                 </View>
                 
                 <Text style={styles.verificationFormSubtitle}>
-                  Use your official company or business email address
+                  Enter your discount code to activate special pricing
                 </Text>
 
                 <TextInput
-                  style={styles.verificationEmailInput}
-                  placeholder="john@company.com"
-                  value={verificationEmail}
-                  onChangeText={setVerificationEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
+                  style={[styles.verificationEmailInput, styles.codeInput]}
+                  placeholder="Enter code"
+                  value={oneTimeCode}
+                  onChangeText={setOneTimeCode}
+                  autoCapitalize="characters"
                   autoCorrect={false}
                   autoFocus={true}
                   editable={!isVerifying}
                 />
 
                 <View style={styles.verificationFormInfo}>
-                  <Text style={styles.verificationInfoText}>✓ Personal emails (Gmail, Yahoo) are not eligible</Text>
-                  <Text style={styles.verificationInfoText}>✓ Each email can only be used once</Text>
-                  <Text style={styles.verificationInfoText}>✓ Instant verification for most business domains</Text>
-                </View>
-
-                <TouchableOpacity 
-                  style={[
-                    styles.verificationSubmitButton, 
-                    (!verificationEmail.trim() || isVerifying) && styles.verificationSubmitButtonDisabled
-                  ]}
-                  onPress={handleVerificationSubmit}
-                  disabled={!verificationEmail.trim() || isVerifying}
-                >
-                  {isVerifying ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.verificationSubmitButtonText}>
-                      Verify Email
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Add "Have a code?" link */}
-                <TouchableOpacity 
-                  onPress={() => {
-                    setShowCodeInput(true);
-                    setShowVerificationForm(false);
-                  }}
-                  style={styles.codeLink}
-                >
-                  <Text style={styles.codeLinkText}>Have a verification code?</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* One-Time Code Input Form */}
-            {showCodeInput && (
-              <View style={styles.verificationForm}>
-                <View style={styles.verificationFormHeader}>
-                  <Ionicons name="key" size={24} color="#4CAF50" />
-                  <Text style={styles.verificationFormTitle}>Enter Verification Code</Text>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      setShowCodeInput(false);
-                      setOneTimeCode('');
-                      setVerificationEmail('');
-                      setIsVerifying(false);
-                    }}
-                    style={styles.verificationFormClose}
-                  >
-                    <Ionicons name="close" size={20} color="#666" />
-                  </TouchableOpacity>
-                </View>
-                
-                <Text style={styles.verificationFormSubtitle}>
-                  Enter the verification code provided by FlexBreak support
-                </Text>
-
-                <TextInput
-                  style={styles.verificationEmailInput}
-                  placeholder="Your email address"
-                  value={verificationEmail}
-                  onChangeText={setVerificationEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!isVerifying}
-                />
-
-                <TextInput
-                  style={[styles.verificationEmailInput, styles.codeInput]}
-                  placeholder="FLEX-XXXXXXXX"
-                  value={oneTimeCode}
-                  onChangeText={(text) => {
-                    // Auto-format code as FLEX-XXXXXXXX
-                    const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                    
-                    if (cleaned.startsWith('FLEX')) {
-                      // If they typed FLEX, add the dash and remaining characters
-                      const remaining = cleaned.slice(4, 12); // Take next 8 characters
-                      setOneTimeCode(remaining.length > 0 ? `FLEX-${remaining}` : 'FLEX-');
-                    } else {
-                      // If they didn't type FLEX, assume they're entering just the numbers
-                      const numbers = cleaned.slice(0, 8);
-                      setOneTimeCode(numbers.length > 0 ? `FLEX-${numbers}` : '');
-                    }
-                  }}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  maxLength={13} // FLEX-XXXXXXXX
-                  editable={!isVerifying}
-                />
-
-                <View style={styles.verificationFormInfo}>
-                  <Text style={styles.verificationInfoText}>✓ Codes are valid for 7 days</Text>
+                  <Text style={styles.verificationInfoText}>✓ Codes provide discounts or free premium access</Text>
                   <Text style={styles.verificationInfoText}>✓ Each code can only be used once</Text>
-                  <Text style={styles.verificationInfoText}>✓ Contact support if you need a new code</Text>
+                  <Text style={styles.verificationInfoText}>✓ Contact support if you need a code</Text>
                 </View>
 
                 <TouchableOpacity 
                   style={[
                     styles.verificationSubmitButton, 
-                    (!oneTimeCode.trim() || !verificationEmail.trim() || isVerifying) && styles.verificationSubmitButtonDisabled
+                    (!oneTimeCode.trim() || isVerifying) && styles.verificationSubmitButtonDisabled
                   ]}
                   onPress={handleCodeSubmit}
-                  disabled={!oneTimeCode.trim() || !verificationEmail.trim() || isVerifying}
+                  disabled={!oneTimeCode.trim() || isVerifying}
                 >
                   {isVerifying ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <Text style={styles.verificationSubmitButtonText}>
-                      Verify Code
+                      Apply Code
                     </Text>
                   )}
                 </TouchableOpacity>
 
-                {/* Link back to email verification */}
+                {/* Contact support link */}
                 <TouchableOpacity 
                   onPress={() => {
-                    setShowCodeInput(false);
-                    setShowVerificationForm(true);
+                    const mailto = `mailto:flexbreakapp@gmail.com?subject=${encodeURIComponent('Request for Discount Code')}&body=${encodeURIComponent('Hi FlexBreak Team,\n\nI would like to request a discount code for FlexBreak Premium.\n\nThank you!')}`;
+                    Linking.openURL(mailto).catch(err => {
+                      console.error('Error opening email client:', err);
+                      Alert.alert('Error', 'Could not open email client. Please manually email flexbreakapp@gmail.com');
+                    });
                   }}
                   style={styles.codeLink}
                 >
-                  <Text style={styles.codeLinkText}>Try email verification instead</Text>
+                  <Text style={styles.codeLinkText}>Contact support for a code</Text>
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* Removed duplicate code input form - now merged with verification form above */}
 
             {products === null ? (
               <ActivityIndicator size="large" style={{marginVertical: 40}}/>

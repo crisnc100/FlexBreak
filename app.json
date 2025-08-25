@@ -51,7 +51,14 @@
           "sounds": ["./assets/sounds/AInotification1.mp3"]
         }
       ],
-      "./plugins/withSiriShortcuts"
+      "./plugins/withSiriShortcuts",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9873959079273159~5503902608",
+          "iosAppId": "ca-app-pub-9873959079273159~5503902608"
+        }
+      ]
     ],
     "extra": {
       "eas": {

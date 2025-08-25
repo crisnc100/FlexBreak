@@ -19,7 +19,7 @@ export interface OneTimeCode {
   usedAt?: string;
   createdBy: string; // Admin who created it
   notes?: string; // Optional notes about why this was issued
-  type?: 'discount' | 'free_premium'; // Type of code - discount gives 60% off, free_premium gives full access
+  type?: 'discount' | 'free_premium'; // Type of code - discount gives special pricing, free_premium gives full access
   duration?: number; // For free_premium codes - duration in days (e.g., 365 for 1 year)
 }
 

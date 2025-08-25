@@ -139,6 +139,7 @@ export async function getNotificationSummary(): Promise<Record<NotificationType,
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     const summary: Record<NotificationType, number> = {
       [NotificationType.MOTIVATIONAL]: 0,
+      [NotificationType.WEATHER_MOTIVATIONAL]: 0,
       [NotificationType.AI_WELLNESS]: 0,
       [NotificationType.REMINDER]: 0,
       [NotificationType.PREMIUM_REMINDER]: 0,
@@ -173,6 +174,7 @@ export async function scheduleTypedNotification(
   const typeString = type === NotificationType.AI_WELLNESS ? 'ai_wellness_checkin' :
                      type === NotificationType.UPGRADE_PROMPT ? 'ai_wellness_upgrade' :
                      type === NotificationType.MOTIVATIONAL ? 'motivational_message' :
+                     type === NotificationType.WEATHER_MOTIVATIONAL ? 'weather_motivational' :
                      type === NotificationType.REMINDER ? 'scheduled_reminder' :
                      type === NotificationType.PREMIUM_REMINDER ? 'premium_reminder' :
                      type;

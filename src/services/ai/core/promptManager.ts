@@ -193,8 +193,8 @@ export class PromptManager {
       contextParts.push(context.userContext.appContext);
     }
     
-    // Add conversation history if this is a follow-up
-    if (context.isFollowUp && context.conversationHistory.length > 0) {
+    // Add conversation history if available
+    if (context.conversationHistory.length > 0) {
       const recentExchange = this.formatRecentExchange(context.conversationHistory, language);
       contextParts.push(`CONVERSATION CONTEXT:\n${recentExchange}`);
     }
@@ -232,7 +232,7 @@ export class PromptManager {
   }
   
   private formatRecentExchange(messages: ConversationMessage[], language: string): string {
-    const recent = messages.slice(-4); // Last 2 exchanges
+    const recent = messages.slice(-6); // Last 3 exchanges (6 messages = 3 user + 3 assistant)
     const formatted = recent.map(msg => {
       const role = msg.role === 'user' ? this.getUserLabel(language) : this.getAssistantLabel(language);
       return `${role}: ${msg.content}`;

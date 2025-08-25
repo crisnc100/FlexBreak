@@ -419,7 +419,15 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     setIsLoading(true);
     try {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-      const result = await aiWellnessService.processWellnessCheckIn(messageText, userId);
+      // Pass conversation history to AI service for context
+      // Limit to last 10 messages to prevent token overflow
+      const recentMessages = messages.slice(-10);
+      const result = await aiWellnessService.processWellnessCheckIn(
+        messageText, 
+        userId,
+        false, // isNotification
+        recentMessages // Pass the recent conversation history
+      );
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

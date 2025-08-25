@@ -27,6 +27,7 @@ import * as storageService from '../services/storageService';
 import * as achievementService from '../utils/progress/modules/achievementManager';
 import { useUpdateNotification } from '../components/UpdateNotificationModal';
 import updateService from '../services/updateService';
+import AdService from '../services/adService';
 
 const { width } = Dimensions.get('window');
 
@@ -90,6 +91,9 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
       }
     };
     loadBadgeCount();
+    
+    // Notify AdService when settings is opened
+    AdService.onSettingsOpened();
   }, []);
 
   // Handle sound effects toggle

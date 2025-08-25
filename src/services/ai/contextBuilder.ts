@@ -170,23 +170,60 @@ export const detectLanguage = (input: string, googleLang?: string): 'en' | 'es' 
     return 'zh';
   }
   
-  // Priority 2: Spanish indicators (check before trusting Google)
-  const spanishWords = [
-    'hola', 'buenos', 'buenas', 'días', 'tardes', 'noches',
-    'como', 'está', 'estoy', 'siento', 'tengo', 'dolor',
-    'cansado', 'cansada', 'bien', 'mal', 'gracias',
-    'duele', 'espalda', 'cuello', 'estómago', 'cabeza',
-    'estrés', 'ansioso', 'fatiga', 'ejercicio', 'caminar'
-  ];
-  
-  const spanishPatterns = /\b(qué|cómo|cuándo|dónde|por qué|está|estoy|tengo|duele|me siento)\b/i;
-  
-  if (spanishPatterns.test(lowerInput) || 
-      spanishWords.some(word => lowerInput.includes(word))) {
-    return 'es';
+  // Priority 2: If Google detected a language, verify and trust it
+  if (googleLang) {
+    console.log(`Language Detection: Google detected ${googleLang}`);
+    
+    // Define language indicators with word boundaries to avoid partial matches
+    const englishWords = [
+      'hi', 'hello', 'hey', 'good', 'morning', 'afternoon', 'evening',
+      'my', 'neck', 'back', 'pain', 'hurt', 'sore', 'tired', 'stress',
+      'help', 'feel', 'feeling', 'better', 'worse', 'thanks', 'thank',
+      'yes', 'no', 'okay', 'fine', 'great', 'bad', 'leg', 'arm',
+      'had', 'lot', 'pizza', 'night', 'should', 'work', 'hard', 'next',
+      'day', 'just', 'follow', 'normal', 'diet', 'exercise', 'workout'
+    ];
+    
+    const spanishWords = [
+      'hola', 'buenos', 'buenas', 'días', 'tardes', 'noches',
+      'como', 'está', 'estoy', 'siento', 'tengo', 'dolor',
+      'cansado', 'cansada', 'bien', 'mal', 'gracias',
+      'duele', 'espalda', 'cuello', 'estómago', 'cabeza',
+      'estrés', 'ansioso', 'fatiga', 'ejercicio', 'caminar',
+      'ayuda', 'mejor', 'peor', 'mucho', 'poco'
+    ];
+    
+    // Count word matches using word boundaries
+    const englishMatches = englishWords.filter(word => 
+      new RegExp(`\\b${word}\\b`, 'i').test(lowerInput)
+    ).length;
+    
+    const spanishMatches = spanishWords.filter(word => 
+      new RegExp(`\\b${word}\\b`, 'i').test(lowerInput)
+    ).length;
+    
+    // Spanish question patterns
+    const spanishPatterns = /\b(qué|cómo|cuándo|dónde|por qué|está|estoy|tengo|duele|me siento)\b/i;
+    const hasSpanishPattern = spanishPatterns.test(lowerInput);
+    
+    // If Google says English and we have English words, trust it
+    if (googleLang.startsWith('en') && englishMatches > 0) {
+      return 'en';
+    }
+    
+    // If Google says Spanish and we have Spanish indicators, trust it
+    if (googleLang.startsWith('es') && (spanishMatches > 0 || hasSpanishPattern)) {
+      return 'es';
+    }
+    
+    // If Google says Chinese but no Chinese chars, check if it's actually English/Spanish
+    if ((googleLang.startsWith('zh') || googleLang.startsWith('cmn')) && 
+        (englishMatches === 0 && spanishMatches === 0)) {
+      return 'zh';
+    }
   }
   
-  // Priority 3: English indicators (common wellness-related words)
+  // Priority 3: Count indicators for each language (when no Google detection)
   const englishWords = [
     'hi', 'hello', 'hey', 'good', 'morning', 'afternoon', 'evening',
     'my', 'neck', 'back', 'pain', 'hurt', 'sore', 'tired', 'stress',
@@ -194,28 +231,33 @@ export const detectLanguage = (input: string, googleLang?: string): 'en' | 'es' 
     'yes', 'no', 'okay', 'fine', 'great', 'bad', 'leg', 'arm'
   ];
   
-  const hasEnglishWords = englishWords.some(word => lowerInput.includes(word));
+  const spanishWords = [
+    'hola', 'buenos', 'buenas', 'días', 'tardes', 'noches',
+    'como', 'está', 'estoy', 'siento', 'tengo', 'dolor',
+    'cansado', 'cansada', 'bien', 'mal', 'gracias',
+    'duele', 'espalda', 'cuello', 'estómago', 'cabeza'
+  ];
   
-  // Priority 4: Google Speech API detection (only trust if content matches)
-  if (googleLang) {
-    // Verify Google's detection against actual content
-    if (googleLang.startsWith('zh') || googleLang.startsWith('cmn')) {
-      // Only trust Chinese detection if there are actual Chinese characters
-      // or if there are no clear English/Spanish words
-      if (!hasEnglishWords && !spanishWords.some(word => lowerInput.includes(word))) {
-        return 'zh';
-      }
-    }
-    
-    if (googleLang.startsWith('es') && 
-        (spanishPatterns.test(lowerInput) || spanishWords.some(word => lowerInput.includes(word)))) {
-      return 'es';
-    }
-    
-    // For English, trust Google if there are English words present
-    if (googleLang.startsWith('en') && hasEnglishWords) {
-      return 'en';
-    }
+  const englishScore = englishWords.filter(word => 
+    new RegExp(`\\b${word}\\b`, 'i').test(lowerInput)
+  ).length;
+  
+  const spanishScore = spanishWords.filter(word => 
+    new RegExp(`\\b${word}\\b`, 'i').test(lowerInput)
+  ).length;
+  
+  // Spanish patterns for questions
+  const spanishPatterns = /\b(qué|cómo|cuándo|dónde|por qué|está|estoy|tengo|duele|me siento)\b/i;
+  const hasSpanishPattern = spanishPatterns.test(lowerInput);
+  
+  // Need at least 2 Spanish words OR 1 Spanish pattern + 1 Spanish word
+  if (spanishScore >= 2 || (hasSpanishPattern && spanishScore >= 1)) {
+    return 'es';
+  }
+  
+  // If we have any English words, return English
+  if (englishScore > 0) {
+    return 'en';
   }
   
   // Default to English

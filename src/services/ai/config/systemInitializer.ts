@@ -213,14 +213,10 @@ class AISystemInitializer {
       
       console.log(`Found ${existingAINotifications.length} existing AI notifications`);
       
-      // Only schedule if we don't have the right number of notifications
-      const expectedCount = isPremium ? 7 : 1; // 7 daily for premium, 1 weekly for free
-      
-      if (existingAINotifications.length < expectedCount) {
-        console.log(`Only ${existingAINotifications.length} AI notifications found, expecting ${expectedCount}. Scheduling...`);
-        
-        // Clean up partial schedules
-        await cleanupAllAINotifications();
+      // Only schedule if there are NO notifications at all
+      // This prevents duplicates when some notifications have fired but others remain
+      if (existingAINotifications.length === 0) {
+        console.log(`No AI notifications found. Scheduling ${isPremium ? 'daily' : 'weekly'} check-ins...`);
         
         // Schedule fresh
         await scheduleRegularCheckIns(isPremium, userId);
@@ -229,7 +225,27 @@ class AISystemInitializer {
         // Mark as scheduled
         markScheduled('ai_wellness_startup');
       } else {
-        console.log(`AI notifications already properly scheduled (${existingAINotifications.length} found), skipping`);
+        // Check if the existing notifications are still valid (not expired)
+        const now = Date.now();
+        const validNotifications = existingAINotifications.filter(n => {
+          const trigger = n.trigger as any;
+          if (trigger?.date) {
+            return new Date(trigger.date).getTime() > now;
+          } else if (trigger?.type === 'timeInterval' && trigger.seconds) {
+            // For time interval triggers, check if they're scheduled for the future
+            return trigger.seconds > 0;
+          }
+          return true;
+        });
+        
+        if (validNotifications.length === 0) {
+          console.log('All existing AI notifications have expired, rescheduling...');
+          await cleanupAllAINotifications();
+          await scheduleRegularCheckIns(isPremium, userId);
+          markScheduled('ai_wellness_startup');
+        } else {
+          console.log(`${validNotifications.length} valid AI notifications already scheduled, skipping`);
+        }
       }
     } catch (error) {
       console.error('Error initializing AI wellness notifications:', error);

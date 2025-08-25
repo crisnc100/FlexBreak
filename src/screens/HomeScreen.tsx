@@ -48,7 +48,6 @@ import {
   TimeRewind,
   Vortex
 } from '../components/home';
-import DiscountBanner from '../components/DiscountBanner';
 import TryPremiumBanner from '../components/TryPremiumBanner';
 import * as notifications from '../utils/notifications';
 import * as firebaseReminders from '../utils/firebaseReminders';
@@ -59,6 +58,9 @@ import { generateDeskBreakBoostRoutine, isDeskBreakBoostAvailable } from '../uti
 import * as Device from 'expo-device';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import { BannerAdComponent } from '../components/ads/BannerAdComponent';
+import { DailyQuoteReward } from '../components/ads/DailyQuoteReward';
+import AdService from '../services/adService';
 
 const { height, width } = Dimensions.get('window');
 
@@ -91,6 +93,8 @@ export default function HomeScreen() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [dailyTip, setDailyTip] = useState(tips[0]);
+  const [dailyQuote, setDailyQuote] = useState<{ text: string; author: string } | null>(null);
+  const [hasReturnedFromRoutine, setHasReturnedFromRoutine] = useState(false);
   const { canAccessFeature, meetsLevelRequirement, getRequiredLevel, getUserLevel, refreshAccess } = useFeatureAccess();
   const { theme, isDark, isSunset } = useTheme();
 
@@ -226,19 +230,64 @@ export default function HomeScreen() {
       handleRefreshRef.current();
     };
     
+    const handleRoutineCompleted = () => {
+      console.log('ROUTINE_COMPLETED event received in HomeScreen');
+      setHasReturnedFromRoutine(true);
+    };
+    
     // Add event listeners
     gamificationEvents.on(LEVEL_UP_EVENT, handleLevelUp);
     gamificationEvents.on(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
     gamificationEvents.on(XP_UPDATED_EVENT, handleXpUpdate);
+    gamificationEvents.on('ROUTINE_COMPLETED', handleRoutineCompleted);
     
     // Clean up event listeners
     return () => {
       gamificationEvents.off(LEVEL_UP_EVENT, handleLevelUp);
       gamificationEvents.off(REWARD_UNLOCKED_EVENT, handleRewardUnlocked);
       gamificationEvents.off(XP_UPDATED_EVENT, handleXpUpdate);
+      gamificationEvents.off('ROUTINE_COMPLETED', handleRoutineCompleted);
     };
   }, []);
   
+  
+  // Handle delayed interstitial ad after returning from routine
+  useEffect(() => {
+    if (!hasReturnedFromRoutine) return;
+    
+    // Immediately reset flag to prevent multiple triggers
+    setHasReturnedFromRoutine(false);
+    
+    // Check if we should show an interstitial ad
+    const checkAndShowAd = async () => {
+      console.log('HomeScreen: Checking if should show interstitial ad after routine...');
+      
+      // Check if AI Wellness onboarding is showing (first routine)
+      const hasSeenAIOnboarding = await AsyncStorage.getItem('@flexbreak:ai_wellness_onboarding_seen');
+      const isFirstRoutine = !hasSeenAIOnboarding;
+      
+      if (isFirstRoutine) {
+        console.log('HomeScreen: First routine, AI onboarding will show, skipping ad');
+        return;
+      }
+      
+      // Check if eligible for interstitial
+      if (AdService.shouldShowInterstitialAfterRoutine()) {
+        console.log('HomeScreen: Eligible for interstitial, waiting 3 seconds...');
+        
+        // Wait 3 seconds for user to settle back on home screen
+        setTimeout(async () => {
+          console.log('HomeScreen: Showing delayed interstitial ad now');
+          await AdService.showDelayedInterstitialAd();
+        }, 3000);
+      } else {
+        console.log('HomeScreen: Not eligible for interstitial ad');
+      }
+    };
+    
+    // Small delay to ensure mini-game popup has been handled
+    setTimeout(checkAndShowAd, 500);
+  }, [hasReturnedFromRoutine]);
   
   // Load data
   useEffect(() => {
@@ -247,6 +296,9 @@ export default function HomeScreen() {
     const loadData = async () => {
       try {
         console.log('HomeScreen: Loading reminder settings');
+
+        // Initialize AdService with premium status
+        AdService.setPremiumStatus(isPremium);
 
         // Load user level
         const level = await getUserLevel();
@@ -289,7 +341,7 @@ export default function HomeScreen() {
     return () => {
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [isPremium]);
 
   // Animation functions for dropdowns
   const openDropdown = useCallback((dropdownName: string) => {
@@ -896,16 +948,6 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <HomeHeader />
-        {/* Discount Banner for Office Workers & Students */}
-        <DiscountBanner 
-          onPress={() => {
-            openModal('subscription');
-          }}
-          onDismiss={() => {
-            // Optional: track dismissal
-            AsyncStorage.setItem('@flexbreak:discount_banner_dismissed', 'true');
-          }}
-        />
 
         {/* Try Premium Banner */}
         <TryPremiumBanner 
@@ -953,8 +995,20 @@ export default function HomeScreen() {
           onOpenSubscription={() => openModal('subscription')}
         />
 
-        {/* Daily Tip */}
-        <DailyTip tip={dailyTip.text} />
+        {/* Daily Quote Reward - Rewarded Ad */}
+        <DailyQuoteReward onQuoteUnlocked={(quote) => {
+          console.log('HomeScreen: Quote unlocked:', quote);
+          setDailyQuote(quote);
+          // Clear quote after 24 hours
+          setTimeout(() => setDailyQuote(null), 24 * 60 * 60 * 1000);
+        }} />
+
+        {/* Daily Tip / Quote */}
+        <DailyTip 
+          tip={dailyQuote ? `"${dailyQuote.text}" - ${dailyQuote.author}` : dailyTip.text} 
+          iconName={dailyQuote ? "sparkles" : "bulb-outline"}
+          iconColor={dailyQuote ? "#FFD700" : "#FF9800"}
+        />
 
         {/* Subscription Teaser - only show for non-premium users */}
         {!isPremium && <SubscriptionTeaser onPremiumPress={showPremiumModal} />}
@@ -1113,6 +1167,13 @@ export default function HomeScreen() {
           ))}
         </View>
       )}
+
+      {/* Banner Ad - Fixed at bottom */}
+      <BannerAdComponent 
+        position="bottom" 
+        showPremiumPrompt={true}
+        onOpenSubscription={() => openModal('subscription')} 
+      />
     </SafeAreaView>
   );
 }
@@ -1129,7 +1190,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 100, // Extra padding for banner ad
   },
   timeRewindContainer: {
     pointerEvents: 'none', // Allow touches to pass through to components underneath

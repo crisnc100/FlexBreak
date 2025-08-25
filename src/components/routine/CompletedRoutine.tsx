@@ -23,6 +23,7 @@ import { createThemedStyles } from '../../utils/themeUtils';
 import { useRefresh } from '../../context/RefreshContext';
 import { Toast } from 'react-native-toast-notifications';
 import { gamificationEvents } from '../../hooks/progress/useGamification';
+import AdService from '../../services/adService';
 
 import {
   CompletedRoutineProps as CompletedRoutinePropsType,
@@ -72,6 +73,11 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   /* streak: record that TODAY we finished a routine */
   useEffect(() => {
     dispatch(updateStreakStatus(true));
+    // Notify AdService about break completion for interstitial ads
+    console.log('CompletedRoutine: Notifying AdService of break completion');
+    AdService.onBreakCompleted().then(() => {
+      console.log('CompletedRoutine: AdService.onBreakCompleted() completed');
+    });
   }, [dispatch]);
 
   /* state */
@@ -253,7 +259,10 @@ const CompletedRoutine: React.FC<CompletedRoutineProps> = ({
   /* render */
   return (
     <View style={styles.container}>
-      <XpNotificationManager showLevelUpInRoutine={!showAnyLevelUp} />
+      <XpNotificationManager 
+        showLevelUpInRoutine={!showAnyLevelUp}
+        showAchievementNotifications={false}
+      />
       
       {/* Theme unlock notification */}
       {showThemeUnlock && (

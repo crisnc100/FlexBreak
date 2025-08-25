@@ -119,6 +119,10 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
       // If AI wellness is enabled, update to daily schedule
       const isEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';
       if (isEnabled) {
+        // IMPORTANT: Clean up all existing notifications first to prevent duplicates
+        await cleanupAllAINotifications();
+        console.log('Cleaned up existing AI notifications before premium upgrade');
+        
         await scheduleRegularCheckIns(true, userId);
         console.log('Updated to daily check-ins for premium user');
       }

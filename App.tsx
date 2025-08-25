@@ -35,10 +35,14 @@ import * as performance from './src/utils/performance/performance';
 import * as storageService from './src/services/storageService';
 import * as notifications from './src/utils/notifications';
 import * as firebaseReminders from './src/utils/firebaseReminders';
+import { refreshWeatherNotifications } from './src/services/notificationScheduler';
+import { updateLocationIfNeeded } from './src/services/locationService';
 // Import the console log disabler
 import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsInProduction';
 // Import video loader service
 import { videoLoaderService } from './src/services/videoLoaderService';
+// Import AdMob initialization
+import mobileAds from 'react-native-google-mobile-ads';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
 import { AIWellnessModal } from './src/components/ai/AIWellnessNotificationHandler';
@@ -125,18 +129,41 @@ export default function App() {
   // Disable console logs in production
   disableConsoleLogsInProduction();
   
+  // Initialize AdMob
+  useEffect(() => {
+    mobileAds().initialize();
+  }, []);
+  
   // Mark app start time for performance measurement
   performance.markAppStart();
   
-  // Subscribe to AppState changes for performance tracking
+  // Subscribe to AppState changes for performance tracking and weather refresh
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
+    let lastBackgroundTime: Date | null = null;
+    
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
       if (nextAppState === 'active') {
         // App came to foreground
         performance.trackAppForeground();
+        
+        // Refresh weather notifications if app was in background for more than 1 hour
+        if (lastBackgroundTime) {
+          const timeSinceBackground = Date.now() - lastBackgroundTime.getTime();
+          if (timeSinceBackground > 60 * 60 * 1000) { // 1 hour
+            try {
+              await updateLocationIfNeeded();
+              await refreshWeatherNotifications();
+              console.log('Refreshed weather notifications after extended background period');
+            } catch (error) {
+              console.error('Error refreshing weather notifications:', error);
+            }
+          }
+        }
+        lastBackgroundTime = null;
       } else if (nextAppState === 'background') {
         // App went to background
         performance.trackAppBackground();
+        lastBackgroundTime = new Date();
       }
     });
     

@@ -5,6 +5,7 @@ import { gamificationEvents } from '../hooks/progress/useGamification';
 import { PREMIUM_STATUS_CHANGED } from '../hooks/progress/useFeatureAccess';
 import * as rewardManager from '../utils/progress/modules/rewardManager';
 import * as storageService from '../services/storageService';
+import AdService from '../services/adService';
 
 export type SubscriptionDetails = {
   productId: string;
@@ -237,6 +238,9 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsPremium(status);
       console.log('Premium status updated globally:', status);
       
+      // Update AdService with new premium status
+      AdService.setPremiumStatus(status);
+      
       // Emit event for premium status change
       if (gamificationEvents) {
         gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
@@ -249,11 +253,8 @@ export const PremiumProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Handle AI Wellness Coach upgrade/downgrade
       try {
         if (status) {
-          // Check if AI wellness is already enabled and needs daily scheduling
-          const systemInitializer = (await import('../services/ai/config/systemInitializer')).default;
-          await systemInitializer.checkAndRestoreAfterUpgrade();
-          
-          // Also send the upgrade welcome message
+          // Send the upgrade welcome message and update to daily schedule
+          // This single call handles everything: cleanup, rescheduling, and welcome message
           const { scheduleAIWellnessV2 } = await import('../services/ai/scheduling/notificationScheduler');
           await scheduleAIWellnessV2('upgrade');
         } else {

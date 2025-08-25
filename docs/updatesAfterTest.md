@@ -15,6 +15,9 @@
 * Build and TEST 
    npx eas build --profile development --platform ios
 
+* Test Flight: 
+npx eas build --platform ios --profile testflight --auto-submit
+
 * Deploy
 Change buildl number in app.json
 and use this command : npx eas-cli build --platform ios --profile testflight --clear-cache --non-interactive --no-wait

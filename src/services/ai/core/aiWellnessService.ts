@@ -24,7 +24,8 @@ export class AIWellnessServiceV2 {
   async processWellnessCheckIn(
     userInput: string,
     userId?: string,
-    isNotification: boolean = false
+    isNotification: boolean = false,
+    conversationHistory?: Array<{ type: 'user' | 'ai'; message: string; timestamp: Date }>
   ): Promise<WellnessResponse> {
     try {
       // Check access and limits first (includes day restrictions and daily limits)
@@ -75,6 +76,35 @@ export class AIWellnessServiceV2 {
         ? await conversationManager.getSessionContext(userId)
         : null;
       
+      // If conversation history is provided from UI, ensure conversationManager has it
+      if (conversationHistory && conversationHistory.length > 0 && userId) {
+        // Get current session
+        const currentSession = await conversationManager.getOrCreateSession(userId);
+        
+        // Check if we need to sync (session is empty or significantly out of sync)
+        const needsSync = currentSession.messages.length === 0 || 
+                         Math.abs(currentSession.messages.length - conversationHistory.length) > 2;
+        
+        if (needsSync) {
+          console.log('[AI Service] Syncing conversation history from UI:', {
+            uiMessages: conversationHistory.length,
+            sessionMessages: currentSession.messages.length
+          });
+          
+          // Clear and rebuild session from UI history
+          await conversationManager.clearSession(userId);
+          
+          // Add all messages from UI history (excluding current input)
+          for (const msg of conversationHistory) {
+            if (msg.type === 'user' && msg.message !== userInput) {
+              await conversationManager.addMessage(userId, 'user', msg.message);
+            } else if (msg.type === 'ai') {
+              await conversationManager.addMessage(userId, 'assistant', msg.message);
+            }
+          }
+        }
+      }
+      
       // Check if this is a negative feedback scenario
       if (sessionContext && sessionContext.isFollowUp && sessionContext.currentSentiment === 'negative') {
         console.log('Detected negative feedback, generating alternative suggestion');
@@ -103,16 +133,20 @@ export class AIWellnessServiceV2 {
       
       // Build enhanced context with conversation history
       const memoryContext = await memoryService.buildContext(userId!, languageCode);
-      const conversationHistory = sessionContext?.recentMessages || [];
+      // Get updated session context after syncing with UI history
+      const updatedSessionContext = userId 
+        ? await conversationManager.getSessionContext(userId)
+        : null;
+      const conversationHistoryForPrompt = updatedSessionContext?.recentMessages || [];
       
       const enhancedPrompt = promptManager.buildEnhancedPrompt({
         userInput,
         userContext: context,
-        conversationHistory,
-        failedSuggestions: sessionContext?.failedSuggestions || [],
-        successfulSuggestions: sessionContext?.successfulSuggestions || [],
-        isFollowUp: sessionContext?.isFollowUp || false,
-        currentSentiment: sessionContext?.currentSentiment,
+        conversationHistory: conversationHistoryForPrompt,
+        failedSuggestions: updatedSessionContext?.failedSuggestions || [],
+        successfulSuggestions: updatedSessionContext?.successfulSuggestions || [],
+        isFollowUp: updatedSessionContext?.isFollowUp || false,
+        currentSentiment: updatedSessionContext?.currentSentiment,
         memoryContext
       });
       

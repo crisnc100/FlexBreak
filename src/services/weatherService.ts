@@ -13,9 +13,22 @@ export interface WeatherData {
   isDay: boolean;
 }
 
+// Forecast data interface
+export interface ForecastData {
+  date: Date;
+  weather: WeatherData;
+}
+
+export interface WeatherForecast {
+  forecasts: ForecastData[];
+  lastUpdated: number;
+}
+
 // Cache key and duration
 const WEATHER_CACHE_KEY = 'weather_cache';
+const WEATHER_FORECAST_CACHE_KEY = 'weather_forecast_cache';
 const CACHE_DURATION = 3 * 60 * 60 * 1000; // 3 hours
+const FORECAST_CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours for forecast
 
 /**
  * Get weather data for a specific location
@@ -42,6 +55,13 @@ export async function getWeatherData(lat: number, lon: number): Promise<WeatherD
     
     // Fetch fresh weather data
     console.log(`Fetching fresh weather data for ${lat}, ${lon}`);
+    
+    // Quick location check - these coordinates should be in North Carolina
+    if (lat > 35 && lat < 37 && lon > -79 && lon < -78) {
+      console.log('Location verified: North Carolina area');
+    } else {
+      console.log('Warning: Location may be incorrect');
+    }
     
     // Get API key from config
     const apiKey = OPENWEATHER_MAP_API_KEY;
@@ -198,8 +218,134 @@ export async function cleanupWeatherCache(): Promise<void> {
 export async function clearWeatherCache(): Promise<void> {
   try {
     await AsyncStorage.removeItem(WEATHER_CACHE_KEY);
+    await AsyncStorage.removeItem(WEATHER_FORECAST_CACHE_KEY);
     console.log('Weather cache cleared');
   } catch (error) {
     console.error('Error clearing weather cache:', error);
+  }
+}
+
+/**
+ * Get 5-day weather forecast for a specific location
+ * Uses the free 5-day/3-hour forecast API
+ */
+export async function getWeatherForecast(lat: number, lon: number): Promise<WeatherForecast | null> {
+  try {
+    // Check cache first
+    const cachedData = await AsyncStorage.getItem(WEATHER_FORECAST_CACHE_KEY);
+    if (cachedData) {
+      const cache = JSON.parse(cachedData);
+      const now = Date.now();
+      
+      // Return cached data if still valid and location is close enough
+      if (
+        now - cache.timestamp < FORECAST_CACHE_DURATION &&
+        Math.abs(cache.lat - lat) < 0.1 &&
+        Math.abs(cache.lon - lon) < 0.1
+      ) {
+        console.log('Using cached weather forecast data');
+        return cache.data;
+      }
+    }
+    
+    // Fetch fresh forecast data
+    console.log(`Fetching fresh weather forecast for ${lat}, ${lon}`);
+    
+    const apiKey = OPENWEATHER_MAP_API_KEY;
+    
+    if (!apiKey || apiKey === 'YOUR_OPENWEATHER_MAP_API_KEY') {
+      console.error('OpenWeatherMap API key not configured');
+      return null;
+    }
+    
+    // Using 5-day forecast API (free tier)
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/2.5/forecast`,
+      {
+        params: {
+          lat,
+          lon,
+          appid: apiKey,
+          units: 'imperial', // For Fahrenheit
+          cnt: 40 // Get all 40 data points (5 days * 8 three-hour periods)
+        },
+        timeout: 10000 // 10 second timeout
+      }
+    );
+    
+    const data = response.data;
+    
+    // Group forecasts by day and get the max temp for each day
+    const dailyForecasts = new Map<string, any>();
+    
+    data.list.forEach((item: any) => {
+      const date = new Date(item.dt * 1000);
+      const dateKey = date.toDateString();
+      const hour = date.getHours();
+      
+      // Get existing entry or create new one
+      const existing = dailyForecasts.get(dateKey);
+      
+      if (!existing) {
+        // First entry for this day
+        dailyForecasts.set(dateKey, {
+          date,
+          data: item,
+          maxTemp: item.main.temp,
+          minTemp: item.main.temp,
+          conditions: [item.weather[0].main]
+        });
+      } else {
+        // Update with higher temp and track conditions
+        if (item.main.temp > existing.maxTemp) {
+          existing.maxTemp = item.main.temp;
+          existing.data = item; // Use the data from the warmest time
+        }
+        if (item.main.temp < existing.minTemp) {
+          existing.minTemp = item.main.temp;
+        }
+        if (!existing.conditions.includes(item.weather[0].main)) {
+          existing.conditions.push(item.weather[0].main);
+        }
+      }
+    });
+    
+    // Convert to our forecast format
+    const forecasts: ForecastData[] = Array.from(dailyForecasts.values())
+      .slice(0, 5) // Limit to 5 days
+      .map(({ date, data: item, maxTemp, minTemp, conditions }) => {
+        console.log(`Forecast for ${date.toDateString()}: High ${Math.round(maxTemp)}°F, Low ${Math.round(minTemp)}°F, Conditions: ${conditions.join(', ')}`);
+        
+        return {
+          date,
+          weather: {
+            temp: Math.round(maxTemp), // Use the high temperature for the day
+            condition: conditions.join(', '), // Include ALL conditions for the day
+            description: item.weather[0].description,
+            humidity: item.main.humidity,
+            windSpeed: Math.round(item.wind.speed),
+            feelsLike: Math.round(item.main.feels_like),
+            isDay: true
+          }
+        };
+      });
+    
+    const forecastData: WeatherForecast = {
+      forecasts,
+      lastUpdated: Date.now()
+    };
+    
+    // Save to cache
+    await AsyncStorage.setItem(WEATHER_FORECAST_CACHE_KEY, JSON.stringify({
+      data: forecastData,
+      timestamp: Date.now(),
+      lat,
+      lon
+    }));
+    
+    return forecastData;
+  } catch (error) {
+    console.error('Error fetching weather forecast:', error);
+    return null;
   }
 }

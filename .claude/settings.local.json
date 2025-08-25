@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(grep:*)",
@@ -9,7 +10,9 @@
       "Bash(ls:*)",
       "Bash(rm:*)",
       "Bash(npm install:*)",
-      "mcp__supabase__get_project_url"
+      "mcp__supabase__get_project_url",
+      "mcp__supabase__get_advisors",
+      "mcp__firecrawl-mcp__firecrawl_search"
     ],
     "deny": []
   },

@@ -937,7 +937,7 @@ export default function RoutineScreen() {
   if (screenState === 'ACTIVE' && area && duration) {
     return (
       <SafeAreaView style={styles.container}>
-        <XpNotificationManager />
+        <XpNotificationManager showAchievementNotifications={false} />
         <ActiveRoutine
           area={area}
           duration={duration}

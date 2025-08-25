@@ -7,6 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLevelProgress } from '../../hooks/progress/useLevelProgress';
 import { MiniGameBadgeDisplay } from './MiniGameBadgeDisplay';
 import * as haptics from '../../utils/haptics';
+import AdService from '../../services/adService';
 // Simple date formatter function to replace date-fns
 const formatTimeAgo = (dateString: string): string => {
   try {
@@ -654,6 +655,8 @@ const Achievements: React.FC<AchievementsProps> = ({
   
   // Explicitly refresh data when component mounts
   useEffect(() => {
+    // Notify AdService when achievements are opened
+    AdService.onAchievementsOpened();
     console.log('Achievements component mounted, refreshing data...');
     refreshData();
     
@@ -1308,6 +1311,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 8,
     gap: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   badgeModalContent: {
     width: '85%',

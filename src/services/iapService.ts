@@ -16,7 +16,7 @@ export const PRODUCTS = {
     android: 'flexbreak_yearly_44.99',
     default: 'flexbreak_yearly_44.99',
   }),
-  // Discounted products for verified users (students OR office workers) - 60% off
+  // Discounted products for verified users with codes
   MONTHLY_VERIFIED: Platform.select({
     ios: 'flexbreak_monthly_verified',
     android: 'flexbreak_monthly_verified',

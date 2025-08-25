@@ -5,18 +5,21 @@ import { WeatherData } from '../services/weatherService';
  * Higher probability for extreme or perfect weather
  */
 export function getWeatherMessageProbability(weather: WeatherData): number {
+  // Parse conditions once
+  const conditions = weather.condition.split(', ');
+  
   // Extreme weather gets highest priority
   if (weather.temp < 32 || weather.temp > 90) {
     return 0.7; // 70% chance
   }
   
   // Perfect weather is also interesting
-  if (weather.temp >= 65 && weather.temp <= 75 && weather.condition === 'Clear') {
+  if (weather.temp >= 65 && weather.temp <= 75 && conditions.includes('Clear')) {
     return 0.5; // 50% chance
   }
   
-  // Rain/snow is noteworthy
-  if (['Rain', 'Snow', 'Thunderstorm'].includes(weather.condition)) {
+  // Rain/snow is noteworthy - check if any condition matches
+  if (conditions.some(c => ['Rain', 'Snow', 'Thunderstorm'].includes(c))) {
     return 0.6; // 60% chance
   }
   

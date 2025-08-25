@@ -3,6 +3,7 @@ import { gamificationEvents, ACHIEVEMENT_COMPLETED_EVENT } from '../../hooks/pro
 import { Achievement } from '../../utils/progress/types';
 import MiniGameAchievementNotification from './MiniGameAchievementNotification';
 import AchievementNotification from './AchievementNotification';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Mini-game achievement IDs
 const MINIGAME_ACHIEVEMENT_IDS = [
@@ -13,23 +14,40 @@ const MINIGAME_ACHIEVEMENT_IDS = [
   'perfect_balance'
 ];
 
+// Routine-related achievement types that should be shown in completion flow
+const ROUTINE_ACHIEVEMENT_TYPES = [
+  'routine_count',
+  'streak', 
+  'area_variety',
+  'specific_area',
+  'total_minutes'
+];
+
 export const GlobalAchievementListener: React.FC = () => {
   const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
   const [showNotification, setShowNotification] = useState(false);
 
   useEffect(() => {
-    const handleAchievementCompleted = (achievement: Achievement) => {
+    const handleAchievementCompleted = async (achievement: Achievement) => {
       console.log('[GlobalAchievementListener] Achievement completed event received:', {
         id: achievement.id,
         title: achievement.title,
         description: achievement.description,
         category: achievement.category,
+        type: (achievement as any).type,
         xp: achievement.xp
       });
       
       // Skip mini-game achievements as they're shown in the completion screen
       if (MINIGAME_ACHIEVEMENT_IDS.includes(achievement.id)) {
         console.log('[GlobalAchievementListener] Skipping mini-game achievement - shown in completion screen');
+        return;
+      }
+      
+      // Skip routine-related achievements during routine completion flow
+      const achievementType = (achievement as any).type;
+      if (achievementType && ROUTINE_ACHIEVEMENT_TYPES.includes(achievementType)) {
+        console.log('[GlobalAchievementListener] Skipping routine-related achievement - shown in routine completion flow:', achievementType);
         return;
       }
       

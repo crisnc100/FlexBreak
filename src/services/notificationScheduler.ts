@@ -4,7 +4,7 @@ import { ReminderSettings } from '../types/reminders';
 import { getNextDayOfWeek, dayStringToNumber } from '../utils/dateUtils';
 import { getRandomMotivationalMessage, getRandomMotivationalMessageExcluding } from '../constants/motivationalMessages';
 import { getCurrentLocation, areWeatherNotificationsEnabled } from './locationService';
-import { getWeatherData, generateWeatherMessage, WeatherData } from './weatherService';
+import { getWeatherData, getWeatherForecast, generateWeatherMessage, WeatherData, WeatherForecast } from './weatherService';
 import { shouldShowWeatherMessage } from '../utils/weatherUtils';
 import { NOTIFICATION_TIMES } from '../constants/reminderDefaults';
 
@@ -133,15 +133,26 @@ export async function scheduleAdvancedReminders(
  */
 export async function scheduleProductionMotivationalMessages(): Promise<void> {
   try {
+    // IMPORTANT: Always cancel existing motivational messages first to prevent duplicates
+    await cancelNotificationsByType([
+      NotificationType.MOTIVATIONAL, 
+      NotificationType.WEATHER_MOTIVATIONAL
+    ]);
+    console.log('Cleared existing motivational and weather messages before rescheduling');
+    
     // Check if weather notifications are enabled
     // When enabled, messages will be a mix of weather and motivational based on probability
     const weatherEnabled = await areWeatherNotificationsEnabled();
     let weatherData: WeatherData | null = null;
+    let weatherForecast: WeatherForecast | null = null;
     
     if (weatherEnabled) {
       const location = await getCurrentLocation();
       if (location) {
+        // Get current weather for today
         weatherData = await getWeatherData(location.lat, location.lon);
+        // Get forecast for upcoming days
+        weatherForecast = await getWeatherForecast(location.lat, location.lon);
       }
     }
     
@@ -154,11 +165,38 @@ export async function scheduleProductionMotivationalMessages(): Promise<void> {
       const targetDay = new Date(dayStart);
       targetDay.setDate(targetDay.getDate() + dayOffset);
       
-      // Schedule morning message
-      await scheduleMorningMessage(targetDay, dayOffset, now, weatherData);
+      // Get weather data for this specific day
+      let dayWeatherData: WeatherData | null = null;
       
-      // Schedule afternoon message
-      await scheduleAfternoonMessage(targetDay, dayOffset, now, weatherData);
+      if (dayOffset === 0) {
+        // Use current weather for today
+        dayWeatherData = weatherData;
+      } else if (weatherForecast && dayOffset <= 5) {
+        // Use forecast data for next 5 days
+        console.log(`Looking for forecast for ${targetDay.toDateString()}`);
+        console.log('Available forecasts:', weatherForecast.forecasts.map(f => ({
+          date: new Date(f.date).toDateString(),
+          temp: f.weather.temp
+        })));
+        
+        const forecastForDay = weatherForecast.forecasts.find(f => {
+          const forecastDate = new Date(f.date);
+          return forecastDate.toDateString() === targetDay.toDateString();
+        });
+        
+        if (forecastForDay) {
+          dayWeatherData = forecastForDay.weather;
+          console.log(`Found forecast for day ${dayOffset}: ${dayWeatherData.temp}°F, ${dayWeatherData.condition}`);
+        } else {
+          console.log(`No forecast found for day ${dayOffset}`);
+        }
+      }
+      
+      // Schedule morning message (with weather when relevant)
+      await scheduleMorningMessage(targetDay, dayOffset, now, dayWeatherData);
+      
+      // Schedule afternoon message (always motivational)
+      await scheduleAfternoonMessage(targetDay, dayOffset, now, null); // Pass null to ensure motivational
     }
     
     console.log('Scheduled motivational messages for the next 10 days');
@@ -185,11 +223,24 @@ async function scheduleMorningMessage(
   // Only schedule today's morning message if it's in the future
   if (dayOffset > 0 || morningDate > now) {
     let morningMsg;
+    let notificationType = NotificationType.MOTIVATIONAL;
     
-    // Check if we should use weather message
-    if (weatherData && dayOffset === 0 && shouldShowWeatherMessage(weatherData, false)) {
-      morningMsg = generateWeatherMessage(weatherData);
+    // Check if we should use weather message (morning only)
+    if (weatherData) {
+      console.log(`Day ${dayOffset} weather data:`, {
+        temp: weatherData.temp,
+        condition: weatherData.condition,
+        shouldShow: shouldShowWeatherMessage(weatherData, false)
+      });
+      
+      if (shouldShowWeatherMessage(weatherData, false)) {
+        morningMsg = generateWeatherMessage(weatherData);
+        notificationType = NotificationType.WEATHER_MOTIVATIONAL;
+      } else {
+        morningMsg = getRandomMotivationalMessage();
+      }
     } else {
+      console.log(`Day ${dayOffset}: No weather data available`);
       morningMsg = getRandomMotivationalMessage();
     }
     
@@ -199,7 +250,8 @@ async function scheduleMorningMessage(
         body: morningMsg.body,
         data: { 
           time: 'morning',
-          scheduledFor: morningDate.toISOString()
+          scheduledFor: morningDate.toISOString(),
+          isWeatherBased: notificationType === NotificationType.WEATHER_MOTIVATIONAL
         },
         sound: true,
       },
@@ -207,10 +259,10 @@ async function scheduleMorningMessage(
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: morningDate
       },
-      NotificationType.MOTIVATIONAL
+      notificationType
     );
     
-    console.log(`Scheduled morning message for ${morningDate.toLocaleString()} with ID ${morningId}`);
+    console.log(`Scheduled morning message for ${morningDate.toLocaleString()} with ID ${morningId} (${notificationType === NotificationType.WEATHER_MOTIVATIONAL ? 'weather_motivational' : 'motivational'})`);
   }
 }
 
@@ -231,14 +283,8 @@ async function scheduleAfternoonMessage(
   
   // Only schedule today's afternoon message if it's in the future
   if (dayOffset > 0 || afternoonDate > now) {
-    let afternoonMsg;
-    
-    // Check if we should use weather message for afternoon too
-    if (weatherData && dayOffset === 0 && shouldShowWeatherMessage(weatherData, true)) {
-      afternoonMsg = generateWeatherMessage(weatherData);
-    } else {
-      afternoonMsg = getRandomMotivationalMessage();
-    }
+    // Afternoon is ALWAYS motivational, never weather
+    const afternoonMsg = getRandomMotivationalMessage();
     
     const afternoonId = await scheduleTypedNotification(
       {
@@ -246,7 +292,8 @@ async function scheduleAfternoonMessage(
         body: afternoonMsg.body,
         data: { 
           time: 'afternoon',
-          scheduledFor: afternoonDate.toISOString()
+          scheduledFor: afternoonDate.toISOString(),
+          isWeatherBased: false
         },
         sound: true,
       },
@@ -257,7 +304,30 @@ async function scheduleAfternoonMessage(
       NotificationType.MOTIVATIONAL
     );
     
-    console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId}`);
+    console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId} (motivational)`);
+  }
+}
+
+/**
+ * Refresh weather notifications when app becomes active
+ * This ensures weather data stays fresh even if app was closed for days
+ */
+export async function refreshWeatherNotifications(): Promise<void> {
+  try {
+    const weatherEnabled = await areWeatherNotificationsEnabled();
+    if (!weatherEnabled) {
+      return;
+    }
+    
+    // Cancel existing weather notifications only
+    await cancelNotificationsByType([NotificationType.WEATHER_MOTIVATIONAL]);
+    
+    // Reschedule all notifications with fresh weather data
+    await scheduleProductionMotivationalMessages();
+    
+    console.log('Weather notifications refreshed with latest forecast data');
+  } catch (error) {
+    console.error('Error refreshing weather notifications:', error);
   }
 }
 

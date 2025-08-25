@@ -7,6 +7,7 @@ import {
   areWeatherNotificationsEnabled,
   updateLocationIfNeeded 
 } from '../../../services/locationService';
+import { scheduleProductionMotivationalMessages } from '../../../services/notificationScheduler';
 import { Ionicons } from '@expo/vector-icons';
 
 export const WeatherNotificationToggle: React.FC = () => {
@@ -43,6 +44,16 @@ export const WeatherNotificationToggle: React.FC = () => {
       
       if (success) {
         setEnabled(value);
+        
+        // Reschedule notifications to include/exclude weather
+        if (value) {
+          // When enabling, reschedule all notifications with weather data
+          await scheduleProductionMotivationalMessages();
+        } else {
+          // When disabling, reschedule to remove weather notifications
+          await scheduleProductionMotivationalMessages();
+        }
+        
         toast.show(
           value ? 'Weather Notifications Enabled\nYour reminders will now include weather-based messages' : 
                   'Weather Notifications Disabled\nYou\'ll receive standard wellness reminders only',
