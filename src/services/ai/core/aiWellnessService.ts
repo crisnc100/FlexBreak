@@ -1,5 +1,6 @@
 import openRouterService from '../integrations/openRouterService';
 import secureAIService from '../integrations/secureAIService';
+import groqService from '../integrations/groqService';
 import { buildUserContext, categorizeInput } from '../contextBuilder';
 import { WELLNESS_COACH_PROMPT, FALLBACK_RESPONSES } from './promptManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -215,12 +216,43 @@ export class AIWellnessServiceV2 {
               }
             );
           } catch (freeModelError) {
-            console.error('Free model also failed, using fallback');
-            aiResponse = await this.getFallbackResponse(userInput, userId);
+            console.error('Free model failed, trying Groq fallback');
+            try {
+              // Try Groq as intermediate fallback
+              aiResponse = await groqService.chatWithRetry(
+                fallbackMessages,
+                {
+                  model: AI_CONFIG.groq.defaultModel,
+                  maxTokens: freeModelConfig.maxTokens,
+                  temperature: 0.7
+                }
+              );
+            } catch (groqError) {
+              console.error('Groq also failed, using static fallback');
+              aiResponse = await this.getFallbackResponse(userInput, userId);
+            }
           }
         } else {
-          // Use fallback for premium users or if free model already tried
-          aiResponse = await this.getFallbackResponse(userInput, userId);
+          // For premium users, try Groq before static fallback
+          console.log('Trying Groq fallback for premium user');
+          try {
+            const fallbackMessages = [
+              { role: 'system' as const, content: enhancedPrompt },
+              { role: 'user' as const, content: userInput }
+            ];
+            
+            aiResponse = await groqService.chatWithRetry(
+              fallbackMessages,
+              {
+                model: AI_CONFIG.groq.defaultModel,
+                maxTokens: modelConfig.maxTokens,
+                temperature: 0.7
+              }
+            );
+          } catch (groqError) {
+            console.error('Groq fallback failed for premium user, using static fallback');
+            aiResponse = await this.getFallbackResponse(userInput, userId);
+          }
         }
       }
       
@@ -481,6 +513,7 @@ export class AIWellnessServiceV2 {
     
     await AsyncStorage.setItem(usageKey, newCount.toString());
   }
+
 }
 
 // Export singleton instance

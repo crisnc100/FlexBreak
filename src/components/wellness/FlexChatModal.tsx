@@ -395,7 +395,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     
     // Clear input
     setMessage('');
-    Keyboard.dismiss();
+    // Keep keyboard open for continuous conversation
 
     // Add user message
     const userMessage: Message = {

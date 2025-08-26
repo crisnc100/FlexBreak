@@ -24,7 +24,7 @@ export function getWeatherMessageProbability(weather: WeatherData): number {
   }
   
   // Normal weather
-  return 0.2; // 20% chance
+  return 0.35; // 35% chance
 }
 
 /**

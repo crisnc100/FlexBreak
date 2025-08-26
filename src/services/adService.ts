@@ -10,9 +10,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const INTERSTITIAL_COOLDOWN = 10 * 60 * 1000; // 10 minutes in milliseconds
-const BREAKS_BEFORE_INTERSTITIAL = 5;
-const SETTINGS_OPEN_FREQUENCY = 3; // Show ad every 3rd time
+const INTERSTITIAL_COOLDOWN = 10 * 60 * 1000; // 10 minutes between interstitials
+const SETTINGS_OPEN_FREQUENCY = 3; // Show ad every 3rd time settings opened
 
 class AdService {
   private static instance: AdService;
@@ -172,46 +171,19 @@ class AdService {
     return timeSinceLastAd >= INTERSTITIAL_COOLDOWN;
   }
 
+  // Post-routine interstitials removed for better user experience
+  // Keeping track of break completions for potential future features
   async onBreakCompleted() {
     if (this.isPremium) {
-      console.log('AdService: User is premium, skipping ad');
+      console.log('AdService: User is premium, no ads');
       return;
     }
     
     this.breaksCompleted++;
-    console.log(`AdService: Break completed! Count: ${this.breaksCompleted}/${BREAKS_BEFORE_INTERSTITIAL}`);
+    console.log(`AdService: Break completed! Total: ${this.breaksCompleted}`);
     await this.saveCount('adBreaksCompleted', this.breaksCompleted);
     
-    // Don't show ad immediately - just track the completion
-    // The ad will be shown from HomeScreen after appropriate delays
-    if (this.breaksCompleted >= BREAKS_BEFORE_INTERSTITIAL && this.canShowInterstitial()) {
-      console.log('AdService: Eligible for interstitial ad, will show after returning to home');
-      // Don't reset count yet - will reset after actually showing the ad
-    } else if (!this.canShowInterstitial()) {
-      console.log('AdService: Interstitial ad on cooldown, waiting...');
-    }
-  }
-  
-  // New method to check if we should show interstitial
-  shouldShowInterstitialAfterRoutine(): boolean {
-    return !this.isPremium && 
-           this.breaksCompleted >= BREAKS_BEFORE_INTERSTITIAL && 
-           this.canShowInterstitial();
-  }
-  
-  // New method to show interstitial with delay (called from HomeScreen)
-  async showDelayedInterstitialAd(): Promise<void> {
-    if (!this.shouldShowInterstitialAfterRoutine()) {
-      console.log('AdService: Not eligible for interstitial ad');
-      return;
-    }
-    
-    console.log('AdService: Showing delayed interstitial ad from home screen');
-    await this.showInterstitialAd();
-    
-    // Reset counter after showing
-    this.breaksCompleted = 0;
-    await this.saveCount('adBreaksCompleted', 0);
+    // Post-routine ads removed - better UX with just banner + rewarded ads
   }
 
   async onSettingsOpened() {

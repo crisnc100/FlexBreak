@@ -86,9 +86,11 @@ const MOTIVATIONAL_QUOTES = [
 
 interface DailyQuoteRewardProps {
   onQuoteUnlocked?: (quote: { text: string; author: string }) => void;
+  onToggleTip?: () => void;
+  isShowingQuote?: boolean;
 }
 
-export const DailyQuoteReward: React.FC<DailyQuoteRewardProps> = ({ onQuoteUnlocked }) => {
+export const DailyQuoteReward: React.FC<DailyQuoteRewardProps> = ({ onQuoteUnlocked, onToggleTip, isShowingQuote }) => {
   const { isPremium } = usePremium();
   const [loading, setLoading] = useState(false);
   const [lastQuoteDate, setLastQuoteDate] = useState<string | null>(null);
@@ -117,8 +119,14 @@ export const DailyQuoteReward: React.FC<DailyQuoteRewardProps> = ({ onQuoteUnloc
 
   const handleWatchAd = async () => {
     if (isPremium) {
-      // Premium users get instant access
-      showRandomQuote();
+      // Premium users can toggle between quote and tip
+      if (isShowingQuote && onToggleTip) {
+        // Currently showing quote, switch to tip
+        onToggleTip();
+      } else {
+        // Currently showing tip, switch to quote
+        showRandomQuote();
+      }
       return;
     }
 
@@ -179,13 +187,17 @@ export const DailyQuoteReward: React.FC<DailyQuoteRewardProps> = ({ onQuoteUnloc
   };
 
   const getButtonText = () => {
-    if (isPremium) return "Get Daily Motivation";
+    if (isPremium) {
+      return isShowingQuote ? "Get Daily Tip" : "Get Daily Motivation";
+    }
     if (hasSeenToday) return "Come back tomorrow!";
     return "Watch Ad for Daily Quote";
   };
 
   const getButtonIcon = () => {
-    if (isPremium) return "sparkles";
+    if (isPremium) {
+      return isShowingQuote ? "bulb-outline" : "sparkles";
+    }
     if (hasSeenToday) return "time-outline";
     return "play-circle-outline";
   };

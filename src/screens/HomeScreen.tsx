@@ -231,7 +231,8 @@ export default function HomeScreen() {
     };
     
     const handleRoutineCompleted = () => {
-      console.log('ROUTINE_COMPLETED event received in HomeScreen');
+      console.log('🎯 HomeScreen: ROUTINE_COMPLETED event received in HomeScreen');
+      console.log('🎯 HomeScreen: Setting hasReturnedFromRoutine to true');
       setHasReturnedFromRoutine(true);
     };
     
@@ -251,42 +252,16 @@ export default function HomeScreen() {
   }, []);
   
   
-  // Handle delayed interstitial ad after returning from routine
+  // Handle routine completion event (kept for AI wellness onboarding)
   useEffect(() => {
     if (!hasReturnedFromRoutine) return;
     
     // Immediately reset flag to prevent multiple triggers
     setHasReturnedFromRoutine(false);
     
-    // Check if we should show an interstitial ad
-    const checkAndShowAd = async () => {
-      console.log('HomeScreen: Checking if should show interstitial ad after routine...');
-      
-      // Check if AI Wellness onboarding is showing (first routine)
-      const hasSeenAIOnboarding = await AsyncStorage.getItem('@flexbreak:ai_wellness_onboarding_seen');
-      const isFirstRoutine = !hasSeenAIOnboarding;
-      
-      if (isFirstRoutine) {
-        console.log('HomeScreen: First routine, AI onboarding will show, skipping ad');
-        return;
-      }
-      
-      // Check if eligible for interstitial
-      if (AdService.shouldShowInterstitialAfterRoutine()) {
-        console.log('HomeScreen: Eligible for interstitial, waiting 3 seconds...');
-        
-        // Wait 3 seconds for user to settle back on home screen
-        setTimeout(async () => {
-          console.log('HomeScreen: Showing delayed interstitial ad now');
-          await AdService.showDelayedInterstitialAd();
-        }, 3000);
-      } else {
-        console.log('HomeScreen: Not eligible for interstitial ad');
-      }
-    };
-    
-    // Small delay to ensure mini-game popup has been handled
-    setTimeout(checkAndShowAd, 500);
+    // Post-routine interstitial ads removed for better user experience
+    // We still track this event for AI wellness onboarding and other features
+    console.log('HomeScreen: Routine completed, continuing with celebration flow');
   }, [hasReturnedFromRoutine]);
   
   // Load data
@@ -996,12 +971,21 @@ export default function HomeScreen() {
         />
 
         {/* Daily Quote Reward - Rewarded Ad */}
-        <DailyQuoteReward onQuoteUnlocked={(quote) => {
-          console.log('HomeScreen: Quote unlocked:', quote);
-          setDailyQuote(quote);
-          // Clear quote after 24 hours
-          setTimeout(() => setDailyQuote(null), 24 * 60 * 60 * 1000);
-        }} />
+        <DailyQuoteReward 
+          onQuoteUnlocked={(quote) => {
+            console.log('HomeScreen: Quote unlocked:', quote);
+            setDailyQuote(quote);
+            // For free users, clear quote after 24 hours
+            if (!isPremium) {
+              setTimeout(() => setDailyQuote(null), 24 * 60 * 60 * 1000);
+            }
+          }}
+          onToggleTip={() => {
+            console.log('HomeScreen: Premium user toggling back to tip');
+            setDailyQuote(null); // Clear quote to show tip
+          }}
+          isShowingQuote={dailyQuote !== null}
+        />
 
         {/* Daily Tip / Quote */}
         <DailyTip 
