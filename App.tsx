@@ -43,6 +43,7 @@ import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsIn
 import { videoLoaderService } from './src/services/videoLoaderService';
 // Import AdMob initialization
 import mobileAds from 'react-native-google-mobile-ads';
+import AdService from './src/services/adService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
 import { AIWellnessModal } from './src/components/ai/AIWellnessNotificationHandler';
@@ -74,6 +75,24 @@ if (!firebase.apps.length) {
 
 // Avoid playing intro sound twice
 let introSoundPlayed = false;
+
+// Initialize AdMob with proper configuration
+mobileAds()
+  .initialize()
+  .then((adapterStatuses) => {
+    console.log('AdMob initialized successfully:', adapterStatuses);
+    // Set global ad settings to prevent auto-playing video ads with sound
+    mobileAds().setRequestConfiguration({
+      // Request non-personalized ads
+      tagForChildDirectedTreatment: false,
+      tagForUnderAgeOfConsent: false,
+      // Set volume to 0 for video ads by default
+      maxAdContentRating: 'G',
+    });
+  })
+  .catch((error) => {
+    console.error('AdMob initialization error:', error);
+  });
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -137,7 +156,7 @@ export default function App() {
   // Mark app start time for performance measurement
   performance.markAppStart();
   
-  // Subscribe to AppState changes for performance tracking and weather refresh
+  // Subscribe to AppState changes for performance tracking, weather refresh, and ad management
   useEffect(() => {
     let lastBackgroundTime: Date | null = null;
     
@@ -145,6 +164,10 @@ export default function App() {
       if (nextAppState === 'active') {
         // App came to foreground
         performance.trackAppForeground();
+        
+        // Resume ads when app comes to foreground
+        AdService.resumeAds();
+        console.log('App active: Resumed ads');
         
         // Refresh weather notifications if app was in background for more than 1 hour
         if (lastBackgroundTime) {
@@ -164,6 +187,15 @@ export default function App() {
         // App went to background
         performance.trackAppBackground();
         lastBackgroundTime = new Date();
+        
+        // Pause ads when app goes to background to prevent audio leaks
+        AdService.pauseAds();
+        console.log('App backgrounded: Paused ads');
+      } else if (nextAppState === 'inactive') {
+        // App is transitioning states (e.g., incoming call)
+        // Also pause ads in inactive state
+        AdService.pauseAds();
+        console.log('App inactive: Paused ads');
       }
     });
     

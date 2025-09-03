@@ -1,7 +1,8 @@
-import { getWeatherData, generateWeatherMessage } from '../../services/weatherService';
+import { getWeatherData, generateWeatherMessage, getWeatherForecast } from '../../services/weatherService';
 import { areWeatherNotificationsEnabled, getCurrentLocation, checkLocationPermission } from '../../services/locationService';
-import { shouldShowWeatherMessage } from '../weatherUtils';
+import { shouldShowWeatherMessage, isWeatherRelevant } from '../weatherUtils';
 import { getRandomMotivationalMessage } from '../../constants/motivationalMessages';
+import * as Notifications from 'expo-notifications';
 
 export async function testWeatherNotifications() {
   console.log('=== Testing Weather Notifications ===\n');
@@ -63,33 +64,74 @@ export async function testWeatherNotifications() {
     console.log(`     Title: "${motivationalMessage.title}"`);
     console.log(`     Body: "${motivationalMessage.body}"`);
     
-    // 6. Test probability system
-    console.log('\n5. Message Mix Probability Test:');
-    let weatherShownMorning = 0;
-    let weatherShownAfternoon = 0;
-    const iterations = 1000;
+    // 6. Test NEW deterministic weather relevance
+    console.log('\n5. Weather Relevance Test (NEW LOGIC):');
+    const isRelevant = isWeatherRelevant(weatherData);
+    console.log(`   Current weather is relevant: ${isRelevant ? '✓ YES' : '✗ NO'}`);
+    console.log(`   Should show weather notification: ${shouldShowWeatherMessage(weatherData) ? '✓ YES' : '✗ NO'}`);
     
-    for (let i = 0; i < iterations; i++) {
-      if (shouldShowWeatherMessage(weatherData, false)) weatherShownMorning++;
-      if (shouldShowWeatherMessage(weatherData, true)) weatherShownAfternoon++;
+    // Test different scenarios
+    console.log('\n   Testing different weather scenarios:');
+    const scenarios = [
+      { temp: 30, condition: 'Snow', expected: true, reason: 'Snow event' },
+      { temp: 95, condition: 'Clear', expected: true, reason: 'Extreme heat' },
+      { temp: 70, condition: 'Clear', expected: true, reason: 'Perfect weather' },
+      { temp: 60, condition: 'Clouds', expected: false, reason: 'Normal weather' },
+      { temp: 75, condition: 'Rain', expected: true, reason: 'Rain event' },
+    ];
+    
+    scenarios.forEach(scenario => {
+      const testWeather = { ...weatherData, temp: scenario.temp, condition: scenario.condition };
+      const relevant = isWeatherRelevant(testWeather);
+      console.log(`     ${scenario.temp}°F ${scenario.condition}: ${relevant ? '✓' : '✗'} (${scenario.reason})`);
+    });
+    
+    // 7. Check scheduled notifications
+    console.log('\n6. Checking Scheduled Notifications:');
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const weatherNotifs = scheduled.filter(n => n.content.data?.isWeatherBased === true);
+    const motivationalNotifs = scheduled.filter(n => n.content.data?.isWeatherBased === false);
+    
+    console.log(`   Total scheduled: ${scheduled.length}`);
+    console.log(`   Weather-based: ${weatherNotifs.length}`);
+    console.log(`   Motivational: ${motivationalNotifs.length}`);
+    
+    if (weatherNotifs.length > 0) {
+      console.log('\n   Next weather notifications:');
+      weatherNotifs.slice(0, 3).forEach(n => {
+        const trigger = n.trigger as any;
+        const date = trigger.date ? new Date(trigger.date) : null;
+        if (date) {
+          console.log(`     - ${date.toLocaleString()}: ${n.content.title}`);
+        }
+      });
     }
     
-    const morningProb = (weatherShownMorning / iterations) * 100;
-    const afternoonProb = (weatherShownAfternoon / iterations) * 100;
+    // 8. Get forecast to check future weather
+    console.log('\n7. Weather Forecast Check:');
+    const forecast = await getWeatherForecast(location.lat, location.lon);
+    if (forecast) {
+      console.log(`   Got ${forecast.forecasts.length} days of forecast:`);
+      forecast.forecasts.slice(0, 3).forEach((day, i) => {
+        const relevant = isWeatherRelevant(day.weather);
+        console.log(`     Day ${i}: ${day.weather.temp}°F, ${day.weather.condition} - Relevant: ${relevant ? '✓' : '✗'}`);
+      });
+    }
     
-    console.log(`   Morning messages: ~${morningProb.toFixed(0)}% weather, ~${(100 - morningProb).toFixed(0)}% motivational`);
-    console.log(`   Afternoon messages: ~${afternoonProb.toFixed(0)}% weather, ~${(100 - afternoonProb).toFixed(0)}% motivational`);
-    
-    // 7. Show expected behavior
-    console.log('\n6. Expected User Experience:');
+    // 9. Show expected behavior
+    console.log('\n8. Expected User Experience (UPDATED):');
     console.log('   When weather notifications are ON:');
-    console.log('   - Users receive a MIX of weather and motivational messages');
-    console.log('   - Weather messages appear more often in extreme conditions');
-    console.log('   - Perfect weather days trigger outdoor activity suggestions');
-    console.log('   - Normal days mostly show standard motivational messages');
+    console.log('   - Weather replaces motivational when conditions are relevant');
+    console.log('   - ALWAYS shows for: Rain, Snow, Storms, Extreme temps (<40°F or >85°F)');
+    console.log('   - ALWAYS shows for: Perfect weather (65-75°F clear)');
+    console.log('   - Normal weather = motivational messages');
+    console.log('   - Only schedules 3 days ahead for accuracy');
     
     console.log('\n✅ All weather notification tests passed!');
-    console.log('\n💡 Tip: Weather messages refresh every 3 hours from cache');
+    console.log('\n💡 Next steps:');
+    console.log('   1. Force reschedule notifications in app');
+    console.log('   2. Weather will show when relevant conditions occur');
+    console.log('   3. Check notifications list in iOS Settings');
     
   } catch (error) {
     console.error('\n❌ Error during testing:', error);

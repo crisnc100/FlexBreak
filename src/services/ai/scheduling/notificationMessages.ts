@@ -52,9 +52,23 @@ interface NotificationMessage {
 // Friendly greetings based on time of day
 const getTimeGreeting = (): string => {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  
+  // More natural time boundaries:
+  // Morning: 5 AM - 11:59 AM
+  // Afternoon: 12 PM - 5:59 PM  
+  // Evening: 6 PM - 8:59 PM
+  // Night: 9 PM - 4:59 AM (but we'll use evening for friendliness)
+  
+  if (hour >= 5 && hour < 12) {
+    return 'Good morning';
+  } else if (hour >= 12 && hour < 18) {
+    return 'Good afternoon';
+  } else if (hour >= 18 && hour < 21) {
+    return 'Good evening';
+  } else {
+    // Late night (9 PM - 4:59 AM) - use evening as it's friendlier
+    return 'Good evening';
+  }
 };
 
 // Get the most common issue from recent insights

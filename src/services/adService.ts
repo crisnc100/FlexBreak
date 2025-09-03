@@ -256,11 +256,16 @@ class AdService {
 
     return new Promise((resolve) => {
       let isResolved = false;
+      let cleanupTimeoutId: NodeJS.Timeout | null = null;
       
-      // Helper to safely resolve only once
+      // Helper to safely resolve only once and cleanup
       const safeResolve = (value: boolean) => {
         if (!isResolved) {
           isResolved = true;
+          if (cleanupTimeoutId) {
+            clearTimeout(cleanupTimeoutId);
+            cleanupTimeoutId = null;
+          }
           resolve(value);
         }
       };
@@ -377,17 +382,48 @@ class AdService {
           this.rewardedAd!.load();
           
           // Timeout if loading takes too long
-          setTimeout(() => {
+          cleanupTimeoutId = setTimeout(() => {
             console.log('AdService: Load timeout reached');
             unsubscribeLoaded();
             safeResolve(false);
+            // Clean up all listeners
+            unsubscribeEarned();
+            unsubscribeClosed();
+            unsubscribeError();
+            unsubscribeOpened();
           }, 15000);
         });
+      
+      // Add ultimate cleanup timeout to prevent stuck ads
+      setTimeout(() => {
+        if (!isResolved) {
+          console.log('AdService: Ultimate timeout reached, cleaning up');
+          safeResolve(false);
+        }
+      }, 30000);
     });
   }
 
+  pauseAds() {
+    console.log('AdService: Pausing all ads');
+    // This method can be called when app goes to background
+    // The actual ad instances will handle their own lifecycle
+  }
+
+  resumeAds() {
+    console.log('AdService: Resuming ads');
+    // Re-load ads if needed when app comes back
+    if (this.interstitialAd && !this.isPremium) {
+      this.loadInterstitialAd();
+    }
+    if (this.rewardedAd && !this.isPremium) {
+      this.loadRewardedAd();
+    }
+  }
+
   cleanup() {
-    // Cleanup method if needed
+    console.log('AdService: Cleaning up all ads');
+    // Properly dispose of ad instances
     this.interstitialAd = null;
     this.rewardedAd = null;
   }

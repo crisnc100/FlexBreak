@@ -160,46 +160,51 @@ export async function scheduleProductionMotivationalMessages(): Promise<void> {
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
 
-    // Schedule for 10 days forward including today
+    // Schedule for 7 days forward including today
     for (let dayOffset = 0; dayOffset < NOTIFICATION_TIMES.SCHEDULE_DAYS_AHEAD; dayOffset++) {
       const targetDay = new Date(dayStart);
       targetDay.setDate(targetDay.getDate() + dayOffset);
       
-      // Get weather data for this specific day
+      // Only use weather data for first 3 days
       let dayWeatherData: WeatherData | null = null;
       
-      if (dayOffset === 0) {
-        // Use current weather for today
-        dayWeatherData = weatherData;
-      } else if (weatherForecast && dayOffset <= 5) {
-        // Use forecast data for next 5 days
-        console.log(`Looking for forecast for ${targetDay.toDateString()}`);
-        console.log('Available forecasts:', weatherForecast.forecasts.map(f => ({
-          date: new Date(f.date).toDateString(),
-          temp: f.weather.temp
-        })));
-        
-        const forecastForDay = weatherForecast.forecasts.find(f => {
-          const forecastDate = new Date(f.date);
-          return forecastDate.toDateString() === targetDay.toDateString();
-        });
-        
-        if (forecastForDay) {
-          dayWeatherData = forecastForDay.weather;
-          console.log(`Found forecast for day ${dayOffset}: ${dayWeatherData.temp}°F, ${dayWeatherData.condition}`);
-        } else {
-          console.log(`No forecast found for day ${dayOffset}`);
+      if (dayOffset < NOTIFICATION_TIMES.WEATHER_DAYS) {
+        // First 3 days: Include weather logic
+        if (dayOffset === 0) {
+          // Use current weather for today
+          dayWeatherData = weatherData;
+          console.log(`Day ${dayOffset}: Using current weather data`);
+        } else if (weatherForecast) {
+          // Use forecast data for next 2 days
+          console.log(`Looking for forecast for ${targetDay.toDateString()}`);
+          
+          const forecastForDay = weatherForecast.forecasts.find(f => {
+            const forecastDate = new Date(f.date);
+            return forecastDate.toDateString() === targetDay.toDateString();
+          });
+          
+          if (forecastForDay) {
+            dayWeatherData = forecastForDay.weather;
+            console.log(`Found forecast for day ${dayOffset}: ${dayWeatherData.temp}°F, ${dayWeatherData.condition}`);
+          } else {
+            console.log(`No forecast found for day ${dayOffset}`);
+          }
         }
+      } else {
+        // Days 4-7: Pure motivational (no weather)
+        console.log(`Day ${dayOffset}: Pure motivational (beyond weather forecast range)`);
       }
       
-      // Schedule morning message (with weather when relevant)
+      // Schedule morning message (with weather when relevant and only for first 3 days)
       await scheduleMorningMessage(targetDay, dayOffset, now, dayWeatherData);
       
-      // Schedule afternoon message (always motivational)
+      // Schedule afternoon message (ALWAYS motivational, never weather)
       await scheduleAfternoonMessage(targetDay, dayOffset, now, null); // Pass null to ensure motivational
     }
     
-    console.log('Scheduled motivational messages for the next 10 days');
+    console.log(`Scheduled messages for the next ${NOTIFICATION_TIMES.SCHEDULE_DAYS_AHEAD} days:`);
+    console.log(`- Days 0-2: Weather (morning if relevant) + Motivational (afternoon always)`);
+    console.log(`- Days 3-6: Pure motivational (both morning and afternoon)`);
   } catch (error) {
     console.error('Error scheduling production motivational messages:', error);
   }
@@ -283,8 +288,12 @@ async function scheduleAfternoonMessage(
   
   // Only schedule today's afternoon message if it's in the future
   if (dayOffset > 0 || afternoonDate > now) {
-    // Afternoon is ALWAYS motivational, never weather
+    // AFTERNOON IS ALWAYS MOTIVATIONAL - Never weather
+    // This ensures users always get at least 1 motivational message per day
     const afternoonMsg = getRandomMotivationalMessage();
+    const notificationType = NotificationType.MOTIVATIONAL;
+    
+    console.log(`Day ${dayOffset} afternoon: Always motivational (50/50 balance rule)`);
     
     const afternoonId = await scheduleTypedNotification(
       {
@@ -293,7 +302,7 @@ async function scheduleAfternoonMessage(
         data: { 
           time: 'afternoon',
           scheduledFor: afternoonDate.toISOString(),
-          isWeatherBased: false
+          isWeatherBased: false // Always false for afternoon
         },
         sound: true,
       },
@@ -301,7 +310,7 @@ async function scheduleAfternoonMessage(
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: afternoonDate
       },
-      NotificationType.MOTIVATIONAL
+      notificationType
     );
     
     console.log(`Scheduled afternoon message for ${afternoonDate.toLocaleString()} with ID ${afternoonId} (motivational)`);

@@ -48,6 +48,7 @@ import {
   TimeRewind,
   Vortex
 } from '../components/home';
+import { WeatherPromptCard } from '../components/home/WeatherPromptCard';
 import TryPremiumBanner from '../components/TryPremiumBanner';
 import * as notifications from '../utils/notifications';
 import * as firebaseReminders from '../utils/firebaseReminders';
@@ -935,6 +936,26 @@ export default function HomeScreen() {
           currentStreak={currentStreak} 
           onPremiumPress={showPremiumModal}
           onFlexSaveApplied={handleFlexSaveApplied}
+        />
+
+        {/* Weather Prompt Card - Shows when conditions are relevant */}
+        <WeatherPromptCard 
+          onEnable={() => {
+            console.log('Weather notifications enabled via prompt card');
+            // Show success message
+            Alert.alert(
+              'Weather Notifications Enabled! 🌤️',
+              'You\'ll now get weather-aware wellness reminders when conditions are relevant.',
+              [{ text: 'Great!', style: 'default' }]
+            );
+            // The WeatherPromptCard already handles:
+            // 1. Setting weather notifications enabled in storage
+            // 2. Rescheduling notifications with weather
+            // The settings toggle will reflect this change when the screen is next loaded
+          }}
+          onDismiss={() => {
+            console.log('Weather prompt dismissed');
+          }}
         />
 
         {/* Level Progress Card - shows for all users */}

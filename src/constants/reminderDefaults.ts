@@ -23,7 +23,8 @@ export const NOTIFICATION_TIMES = {
   MORNING_END: 11,
   AFTERNOON_START: 14,
   AFTERNOON_END: 16,
-  SCHEDULE_DAYS_AHEAD: 10
+  SCHEDULE_DAYS_AHEAD: 7,  // Back to 7 days (3 with weather, 4 pure motivational)
+  WEATHER_DAYS: 3  // Only first 3 days include weather logic
 } as const;
 
 // Day mapping

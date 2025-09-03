@@ -20,10 +20,19 @@ export const buildUserContext = async (userInput: string, userId?: string): Prom
   const now = new Date();
   const hour = now.getHours();
   
+  // More accurate time boundaries:
+  // Morning: 5 AM - 11:59 AM
+  // Afternoon: 12 PM - 5:59 PM  
+  // Evening: 6 PM onwards (includes night for simplicity)
   let timeOfDay: 'morning' | 'afternoon' | 'evening';
-  if (hour < 12) timeOfDay = 'morning';
-  else if (hour < 17) timeOfDay = 'afternoon';
-  else timeOfDay = 'evening';
+  if (hour >= 5 && hour < 12) {
+    timeOfDay = 'morning';
+  } else if (hour >= 12 && hour < 18) {
+    timeOfDay = 'afternoon';
+  } else {
+    // Evening/Night (6 PM - 4:59 AM)
+    timeOfDay = 'evening';
+  }
   
   const context: UserContext = {
     message: userInput,
@@ -131,9 +140,14 @@ export const buildUserContext = async (userInput: string, userId?: string): Prom
 export const getTimeOfDayContext = (): string => {
   const hour = new Date().getHours();
   
-  if (hour < 12) return CONTEXT_TEMPLATE.timeOfDay.morning;
-  else if (hour < 17) return CONTEXT_TEMPLATE.timeOfDay.afternoon;
-  else return CONTEXT_TEMPLATE.timeOfDay.evening;
+  // Match the same time boundaries as getTimeGreeting
+  if (hour >= 5 && hour < 12) {
+    return CONTEXT_TEMPLATE.timeOfDay.morning;
+  } else if (hour >= 12 && hour < 18) {
+    return CONTEXT_TEMPLATE.timeOfDay.afternoon;
+  } else {
+    return CONTEXT_TEMPLATE.timeOfDay.evening;
+  }
 };
 
 export const categorizeInput = (input: string): string => {

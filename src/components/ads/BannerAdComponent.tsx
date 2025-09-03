@@ -1,9 +1,10 @@
-import React from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Text, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { usePremium } from '../../context/PremiumContext';
 import AdService from '../../services/adService';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface BannerAdComponentProps {
   position?: 'top' | 'bottom';
@@ -17,7 +18,58 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
   onOpenSubscription
 }) => {
   const { isPremium } = usePremium();
-  const [adError, setAdError] = React.useState(false);
+  const [adError, setAdError] = useState(false);
+  const [shouldShowAd, setShouldShowAd] = useState(true);
+  const appStateRef = useRef(AppState.currentState);
+  const bannerRef = useRef<any>(null);
+
+  // Handle app state changes to pause/resume ads
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (
+        appStateRef.current.match(/active/) &&
+        nextAppState.match(/inactive|background/)
+      ) {
+        // App is going to background - hide ad to prevent background audio
+        console.log('BannerAd: App going to background, hiding ad');
+        setShouldShowAd(false);
+      } else if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // App is coming to foreground - show ad again
+        console.log('BannerAd: App coming to foreground, showing ad');
+        setShouldShowAd(true);
+      }
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Hide ad when screen loses focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('BannerAd: Screen focused, showing ad');
+      setShouldShowAd(true);
+      
+      return () => {
+        console.log('BannerAd: Screen unfocused, hiding ad');
+        setShouldShowAd(false);
+      };
+    }, [])
+  );
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      console.log('BannerAd: Component unmounting, cleaning up');
+      setShouldShowAd(false);
+    };
+  }, []);
 
   if (isPremium) {
     return null;
@@ -42,16 +94,21 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
         </TouchableOpacity>
       )}
       
-      {!adError ? (
+      {!adError && shouldShowAd ? (
         <BannerAd
+          ref={bannerRef}
           unitId={AdService.getBannerAdUnitId()}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
           requestOptions={{
             requestNonPersonalizedAdsOnly: true,
+            keywords: ['fitness', 'health', 'wellness', 'exercise'],
           }}
           onAdFailedToLoad={handleAdError}
+          onAdLoaded={() => console.log('BannerAd: Ad loaded successfully')}
+          onAdOpened={() => console.log('BannerAd: Ad opened')}
+          onAdClosed={() => console.log('BannerAd: Ad closed')}
         />
-      ) : (
+      ) : !adError ? null : (
         <View style={styles.fallback}>
           <TouchableOpacity 
             style={styles.fallbackButton}

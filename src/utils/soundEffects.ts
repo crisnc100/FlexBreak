@@ -153,16 +153,17 @@ export const initSoundSystem = async (): Promise<void> => {
         isAudioSessionInitialized = true;
         console.log('Audio session initialized successfully');
         break;
-      } catch (error) {
+      } catch (error: any) {
         retryCount++;
-        console.warn(`Audio session initialization attempt ${retryCount} failed:`, error);
+        console.warn(`Audio session initialization attempt ${retryCount} failed:`, error?.message || error);
         
         if (retryCount >= maxRetries) {
-          console.error('Failed to initialize audio session after', maxRetries, 'attempts');
-          // Continue without audio session - sounds may still work
+          console.warn('Audio session initialization failed, but continuing anyway');
+          // Mark as initialized anyway - sounds may still work without proper audio session
+          isAudioSessionInitialized = true;
         } else {
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Wait longer before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
         }
       }
     }
@@ -237,9 +238,9 @@ export const loadSound = async (soundName: SoundEffect): Promise<boolean> => {
         false // Don't download first (for better performance)
       );
 
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (increased to 30 seconds for slower devices)
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Sound loading timeout')), 10000)
+        setTimeout(() => reject(new Error('Sound loading timeout')), 30000)
       );
 
       const { sound } = await Promise.race([loadPromise, timeoutPromise]) as any;
@@ -273,17 +274,38 @@ export const loadSound = async (soundName: SoundEffect): Promise<boolean> => {
  */
 export const preloadAllSounds = async (): Promise<void> => {
   try {
-    const soundNames = Object.keys(soundUris) as SoundEffect[];
-    console.log(`Starting to preload ${soundNames.length} sounds...`);
+    // Prioritize critical sounds that are used frequently
+    const criticalSounds: SoundEffect[] = ['click', 'complete', 'levelUp', 'AInotification1'];
+    const allSounds = Object.keys(soundUris) as SoundEffect[];
+    const nonCriticalSounds = allSounds.filter(s => !criticalSounds.includes(s));
     
-    // Load sounds in smaller batches to avoid overwhelming the system
-    const batchSize = 5;
+    console.log(`Starting to preload ${allSounds.length} sounds (${criticalSounds.length} critical)...`);
+    
     let loadedCount = 0;
     let failedCount = 0;
     
-    for (let i = 0; i < soundNames.length; i += batchSize) {
-      const batch = soundNames.slice(i, i + batchSize);
+    // Load critical sounds first with longer timeout
+    for (const soundName of criticalSounds) {
+      try {
+        const success = await loadSound(soundName);
+        if (success) {
+          loadedCount++;
+        } else {
+          failedCount++;
+        }
+      } catch (error) {
+        failedCount++;
+        console.warn(`Failed to load critical sound: ${soundName}`);
+      }
+    }
+    
+    // Load non-critical sounds in smaller batches
+    const batchSize = 3; // Reduced batch size
+    
+    for (let i = 0; i < nonCriticalSounds.length; i += batchSize) {
+      const batch = nonCriticalSounds.slice(i, i + batchSize);
       
+      // Use allSettled to continue even if some fail
       const results = await Promise.allSettled(
         batch.map(name => loadSound(name))
       );
@@ -297,13 +319,23 @@ export const preloadAllSounds = async (): Promise<void> => {
         }
       });
       
-      // Small delay between batches
-      if (i + batchSize < soundNames.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Longer delay between batches to prevent overwhelming the system
+      if (i + batchSize < nonCriticalSounds.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
     
     console.log(`Sound preloading completed: ${loadedCount} loaded, ${failedCount} failed`);
+    console.log(`Sound system status after preload:`, getSoundSystemStatus());
+    
+    // If too many sounds failed, try retrying them after a delay
+    if (failedCount > 5) {
+      console.log(`Many sounds failed to load. Will retry in background...`);
+      // Retry failed sounds after 5 seconds
+      setTimeout(() => {
+        retryFailedSounds().catch(console.error);
+      }, 5000);
+    }
   } catch (error) {
     console.error('Error preloading sounds:', error);
   }
