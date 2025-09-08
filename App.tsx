@@ -688,16 +688,22 @@ function MainApp() {
         // IMPORTANT: Wait a bit to ensure the modal handler is set up first
         await new Promise(resolve => setTimeout(resolve, 500));
         
+        // Defer heavy initializers if onboarding is showing to avoid cold-start lag
+        if (showIntro) {
+          console.log('Deferring heavy initialization until after onboarding');
+          return;
+        }
+
         // Initialize local notifications system
         await notifications.configureNotifications();
-        
+
         // Clear any data cleanup notifications
         await clearDataCleanupNotifications();
-        
+
         // Initialize AI wellness system (includes notifications)
         const systemInitializer = (await import('./src/services/ai/config/systemInitializer')).default;
         await systemInitializer.initialize();
-        
+
         // Get notification permissions (both systems need this)
         const permissionsGranted = await notifications.requestNotificationsPermissions();
         
@@ -793,15 +799,16 @@ function MainApp() {
         // Initialize sound system with user preferences
         await soundEffects.initSoundSystem();
 
-        // Prime the click sound to guarantee first-tap responsiveness
+        // Prime core onboarding sounds to guarantee first-tap responsiveness
         try {
           await soundEffects.loadSound('click');
+          await soundEffects.loadSound('intro');
         } catch (_) {}
 
         // Preload all sound effects for faster playback
         await soundEffects.preloadAllSounds();
 
-        // After audio is configured, initialize AdMob so ad audio cannot preempt our audio session
+        // After audio is configured, initialize AdMob SDK (safe by itself)
         try {
           console.log('Initializing AdMob after audio setup...');
           await mobileAds().setRequestConfiguration({
@@ -856,6 +863,21 @@ function MainApp() {
       });
     };
   }, []);
+
+  // Initialize AdService lazily after onboarding completes to avoid background ad audio
+  useEffect(() => {
+    if (!showIntro) {
+      (async () => {
+        try {
+          const { default: AdService } = await import('./src/services/adService');
+          await AdService.initialize();
+          console.log('AdService initialized after onboarding');
+        } catch (e) {
+          console.error('Failed to initialize AdService after onboarding:', e);
+        }
+      })();
+    }
+  }, [showIntro]);
   
   // Effect to animate fade-in when transitioning from intro screens
   useEffect(() => {

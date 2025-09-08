@@ -22,6 +22,7 @@ class AdService {
   private settingsOpenCount: number = 0;
   private achievementsOpenCount: number = 0;
   private isPremium: boolean = false;
+  private initialized: boolean = false;
 
   // Ad Unit IDs - Using test IDs for development
   // TODO: Create ad units in AdMob console and replace these IDs
@@ -40,7 +41,7 @@ class AdService {
   };
 
   private constructor() {
-    this.initializeAds();
+    // Make initialization lazy to avoid competing with onboarding/audio on first boot
     this.loadStoredCounts();
   }
 
@@ -72,6 +73,14 @@ class AdService {
     } catch (error) {
       console.error('Error initializing ads:', error);
     }
+  }
+
+  async initialize() {
+    if (this.initialized) {
+      return;
+    }
+    this.initialized = true;
+    await this.initializeAds();
   }
 
   private async loadStoredCounts() {
