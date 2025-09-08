@@ -20,11 +20,15 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
   const { isPremium } = usePremium();
   const [adError, setAdError] = useState(false);
   const [shouldShowAd, setShouldShowAd] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const appStateRef = useRef(AppState.currentState);
   const bannerRef = useRef<any>(null);
 
   // Handle app state changes to pause/resume ads
   useEffect(() => {
+    // Small initial delay to avoid competing with audio setup on first mount
+    const readyTimer = setTimeout(() => setIsReady(true), 1000);
+
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (
         appStateRef.current.match(/active/) &&
@@ -47,6 +51,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
       subscription.remove();
+      clearTimeout(readyTimer);
     };
   }, []);
 
@@ -94,7 +99,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
         </TouchableOpacity>
       )}
       
-      {!adError && shouldShowAd ? (
+      {!adError && shouldShowAd && isReady ? (
         <BannerAd
           ref={bannerRef}
           unitId={AdService.getBannerAdUnitId()}

@@ -77,23 +77,7 @@ if (!firebase.apps.length) {
 // Avoid playing intro sound twice
 let introSoundPlayed = false;
 
-// Initialize AdMob with proper configuration
-mobileAds()
-  .initialize()
-  .then((adapterStatuses) => {
-    console.log('AdMob initialized successfully:', adapterStatuses);
-    // Set global ad settings to prevent auto-playing video ads with sound
-    mobileAds().setRequestConfiguration({
-      // Request non-personalized ads
-      tagForChildDirectedTreatment: false,
-      tagForUnderAgeOfConsent: false,
-      // Set volume to 0 for video ads by default
-      maxAdContentRating: 'G',
-    });
-  })
-  .catch((error) => {
-    console.error('AdMob initialization error:', error);
-  });
+// AdMob initialization is deferred until after audio is configured
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -808,9 +792,28 @@ function MainApp() {
         
         // Initialize sound system with user preferences
         await soundEffects.initSoundSystem();
-        
+
+        // Prime the click sound to guarantee first-tap responsiveness
+        try {
+          await soundEffects.loadSound('click');
+        } catch (_) {}
+
         // Preload all sound effects for faster playback
         await soundEffects.preloadAllSounds();
+
+        // After audio is configured, initialize AdMob so ad audio cannot preempt our audio session
+        try {
+          console.log('Initializing AdMob after audio setup...');
+          await mobileAds().setRequestConfiguration({
+            tagForChildDirectedTreatment: false,
+            tagForUnderAgeOfConsent: false,
+            maxAdContentRating: 'G',
+          });
+          const adapters = await mobileAds().initialize();
+          console.log('AdMob initialized successfully (post-audio):', adapters);
+        } catch (adInitError) {
+          console.error('AdMob initialization error (post-audio):', adInitError);
+        }
         
         // Log the status after preloading
         const status = soundEffects.getSoundSystemStatus();
