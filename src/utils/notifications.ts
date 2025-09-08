@@ -43,6 +43,7 @@ export async function configureNotifications(): Promise<void> {
       const isGoodbye = data?.isGoodbye;
       const isAIResponse = data?.type === 'ai_wellness_response' || data?.isWelcomeResponse;
       const isAICheckIn = data?.type === 'ai_wellness_checkin';
+      const isWeather = data?.isWeatherBased === true || data?.type === 'weather_motivational';
       
       console.log('[notifications.ts] Notification received in foreground:', {
         title: notification.request.content.title,
@@ -56,6 +57,14 @@ export async function configureNotifications(): Promise<void> {
       // 1. Welcome/goodbye messages
       // 2. AI wellness check-ins
       // 3. AI wellness responses (for conversation flow)
+      // 4. Weather-based motivational messages (NEW)
+      if (isWeather) {
+        return {
+          shouldShowAlert: true,   // Show weather messages even if app is open
+          shouldPlaySound: false,  // Keep gentle in-app
+          shouldSetBadge: false,
+        };
+      }
       if (isWelcome || isGoodbye || isAIResponse || isAICheckIn) {
         return {
           shouldShowAlert: true,   // Show these immediately

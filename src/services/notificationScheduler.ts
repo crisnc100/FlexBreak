@@ -1,8 +1,10 @@
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationType, scheduleTypedNotification, cancelNotificationsByType } from '../utils/notificationManager';
 import { ReminderSettings } from '../types/reminders';
 import { getNextDayOfWeek, dayStringToNumber } from '../utils/dateUtils';
 import { getRandomMotivationalMessage, getRandomMotivationalMessageExcluding } from '../constants/motivationalMessages';
+import { getRandomWeekendMessageExcluding } from '../constants/weekendMessages';
 import { getCurrentLocation, areWeatherNotificationsEnabled } from './locationService';
 import { getWeatherData, getWeatherForecast, generateWeatherMessage, WeatherData, WeatherForecast } from './weatherService';
 import { shouldShowWeatherMessage } from '../utils/weatherUtils';
@@ -160,6 +162,55 @@ export async function scheduleProductionMotivationalMessages(): Promise<void> {
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
 
+    // Load last-used indices to reduce repetition
+    type TimeOfDay = 'morning' | 'afternoon';
+    type Pool = 'weekday' | 'weekend';
+    const keyFor = (t: TimeOfDay, p: Pool) => `@flexbreak:motivational:lastIndex:${t}:${p}`;
+    const parseIntOrNull = (v: string | null) => (v === null || v === undefined ? null : Number.isNaN(parseInt(v, 10)) ? null : parseInt(v, 10));
+
+    const lastIndexCache: Record<string, number | null> = {
+      [`${keyFor('morning','weekday')}`]: parseIntOrNull(await AsyncStorage.getItem(keyFor('morning','weekday'))),
+      [`${keyFor('morning','weekend')}`]: parseIntOrNull(await AsyncStorage.getItem(keyFor('morning','weekend'))),
+      [`${keyFor('afternoon','weekday')}`]: parseIntOrNull(await AsyncStorage.getItem(keyFor('afternoon','weekday'))),
+      [`${keyFor('afternoon','weekend')}`]: parseIntOrNull(await AsyncStorage.getItem(keyFor('afternoon','weekend'))),
+    };
+
+    const setLastIndex = async (t: TimeOfDay, p: Pool, idx: number | null) => {
+      const k = keyFor(t, p);
+      lastIndexCache[k] = idx;
+      if (idx === null || idx === undefined) {
+        await AsyncStorage.removeItem(k);
+      } else {
+        await AsyncStorage.setItem(k, String(idx));
+      }
+    };
+
+    // Helper to pick a motivational message with anti-repeat and weekend pool
+    const pickMotivation = (
+      targetDay: Date,
+      time: TimeOfDay,
+      excludeIndexFromSameDay: number | null
+    ): { title: string; body: string; index: number; pool: Pool } => {
+      const isWeekend = targetDay.getDay() === 0 || targetDay.getDay() === 6;
+      const pool: Pool = isWeekend ? 'weekend' : 'weekday';
+      const lastIndexKey = keyFor(time, pool);
+      const lastIndex = lastIndexCache[lastIndexKey] ?? null;
+
+      if (pool === 'weekend') {
+        // Avoid repeating immediate past and same-day duplicate
+        const exclude = excludeIndexFromSameDay ?? lastIndex;
+        const { message, index } = getRandomWeekendMessageExcluding(exclude ?? null);
+        // Update cache immediately for sequential scheduling
+        lastIndexCache[lastIndexKey] = index;
+        return { title: message.title, body: message.body, index, pool };
+      } else {
+        const exclude = excludeIndexFromSameDay ?? lastIndex;
+        const { message, index } = getRandomMotivationalMessageExcluding(exclude ?? null);
+        lastIndexCache[lastIndexKey] = index;
+        return { title: message.title, body: message.body, index, pool };
+      }
+    };
+
     // Schedule for 7 days forward including today
     for (let dayOffset = 0; dayOffset < NOTIFICATION_TIMES.SCHEDULE_DAYS_AHEAD; dayOffset++) {
       const targetDay = new Date(dayStart);
@@ -196,12 +247,45 @@ export async function scheduleProductionMotivationalMessages(): Promise<void> {
       }
       
       // Schedule morning message (with weather when relevant and only for first 3 days)
-      await scheduleMorningMessage(targetDay, dayOffset, now, dayWeatherData);
+      const morningResult = await scheduleMorningMessage(
+        targetDay,
+        dayOffset,
+        now,
+        dayWeatherData,
+        pickMotivation
+      );
       
       // Schedule afternoon message (ALWAYS motivational, never weather)
-      await scheduleAfternoonMessage(targetDay, dayOffset, now, null); // Pass null to ensure motivational
+      await scheduleAfternoonMessage(
+        targetDay,
+        dayOffset,
+        now,
+        // avoid duplicating the same motivational used in morning (if any)
+        morningResult.usedMotivationalIndex,
+        pickMotivation
+      );
     }
     
+    // Persist last-used indices to avoid immediate repeats across runs
+    try {
+      const keysToPersist = [
+        keyFor('morning','weekday'),
+        keyFor('morning','weekend'),
+        keyFor('afternoon','weekday'),
+        keyFor('afternoon','weekend'),
+      ];
+      for (const k of keysToPersist) {
+        const v = lastIndexCache[k];
+        if (v === null || v === undefined) {
+          await AsyncStorage.removeItem(k);
+        } else {
+          await AsyncStorage.setItem(k, String(v));
+        }
+      }
+    } catch (persistErr) {
+      console.warn('Could not persist motivational last-index cache', persistErr);
+    }
+
     console.log(`Scheduled messages for the next ${NOTIFICATION_TIMES.SCHEDULE_DAYS_AHEAD} days:`);
     console.log(`- Days 0-2: Weather (morning if relevant) + Motivational (afternoon always)`);
     console.log(`- Days 3-6: Pure motivational (both morning and afternoon)`);
@@ -217,8 +301,13 @@ async function scheduleMorningMessage(
   targetDay: Date,
   dayOffset: number,
   now: Date,
-  weatherData: WeatherData | null
-): Promise<void> {
+  weatherData: WeatherData | null,
+  pickMotivation: (
+    targetDay: Date,
+    time: 'morning'|'afternoon',
+    excludeIndexFromSameDay: number | null
+  ) => { title: string; body: string; index: number; pool: 'weekday'|'weekend' }
+): Promise<{ usedMotivationalIndex: number | null }> {
   const morningHour = NOTIFICATION_TIMES.MORNING_START + Math.floor(Math.random() * 2);
   const morningMinute = Math.floor(Math.random() * 60);
   
@@ -227,8 +316,9 @@ async function scheduleMorningMessage(
   
   // Only schedule today's morning message if it's in the future
   if (dayOffset > 0 || morningDate > now) {
-    let morningMsg;
+    let morningMsg: { title: string; body: string };
     let notificationType = NotificationType.MOTIVATIONAL;
+    let usedMotivationalIndex: number | null = null;
     
     // Check if we should use weather message (morning only)
     if (weatherData) {
@@ -242,11 +332,15 @@ async function scheduleMorningMessage(
         morningMsg = generateWeatherMessage(weatherData);
         notificationType = NotificationType.WEATHER_MOTIVATIONAL;
       } else {
-        morningMsg = getRandomMotivationalMessage();
+        const pick = pickMotivation(targetDay, 'morning', null);
+        morningMsg = { title: pick.title, body: pick.body };
+        usedMotivationalIndex = pick.index;
       }
     } else {
       console.log(`Day ${dayOffset}: No weather data available`);
-      morningMsg = getRandomMotivationalMessage();
+      const pick = pickMotivation(targetDay, 'morning', null);
+      morningMsg = { title: pick.title, body: pick.body };
+      usedMotivationalIndex = pick.index;
     }
     
     const morningId = await scheduleTypedNotification(
@@ -268,7 +362,9 @@ async function scheduleMorningMessage(
     );
     
     console.log(`Scheduled morning message for ${morningDate.toLocaleString()} with ID ${morningId} (${notificationType === NotificationType.WEATHER_MOTIVATIONAL ? 'weather_motivational' : 'motivational'})`);
+    return { usedMotivationalIndex };
   }
+  return { usedMotivationalIndex: null };
 }
 
 /**
@@ -278,7 +374,12 @@ async function scheduleAfternoonMessage(
   targetDay: Date,
   dayOffset: number,
   now: Date,
-  weatherData: WeatherData | null
+  excludeIndexFromMorning: number | null,
+  pickMotivation: (
+    targetDay: Date,
+    time: 'morning'|'afternoon',
+    excludeIndexFromSameDay: number | null
+  ) => { title: string; body: string; index: number; pool: 'weekday'|'weekend' }
 ): Promise<void> {
   const afternoonHour = NOTIFICATION_TIMES.AFTERNOON_START + Math.floor(Math.random() * 2);
   const afternoonMinute = Math.floor(Math.random() * 60);
@@ -290,7 +391,8 @@ async function scheduleAfternoonMessage(
   if (dayOffset > 0 || afternoonDate > now) {
     // AFTERNOON IS ALWAYS MOTIVATIONAL - Never weather
     // This ensures users always get at least 1 motivational message per day
-    const afternoonMsg = getRandomMotivationalMessage();
+    const pick = pickMotivation(targetDay, 'afternoon', excludeIndexFromMorning ?? null);
+    const afternoonMsg = { title: pick.title, body: pick.body };
     const notificationType = NotificationType.MOTIVATIONAL;
     
     console.log(`Day ${dayOffset} afternoon: Always motivational (50/50 balance rule)`);

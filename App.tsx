@@ -57,6 +57,7 @@ import { useAIWellnessPremiumUpgrade } from './src/hooks/useAIWellnessPremiumUpg
 import { AIWellnessPremiumUpgrade } from './src/components/ai/AIWellnessPremiumUpgrade';
 import * as Linking from 'expo-linking';
 import { canAccessFlexCoach } from './src/utils/siriShortcuts';
+import aiSystemInitializer from './src/services/ai/config/systemInitializer';
 
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
@@ -211,7 +212,7 @@ export default function App() {
         // Initialize video loader
         await videoLoaderService.initialize();
         console.log('✅ Video loader service initialized');
-        
+
         // Clean up expired weather cache
         const { cleanupWeatherCache } = await import('./src/services/weatherService');
         await cleanupWeatherCache();
@@ -221,6 +222,20 @@ export default function App() {
     };
 
     initializeServices();
+  }, []);
+
+  // Initialize AI wellness system (secure-mode aware)
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await aiSystemInitializer.initialize();
+        console.log('AI wellness initialization:', result);
+        // Optionally ensure schedules are upgraded after subscription changes
+        // await aiSystemInitializer.checkAndRestoreAfterUpgrade();
+      } catch (e) {
+        console.error('AI wellness init failed:', e);
+      }
+    })();
   }, []);
   
   return (

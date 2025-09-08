@@ -139,7 +139,7 @@ const QUICK_ACTIONS = {
 
 const FALLBACK_RESPONSES = {
   en: {
-    back_pain: "Try this: Stand up, hands on lower back, arch gently 3 times - it'll release tension and help you sit comfortably for focused work. Cat-cow stretches boost productivity by 20%!",
+    back_pain: "Try this: Stand up, hands on lower back, arch gently 3 times - it'll release tension and help you sit more comfortably so you can focus better.",
     stress: "Take 5 deep belly breaths right now - it'll reset your mind for clearer thinking. Roll shoulders back 10 times. You've got this, and you'll tackle that task better after!",
     fatigue: "Stand up and do 10 arm circles - it'll wake up your brain for sharper focus. Deep breaths and water will energize you to power through your work!",
     focus: "Try 20-20-20: Look 20 feet away for 20 seconds - it'll refresh your eyes for better screen work. Gentle neck rolls prevent tension headaches that kill productivity.",
@@ -147,7 +147,7 @@ const FALLBACK_RESPONSES = {
     general: "Stand up and stretch for 30 seconds - it'll boost your energy and help you work smarter, not harder. Your productivity will thank you!"
   },
   es: {
-    back_pain: "Prueba esto: Levántate, manos en espalda baja, arquea suavemente 3x - liberará tensión y te ayudará a trabajar cómodamente. ¡El estiramiento gato-vaca aumenta la productividad un 20%!",
+    back_pain: "Prueba esto: Levántate, manos en la espalda baja, arquea suavemente 3 veces; liberará tensión y te ayudará a sentarte con más comodidad para concentrarte mejor.",
     stress: "Toma 5 respiraciones profundas ahora - reiniciará tu mente para pensar más claro. Gira hombros 10x. ¡Puedes con esto, y trabajarás mejor después!",
     fatigue: "Levántate, haz 10 círculos con brazos - despertará tu cerebro para mejor enfoque. ¡Respiración profunda y agua te energizarán para rendir al máximo!",
     focus: "Prueba 20-20-20: Mira a 20 pies por 20 segundos - refrescará tus ojos para mejor trabajo en pantalla. Los giros de cuello previenen dolores que matan la productividad.",
@@ -155,7 +155,7 @@ const FALLBACK_RESPONSES = {
     general: "Levántate y estírate 30 segundos - aumentará tu energía y te ayudará a trabajar más inteligentemente. ¡Tu productividad te lo agradecerá!"
   },
   zh: {
-    back_pain: "试试这个：站起来，双手放下背，轻轻后弯3次 - 这会释放紧张，帮你舒适工作提高专注。猫牛式能提升20%生产力！",
+    back_pain: "试试这个：站起来，双手放在下背部，轻轻后弯3次——可缓解紧张，让你坐得更舒适，更容易专注。",
     stress: "现在深呼吸5次 - 这会重置你的思维，让你思考更清晰。肩膀后转10次。你能行的，之后工作会更出色！",
     fatigue: "站起来手臂画圈10次 - 这会唤醒大脑，让你更专注。深呼吸加喝水会让你充满能量，高效完成工作！",
     focus: "试试20-20-20法则：看20英尺外20秒 - 这会让眼睛恢复，更好地进行屏幕工作。颈部转动防止影响生产力的头痛。",

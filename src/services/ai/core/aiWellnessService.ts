@@ -140,7 +140,7 @@ export class AIWellnessServiceV2 {
         : null;
       const conversationHistoryForPrompt = updatedSessionContext?.recentMessages || [];
       
-      const enhancedPrompt = promptManager.buildEnhancedPrompt({
+      let enhancedPrompt = promptManager.buildEnhancedPrompt({
         userInput,
         userContext: context,
         conversationHistory: conversationHistoryForPrompt,
@@ -158,7 +158,7 @@ export class AIWellnessServiceV2 {
           es: '\n\nEsta es una notificación de chequeo programada. Sé cálido y alentador.',
           zh: '\n\n这是定期问候通知。请温暖和鼓励。'
         };
-        enhancedPrompt + (notificationInstructions[languageCode] || notificationInstructions.en);
+        enhancedPrompt += (notificationInstructions[languageCode] || notificationInstructions.en);
       }
       
       // Get AI response using appropriate model
@@ -264,18 +264,19 @@ export class AIWellnessServiceV2 {
       
       // Format the response for better display
       const formattedResponse = formatAIResponse(aiResponse, isNotification);
+      const safeResponse = this.applySafetyFooter(formattedResponse, userInput, languageCode, isNotification);
       
       // Extract the main suggestion from the response
-      const mainSuggestion = this.extractMainSuggestion(formattedResponse);
+      const mainSuggestion = this.extractMainSuggestion(safeResponse);
       
       // Store assistant response in conversation
       if (userId) {
-        await conversationManager.addMessage(userId, 'assistant', formattedResponse, mainSuggestion);
+        await conversationManager.addMessage(userId, 'assistant', safeResponse, mainSuggestion);
       }
       
       // Extract and store wellness data with the AI response for validation
       if (userId) {
-        await memoryService.extractAndStore(userId, userInput, formattedResponse, languageCode);
+        await memoryService.extractAndStore(userId, userInput, safeResponse, languageCode);
       }
       
       // Track costs with improved token estimation
@@ -289,12 +290,12 @@ export class AIWellnessServiceV2 {
       );
       
       // Parse response for actions
-      const suggestedActions = this.extractActions(formattedResponse);
+      const suggestedActions = this.extractActions(safeResponse);
       const category = categorizeInput(userInput);
       
       // Store conversation to AsyncStorage for persistence
       if (userId) {
-        await this.storeConversation(userId, userInput, formattedResponse);
+        await this.storeConversation(userId, userInput, safeResponse);
       }
       
       await this.trackUsage(userId);
@@ -313,7 +314,7 @@ export class AIWellnessServiceV2 {
       }
       
       return {
-        response: formattedResponse,
+        response: safeResponse,
         suggestedActions,
         category
       };
@@ -336,11 +337,61 @@ export class AIWellnessServiceV2 {
       
       // Use fallback response for non-retryable errors
       const fallbackResponse = await this.getFallbackResponse(userInput, userId);
+      const formattedFallback = formatAIResponse(fallbackResponse, isNotification);
+      const safeFallback = this.applySafetyFooter(formattedFallback, userInput, (await buildUserContext(userInput, userId)).detectedLanguage || 'en', isNotification);
       return {
-        response: formatAIResponse(fallbackResponse, isNotification),
+        response: safeFallback,
         category: 'error',
         fallback: true
       };
+    }
+  }
+
+  private applySafetyFooter(response: string, userInput: string, language: string, isNotification: boolean): string {
+    try {
+      if (isNotification) return response; // keep notifications short
+
+      const text = (userInput || '').toLowerCase();
+
+      // Self-harm red flags
+      const selfHarmPatterns = [
+        'suicide', 'kill myself', 'harm myself', 'self-harm', 'end my life',
+        'suicidio', 'matarme', 'hacerme daño', 'quitarme la vida',
+        '自杀', '傷害自己', '伤害自己', '轻生'
+      ];
+      const isSelfHarm = selfHarmPatterns.some(p => text.includes(p));
+
+      // Severe injury/pain red flags
+      const injuryPatterns = [
+        'severe pain', 'sharp pain', 'numbness', 'tingling', 'injury', 'injured', 'fracture', 'broken', 'swollen', "can't move",
+        'dolor severo', 'dolor agudo', 'entumecimiento', 'hormigueo', 'lesión', 'lesion', 'fractura', 'hinchado', 'no puedo mover',
+        '剧痛', '刺痛', '麻木', '受伤', '骨折', '肿胀', '不能动'
+      ];
+      const isInjury = injuryPatterns.some(p => text.includes(p));
+
+      const alreadyHasSafety = /consult\s+a\s+qualified\s+professional|consulta\s+a\s+un\s+profesional|咨询.*专业人士/i.test(response);
+
+      if (isSelfHarm) {
+        const msg = {
+          en: "If you’re thinking about harming yourself or others, please seek immediate help from local emergency services or a trusted professional. You’re not alone.",
+          es: "Si estás pensando en hacerte daño a ti u a otros, busca ayuda inmediata con los servicios de emergencia locales o un profesional de confianza. No estás solo/a.",
+          zh: "如果你有伤害自己或他人的想法，请立即联系当地急救或可信赖的专业人士。你并不孤单。"
+        }[language] || "Please seek immediate help from local emergency services or a trusted professional.";
+        return `${response}\n\n${msg}`.trim();
+      }
+
+      if (isInjury && !alreadyHasSafety) {
+        const msg = {
+          en: "If you’re experiencing severe or worsening symptoms, stop and consult a qualified professional.",
+          es: "Si tienes síntomas graves o que empeoran, detente y consulta a un profesional de la salud.",
+          zh: "如果症状严重或加重，请停止并咨询专业人士。"
+        }[language] || "If symptoms are severe or worsening, consult a qualified professional.";
+        return `${response}\n\n${msg}`.trim();
+      }
+
+      return response;
+    } catch {
+      return response;
     }
   }
   

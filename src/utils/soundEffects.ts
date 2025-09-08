@@ -142,11 +142,14 @@ export const initSoundSystem = async (): Promise<void> => {
     while (retryCount < maxRetries) {
       try {
         await Audio.setAudioModeAsync({
+          // iOS
           playsInSilentModeIOS: true,
           allowsRecordingIOS: false,
           staysActiveInBackground: false,
-          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
-          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+          // Use enum syntax compatible with expo-av@15
+          interruptionModeIOS: Audio.InterruptionModeIOS.DoNotMix,
+          // Android
+          interruptionModeAndroid: Audio.InterruptionModeAndroid.DoNotMix,
           shouldDuckAndroid: true,
         });
         
@@ -349,6 +352,23 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
     // Return early if sound is disabled
     if (!soundEnabled) {
       return;
+    }
+
+    // If audio session wasn't initialized earlier, try once here lazily
+    if (!isAudioSessionInitialized) {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          allowsRecordingIOS: false,
+          staysActiveInBackground: false,
+          interruptionModeIOS: Audio.InterruptionModeIOS.DoNotMix,
+          interruptionModeAndroid: Audio.InterruptionModeAndroid.DoNotMix,
+          shouldDuckAndroid: true,
+        });
+        isAudioSessionInitialized = true;
+      } catch (lazyInitErr) {
+        // Continue anyway; we'll attempt to play without explicit session changes
+      }
     }
     
     const now = Date.now();
