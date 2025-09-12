@@ -14,10 +14,20 @@ config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, 'src'),
 ];
 
-// Add additional server options for React Native Firebase if needed
+// Add additional server options / module aliases
 config.resolver.extraNodeModules = {
+  // Ensure Firebase JS SDK resolves correctly
   'firebase': path.resolve(__dirname, 'node_modules/firebase'),
-  'firebase/compat/functions': path.resolve(__dirname, 'node_modules/firebase/compat/functions'),
+  'firebase/compat/functions': path.resolve(
+    __dirname,
+    'node_modules/firebase/compat/functions'
+  ),
+  // Shim React Native's deprecated PushNotificationIOS to avoid crashes when
+  // any dependency accidentally requires it on iOS. We use expo-notifications instead.
+  'react-native/Libraries/PushNotificationIOS/PushNotificationIOS': path.resolve(
+    __dirname,
+    'shims/PushNotificationIOS.js'
+  ),
 };
 
 // Exclude firebase-admin from Metro file watching (dev dependency only)

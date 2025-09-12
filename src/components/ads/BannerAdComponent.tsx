@@ -11,6 +11,47 @@ interface BannerAdComponentProps {
   onOpenSubscription?: () => void;
 }
 
+const DynamicBannerAd: React.FC<{
+  bannerRef: any;
+  unitId: string;
+  onAdFailedToLoad: (error: Error) => void;
+}> = ({ bannerRef, unitId, onAdFailedToLoad }) => {
+  const [BannerAdComponent, setBannerAdComponent] = useState<any>(null);
+  const [BannerAdSize, setBannerAdSize] = useState<any>(null);
+
+  useEffect(() => {
+    import('react-native-google-mobile-ads')
+      .then(({ BannerAd, BannerAdSize }) => {
+        setBannerAdComponent(() => BannerAd);
+        setBannerAdSize(BannerAdSize);
+      })
+      .catch((error) => {
+        console.error('Failed to load BannerAd module:', error);
+        onAdFailedToLoad(error);
+      });
+  }, []);
+
+  if (!BannerAdComponent || !BannerAdSize) {
+    return null;
+  }
+
+  return (
+    <BannerAdComponent
+      ref={bannerRef}
+      unitId={unitId}
+      size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+      requestOptions={{
+        requestNonPersonalizedAdsOnly: true,
+        keywords: ['fitness', 'health', 'wellness', 'exercise'],
+      }}
+      onAdFailedToLoad={onAdFailedToLoad}
+      onAdLoaded={() => console.log('BannerAd: Ad loaded successfully')}
+      onAdOpened={() => console.log('BannerAd: Ad opened')}
+      onAdClosed={() => console.log('BannerAd: Ad closed')}
+    />
+  );
+};
+
 export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ 
   position = 'bottom',
   showPremiumPrompt = true,
@@ -104,24 +145,11 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
       )}
       
       {!adError && shouldShowAd && isReady ? (
-        (() => {
-          const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
-          return (
-            <BannerAd
-              ref={bannerRef}
-              unitId={AdService.getBannerAdUnitId()}
-              size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-              requestOptions={{
-                requestNonPersonalizedAdsOnly: true,
-                keywords: ['fitness', 'health', 'wellness', 'exercise'],
-              }}
-              onAdFailedToLoad={handleAdError}
-              onAdLoaded={() => console.log('BannerAd: Ad loaded successfully')}
-              onAdOpened={() => console.log('BannerAd: Ad opened')}
-              onAdClosed={() => console.log('BannerAd: Ad closed')}
-            />
-          );
-        })()
+        <DynamicBannerAd 
+          bannerRef={bannerRef}
+          unitId={AdService.getBannerAdUnitId()}
+          onAdFailedToLoad={handleAdError}
+        />
       ) : !adError ? null : (
         <View style={styles.fallback}>
           <TouchableOpacity 

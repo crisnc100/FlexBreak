@@ -44,7 +44,6 @@
     },
     "web": {},
     "plugins": [
-      "expo-dev-client",
       [
         "expo-notifications",
         {
