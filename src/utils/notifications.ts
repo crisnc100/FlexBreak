@@ -92,6 +92,34 @@ export async function configureNotifications(): Promise<void> {
   // Note: Notification handlers are set up in setupAINotificationHandlers
   // We don't need duplicate listeners here
   
+  // On Android, ensure channels exist and are high importance for lock-screen visibility
+  try {
+    const { Platform } = await import('react-native');
+    if (Platform.OS === 'android') {
+      // Default channel used when none is provided
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Default',
+        importance: Notifications.AndroidImportance.HIGH,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+
+      // Reminders channel for scheduled reminders
+      await Notifications.setNotificationChannelAsync('reminders', {
+        name: 'Stretch Reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+
+      // (Removed legacy tests channel)
+    }
+  } catch (channelError) {
+    console.warn('Failed to ensure Android notification channels:', channelError);
+  }
+
   console.log('Notifications handler configured');
 }
 
@@ -108,13 +136,26 @@ export const requestNotificationsPermissions = async (): Promise<boolean> => {
   if (existingStatus !== 'granted') {
       // Android requires extra step to get permission
       if (Platform.OS === 'android') {
-        console.log('Setting up Android notification channel');
-        await Notifications.setNotificationChannelAsync('reminders', {
-          name: 'Stretch Reminders',
-          importance: Notifications.AndroidImportance.HIGH,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
-        });
+        console.log('Ensuring Android notification channels exist');
+        try {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'Default',
+            importance: Notifications.AndroidImportance.HIGH,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+          });
+          await Notifications.setNotificationChannelAsync('reminders', {
+            name: 'Stretch Reminders',
+            importance: Notifications.AndroidImportance.HIGH,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+          });
+          // (Removed legacy tests channel)
+        } catch (e) {
+          console.warn('Channel setup during permission request failed:', e);
+        }
       }
 
       console.log('Requesting permission...');
@@ -626,46 +667,7 @@ export async function cancelReminders(): Promise<void> {
   }
 }
 
-/**
- * Schedule a test notification that fires after a short delay
- * for testing purposes
- */
-export async function scheduleTestNotification(delaySeconds: number = 5): Promise<string> {
-  // Enforce a minimum delay for the test notification
-  const MINIMUM_TEST_DELAY = 20; // At least 20 seconds
-  if (delaySeconds < MINIMUM_TEST_DELAY) {
-    delaySeconds = MINIMUM_TEST_DELAY;
-  }
-  
-  console.log(`Scheduling TEST notification in ${delaySeconds} seconds`);
-  
-  try {
-    // Create a proper delay-based trigger that works in Expo
-    const now = new Date();
-    const futureTime = new Date(now.getTime() + (delaySeconds * 1000));
-    
-    console.log(`Test notification will appear at: ${futureTime.toLocaleTimeString()}`);
-    
-  const identifier = await Notifications.scheduleNotificationAsync({
-    content: {
-        title: 'FlexBreak Test',
-        body: 'This is a TEST notification. This confirms your notification system is working!',
-        data: { type: 'test_only' },
-        sound: true,
-      },
-      trigger: { 
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: delaySeconds,
-      },
-    });
-    
-    console.log('Test notification scheduled with ID:', identifier);
-    return identifier;
-  } catch (error) {
-    console.error('Error scheduling test notification:', error);
-    throw error;
-  }
-}
+// Removed legacy test notification scheduler
 
 /**
  * Schedule a real reminder for a specific time.

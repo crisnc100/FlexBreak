@@ -67,7 +67,8 @@ export function fillToTargetTime(
   routine: (Stretch | TransitionPeriod)[],
   pool: Stretch[],
   targetSeconds: number,
-  transitionDuration = 0
+  transitionDuration = 0,
+  maxStretchCount?: number
 ): (Stretch | TransitionPeriod)[] {
   const result: (Stretch | TransitionPeriod)[] = [...routine];
 
@@ -79,15 +80,28 @@ export function fillToTargetTime(
     }, 0);
 
   let current = durationOf(result);
-  const shuffled = shuffleArray(pool);
+  let shuffled = shuffleArray(pool);
   let idx = 0;
 
   while (current < targetSeconds && idx < shuffled.length) {
+    // Respect max stretch count if provided
+    const nonTransitionCount = result.filter(i => !('isTransition' in i)).length;
+    if (maxStretchCount !== undefined && nonTransitionCount >= maxStretchCount) break;
+    if (idx >= shuffled.length) {
+      shuffled = shuffleArray(pool);
+      idx = 0;
+    }
     const stretch = shuffled[idx++];
     const last = result[result.length - 1];
     if (last && !('isTransition' in last) && (last as Stretch).id === stretch.id) continue; // avoid immediate dup
 
-    if (transitionDuration > 0 && result.length > 0) {
+    // Insert transition between stretches (if last item is not a transition)
+    if (
+      transitionDuration > 0 &&
+      result.length > 0 &&
+      !('isTransition' in result[result.length - 1]) &&
+      (maxStretchCount === undefined || nonTransitionCount < maxStretchCount)
+    ) {
       result.push({
         id: `transition-pad-${result.length}`,
         name: 'Transition',

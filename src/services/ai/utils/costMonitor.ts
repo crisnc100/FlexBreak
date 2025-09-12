@@ -31,6 +31,8 @@ class CostMonitor {
   
   // Model costs per 1k tokens (in USD)
   private readonly MODEL_COSTS: Record<string, ModelCost> = {
+    'local_cta': { inputCostPer1k: 0, outputCostPer1k: 0 },
+    'local_ack': { inputCostPer1k: 0, outputCostPer1k: 0 },
     'mistralai/mistral-7b-instruct': { inputCostPer1k: 0.00025, outputCostPer1k: 0.00025 },
     'mistralai/mistral-7b-instruct:free': { inputCostPer1k: 0, outputCostPer1k: 0 },
     'meta-llama/llama-3.1-8b-instruct': { inputCostPer1k: 0.00018, outputCostPer1k: 0.00018 },

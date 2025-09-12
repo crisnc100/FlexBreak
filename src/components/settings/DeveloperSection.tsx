@@ -24,6 +24,7 @@ const DeveloperSection: React.FC<DeveloperSectionProps> = ({
 }) => {
   const { theme, isDark, isSunset } = useTheme();
 
+
   return (
     <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
       <Text style={[styles.sectionTitle, { color: theme.text }]}>Developer</Text>

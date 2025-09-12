@@ -650,38 +650,7 @@ export default function HomeScreen() {
     openModal('subscription');
   };
 
-  // Handle test notification
-  const handleTestNotification = async () => {
-    try {
-      console.log('Testing notification system...');
-      const hasPermission = await notifications.requestNotificationsPermissions();
-      console.log('Notification permission status:', hasPermission);
-
-      if (!hasPermission) {
-        console.log('Notification permission denied');
-        Alert.alert(
-          'Permission Required',
-          'Please enable notifications to test this feature.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // Schedule the test notification for 5 seconds in the future
-      // Using a much shorter delay for interactive testing
-      const delaySeconds = 5;
-      const testId = await notifications.scheduleTestNotification(delaySeconds);
-      console.log('TEST notification scheduled with ID:', testId);
-      
-      Alert.alert(
-        'Test Notification Scheduled',
-        `A notification will appear in ${delaySeconds} seconds.\n\nIMPORTANT EXPO LIMITATIONS:\n- You may need to exit the app completely to see it\n- If reminders aren't working, try restarting the app`
-      );
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      Alert.alert('Error', 'Could not send test notification');
-    }
-  };
+  // Removed legacy test notification handler
 
   // Handle custom routines press
   const handleCustomRoutinesPress = async () => {

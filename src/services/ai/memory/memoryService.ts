@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RoutineParams, BodyArea, Duration, Position } from '../../../types';
 
 // Unified memory system with validation, confidence scoring, and backward compatibility
 export interface UnifiedUserMemory {
@@ -36,6 +37,13 @@ export interface UnifiedUserMemory {
     totalInteractions: number;
     weeklyCount: number; // From simpleMemory
     isPremium: boolean;
+  };
+  // Lightweight routine context for continuity
+  recent_routine?: {
+    area: BodyArea;
+    duration: Duration;
+    position: Position;
+    timestamp: number;
   };
 }
 
@@ -293,8 +301,44 @@ class UnifiedMemoryService {
         parts.push(`Regular user for ${daysSinceStart} weeks`);
       }
     }
-    
+
+    // Include last routine context if available
+    if (memory.recent_routine) {
+      const lr = memory.recent_routine;
+      const label = {
+        en: 'Last routine',
+        es: 'Última rutina',
+        zh: '上次训练'
+      }[language];
+      parts.push(`${label}: ${lr.duration} min ${lr.area} • ${lr.position}`);
+    }
+
     return parts.length > 0 ? parts.join('. ') : '';
+  }
+
+  /**
+   * Record a short routine note to help with continuity
+   */
+  async recordRoutineNote(userId: string, rp: RoutineParams): Promise<void> {
+    const mem = await this.getMemory(userId);
+    const updated: UnifiedUserMemory = {
+      ...mem,
+      preferences: {
+        ...mem.preferences,
+        responseStyle: 'practical'
+      },
+      recent_routine: {
+        area: rp.area,
+        duration: rp.duration,
+        position: rp.position || 'All',
+        timestamp: Date.now()
+      },
+      usage: {
+        ...mem.usage,
+        lastCheckIn: Date.now()
+      }
+    };
+    await this.saveMemory(userId, updated);
   }
   
   /**

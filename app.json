@@ -12,7 +12,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cristianortega.flexbreak",
-      "buildNumber": "9",
+      "buildNumber": "10",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested.",
@@ -58,7 +59,8 @@
           "androidAppId": "ca-app-pub-9873959079273159~5503902608",
           "iosAppId": "ca-app-pub-9873959079273159~5503902608"
         }
-      ]
+      ],
+      "@react-native-firebase/app"
     ],
     "extra": {
       "eas": {

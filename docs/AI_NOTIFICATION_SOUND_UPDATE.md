@@ -144,51 +144,12 @@ async createEnhancedNotification(config: EnhancedNotificationConfig): Promise<st
 }
 ```
 
-## Testing the Custom Sound
+## Platform Notes
 
-### 1. Build for Testing
-Since custom sounds don't work in Expo Go, you need to build a development client:
-
-```bash
-# Create a development build
-eas build --profile development --platform all
-
-# Or for specific platform
-eas build --profile development --platform ios
-eas build --profile development --platform android
-```
-
-### 2. Test Notification
-```typescript
-// Add this test function to your app
-const testAINotificationSound = async () => {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: '🤖 AI Flex Coach',
-      body: 'Testing custom notification sound',
-      sound: 'AInotification1.mp3',
-    },
-    trigger: { seconds: 2 },
-  });
-};
-```
-
-## Fallback for Expo Go
-
-For testing in Expo Go (where custom sounds don't work), you can:
-
-1. Use the default system sound
-2. Play the sound in-app when notification is received
-
-```typescript
-// In your notification received handler
-Notifications.addNotificationReceivedListener(async (notification) => {
-  if (notification.request.content.data?.type === 'AI_WELLNESS_ENHANCED') {
-    // Play custom sound in-app (only works when app is in foreground)
-    await playAInotification1Sound(); // From soundEffects.ts
-  }
-});
-```
+Custom sounds only work in:
+- Development builds (not Expo Go)
+- Production builds
+- TestFlight/Internal testing tracks
 
 ## Important Notes
 

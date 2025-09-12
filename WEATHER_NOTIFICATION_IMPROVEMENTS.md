@@ -80,20 +80,6 @@ Instead of a separate toggle, show weather status:
 2. **Simplify the UX** - One notification system, enhanced by weather when available
 3. **Test with users** - Ensure the automatic approach feels natural
 
-## Testing Weather Notifications
-
-Run the test script:
-```bash
-npx ts-node src/utils/testing/testWeatherNotifications.ts
-```
-
-Or in the app:
-```typescript
-import { testWeatherNotifications } from './src/utils/testing/testWeatherNotifications';
-// Call in a dev menu or button
-await testWeatherNotifications();
-```
-
 ## Benefits
 - **Less friction**: Users don't need to find and enable a separate setting
 - **Better adoption**: Weather notifications happen automatically when possible

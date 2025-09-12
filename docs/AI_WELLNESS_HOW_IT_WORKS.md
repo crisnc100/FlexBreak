@@ -48,10 +48,9 @@ When you tap 🎙️ Voice Reply:
 - **Your mood history** - Shows your journey over time
 - **Works everywhere** - All iOS/Android versions
 
-## Testing
+## Managing Notifications
 
 In Settings > AI Wellness:
-1. **Test Notification Now (5s)** - Sends a test notification
-2. **View Schedule** - See when notifications are scheduled
+1. **View Schedule** - See when notifications are scheduled
 
 That's it! Simple, flexible, and focused on letting you express yourself naturally.

@@ -42,7 +42,7 @@ import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsIn
 // Import video loader service
 import { videoLoaderService } from './src/services/videoLoaderService';
 // Import AdMob initialization
-import mobileAds from 'react-native-google-mobile-ads';
+import { NativeModules } from 'react-native';
 import AdService from './src/services/adService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
@@ -133,9 +133,21 @@ export default function App() {
   // Disable console logs in production
   disableConsoleLogsInProduction();
   
-  // Initialize AdMob
+  // Initialize AdMob only when native module is present (dev/prod builds, not Expo Go)
   useEffect(() => {
-    mobileAds().initialize();
+    (async () => {
+      try {
+        const hasModule = !!(NativeModules as any)?.RNGoogleMobileAdsModule;
+        if (hasModule) {
+          const { default: mobileAds } = await import('react-native-google-mobile-ads');
+          mobileAds().initialize();
+        } else {
+          console.log('[App] Google Mobile Ads not available in this runtime. Skipping init.');
+        }
+      } catch (e) {
+        console.warn('[App] Failed to initialize mobileAds, skipping:', e);
+      }
+    })();
   }, []);
   
   // Mark app start time for performance measurement
@@ -602,6 +614,23 @@ function MainApp() {
         setShowFlexChat(true);
       }
     };
+
+    // Expose a global helper to navigate to the Routine tab with params
+    ;(global as any).navigateToRoutine = (params: any) => {
+      try {
+        if (navigationRef.isReady()) {
+          // Navigate to the Routine tab inside MainTabs with params
+          navigationRef.navigate('MainTabs' as any, {
+            screen: 'Routine',
+            params
+          } as any);
+        } else {
+          console.warn('[Global Navigation] navigationRef not ready for navigateToRoutine');
+        }
+      } catch (e) {
+        console.error('[Global Navigation] Failed to navigate to Routine', e);
+      }
+    };
     
     // Check if we need to show bubble on app focus (fallback)
     const checkModalFlag = async () => {
@@ -656,6 +685,7 @@ function MainApp() {
     return () => {
       setShowAIWellnessModal(null);
       (global as any).openFlexChat = null;
+      (global as any).navigateToRoutine = null;
       subscription?.remove();
     };
   }, []);
@@ -808,16 +838,23 @@ function MainApp() {
         // Preload all sound effects for faster playback
         await soundEffects.preloadAllSounds();
 
-        // After audio is configured, initialize AdMob SDK (safe by itself)
+        // After audio is configured, initialize AdMob SDK (guarded)
         try {
-          console.log('Initializing AdMob after audio setup...');
-          await mobileAds().setRequestConfiguration({
-            tagForChildDirectedTreatment: false,
-            tagForUnderAgeOfConsent: false,
-            maxAdContentRating: 'G',
-          });
-          const adapters = await mobileAds().initialize();
-          console.log('AdMob initialized successfully (post-audio):', adapters);
+          const hasAdsModule = !!(NativeModules as any)?.RNGoogleMobileAdsModule;
+          const hasRNAppModule = !!(NativeModules as any)?.RNAppModule;
+          if (hasAdsModule && hasRNAppModule) {
+            console.log('Initializing AdMob after audio setup...');
+            const { default: mobileAds } = await import('react-native-google-mobile-ads');
+            await mobileAds().setRequestConfiguration({
+              tagForChildDirectedTreatment: false,
+              tagForUnderAgeOfConsent: false,
+              maxAdContentRating: 'G',
+            });
+            const adapters = await mobileAds().initialize();
+            console.log('AdMob initialized successfully (post-audio):', adapters);
+          } else {
+            console.log('[AdMob] Skipping post-audio init: native ads module not available in this build');
+          }
         } catch (adInitError) {
           console.error('AdMob initialization error (post-audio):', adInitError);
         }

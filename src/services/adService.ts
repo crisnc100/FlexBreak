@@ -1,42 +1,32 @@
-import {
-  BannerAd,
-  BannerAdSize,
-  InterstitialAd,
-  RewardedAd,
-  RewardedAdEventType,
-  AdEventType,
-  TestIds,
-} from 'react-native-google-mobile-ads';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const INTERSTITIAL_COOLDOWN = 10 * 60 * 1000; // 10 minutes between interstitials
 const SETTINGS_OPEN_FREQUENCY = 3; // Show ad every 3rd time settings opened
 
 class AdService {
   private static instance: AdService;
-  private interstitialAd: InterstitialAd | null = null;
-  private rewardedAd: RewardedAd | null = null;
+  private interstitialAd: any | null = null;
+  private rewardedAd: any | null = null;
   private lastInterstitialTime: number = 0;
   private breaksCompleted: number = 0;
   private settingsOpenCount: number = 0;
   private achievementsOpenCount: number = 0;
   private isPremium: boolean = false;
   private initialized: boolean = false;
+  private static readonly isModuleAvailable: boolean = !!(NativeModules as any)?.RNGoogleMobileAdsModule && !!(NativeModules as any)?.RNAppModule;
 
   // Ad Unit IDs - Using test IDs for development
-  // TODO: Create ad units in AdMob console and replace these IDs
+  // (Avoid importing TestIds to prevent native module initialization in unsupported runtimes)
   private adUnitIds = {
     banner: __DEV__ 
-      ? TestIds.BANNER 
+      ? 'ca-app-pub-3940256099942544/6300978111' // Google test banner ID
       : 'ca-app-pub-9873959079273159/9281519601',
-    
     interstitial: __DEV__
-      ? TestIds.INTERSTITIAL
+      ? 'ca-app-pub-3940256099942544/1033173712' // Google test interstitial ID
       : 'ca-app-pub-9873959079273159/2281815225',
-    
     rewarded: __DEV__
-      ? TestIds.REWARDED
+      ? 'ca-app-pub-3940256099942544/5224354917' // Google test rewarded ID
       : 'ca-app-pub-9873959079273159/4300671571',
   };
 
@@ -51,10 +41,27 @@ class AdService {
     }
     return AdService.instance;
   }
+  
+  static isAvailable(): boolean {
+    return Platform.OS !== 'web' && AdService.isModuleAvailable;
+  }
+
+  // Instance-level helper for consumers using the default instance export
+  public isAvailable(): boolean {
+    return AdService.isAvailable();
+  }
 
   private async initializeAds() {
     try {
       console.log('AdService: Initializing ads...');
+      if (!AdService.isAvailable()) {
+        console.log('AdService: Google Mobile Ads module not available. Skipping ad initialization.');
+        return;
+      }
+      const {
+        InterstitialAd,
+        RewardedAd,
+      } = await import('react-native-google-mobile-ads');
       
       // Initialize interstitial ad
       console.log('AdService: Creating interstitial ad with ID:', this.adUnitIds.interstitial);
@@ -80,6 +87,10 @@ class AdService {
       return;
     }
     this.initialized = true;
+    if (!AdService.isAvailable()) {
+      console.log('AdService: Skipping initialize() — ads module not available in this build');
+      return;
+    }
     await this.initializeAds();
   }
 
@@ -125,18 +136,22 @@ class AdService {
     };
   }
 
-  private loadInterstitialAd() {
+  private async loadInterstitialAd() {
     if (!this.interstitialAd || this.isPremium) return;
 
-    const unsubscribe = this.interstitialAd.addAdEventListener(
-      AdEventType.LOADED,
-      () => {
-        console.log('Interstitial ad loaded');
-      }
-    );
-
-    this.interstitialAd.load();
-    return unsubscribe;
+    try {
+      const { AdEventType } = await import('react-native-google-mobile-ads');
+      const unsubscribe = this.interstitialAd.addAdEventListener(
+        AdEventType.LOADED,
+        () => {
+          console.log('Interstitial ad loaded');
+        }
+      );
+      this.interstitialAd.load();
+      return unsubscribe;
+    } catch (e) {
+      console.warn('AdService: Failed to load interstitial ad (module not available).');
+    }
   }
 
   private loadRewardedAd() {
@@ -153,22 +168,16 @@ class AdService {
     console.log('AdService: Loading rewarded ad...');
     
     // Add error listener
-    const unsubscribeError = this.rewardedAd.addAdEventListener(
-      AdEventType.ERROR,
-      (error: any) => {
+    import('react-native-google-mobile-ads').then(({ AdEventType, RewardedAdEventType }) => {
+      this.rewardedAd?.addAdEventListener(AdEventType.ERROR, (error: any) => {
         console.error('AdService: Rewarded ad error:', error);
-      }
-    );
-    
-    const unsubscribeLoaded = this.rewardedAd.addAdEventListener(
-      RewardedAdEventType.LOADED,
-      () => {
+      });
+      this.rewardedAd?.addAdEventListener(RewardedAdEventType.LOADED, () => {
         console.log('AdService: Rewarded ad loaded successfully');
-      }
-    );
+      });
+    }).catch(() => {});
 
     this.rewardedAd.load();
-    return unsubscribeLoaded;
   }
 
   private canShowInterstitial(): boolean {
@@ -248,6 +257,10 @@ class AdService {
 
   async showRewardedAd(): Promise<boolean> {
     console.log('AdService: showRewardedAd called');
+    if (!AdService.isAvailable()) {
+      console.log('AdService: Ads not available in this runtime');
+      return false;
+    }
     
     if (this.isPremium) {
       console.log('AdService: User is premium, granting reward without ad');
@@ -257,15 +270,17 @@ class AdService {
     if (!this.rewardedAd) {
       console.error('AdService: Rewarded ad not initialized, creating new one...');
       // Try to create a new one
+      const { RewardedAd } = await import('react-native-google-mobile-ads');
       this.rewardedAd = RewardedAd.createForAdRequest(this.adUnitIds.rewarded);
       if (!this.rewardedAd) {
         return false;
       }
     }
 
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       let isResolved = false;
       let cleanupTimeoutId: NodeJS.Timeout | null = null;
+      const { AdEventType, RewardedAdEventType } = await import('react-native-google-mobile-ads');
       
       // Helper to safely resolve only once and cleanup
       const safeResolve = (value: boolean) => {

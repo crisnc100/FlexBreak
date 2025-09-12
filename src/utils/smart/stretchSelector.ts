@@ -53,11 +53,15 @@ export const selectStretches = (
 
   const routine: (Stretch | TransitionPeriod)[] = [];
   let current = 0;
+  const desiredCount = parseInt(config.duration as any, 10) || 5;
 
   for (const stretch of filtered) {
+    const nonTransitionCount = routine.filter(i => !('isTransition' in i)).length;
+    if (nonTransitionCount >= desiredCount) break;
     if (current >= minDuration) break;
 
-    if (config.transitionDuration && config.transitionDuration > 0 && routine.length) {
+    // Insert transition between stretches (avoid double transitions)
+    if (config.transitionDuration && config.transitionDuration > 0 && routine.length > 0 && !('isTransition' in routine[routine.length - 1])) {
       routine.push({
         id: `transition-${routine.length}`,
         name: 'Transition',
@@ -75,5 +79,5 @@ export const selectStretches = (
   // Post-processing
   const deDuped = ensureVariety(routine, filtered, 3, config.transitionDuration || 0);
   const targetSec = selDuration * 60 * 0.9; // 90%
-  return fillToTargetTime(deDuped, filtered, targetSec, config.transitionDuration || 0);
-}; 
+  return fillToTargetTime(deDuped, filtered, targetSec, config.transitionDuration || 0, desiredCount);
+};

@@ -5,22 +5,258 @@ import { buildUserContext, categorizeInput } from '../contextBuilder';
 import { WELLNESS_COACH_PROMPT, FALLBACK_RESPONSES } from './promptManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AI_CONFIG } from '../../../config/aiConfig';
-import { KEYS } from '../../storageService';
+import { KEYS, getTransitionDuration } from '../../storageService';
 import memoryService, { simpleMemory } from '../memory/memoryService';
 import costMonitor from '../utils/costMonitor';
 import configValidator from '../../security/configValidator';
 import { rateLimiter, errorHandler, retryUtil } from '../utils/reliabilityService';
-import { conversationManager, formatAIResponse } from './conversationManager';
+import { conversationManager, formatAIResponse, extractExerciseSteps } from './conversationManager';
 import { promptManager } from './promptManager';
+import { RoutineParams, Stretch, RestPeriod, TransitionPeriod, BodyArea, Duration, Position } from '../../../types';
+import allStretches from '../../../data/stretches';
+import { parseUserInput } from '../../../utils/smart/parser';
+import { generateRoutineConfig } from '../../../utils/smart/configBuilder';
+import { selectStretches } from '../../../utils/smart/stretchSelector';
+import * as rewardManager from '../../../utils/progress/modules/rewardManager';
+import { inferRoutineDomain, decideOutputMode } from '../../../utils/smart/domainDetector';
 
 export interface WellnessResponse {
   response: string;
   suggestedActions?: string[];
   category?: string;
   fallback?: boolean;
+  routineParams?: RoutineParams;
 }
 
 export class AIWellnessServiceV2 {
+  /** Map quick answers like 'A'/'B' or 'stretch'/'workout' to a domain */
+  private detectClarificationAnswer(userInput: string): 'stretch' | 'workout' | null {
+    const tRaw = userInput.trim();
+    const t = tRaw.toLowerCase();
+    const onlyLetter = tRaw.replace(/[\s.,，。!！?？()（）]/g, '').toLowerCase();
+    if (onlyLetter === 'a') return 'stretch';
+    if (onlyLetter === 'b') return 'workout';
+
+    // English
+    if (t === 'stretch' || t === 'stretches' || t.includes('stretch routine')) return 'stretch';
+    if (t === 'workout' || t.includes('strength') || t.includes('training')) return 'workout';
+
+    // Spanish
+    if (t.includes('estirar') || t.includes('estiramiento') || t.includes('estiramientos')) return 'stretch';
+    if (t.includes('entrenamiento') || t.includes('fuerza') || t.includes('ejercicio')) return 'workout';
+
+    // Chinese
+    if (t.includes('拉伸') || t.includes('伸展')) return 'stretch';
+    if (t.includes('锻炼') || t.includes('训练') || t.includes('力量')) return 'workout';
+    return null;
+  }
+
+  /** Keep workout text plans compact, bulletized, and within ~180 words */
+  private enforceTextPlanConciseness(response: string): string {
+    // Normalize bullets (convert lists to bullet dots)
+    let text = response
+      .replace(/^\d+\.\s+/gm, '• ')
+      .replace(/^[-*]\s+/gm, '• ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    // Ensure bullets start on new lines (avoid bullets inline in a single paragraph)
+    text = text.replace(/\s*•\s*/g, '\n• ');
+    text = text.replace(/^\n+/, '');
+
+    // If there are no bullets at all, convert to: one brief intro line + bullets
+    const hasBullets = /^•\s+/m.test(text);
+    if (!hasBullets) {
+      // Split into sentences by common punctuation (supports CJK)
+      const sentences = text
+        .split(/(?<=[\.!?。！？])\s+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const intro = sentences.shift() || '';
+      const maxBullets = 9;
+      const bullets = sentences.slice(0, maxBullets).map(s => `• ${s.replace(/^•\s*/, '')}`);
+      const lines: string[] = [];
+      if (intro) lines.push(intro);
+      if (bullets.length) lines.push(bullets.join('\n'));
+      text = lines.join('\n\n');
+    }
+
+    // If we have many bullets, clamp softly to 6–9 bullets but keep an intro if present
+    const lines = text.split(/\n+/);
+    const introLine = lines.length && !lines[0].trim().startsWith('• ') ? lines[0] : '';
+    const bulletsOnly = lines.filter(l => l.trim().startsWith('• '));
+    if (bulletsOnly.length > 0) {
+      const limited = bulletsOnly.slice(0, 9);
+      text = introLine ? [introLine, limited.join('\n')].join('\n\n') : limited.join('\n');
+    }
+
+    // Soft word clamp (~220 max, ideal 160–220)
+    const words = text.split(/\s+/);
+    if (words.length > 220) {
+      text = words.slice(0, 220).join(' ').replace(/[,:;\-]+$/, '') + '…';
+    }
+    return text.trim();
+  }
+
+  /** Build minimal CTA message for stretch routines */
+  private buildCtaMinimalMessage(language: string, rp?: RoutineParams | null): string {
+    const d = rp?.duration || '5';
+    const a = rp?.area || 'Full Body';
+    const en = `I prepared a ${d}-minute ${a} stretch routine. When you’re ready, tap Start Routine. After you finish, tell me how it felt.`;
+    const es = `Preparé una rutina de estiramiento de ${d} minutos para ${a}. Cuando estés listo/a, toca Iniciar Rutina. Al terminar, cuéntame cómo te fue.`;
+    const zh = `我为你准备了 ${d} 分钟的 ${a} 拉伸方案。准备好后点按“开始训练”。结束后告诉我你的感受。`;
+    if (language === 'es') return es;
+    if (language === 'zh') return zh;
+    return en;
+  }
+
+  /** Clean clarify responses to avoid UI references and reinforce A/B reply */
+  private sanitizeClarifyResponse(response: string, language: string): string {
+    let text = response
+      .replace(/tap[^\n]*option[^\n]*/gi, '')
+      .replace(/tap[^\n]*button[^\n]*/gi, '')
+      .replace(/choose an option above/gi, '')
+      .replace(/select an option above/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const hints: Record<string, string> = {
+      en: "Reply with 'A' or 'B'.",
+      es: "Responde con 'A' o 'B'.",
+      zh: "请回复 ‘A’ 或 ‘B’。"
+    };
+    const hint = hints[language] || hints.en;
+
+    // Ensure hint is present at the end
+    if (!/reply with ['“”'A]/i.test(text)) {
+      text = `${text}\n\n${hint}`.trim();
+    }
+    return text;
+  }
+  /**
+   * Ensure routine responses are concise: 4–6 steps, ~120 words, final sentence.
+   */
+  private enforceRoutineConciseness(response: string, language: string): string {
+    // Extract steps if present; otherwise split sentences
+    let steps = extractExerciseSteps(response);
+    if (!steps || steps.length === 0) {
+      // Fallback: split by sentence-ish delimiters
+      steps = response
+        .split(/\n+|(?<=[.!?])\s+(?=[A-Z])/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    // Normalize and clamp to 4–6 steps
+    const maxSteps = 6;
+    const minSteps = 4;
+    const pruned = steps
+      .map(s => s.replace(/^[-•\d.\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, maxSteps);
+
+    // If fewer than 4, keep what we have but still enforce brevity
+    const singleLimit = 28; // ~28 words per step
+    const limited = pruned.map(s => {
+      const words = s.split(/\s+/);
+      return words.length > singleLimit ? words.slice(0, singleLimit).join(' ').replace(/[,:;\-]+$/, '') + '…' : s;
+    });
+
+    // Rebuild as numbered list
+    const numbered = limited.map((s, i) => `${i + 1}. ${s}`);
+
+    // Create a brief concluding sentence per language
+    const finals: Record<string, string> = {
+      en: 'When you’re ready, tap Start Routine.',
+      es: 'Cuando estés listo, toca Iniciar Rutina.',
+      zh: '准备好后，点按“开始训练”。'
+    };
+    const finalLine = finals[language] || finals.en;
+
+    // Join and apply overall ~120-word clamp
+    const body = numbered.join('\n');
+    const all = `${body}\n\n${finalLine}`.trim();
+    const words = all.split(/\s+/);
+    if (words.length > 130) {
+      return words.slice(0, 130).join(' ').replace(/[,:;\-]+$/, '') + '…';
+    }
+    return all;
+  }
+  /**
+   * Build a grounded routine from user input using our curated library and smart pipeline
+   */
+  private async buildRoutineFromInput(userInput: string): Promise<RoutineParams | null> {
+    try {
+      const parsed = parseUserInput(userInput);
+
+      const lower = userInput.toLowerCase();
+      const duration: Duration = lower.includes('15') ? '15' : lower.includes('10') ? '10' : '5';
+      const issue = (parsed.parsedIssue || 'stiffness') as any;
+      const transitionDuration = await getTransitionDuration();
+
+      const config = generateRoutineConfig(parsed, issue, duration, transitionDuration);
+      let routineItems = selectStretches(config, allStretches);
+
+      const hasPremiumAccess = await rewardManager.isRewardUnlocked('premium_stretches');
+      let filtered = routineItems.filter(item => {
+        if ('isTransition' in item) return true;
+        const s = item as Stretch;
+        return !s.premium || hasPremiumAccess;
+      });
+
+      // Area/position for params
+      const area: BodyArea = (parsed.parsedArea && parsed.parsedArea[0]) || 'Full Body';
+      const position: Position = parsed.parsedPosition || config.position || 'All';
+
+      let custom: (Stretch | RestPeriod | TransitionPeriod)[] = filtered as any;
+
+      // Ensure we have at least 3 stretch items (excluding transitions)
+      const countNonTransition = (arr: (Stretch | RestPeriod | TransitionPeriod)[]) =>
+        arr.filter(it => !('isTransition' in it) && !('isRest' in it)).length;
+
+      if (!custom || countNonTransition(custom) < 3) {
+        // Relax position filter
+        const relaxedConfig = { ...config, position: 'All' as Position, isDeskFriendly: false };
+        let relaxedItems = selectStretches(relaxedConfig, allStretches);
+        let relaxedFiltered = relaxedItems.filter(item => {
+          if ('isTransition' in item) return true;
+          const s = item as Stretch;
+          return !s.premium || hasPremiumAccess;
+        });
+        if (countNonTransition(relaxedFiltered as any) >= 3) {
+          custom = relaxedFiltered as any;
+        } else {
+          // Fallback: full body, all positions
+          const fbConfig = { ...relaxedConfig, areas: ['Full Body'] as BodyArea[] };
+          const fbItems = selectStretches(fbConfig, allStretches);
+          const fbFiltered = fbItems.filter(item => {
+            if ('isTransition' in item) return true;
+            const s = item as Stretch;
+            return !s.premium || hasPremiumAccess;
+          });
+          if (countNonTransition(fbFiltered as any) > countNonTransition(custom)) {
+            custom = fbFiltered as any;
+          }
+        }
+      }
+
+      // Ensure final has at least 3 stretches (non-transition)
+      if (!custom || countNonTransition(custom) < 3) return null;
+
+      return {
+        area,
+        duration,
+        position,
+        customStretches: custom,
+        includePremiumStretches: hasPremiumAccess,
+        transitionDuration
+      };
+    } catch (err) {
+      console.warn('[AIWellnessService] buildRoutineFromInput failed', err);
+      return null;
+    }
+  }
   
   async processWellnessCheckIn(
     userInput: string,
@@ -139,7 +375,7 @@ export class AIWellnessServiceV2 {
         ? await conversationManager.getSessionContext(userId)
         : null;
       const conversationHistoryForPrompt = updatedSessionContext?.recentMessages || [];
-      
+
       let enhancedPrompt = promptManager.buildEnhancedPrompt({
         userInput,
         userContext: context,
@@ -150,6 +386,56 @@ export class AIWellnessServiceV2 {
         currentSentiment: updatedSessionContext?.currentSentiment,
         memoryContext
       });
+
+      // Positive follow-up short-circuit: if the last assistant suggestion was followed by
+      // positive user feedback, respond with a brief acknowledgment (no clarify).
+      if (updatedSessionContext && updatedSessionContext.isFollowUp && updatedSessionContext.currentSentiment === 'positive') {
+        const ackMap: Record<string, string> = {
+          en: "Awesome — glad that helped! I’m here when you want the next one.",
+          es: "¡Genial! Me alegra que te ayudara. Estoy aquí cuando quieras la próxima.",
+          zh: "太好了！很高兴对你有帮助。想继续时随时告诉我。"
+        };
+        const ack = ackMap[languageCode] || ackMap.en;
+        if (userId) {
+          await conversationManager.addMessage(userId, 'assistant', ack, 'positive_ack');
+          await memoryService.extractAndStore(userId, userInput, ack, languageCode as any);
+        }
+        await costMonitor.trackUsage('local_ack', 0, Math.ceil(ack.length / 4), isPremium);
+        await this.trackUsage(userId);
+        return {
+          response: ack,
+          suggestedActions: [],
+          category: categorizeInput(userInput)
+        };
+      }
+
+      // Detect direct clarification answers (A/B or stretch/workout)
+      const clarificationAnswer = this.detectClarificationAnswer(userInput);
+      const domain = clarificationAnswer || inferRoutineDomain(userInput);
+      let outputMode = decideOutputMode(domain);
+      if (outputMode === 'clarify') outputMode = 'text';
+
+      // P1: Mode-aware prompting
+      if (outputMode === 'cta') {
+        // For CTA mode we will generate the routine locally and return a minimal message without calling the LLM.
+      } else if (outputMode === 'text') {
+        const lang = languageCode as 'en' | 'es' | 'zh';
+        if (domain === 'workout') {
+          const workoutInstructions = {
+            en: "\n\nProvide a compact, safe workout plan in 6–10 bullets (e.g., warm-up, 3–5 core movements with sets/reps, cool-down). Keep it under ~180 words. Avoid medical claims.",
+            es: "\n\nDa un plan de entrenamiento compacto en 6–10 viñetas (calentamiento, 3–5 movimientos con series/reps, enfriamiento). Menos de ~180 palabras. Sin afirmaciones médicas.",
+            zh: "\n\n请用 6–10 条要点给出简洁安全的训练计划（热身、3–5 个核心动作含组数/次数、放松），约 180 字以内，避免医疗表述。"
+          } as const;
+          enhancedPrompt += workoutInstructions[lang] || workoutInstructions.en;
+        } else {
+          const conciseBullets = {
+            en: "\n\nProvide a nicely formatted answer: one brief intro sentence, then 6–9 short bullets. Keep it readable (no wall of text), around 160–220 words total.",
+            es: "\n\nResponde con buen formato: una breve frase inicial y luego 6–9 viñetas cortas. Que sea legible (sin bloque largo), en torno a 160–220 palabras en total.",
+            zh: "\n\n请优雅排版：先用一句简短引言，然后给出 6–9 条精炼要点。保持易读（不要整段大段落），总字数约 160–220。"
+          } as const;
+          enhancedPrompt += conciseBullets[lang] || conciseBullets.en;
+        }
+      }
       
       // Add notification-specific instructions
       if (isNotification) {
@@ -161,9 +447,46 @@ export class AIWellnessServiceV2 {
         enhancedPrompt += (notificationInstructions[languageCode] || notificationInstructions.en);
       }
       
-      // Get AI response using appropriate model
+      // If we're in CTA mode, skip LLM and return a minimal message with routineParams
+      if (outputMode === 'cta') {
+        const routineParams = await this.buildRoutineFromInput(userInput) || undefined;
+        const minimal = routineParams
+          ? this.buildCtaMinimalMessage(languageCode, routineParams)
+          : ((lang => ({
+              en: "I couldn’t assemble a safe set of stretches right now. Want a couple of gentle suggestions instead?",
+              es: "No pude armar un conjunto seguro de estiramientos ahora. ¿Quieres algunas sugerencias suaves?",
+              zh: "现在无法安全地组合一组拉伸。要不要先给你两三个温和建议？"
+            }[lang] || "I couldn’t assemble a safe set of stretches right now."))(languageCode));
+        // Store assistant response
+        if (userId) {
+          await conversationManager.addMessage(userId, 'assistant', minimal, 'cta_minimal');
+          await memoryService.extractAndStore(userId, userInput, minimal, languageCode as any);
+        }
+        // Track minimal "cost" (no LLM)
+        await costMonitor.trackUsage('local_cta', 0, Math.ceil(minimal.length / 4), isPremium);
+        // Update usage + last check-in
+        await this.trackUsage(userId);
+        if (userId) {
+          const currentMemory = await simpleMemory.getMemory(userId);
+          await simpleMemory.updateMemory(userId, {
+            usage: {
+              lastCheckIn: Date.now(),
+              totalInteractions: currentMemory.usage.totalInteractions + 1,
+              weeklyCount: currentMemory.usage.weeklyCount + 1,
+              isPremium: await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true'
+            }
+          });
+        }
+        return {
+          response: minimal,
+          suggestedActions: [],
+          category: categorizeInput(userInput),
+          routineParams: routineParams || undefined
+        };
+      }
+
+      // Get AI response using appropriate model for text/clarify
       const modelConfig = this.getModelConfig(languageCode, isPremium);
-      
       let aiResponse: string;
       
       try {
@@ -263,7 +586,11 @@ export class AIWellnessServiceV2 {
       }
       
       // Format the response for better display
-      const formattedResponse = formatAIResponse(aiResponse, isNotification);
+      let formattedResponse = formatAIResponse(aiResponse, isNotification);
+      // Keep workout text compact
+      if (outputMode === 'text') {
+        formattedResponse = this.enforceTextPlanConciseness(formattedResponse);
+      }
       const safeResponse = this.applySafetyFooter(formattedResponse, userInput, languageCode, isNotification);
       
       // Extract the main suggestion from the response
@@ -313,10 +640,14 @@ export class AIWellnessServiceV2 {
         });
       }
       
+      // No routineParams in text/clarify modes
+      let routineParams: RoutineParams | undefined = undefined;
+
       return {
         response: safeResponse,
         suggestedActions,
-        category
+        category,
+        routineParams
       };
       
     } catch (error) {

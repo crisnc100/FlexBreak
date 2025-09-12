@@ -23,6 +23,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import aiWellnessService from '../../services/ai/core/aiWellnessService';
+import { AI_CONFIG } from '../../config/aiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import voiceRecordingService from '../../services/ai/integrations/voiceRecordingService';
 import memoryService from '../../services/ai/memory/memoryService';
@@ -52,6 +53,7 @@ interface Message {
   content?: string; // Added for compatibility
   quickReplies?: any[]; // Added for compatibility
   isTypewriting?: boolean; // Flag to enable typewriter effect
+  routineParams?: import('../../types').RoutineParams; // Optional routine params for CTA
 }
 
 interface FlexChatModalProps {
@@ -397,11 +399,22 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     setMessage('');
     // Keep keyboard open for continuous conversation
 
-    // Add user message
+    // P0.5: Enforce input clamp with brief notice
+    let outboundText = messageText;
+    try {
+      const isPremium = (await AsyncStorage.getItem(KEYS.USER.PREMIUM)) === 'true';
+      const maxLen = isPremium ? AI_CONFIG.limits.premium.maxInputLength : AI_CONFIG.limits.free.maxInputLength;
+      if (outboundText.length > maxLen) {
+        outboundText = outboundText.slice(0, maxLen);
+        Alert.alert('Message trimmed', 'Your message was quite long, so I trimmed it to keep the reply concise.');
+      }
+    } catch {}
+
+    // Add user message (possibly trimmed)
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      message: messageText,
+      message: outboundText,
       timestamp: new Date(),
     };
     const updatedMessages = [...messages, userMessage];
@@ -423,7 +436,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       // Limit to last 10 messages to prevent token overflow
       const recentMessages = messages.slice(-10);
       const result = await aiWellnessService.processWellnessCheckIn(
-        messageText, 
+        outboundText, 
         userId,
         false, // isNotification
         recentMessages // Pass the recent conversation history
@@ -435,6 +448,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         message: result.response,
         timestamp: new Date(),
         isTypewriting: ENABLE_TYPEWRITER_EFFECT,
+        routineParams: result.routineParams,
         // suggestedActions removed
       };
       
@@ -752,12 +766,43 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                                 {msg.message}
                               </Text>
                             )}
+                            {msg.type === 'ai' && msg.routineParams && (
+                              <View style={[styles.routineCtaBox, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}>
+                                <Text style={[styles.routineTitle, { color: theme.text }]}>Ready to start?</Text>
+                                <Text style={[styles.routineMeta, { color: theme.textSecondary }]}>
+                                  {msg.routineParams.area} • {msg.routineParams.duration} min • {msg.routineParams.position}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={async () => {
+                                    try {
+                                      const userId = (await AsyncStorage.getItem('@user_id')) || 'anonymous';
+                                      await memoryService.recordRoutineNote(userId, msg.routineParams!);
+                                      if ((global as any).navigateToRoutine) {
+                                        (global as any).navigateToRoutine(msg.routineParams!);
+                                        // Close chat after navigating to routine
+                                        onClose();
+                                      } else {
+                                        console.warn('[FlexChatModal] navigateToRoutine not available');
+                                      }
+                                    } catch (e) {
+                                      console.error('[FlexChatModal] Failed to navigate to Routine', e);
+                                    }
+                                  }}
+                                  style={[styles.startButton, { backgroundColor: theme.accent }]}
+                                  activeOpacity={0.9}
+                                >
+                                  <Text style={styles.startButtonText}>Start Routine</Text>
+                                  <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+                                </TouchableOpacity>
+                              </View>
+                            )}
                           </View>
                         )}
                       </View>
                       {/* Suggested Actions removed - users type their own responses */}
                     </View>
                   ))}
+
                   
                   {isLoading && (
                     <View style={styles.loadingContainer}>
@@ -906,7 +951,8 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                       onSubmitEditing={() => handleSend()}
                       returnKeyType="send"
                       multiline
-                      maxLength={500}
+                      // Allow longer input in UI; we'll clamp per tier in handler
+                      maxLength={1000}
                       editable={!isLoading && !isRecording}
                     />
 
@@ -1066,6 +1112,35 @@ const styles = StyleSheet.create({
   aiBubbleContent: {
     padding: 14,
     borderRadius: 18,
+  },
+  // Routine CTA styles
+  routineCtaBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  routineTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  routineMeta: {
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  startButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+  },
+  startButtonText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 14,
   },
   messageText: {
     fontSize: 15,

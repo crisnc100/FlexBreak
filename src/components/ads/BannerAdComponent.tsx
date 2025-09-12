@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
-import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { usePremium } from '../../context/PremiumContext';
 import AdService from '../../services/adService';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,6 +78,11 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
   if (isPremium) {
     return null;
   }
+  
+  // Skip rendering banner ad entirely if ads module is not available (e.g., Expo Go)
+  if (!AdService.isAvailable()) {
+    return null;
+  }
 
   const handleAdError = (error: Error) => {
     console.error('Banner ad error:', error);
@@ -100,19 +104,24 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
       )}
       
       {!adError && shouldShowAd && isReady ? (
-        <BannerAd
-          ref={bannerRef}
-          unitId={AdService.getBannerAdUnitId()}
-          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-          requestOptions={{
-            requestNonPersonalizedAdsOnly: true,
-            keywords: ['fitness', 'health', 'wellness', 'exercise'],
-          }}
-          onAdFailedToLoad={handleAdError}
-          onAdLoaded={() => console.log('BannerAd: Ad loaded successfully')}
-          onAdOpened={() => console.log('BannerAd: Ad opened')}
-          onAdClosed={() => console.log('BannerAd: Ad closed')}
-        />
+        (() => {
+          const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
+          return (
+            <BannerAd
+              ref={bannerRef}
+              unitId={AdService.getBannerAdUnitId()}
+              size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+              requestOptions={{
+                requestNonPersonalizedAdsOnly: true,
+                keywords: ['fitness', 'health', 'wellness', 'exercise'],
+              }}
+              onAdFailedToLoad={handleAdError}
+              onAdLoaded={() => console.log('BannerAd: Ad loaded successfully')}
+              onAdOpened={() => console.log('BannerAd: Ad opened')}
+              onAdClosed={() => console.log('BannerAd: Ad closed')}
+            />
+          );
+        })()
       ) : !adError ? null : (
         <View style={styles.fallback}>
           <TouchableOpacity 
