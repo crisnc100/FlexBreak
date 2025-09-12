@@ -27,6 +27,7 @@
     },
     "android": {
       "package": "com.cristianortega.flexbreak",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -45,6 +46,14 @@
     "plugins": [
       "expo-dev-client",
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/potentialLogo2.png",
@@ -53,6 +62,7 @@
         }
       ],
       "./plugins/withSiriShortcuts",
+      "./plugins/withModularHeaders",
       [
         "react-native-google-mobile-ads",
         {
