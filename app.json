@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cristianortega.flexbreak",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -62,12 +62,11 @@
         }
       ],
       "./plugins/withSiriShortcuts",
-      "./plugins/withModularHeaders",
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-9873959079273159~5503902608",
-          "iosAppId": "ca-app-pub-9873959079273159~5503902608"
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ],
       "@react-native-firebase/app"

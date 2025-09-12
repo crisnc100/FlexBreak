@@ -300,6 +300,7 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
+				CODE_SIGN_ENTITLEMENTS = FlexBreak/FlexBreak.entitlements;
 			};
 			name = Debug;
 		};
@@ -323,6 +324,7 @@
 				PRODUCT_NAME = FlexBreak;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
+				CODE_SIGN_ENTITLEMENTS = FlexBreak/FlexBreak.entitlements;
 			};
 			name = Release;
 		};
