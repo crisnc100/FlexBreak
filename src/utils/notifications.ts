@@ -92,34 +92,6 @@ export async function configureNotifications(): Promise<void> {
   // Note: Notification handlers are set up in setupAINotificationHandlers
   // We don't need duplicate listeners here
   
-  // On Android, ensure channels exist and are high importance for lock-screen visibility
-  try {
-    const { Platform } = await import('react-native');
-    if (Platform.OS === 'android') {
-      // Default channel used when none is provided
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Default',
-        importance: Notifications.AndroidImportance.HIGH,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-
-      // Reminders channel for scheduled reminders
-      await Notifications.setNotificationChannelAsync('reminders', {
-        name: 'Stretch Reminders',
-        importance: Notifications.AndroidImportance.HIGH,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-
-      // (Removed legacy tests channel)
-    }
-  } catch (channelError) {
-    console.warn('Failed to ensure Android notification channels:', channelError);
-  }
-
   console.log('Notifications handler configured');
 }
 
@@ -136,26 +108,13 @@ export const requestNotificationsPermissions = async (): Promise<boolean> => {
   if (existingStatus !== 'granted') {
       // Android requires extra step to get permission
       if (Platform.OS === 'android') {
-        console.log('Ensuring Android notification channels exist');
-        try {
-          await Notifications.setNotificationChannelAsync('default', {
-            name: 'Default',
-            importance: Notifications.AndroidImportance.HIGH,
-            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#FF231F7C',
-          });
-          await Notifications.setNotificationChannelAsync('reminders', {
-            name: 'Stretch Reminders',
-            importance: Notifications.AndroidImportance.HIGH,
-            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#FF231F7C',
-          });
-          // (Removed legacy tests channel)
-        } catch (e) {
-          console.warn('Channel setup during permission request failed:', e);
-        }
+        console.log('Setting up Android notification channel');
+        await Notifications.setNotificationChannelAsync('reminders', {
+          name: 'Stretch Reminders',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
       }
 
       console.log('Requesting permission...');
@@ -674,6 +633,11 @@ export async function cancelReminders(): Promise<void> {
  * This function should be called when the app is resumed or started,
  * NOT when the user toggles reminders or changes time.
  */
+/**
+ * Schedule a real reminder for a specific time.
+ * This function should be called when the app is resumed or started,
+ * NOT when the user toggles reminders or changes time.
+ */
 export async function scheduleRealReminder(): Promise<void> {
   console.log('Checking if we need to schedule a real reminder...');
   
@@ -778,4 +742,4 @@ export function setupBackgroundScheduling(): void {
   
   // The rest of the scheduling logic is handled in App.tsx
   console.log('Background scheduling setup complete');
-} 
+}

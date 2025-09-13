@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
+import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { usePremium } from '../../context/PremiumContext';
 import AdService from '../../services/adService';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,47 +11,6 @@ interface BannerAdComponentProps {
   showPremiumPrompt?: boolean;
   onOpenSubscription?: () => void;
 }
-
-const DynamicBannerAd: React.FC<{
-  bannerRef: any;
-  unitId: string;
-  onAdFailedToLoad: (error: Error) => void;
-}> = ({ bannerRef, unitId, onAdFailedToLoad }) => {
-  const [BannerAdComponent, setBannerAdComponent] = useState<any>(null);
-  const [BannerAdSize, setBannerAdSize] = useState<any>(null);
-
-  useEffect(() => {
-    import('react-native-google-mobile-ads')
-      .then(({ BannerAd, BannerAdSize }) => {
-        setBannerAdComponent(() => BannerAd);
-        setBannerAdSize(BannerAdSize);
-      })
-      .catch((error) => {
-        console.error('Failed to load BannerAd module:', error);
-        onAdFailedToLoad(error);
-      });
-  }, []);
-
-  if (!BannerAdComponent || !BannerAdSize) {
-    return null;
-  }
-
-  return (
-    <BannerAdComponent
-      ref={bannerRef}
-      unitId={unitId}
-      size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-      requestOptions={{
-        requestNonPersonalizedAdsOnly: true,
-        keywords: ['fitness', 'health', 'wellness', 'exercise'],
-      }}
-      onAdFailedToLoad={onAdFailedToLoad}
-      onAdLoaded={() => console.log('BannerAd: Ad loaded successfully')}
-      onAdOpened={() => console.log('BannerAd: Ad opened')}
-      onAdClosed={() => console.log('BannerAd: Ad closed')}
-    />
-  );
-};
 
 export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ 
   position = 'bottom',
@@ -119,11 +79,6 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
   if (isPremium) {
     return null;
   }
-  
-  // Skip rendering banner ad entirely if ads module is not available (e.g., Expo Go)
-  if (!AdService.isAvailable()) {
-    return null;
-  }
 
   const handleAdError = (error: Error) => {
     console.error('Banner ad error:', error);
@@ -145,10 +100,18 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({
       )}
       
       {!adError && shouldShowAd && isReady ? (
-        <DynamicBannerAd 
-          bannerRef={bannerRef}
+        <BannerAd
+          ref={bannerRef}
           unitId={AdService.getBannerAdUnitId()}
+          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+          requestOptions={{
+            requestNonPersonalizedAdsOnly: true,
+            keywords: ['fitness', 'health', 'wellness', 'exercise'],
+          }}
           onAdFailedToLoad={handleAdError}
+          onAdLoaded={() => console.log('BannerAd: Ad loaded successfully')}
+          onAdOpened={() => console.log('BannerAd: Ad opened')}
+          onAdClosed={() => console.log('BannerAd: Ad closed')}
         />
       ) : !adError ? null : (
         <View style={styles.fallback}>

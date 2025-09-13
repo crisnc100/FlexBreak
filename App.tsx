@@ -42,7 +42,7 @@ import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsIn
 // Import video loader service
 import { videoLoaderService } from './src/services/videoLoaderService';
 // Import AdMob initialization
-import { NativeModules } from 'react-native';
+import mobileAds from 'react-native-google-mobile-ads';
 import AdService from './src/services/adService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
@@ -133,21 +133,9 @@ export default function App() {
   // Disable console logs in production
   disableConsoleLogsInProduction();
   
-  // Initialize AdMob only when native module is present (dev/prod builds, not Expo Go)
+  // Initialize AdMob
   useEffect(() => {
-    (async () => {
-      try {
-        const hasModule = !!(NativeModules as any)?.RNGoogleMobileAdsModule;
-        if (hasModule) {
-          const { default: mobileAds } = await import('react-native-google-mobile-ads');
-          mobileAds().initialize();
-        } else {
-          console.log('[App] Google Mobile Ads not available in this runtime. Skipping init.');
-        }
-      } catch (e) {
-        console.warn('[App] Failed to initialize mobileAds, skipping:', e);
-      }
-    })();
+    mobileAds().initialize();
   }, []);
   
   // Mark app start time for performance measurement
@@ -554,7 +542,7 @@ function MainApp() {
         
         if (accessCheck.canAccess) {
           console.log('[App.tsx] Access granted, opening FlexChat');
-          setShowFlexChatRef.current(true);
+          setShowFlexChat(true);
         } else {
           console.log('[App.tsx] Access denied:', accessCheck.message);
           // Show alert with access restriction message
@@ -690,8 +678,8 @@ function MainApp() {
     };
   }, []);
   
-  // Mark component render for performance tracking
-  useEffect(() => {
+   // Mark component render for performance tracking
+   useEffect(() => {
     performance.markComponentRender('MainApp');
   }, []);
   
@@ -838,23 +826,16 @@ function MainApp() {
         // Preload all sound effects for faster playback
         await soundEffects.preloadAllSounds();
 
-        // After audio is configured, initialize AdMob SDK (guarded)
+        // After audio is configured, initialize AdMob SDK (safe by itself)
         try {
-          const hasAdsModule = !!(NativeModules as any)?.RNGoogleMobileAdsModule;
-          const hasRNAppModule = !!(NativeModules as any)?.RNAppModule;
-          if (hasAdsModule && hasRNAppModule) {
-            console.log('Initializing AdMob after audio setup...');
-            const { default: mobileAds } = await import('react-native-google-mobile-ads');
-            await mobileAds().setRequestConfiguration({
-              tagForChildDirectedTreatment: false,
-              tagForUnderAgeOfConsent: false,
-              maxAdContentRating: 'G',
-            });
-            const adapters = await mobileAds().initialize();
-            console.log('AdMob initialized successfully (post-audio):', adapters);
-          } else {
-            console.log('[AdMob] Skipping post-audio init: native ads module not available in this build');
-          }
+          console.log('Initializing AdMob after audio setup...');
+          await mobileAds().setRequestConfiguration({
+            tagForChildDirectedTreatment: false,
+            tagForUnderAgeOfConsent: false,
+            maxAdContentRating: 'G',
+          });
+          const adapters = await mobileAds().initialize();
+          console.log('AdMob initialized successfully (post-audio):', adapters);
         } catch (adInitError) {
           console.error('AdMob initialization error (post-audio):', adInitError);
         }

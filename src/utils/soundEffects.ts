@@ -1,4 +1,5 @@
 import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types
@@ -237,8 +238,7 @@ export const loadSound = async (soundName: SoundEffect): Promise<boolean> => {
       const loadPromise = Audio.Sound.createAsync(
         soundUris[soundName],
         { shouldPlay: false }, // Don't auto-play
-        null, // No status update callback needed during loading
-        false // Don't download first (for better performance)
+        null // No status update callback needed during loading
       );
 
       // Add timeout to prevent hanging (increased to 30 seconds for slower devices)
@@ -280,7 +280,21 @@ export const preloadAllSounds = async (): Promise<void> => {
     // Prioritize critical sounds that are used frequently
     const criticalSounds: SoundEffect[] = ['click', 'complete', 'levelUp', 'AInotification1'];
     const allSounds = Object.keys(soundUris) as SoundEffect[];
-    const nonCriticalSounds = allSounds.filter(s => !criticalSounds.includes(s));
+    let nonCriticalSounds = allSounds.filter(s => !criticalSounds.includes(s));
+
+    // iOS has stricter resource constraints for many simultaneous AVPlayers.
+    // Defer some heavier/longer sounds to lazy-load on first use to avoid -11819 errors.
+    if (Platform.OS === 'ios') {
+      const deferOnIOS: SoundEffect[] = [
+        'bossRound',
+        'monstersDestroyed',
+        'incorrect',
+        'timerTheme1',
+        'timerTheme2',
+        'roundComplete',
+      ];
+      nonCriticalSounds = nonCriticalSounds.filter(s => !deferOnIOS.includes(s));
+    }
     
     console.log(`Starting to preload ${allSounds.length} sounds (${criticalSounds.length} critical)...`);
     
@@ -303,7 +317,7 @@ export const preloadAllSounds = async (): Promise<void> => {
     }
     
     // Load non-critical sounds in smaller batches
-    const batchSize = 3; // Reduced batch size
+    const batchSize = Platform.OS === 'ios' ? 1 : 3; // iOS: strict throttling
     
     for (let i = 0; i < nonCriticalSounds.length; i += batchSize) {
       const batch = nonCriticalSounds.slice(i, i + batchSize);
@@ -324,7 +338,8 @@ export const preloadAllSounds = async (): Promise<void> => {
       
       // Longer delay between batches to prevent overwhelming the system
       if (i + batchSize < nonCriticalSounds.length) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        const delay = Platform.OS === 'ios' ? 350 : 200;
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
     

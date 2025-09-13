@@ -22,12 +22,6 @@ config.resolver.extraNodeModules = {
     __dirname,
     'node_modules/firebase/compat/functions'
   ),
-  // Shim React Native's deprecated PushNotificationIOS to avoid crashes when
-  // any dependency accidentally requires it on iOS. We use expo-notifications instead.
-  'react-native/Libraries/PushNotificationIOS/PushNotificationIOS': path.resolve(
-    __dirname,
-    'shims/PushNotificationIOS.js'
-  ),
 };
 
 // Exclude firebase-admin from Metro file watching (dev dependency only)

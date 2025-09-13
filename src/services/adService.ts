@@ -14,7 +14,9 @@ class AdService {
   private achievementsOpenCount: number = 0;
   private isPremium: boolean = false;
   private initialized: boolean = false;
-  private static readonly isModuleAvailable: boolean = !!(NativeModules as any)?.RNGoogleMobileAdsModule && !!(NativeModules as any)?.RNAppModule;
+  private static readonly isModuleAvailable: boolean = !!(NativeModules as any)?.RNGoogleMobileAdsModule 
+    && !!(NativeModules as any)?.RNGoogleMobileAdsNativeModule 
+    && !!(NativeModules as any)?.RNAppModule;
 
   // Ad Unit IDs - Using test IDs for development
   // (Avoid importing TestIds to prevent native module initialization in unsupported runtimes)

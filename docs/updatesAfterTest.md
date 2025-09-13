@@ -14,6 +14,7 @@
 
 * Build and TEST 
    npx eas build --profile development --platform ios
+   eas build --platform ios --profile development
 
 * Test Flight: 
 npx eas build --platform ios --profile testflight --auto-submit
