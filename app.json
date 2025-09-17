@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlexBreak",
     "slug": "flexbreak",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/potentialLogo2.png",
     "userInterfaceStyle": "light",
@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cristianortega.flexbreak",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

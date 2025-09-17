@@ -312,8 +312,16 @@ export default function SubscriptionModal({
                 setShowVerificationForm(false);
                 setOneTimeCode('');
                 
+                // Ensure premium side-effects run just like paid subscriptions
+                await AsyncStorage.removeItem('@ai_wellness_premium_upgrade_seen');
+                await setPremiumStatus(true);
+                gamificationEvents.emit('SUBSCRIPTION_UPDATED');
+                await refreshPremiumStatus?.();
+                await refreshAccess?.();
+                await refreshData?.();
+                await refreshTheme?.();
+                
                 // Close the modal and refresh premium status
-                await refreshPremiumStatus();
                 onClose();
                 
                 // Show a success message after closing

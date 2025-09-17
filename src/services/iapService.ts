@@ -93,7 +93,12 @@ export const initializeIAP = async () => {
         if (results && Array.isArray(results)) {
           results.forEach((purchase, index) => {
             console.log(`Processing purchase result ${index + 1}/${results.length}`);
-            
+
+            if (!isCompletedPurchase(purchase)) {
+              console.log('Purchase not completed yet, skipping persistence until confirmed by store.');
+              return;
+            }
+
             // Save the successful purchase to AsyncStorage so we can verify it later if direct IAP response fails
             try {
               const purchaseKey = `last_purchase_${purchase.productId}`;
@@ -107,7 +112,7 @@ export const initializeIAP = async () => {
             } catch (e) {
               console.error('Error preparing purchase data for storage:', e);
             }
-            
+
             // Complete the transaction after handling it
             if (Platform.OS === 'ios') {
               console.log(`Finishing transaction for product: ${purchase.productId}`);
@@ -222,6 +227,40 @@ export const getProductsForUser = (verificationType?: 'office' | 'student' | nul
   }
 };
 
+const hasPurchaseEvidence = (purchase: any): boolean => {
+  if (!purchase) return false;
+
+  const evidenceKeys = [
+    'transactionReceipt',
+    'originalTransactionId',
+    'transactionId',
+    'purchaseToken',
+    'orderId'
+  ];
+
+  return evidenceKeys.some((key) => {
+    const value = purchase[key];
+    return typeof value === 'string' && value.length > 0;
+  });
+};
+
+const isCompletedPurchase = (purchase: any): boolean => {
+  if (!purchase) return false;
+
+  const { purchaseState } = purchase;
+
+  const isPurchasedState =
+    purchaseState === undefined ||
+    purchaseState === InAppPurchases.InAppPurchaseState.PURCHASED ||
+    purchaseState === InAppPurchases.InAppPurchaseState.RESTORED;
+
+  if (!isPurchasedState) {
+    return false;
+  }
+
+  return hasPurchaseEvidence(purchase);
+};
+
 // Format purchase data into subscription details
 const formatSubscriptionDetails = (purchase: any): SubscriptionDetails => {
   const now = new Date();
@@ -321,7 +360,7 @@ export const purchaseSubscription = async (productId: string, updateSubscription
             
           // Look for a very recent purchase of this product
           const recentPurchase = historyResponse.results.find(purchase => 
-            purchase.productId === productId
+            purchase.productId === productId && isCompletedPurchase(purchase)
           );
           
           if (recentPurchase) {
@@ -356,27 +395,31 @@ export const purchaseSubscription = async (productId: string, updateSubscription
       
       // Check if results has items
       if (results && results.length > 0) {
-        // Handle purchase verification (receipt validation would go here in production)
-        const purchase = results[0];
-        console.log('Processing purchase:', JSON.stringify(purchase, null, 2));
-        
-        // Format subscription details
-        const subscriptionDetails = formatSubscriptionDetails(purchase);
-        console.log('Formatted subscription details:', JSON.stringify(subscriptionDetails, null, 2));
-        
-        // Update subscription details and premium status
-        if (updateSubscription) {
-          console.log('Calling updateSubscription');
-          await updateSubscription(subscriptionDetails);
-        } else {
-          // Fallback to old method if context function not available
-          console.log('Using fallback storage method for subscription');
-          await storageService.saveSubscriptionDetails(subscriptionDetails);
-          await storageService.saveIsPremium(true);
+        const validPurchase = results.find(isCompletedPurchase);
+
+        if (validPurchase) {
+          console.log('Processing confirmed purchase:', JSON.stringify(validPurchase, null, 2));
+
+          // Format subscription details
+          const subscriptionDetails = formatSubscriptionDetails(validPurchase);
+          console.log('Formatted subscription details:', JSON.stringify(subscriptionDetails, null, 2));
+
+          // Update subscription details and premium status
+          if (updateSubscription) {
+            console.log('Calling updateSubscription');
+            await updateSubscription(subscriptionDetails);
+          } else {
+            // Fallback to old method if context function not available
+            console.log('Using fallback storage method for subscription');
+            await storageService.saveSubscriptionDetails(subscriptionDetails);
+            await storageService.saveIsPremium(true);
+          }
+
+          console.log('Purchase processing completed successfully');
+          return { success: true, purchase: validPurchase, subscriptionDetails };
         }
-        
-        console.log('Purchase processing completed successfully');
-        return { success: true, purchase: results[0], subscriptionDetails };
+
+        console.warn('Purchase response contained no completed transactions. Waiting for confirmation.');
       } else {
         console.error('Purchase results array is empty or undefined');
       }
@@ -412,6 +455,11 @@ export const restorePurchases = async (updateSubscription: Function) => {
           const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
           
           if (timestamp > fiveMinutesAgo && purchase) {
+            if (!isCompletedPurchase(purchase)) {
+              console.log('Stored recent purchase is not completed yet. Skipping persistence.');
+              await AsyncStorage.removeItem(purchaseKey);
+              continue;
+            }
             console.log(`Found recent purchase for ${productId} from ${new Date(timestamp).toISOString()}`);
             
             // Format subscription details
@@ -463,7 +511,7 @@ export const restorePurchases = async (updateSubscription: Function) => {
       
       // Check if any valid subscription exists
       const validSubscriptions = results.filter(purchase => 
-        Object.values(PRODUCTS).includes(purchase.productId)
+        Object.values(PRODUCTS).includes(purchase.productId) && isCompletedPurchase(purchase)
       );
       
       if (validSubscriptions.length > 0) {
