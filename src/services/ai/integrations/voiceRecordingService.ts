@@ -1,5 +1,6 @@
 import { trackAIWork, getAIDataGeneration, isAIDataCurrent } from '../aiDataLifecycle';
 import { AudioModule, setAudioModeAsync, type AudioRecorder, type RecordingOptions } from 'expo-audio';
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import secureGoogleSpeechService from './secureGoogleSpeechService';
@@ -73,7 +74,11 @@ class VoiceRecordingService {
       };
       
       console.log('Creating recording with options:', recordingOptions);
-      const recording = new AudioModule.AudioRecorder(recordingOptions);
+      // The native constructor requires flat platform options, as supplied by
+      // Expo's useAudioRecorder hook. Preparation cannot repair a failed constructor.
+      const { ios, android, web, ...commonOptions } = recordingOptions;
+      const platformOptions = Platform.OS === 'ios' ? ios : Platform.OS === 'android' ? android : web;
+      const recording = new AudioModule.AudioRecorder({ ...commonOptions, ...platformOptions });
       this.recording = recording;
       await recording.prepareToRecordAsync();
       if (!isAIDataCurrent(generation)) {

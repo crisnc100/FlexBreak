@@ -591,7 +591,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       } else {
         Alert.alert(
           "Recording Failed",
-          "Please check your microphone permissions.",
+          "Unable to start recording. Microphone access may be disabled; check Settings and try again.",
           [{ text: "OK" }]
         );
       }

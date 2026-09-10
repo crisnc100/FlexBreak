@@ -115,6 +115,7 @@ test('pending native transcription drains before language removal and deletes it
     'src/services/ai/utils/reliabilityService': { rateLimiter: { checkLimit: async () => ({ allowed: true }) } },
   }, externalMocks: {
     'expo-audio': { AudioModule: {}, setAudioModeAsync: async () => {} },
+    'react-native': { Platform: { OS: 'ios' } },
     'expo-file-system/legacy': { deleteAsync: async uri => { deleted.push(uri); } },
     '@react-native-async-storage/async-storage': { getItem: async key => data.get(key) ?? null, setItem: async (key, value) => { data.set(key, value); } },
   } });
@@ -139,6 +140,7 @@ test('deletion cancels a recorder which finishes preparing after deletion begins
     'src/services/ai/integrations/secureGoogleSpeechService': {}, 'src/services/ai/utils/reliabilityService': {},
   }, externalMocks: {
     'expo-audio': { AudioModule: { requestRecordingPermissionsAsync: async () => ({ status: 'granted' }), AudioRecorder: Recorder }, setAudioModeAsync: async () => {} },
+    'react-native': { Platform: { OS: 'ios' } },
     'expo-file-system/legacy': { deleteAsync: async uri => { deleted.push(uri); } },
     '@react-native-async-storage/async-storage': {},
   } });

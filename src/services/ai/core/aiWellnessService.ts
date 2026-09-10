@@ -196,20 +196,17 @@ export class AIWellnessServiceV2 {
       const transitionDuration = await getTransitionDuration();
 
       const config = generateRoutineConfig(parsed, issue, duration, transitionDuration);
-      const routineItems = selectStretches(config, allStretches);
-
       const hasPremiumAccess = await rewardManager.isRewardUnlocked('premium_stretches');
-      const filtered = routineItems.filter(item => {
-        if ('isTransition' in item) return true;
-        const s = item as Stretch;
-        return !s.premium || hasPremiumAccess;
-      });
+      // Select accessible stretches before constructing transitions, so removing
+      // a premium stretch cannot leave a leading or consecutive transition.
+      const availableStretches = allStretches.filter(stretch => !stretch.premium || hasPremiumAccess);
+      const routineItems = selectStretches(config, availableStretches);
 
       // Area/position for params
       const area: BodyArea = (parsed.parsedArea && parsed.parsedArea[0]) || 'Full Body';
       const position: Position = parsed.parsedPosition || config.position || 'All';
 
-      let custom: (Stretch | RestPeriod | TransitionPeriod)[] = filtered as any;
+      let custom: (Stretch | RestPeriod | TransitionPeriod)[] = routineItems;
 
       // Ensure we have at least 3 stretch items (excluding transitions)
       const countNonTransition = (arr: (Stretch | RestPeriod | TransitionPeriod)[]) =>
@@ -218,25 +215,15 @@ export class AIWellnessServiceV2 {
       if (!custom || countNonTransition(custom) < 3) {
         // Relax position filter
         const relaxedConfig = { ...config, position: 'All' as Position, isDeskFriendly: false };
-        const relaxedItems = selectStretches(relaxedConfig, allStretches);
-        const relaxedFiltered = relaxedItems.filter(item => {
-          if ('isTransition' in item) return true;
-          const s = item as Stretch;
-          return !s.premium || hasPremiumAccess;
-        });
-        if (countNonTransition(relaxedFiltered as any) >= 3) {
-          custom = relaxedFiltered as any;
+        const relaxedItems = selectStretches(relaxedConfig, availableStretches);
+        if (countNonTransition(relaxedItems) >= 3) {
+          custom = relaxedItems;
         } else {
           // Fallback: full body, all positions
           const fbConfig = { ...relaxedConfig, areas: ['Full Body'] as BodyArea[] };
-          const fbItems = selectStretches(fbConfig, allStretches);
-          const fbFiltered = fbItems.filter(item => {
-            if ('isTransition' in item) return true;
-            const s = item as Stretch;
-            return !s.premium || hasPremiumAccess;
-          });
-          if (countNonTransition(fbFiltered as any) > countNonTransition(custom)) {
-            custom = fbFiltered as any;
+          const fbItems = selectStretches(fbConfig, availableStretches);
+          if (countNonTransition(fbItems) > countNonTransition(custom)) {
+            custom = fbItems;
           }
         }
       }
@@ -437,12 +424,12 @@ export class AIWellnessServiceV2 {
           } as const;
           enhancedPrompt += workoutInstructions[lang] || workoutInstructions.en;
         } else {
-          const conciseBullets = {
-            en: "\n\nProvide a nicely formatted answer: one brief intro sentence, then 6–9 short bullets. Keep it readable (no wall of text), around 160–220 words total.",
-            es: "\n\nResponde con buen formato: una breve frase inicial y luego 6–9 viñetas cortas. Que sea legible (sin bloque largo), en torno a 160–220 palabras en total.",
-            zh: "\n\n请优雅排版：先用一句简短引言，然后给出 6–9 条精炼要点。保持易读（不要整段大段落），总字数约 160–220。"
+          const briefAdvice = {
+            en: "\n\nAnswer directly in 2–4 short sentences or at most 3 short bullets, around 60–90 words total. Focus on one practical next step; skip a lengthy introduction. Keep necessary safety guidance and finish complete thoughts.",
+            es: "\n\nResponde directamente en 2–4 frases cortas o como máximo 3 viñetas cortas, unas 60–90 palabras en total. Céntrate en un siguiente paso práctico; evita una introducción larga. Mantén las indicaciones de seguridad necesarias y completa las ideas.",
+            zh: "\n\n直接用 2–4 句短句或最多 3 条简短要点回答，总长度约 100–150 个汉字。专注于一个实用的下一步，不要长篇铺垫。保留必要的安全提示，并完整表达意思。"
           } as const;
-          enhancedPrompt += conciseBullets[lang] || conciseBullets.en;
+          enhancedPrompt += briefAdvice[lang] || briefAdvice.en;
         }
       }
       
@@ -519,7 +506,7 @@ export class AIWellnessServiceV2 {
       // Format the response for better display
       let formattedResponse = formatAIResponse(aiResponse, isNotification);
       // Keep workout text compact
-      if (outputMode === 'text') {
+      if (outputMode === 'text' && domain === 'workout') {
         formattedResponse = this.enforceTextPlanConciseness(formattedResponse);
       }
       const safeResponse = this.applySafetyFooter(formattedResponse, userInput, languageCode, isNotification);
