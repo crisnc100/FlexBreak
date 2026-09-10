@@ -15,8 +15,10 @@ const env = {
 const ready = { status: 'ready', evidence: 'Reviewed environment, source and device results' };
 const platformServices = Object.fromEntries(Object.entries(platformServiceReadiness).map(([platform, records]) => [platform, Object.fromEntries(Object.keys(records).map(key => [key, ready]))]));
 const expected = { platform: 'ios', projectId, sourceSha };
+// Sanitized EAS CLI 24 BuildFragment shape confirmed against qualification build 37.
+// Production differs in profile/distribution; project identity remains app.id.
 const build = {
-  id: buildId, status: 'FINISHED', platform: 'IOS', project: { id: projectId },
+  id: buildId, status: 'FINISHED', platform: 'IOS', app: { id: projectId, slug: 'flexbreak', ownerAccount: { name: 'crisnc100' } },
   gitCommitHash: sourceSha, distribution: 'STORE', buildProfile: 'production',
   isForIosSimulator: false, artifacts: { applicationArchiveUrl: 'https://example.com/app.ipa' },
 };
@@ -32,7 +34,8 @@ test('malformed, ambiguous and unsuccessful builds cannot become submissions', (
   }
   for (const change of [
     { status: 'ERRORED' }, { status: 'CANCELED' }, { status: 'IN_PROGRESS' },
-    { id: '--latest' }, { platform: 'ANDROID' }, { project: { id: buildId } },
+    { id: '--latest' }, { platform: 'ANDROID' }, { app: { id: buildId } },
+    { app: {} }, { app: undefined, project: { id: projectId } },
     { gitCommitHash: 'b'.repeat(40) }, { buildProfile: 'preview' },
     { distribution: 'INTERNAL' }, { isForIosSimulator: true }, { artifacts: {} },
   ]) assert.throws(() => validateBuildResult(JSON.stringify([{ ...build, ...change }]), expected));
