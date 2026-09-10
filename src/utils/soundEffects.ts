@@ -258,7 +258,8 @@ export const loadSound = async (soundName: SoundEffect): Promise<boolean> => {
       // Load the sound file with timeout
       const loadPromise = Audio.Sound.createAsync(
         soundUris[soundName],
-        { shouldPlay: false }, // Don't auto-play
+        // Ending an iOS effect must not deactivate the session used by stretch videos.
+        { shouldPlay: false, keepAudioSessionActive: Platform.OS === 'ios' },
         null // No status update callback needed during loading
       );
 
