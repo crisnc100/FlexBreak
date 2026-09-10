@@ -1,0 +1,15 @@
+{
+  "checkedOn": "2026-09-10",
+  "source": "Owner personal AdMob account, FlexBreak iOS App settings",
+  "iosAppId": "ca-app-pub-9873959079273159~5503902608",
+  "storeAppId": "6743581671",
+  "storeName": "FlexBreak",
+  "result": "Registered app ID and App Store association verified; app.json updated",
+  "limitations": [
+    "New native build with corrected app ID not yet qualified",
+    "Developer website and root app-ads.txt publication must be verified before AdMob review",
+    "Android remains deferred"
+  ],
+  "verificationStatus": "Requires review; limited ad serving",
+  "verificationBlocker": "AdMob reports no developer website in App Store listing"
+}

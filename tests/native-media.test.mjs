@@ -68,16 +68,18 @@ test('video adapter preserves completion, first frame, load, buffered millisecon
   cleanups.forEach(cleanup => cleanup()); assert.equal(events.size, 0);
 });
 
-test('speech recorder preserves mono16k PCM/AMR options and privacy cleanup removes last completed file', async () => {
+for (const platform of ['ios', 'android']) test(`speech recorder passes normalized ${platform} options to native constructor and cleans up`, async () => {
   const deleted = []; const modes = []; let options; let releases = 0;
   class Recorder {
-    constructor(value) { options = value; this.uri = 'file:///voice.wav'; }
+    constructor(value) { options = value; this.uri = `file:///voice${value.extension}`; }
     async prepareToRecordAsync() {} record() {} async stop() {} release() { releases++; }
   }
   const load = createLoader({ mocks: {
     'src/services/ai/integrations/secureGoogleSpeechService': {},
     'src/services/ai/utils/reliabilityService': {},
   }, externalMocks: {
+    'react-native': { Platform: { OS: platform } },
+    'expo-modules-core': { Platform: { OS: platform } },
     'expo-audio': { AudioModule: { requestRecordingPermissionsAsync: async () => ({ status: 'granted' }), AudioRecorder: Recorder }, setAudioModeAsync: async mode => modes.push(mode) },
     'expo-file-system/legacy': { deleteAsync: async uri => deleted.push(uri) },
     '@react-native-async-storage/async-storage': {},
@@ -85,12 +87,22 @@ test('speech recorder preserves mono16k PCM/AMR options and privacy cleanup remo
   const recorder = load('src/services/ai/integrations/voiceRecordingService.ts').default;
   assert.equal(await recorder.startRecording(), true);
   assert.equal(options.sampleRate, 16000); assert.equal(options.numberOfChannels, 1);
-  assert.equal(options.ios.extension, '.wav'); assert.equal(options.ios.outputFormat, 'lpcm');
-  assert.equal(options.ios.linearPCMBitDepth, 16);
-  assert.equal(options.android.outputFormat, 'amrwb'); assert.equal(options.android.audioEncoder, 'amr_wb');
-  assert.equal(await recorder.stopRecording(), 'file:///voice.wav');
+  assert.equal(options.isMeteringEnabled, true);
+  // Compare against the installed SDK's actual platform normalizer. Native iOS
+  // constructs AVAudioRecorder immediately, before prepareToRecordAsync runs.
+  const { createRecordingOptions } = load('node_modules/expo-audio/src/utils/options.ts');
+  const reference = createRecordingOptions({
+    extension: '.amr', sampleRate: 16000, numberOfChannels: 1, bitRate: 23850, isMeteringEnabled: true,
+    ios: { extension: '.wav', outputFormat: 'lpcm', audioQuality: 32, sampleRate: 16000, linearPCMBitDepth: 16, linearPCMIsBigEndian: false, linearPCMIsFloat: false },
+    android: { extension: '.amr', outputFormat: 'amrwb', audioEncoder: 'amr_wb', sampleRate: 16000 },
+    web: { mimeType: 'audio/webm', bitsPerSecond: 128000 },
+  });
+  for (const [key, expected] of Object.entries(reference)) assert.equal(options[key], expected, `native ${key}`);
+  assert.equal(options.ios, undefined); assert.equal(options.android, undefined);
+  const uri = `file:///voice${platform === 'ios' ? '.wav' : '.amr'}`;
+  assert.equal(await recorder.stopRecording(), uri);
   await recorder.cancelRecording();
-  assert.deepEqual(deleted, ['file:///voice.wav']); assert.equal(releases, 1);
+  assert.deepEqual(deleted, [uri]); assert.equal(releases, 1);
   assert.equal(modes.at(-1).allowsRecording, false);
 });
 

@@ -179,6 +179,7 @@ const IntroManager: React.FC<IntroManagerProps> = ({ onComplete }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#4776E6',
   }
 });
 

@@ -74,9 +74,9 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   const [demoVideoStatus, setDemoVideoStatus] = useState<'not-started' | 'playing' | 'completed'>('not-started');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [displayedTime, setDisplayedTime] = useState(timeRemaining);
-  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
   const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
-  const [videoSource, setVideoSource] = useState<any>(null);
+  const [loadedVideo, setLoadedVideo] = useState<{ key: string; source: any } | null>(null);
   const [isVideoLocal, setIsVideoLocal] = useState(false);
   const [transitionVideoOpacity, setTransitionVideoOpacity] = useState(0.6);
   
@@ -106,9 +106,24 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   
   // Track current stretch ID for detecting changes
   const currentStretchId = stretch.id;
+  const mediaKey = JSON.stringify([currentStretchId, stretchObj?.image]);
+  const currentMediaKey = useRef<string | null>(mediaKey);
+  currentMediaKey.current = mediaKey;
+  const videoSource = loadedVideo?.key === mediaKey ? loadedVideo.source : null;
+
+  useEffect(() => {
+    currentMediaKey.current = mediaKey;
+    return () => { currentMediaKey.current = null; };
+  }, [mediaKey]);
 
   // Load video source when stretch changes
   useEffect(() => {
+    let active = true;
+    const setVideoSource = (source: NonNullable<typeof loadedVideo>['source']) => {
+      if (active && currentMediaKey.current === mediaKey) {
+        setLoadedVideo({ key: mediaKey, source });
+      }
+    };
     const loadVideoSource = async () => {
       if (!stretchObj || !isVideoSource(stretchObj)) {
         setVideoSource(null);
@@ -129,6 +144,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             // Use video loader service for Firebase URLs
             console.log(`📥 Using video loader service for ${stretchObj.name}`);
             const result = await videoLoaderService.getVideoSource(firebaseUrl);
+            if (!active || currentMediaKey.current !== mediaKey) return;
             setVideoSource({ uri: result.uri });
             setIsVideoLocal(result.isLocal);
             
@@ -151,6 +167,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
           setIsVideoLocal(false);
         }
       } catch (error) {
+        if (!active || currentMediaKey.current !== mediaKey) return;
         console.error('❌ Failed to load video source:', error);
         // Fallback to original source
         setVideoSource(stretchObj.image);
@@ -159,12 +176,13 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     };
 
     loadVideoSource();
-  }, [currentStretchId, stretchObj]);
+    return () => { active = false; };
+  }, [currentStretchId, stretchObj, mediaKey]);
   
   // Effect to handle stretch changes
   useEffect(() => {
     // Reset image error state when stretch changes
-    setImageLoadError(false);
+    setImageLoadError(null);
     
     // Fade out current image
     Animated.timing(imageOpacity, {
@@ -178,7 +196,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
       // Reset hasDemoBeenWatched when stretch changes
       setHasDemoBeenWatched(false);
     });
-  }, [currentStretchId]);
+  }, [currentStretchId, mediaKey]);
   
   // Determine if this stretch has tips
   const hasTips = !isRest && !isTransition && 'tips' in stretch && (stretch as any).tips && (stretch as any).tips.length > 0;
@@ -442,7 +460,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   
   // Render the appropriate image or video
   const renderStretchImage = () => {
-    if (isRest || imageLoadError) {
+    if (isRest || imageLoadError === mediaKey) {
       return (
         <View style={styles.fallbackImageContainer}>
           <Ionicons name="image-outline" size={50} color={isDark || isSunset ? "#666" : "#999"} />
@@ -456,11 +474,27 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     if (!stretchObj) return null;
     
     const shouldRenderVideo = isVideoSource(stretchObj);
+
+    // Resolving a video source must never send its MP4/MOV URI to Image.
+    // Keep this loading state outside the media's initially-transparent wrapper.
+    if (shouldRenderVideo && !videoSource) {
+      return (
+        <View style={styles.imageWrapper}>
+          <View style={styles.imageLoadingContainer}>
+            <ActivityIndicator size="large" color={isDark || isSunset ? theme.accent : '#4CAF50'} />
+            <Text style={[styles.loadingText, { color: isDark || isSunset ? theme.textSecondary : '#666', marginTop: 10 }]}>
+              Loading video...
+            </Text>
+          </View>
+        </View>
+      );
+    }
     
     if (shouldRenderVideo && videoSource) {
       return (
         <Animated.View style={[styles.imageWrapper, { opacity: imageOpacity }]}>
           <Video 
+            key={mediaKey}
             source={videoSource}
             style={styles.stretchImage}
             resizeMode={VideoResizeMode.CONTAIN}
@@ -492,8 +526,9 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               }).start();
             }}
             onError={(error) => {
+              if (currentMediaKey.current !== mediaKey) return;
               console.warn(`Failed to load video for stretch: ${stretchObj.name}`, error);
-              setImageLoadError(true);
+              setImageLoadError(mediaKey);
               setIsImageLoading(false);
             }}
             onPlaybackStatusUpdate={(status) => {
@@ -541,8 +576,9 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
             }).start();
           }}
           onError={(e) => {
+            if (currentMediaKey.current !== mediaKey) return;
             console.warn(`Failed to load image for stretch: ${stretchObj.name}`, e.nativeEvent.error);
-            setImageLoadError(true);
+            setImageLoadError(mediaKey);
             setIsImageLoading(false);
           }}
         />
@@ -1837,4 +1873,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StretchFlowView; 
+export default StretchFlowView;

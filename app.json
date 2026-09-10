@@ -54,7 +54,7 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "iosAppId": "ca-app-pub-9873959079273159~5503902608"
         }
       ],
       [
@@ -78,10 +78,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/potentialLogo2.png",
-          "imageWidth": 100,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#4776E6",
+          "android": {
+            "image": "./assets/images/potentialLogo2.png",
+            "imageWidth": 100,
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff"
+          },
+          "image": "./assets/images/launch-background.png"
         }
       ],
       "./plugins/withReleaseSigningGuard.mjs"
