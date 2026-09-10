@@ -23,9 +23,7 @@ module.exports = function(api) {
           safe: false,
           allowUndefined: true
         }
-      ],
-      // IMPORTANT: Must be the last plugin for Reanimated to work correctly
-      'react-native-reanimated/plugin'
+      ]
     ]
   };
 };

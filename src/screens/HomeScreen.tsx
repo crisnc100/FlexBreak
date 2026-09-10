@@ -65,9 +65,6 @@ import AdService from '../services/adService';
 
 const { height, width } = Dimensions.get('window');
 
-interface GuestUser {
-  // Add any necessary properties for guest users
-}
 
 export default function HomeScreen() {
   const navigation = useNavigation<AppNavigationProp>();
@@ -173,7 +170,7 @@ export default function HomeScreen() {
         console.log(`HomeScreen: Found ${allRoutines.length} routines for streak calculation`);
         
         // Import the calculateStreak function (same one used in useProgressData)
-        const { calculateStreak } = require('../utils/progress/modules/progressTracker');
+        const { calculateStreak } = await import('../utils/progress/modules/progressTracker');
         
         // Calculate streak from routines
         const calculatedStreak = calculateStreak(allRoutines);

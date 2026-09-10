@@ -53,7 +53,7 @@ export default function SubscriptionModal({
   onClose,
   isFromSettings = false 
 }: SubscriptionModalProps) {
-  const {subscriptionDetails,updateSubscription,setPremiumStatus,refreshPremiumStatus,isPremium}=usePremium();
+  const {subscriptionDetails,updateSubscription,refreshPremiumStatus,isPremium}=usePremium();
   const {refreshAccess}=useFeatureAccess();
   const {refreshData}=useGamification();
   const {refreshTheme}=useTheme();
@@ -120,12 +120,13 @@ export default function SubscriptionModal({
         setProducts([]);
       }
     })();
-  },[visible, verificationStatus]);
+  },[visible, verificationStatus, userType]);
 
   /* side-effects after unlock */
   const unlockPremiumLocally=async()=>{
     console.log('[SubscriptionModal] Unlocking premium features locally');
     try {
+      if (!await storageService.getIsPremium()) throw new Error('Verified premium access is required');
       const cur=await storageService.getUserProgress();
       if(!cur.rewards) {
         console.log('[SubscriptionModal] Creating initial rewards');
@@ -136,11 +137,11 @@ export default function SubscriptionModal({
       // Check if we're upgrading from Settings and set flags BEFORE premium status changes
       if (isFromSettings) {
         // Mark that they have already seen the upgrade flow (via Alert in Settings)
-        // This must happen BEFORE setPremiumStatus to prevent the hook from triggering
+        // This must happen BEFORE refreshing premium status to prevent the hook from triggering
         await AsyncStorage.setItem('@ai_wellness_premium_upgrade_seen', 'true');
       }
       
-      await setPremiumStatus(true);
+      await refreshPremiumStatus();
       await soundEffects.playPremiumUnlockedSound().catch(()=>{});
       gamificationEvents.emit(PREMIUM_STATUS_CHANGED);
       gamificationEvents.emit('SUBSCRIPTION_UPDATED'); // Ensure HomeHeader updates immediately
@@ -203,18 +204,27 @@ export default function SubscriptionModal({
     
     // Track if we started a purchase
     let purchaseStarted = false;
+    let purchaseSettled = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    let appStateSubscription: ReturnType<typeof AppState.addEventListener> | undefined;
+    const cleanupPurchase = () => {
+      purchaseSettled = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      appStateSubscription?.remove();
+      setBusy(false);
+    };
     
     try {
       // Set up app state change listener to detect return from payment sheet
-      const appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
+      appStateSubscription = AppState.addEventListener('change', async (nextAppState) => {
         console.log(`[SubscriptionModal] App state changed to: ${nextAppState}`);
         
         // Only proceed if we're returning to the foreground after starting a purchase
-        if (purchaseStarted && nextAppState === 'active') {
+        if (purchaseStarted && !purchaseSettled && nextAppState === 'active') {
           console.log('[SubscriptionModal] App returned to foreground after purchase attempt, checking purchases');
           
           // Remove the listener since we only need it once
-          appStateSubscription.remove();
+          appStateSubscription?.remove();
           
           // Check if the purchase was successful by checking purchase history
           try {
@@ -224,7 +234,7 @@ export default function SubscriptionModal({
             if (restoreResult.success && restoreResult.hasPurchases) {
               console.log('[SubscriptionModal] Purchase verified successfully, unlocking premium features');
               await unlockPremiumLocally();
-              setBusy(false);
+              cleanupPurchase();
               onClose();
               return;
             }
@@ -245,21 +255,20 @@ export default function SubscriptionModal({
       if (res.success) {
         console.log('[SubscriptionModal] Purchase successful, unlocking premium features');
         await unlockPremiumLocally();
-        // Remove the listener since we succeeded directly
-        appStateSubscription.remove();
+        cleanupPurchase();
       } else {
         console.error('[SubscriptionModal] Purchase failed:', res.error || res.responseCode);
         // Wait for the app state listener to potentially capture the successful purchase
         // If after 10 seconds we don't get a success, show an error
-        setTimeout(() => {
-          if (busy) {
+        fallbackTimer = setTimeout(() => {
+          if (!purchaseSettled) {
             Alert.alert('Purchase Failed', 'Purchase failed or timed out. Please try again later.');
-            setBusy(false);
-            appStateSubscription.remove();
+            cleanupPurchase();
           }
         }, 10000);
       }
     } catch (error) {
+      cleanupPurchase();
       console.error('[SubscriptionModal] Purchase error:', error);
       Alert.alert('Purchase Failed', 'Purchase failed. Please try again later.');
       setBusy(false);
@@ -314,7 +323,7 @@ export default function SubscriptionModal({
                 
                 // Ensure premium side-effects run just like paid subscriptions
                 await AsyncStorage.removeItem('@ai_wellness_premium_upgrade_seen');
-                await setPremiumStatus(true);
+                await refreshPremiumStatus();
                 gamificationEvents.emit('SUBSCRIPTION_UPDATED');
                 await refreshPremiumStatus?.();
                 await refreshAccess?.();
@@ -347,21 +356,12 @@ export default function SubscriptionModal({
                 setShowVerificationForm(false);
                 setOneTimeCode('');
                 
-                // Store verification locally (one-time code already stores in Firebase)
-                // Store verification status locally
-                await AsyncStorage.setItem('@flexbreak:verification_status', 'verified');
-                await AsyncStorage.setItem('@flexbreak:user_type', 'discounted');
-                await AsyncStorage.setItem('@flexbreak:verification_date', new Date().toISOString());
-                
-                // Refresh verification status
-                //const verificationData = await ZeroBounceVerificationService.getVerificationStatus();
-                //setVerificationStatus(verificationData.isVerified ? 'verified' : null);
-                //setUserType(verificationData.userType || null);
+                setVerificationStatus('verified');
+                setUserType(result.discountType || null);
                 setShowVerificationPromo(false);
                 
                 // Force refresh products to get discounted prices
                 console.log('[SubscriptionModal] Triggering product refresh for discounted prices...');
-                setProducts(null); // Clear products to trigger reload
               }
             }]
           );

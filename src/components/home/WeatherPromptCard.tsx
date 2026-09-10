@@ -261,7 +261,7 @@ export const WeatherPromptCard: React.FC<WeatherPromptCardProps> = ({ onEnable, 
     return null;
   }
 
-  const getWeatherGradient = () => {
+  const getWeatherGradient = (): React.ComponentProps<typeof LinearGradient>['colors'] => {
     if (weather.temp > 85) {
       return ['#FF6B6B', '#FFB366']; // Hot gradient
     } else if (weather.condition.includes('Rain')) {

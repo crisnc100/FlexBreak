@@ -1,3 +1,4 @@
+import { getAIDataGeneration, isAIDataCurrent, runAIUIWork } from '../ai/aiDataLifecycle';
 import * as Notifications from 'expo-notifications';
 import aiWellnessService from '../ai/core/aiWellnessService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -56,7 +57,7 @@ export const setShowAIWellnessModal = (fn: () => void) => {
 };
 
 // Shared function to handle notification responses
-const handleNotificationResponse = async (response: Notifications.NotificationResponse) => {
+const handleNotificationResponse = async (response: Notifications.NotificationResponse) => runAIUIWork(async generation => {
   try {
     const { notification } = response;
     const data = notification.request.content.data || {};
@@ -71,6 +72,7 @@ const handleNotificationResponse = async (response: Notifications.NotificationRe
       
       // Check if AI wellness is enabled
       const aiWellnessEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+      if (!isAIDataCurrent(generation)) return;
       if (aiWellnessEnabled !== 'true' && !data?.isWelcome && !data?.isPremiumWelcome) {
         console.log('AI wellness is disabled, not opening FlexChat modal');
         return;
@@ -85,6 +87,7 @@ const handleNotificationResponse = async (response: Notifications.NotificationRe
         await scheduleAIWellnessV2('welcome_response');
       }
       
+      if (!isAIDataCurrent(generation)) return;
       // Try to open the FlexChatModal if handler is available
       if (showAIWellnessModal) {
         console.log('Modal handler is available, opening FlexChatModal directly');
@@ -109,7 +112,7 @@ const handleNotificationResponse = async (response: Notifications.NotificationRe
   } catch (error) {
     console.error('Error in AI notification handler:', error);
   }
-};
+});
 
 export const setupAINotificationHandlers = () => {
   // Prevent duplicate handler registration
@@ -130,7 +133,9 @@ export const setupAINotificationHandlers = () => {
   
   // IMPORTANT: Check if app was opened from a notification (handles killed app state)
   // This must be done AFTER setting up the listener and with a small delay
+  const generation = getAIDataGeneration();
   setTimeout(async () => {
+    if (!isAIDataCurrent(generation)) return;
     try {
       // Check if we've already processed the last notification in this session
       const processedKey = '@last_notification_processed';
@@ -159,7 +164,7 @@ export const setupAINotificationHandlers = () => {
         if (isAIWellnessNotification && aiWellnessEnabled !== 'true' && !data?.isWelcome && !data?.isPremiumWelcome) {
           console.log('[aiNotificationHandler] AI wellness is disabled, not processing old AI wellness notification');
           // Still mark it as processed so we don't check it again
-          await AsyncStorage.setItem(processedKey, responseId);
+          if (isAIDataCurrent(generation)) await runAIUIWork(async () => { await AsyncStorage.setItem(processedKey, responseId); });
           return;
         }
         
@@ -174,7 +179,7 @@ export const setupAINotificationHandlers = () => {
           await handleNotificationResponse(lastResponse);
           
           // Mark this notification as processed
-          await AsyncStorage.setItem(processedKey, responseId);
+          if (isAIDataCurrent(generation)) await runAIUIWork(async () => { await AsyncStorage.setItem(processedKey, responseId); });
         } else {
           console.log('[aiNotificationHandler] Notification already processed, skipping');
         }

@@ -1,3 +1,4 @@
+import { trackAIWork, onAIDataDeleted, getAIDataGeneration, isAIDataCurrent } from '../aiDataLifecycle';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import configValidator from '../../security/configValidator';
 import costMonitor from '../utils/costMonitor';
@@ -6,7 +7,7 @@ import { AI_CONFIG } from '../../../config/aiConfig';
 import unifiedMemoryService from '../memory/memoryService';
 import { scheduleRegularCheckIns, cleanupAllAINotifications, canScheduleNotifications, markScheduled } from '../scheduling/notificationScheduler';
 import { getNotificationsByType, NotificationType } from '../../../utils/notificationManager';
-import { KEYS } from '../../storageService';
+import { KEYS, getIsPremium } from '../../storageService';
 
 interface InitializationResult {
   success: boolean;
@@ -18,7 +19,7 @@ class AISystemInitializer {
   private static instance: AISystemInitializer;
   private initialized: boolean = false;
   
-  private constructor() {}
+  private constructor() { onAIDataDeleted(() => this.reset()); }
   
   static getInstance(): AISystemInitializer {
     if (!AISystemInitializer.instance) {
@@ -31,6 +32,8 @@ class AISystemInitializer {
    * Initializes AI wellness services on app startup
    */
   async initialize(): Promise<InitializationResult> {
+    const generation = getAIDataGeneration();
+    return trackAIWork(async () => {
     if (this.initialized) {
       return { success: true, errors: [], warnings: [] };
     }
@@ -53,10 +56,10 @@ class AISystemInitializer {
         console.warn('Cost Alert:', alert);
         
         // Store alert for user notification
-        AsyncStorage.setItem('@ai_cost_alert_latest', JSON.stringify({
+        void trackAIWork(() => AsyncStorage.setItem('@ai_cost_alert_latest', JSON.stringify({
           ...alert,
           timestamp: Date.now()
-        }));
+        }))).catch(error => console.warn('Cost alert storage unavailable:', error));
         
         // TODO: Show in-app notification to user
       });
@@ -92,7 +95,7 @@ class AISystemInitializer {
         }
         
         // 7. Initialize AI wellness notifications
-        const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
+        const isPremium = await getIsPremium();
         await this.initializeNotifications(isPremium, userId);
       }
       
@@ -104,7 +107,7 @@ class AISystemInitializer {
         apiKeyConfigured: true // API keys now secure on Firebase
       });
       
-      this.initialized = true;
+      this.initialized = isAIDataCurrent(generation);
       
       return {
         success: errors.length === 0,
@@ -122,6 +125,8 @@ class AISystemInitializer {
         warnings
       };
     }
+
+    });
   }
   
   /**
@@ -258,9 +263,10 @@ class AISystemInitializer {
    * This handles the case where a free user with Wednesday notifications upgrades to premium
    */
   async checkAndRestoreAfterUpgrade(): Promise<void> {
+    return trackAIWork(async () => {
     try {
       const isEnabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';
-      const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
+      const isPremium = await getIsPremium();
       
       if (!isEnabled || !isPremium) {
         return;
@@ -285,6 +291,8 @@ class AISystemInitializer {
     } catch (error) {
       console.error('Error checking upgrade status:', error);
     }
+
+    });
   }
 
   /**

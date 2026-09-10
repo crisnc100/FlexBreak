@@ -1,11 +1,11 @@
 import { APP_URL } from '@env';
 
 export const AI_CONFIG = {
-  // Security configuration - API keys now secure on Firebase Functions
-  useSecureMode: true, // Always true - using Firebase Functions
+  // Security configuration - API keys now secure on authenticated backend
+  useSecureMode: true, // Provider routing is server-owned
   
   openRouter: {
-    // API key now securely managed by Firebase Functions
+    // API key now securely managed by authenticated backend
     appUrl: APP_URL || 'https://flexbreak.app',
     defaultModel: 'meta-llama/llama-3.1-8b-instruct:free', // Default model
     maxRetries: 3,
@@ -13,7 +13,7 @@ export const AI_CONFIG = {
   },
   
   groq: {
-    // API key now securely managed by Firebase Functions
+    // API key now securely managed by authenticated backend
     defaultModel: 'llama3-8b-8192', // Groq fallback model
     maxRetries: 3,
     timeout: 30000, // 30 seconds
@@ -49,8 +49,8 @@ export const AI_CONFIG = {
  `
 };
 
-// Export individual config values (API keys now secure on Firebase Functions)
+// Export individual config values (API keys now secure on authenticated backend)
 export default {
-  // API keys removed - now securely managed by Firebase Functions
+  // API keys removed - now securely managed by authenticated backend
   HTTP_REFERER: APP_URL || 'https://flexbreak.app',
 };

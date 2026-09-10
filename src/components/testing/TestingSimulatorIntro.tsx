@@ -377,12 +377,12 @@ const TestingSimulatorIntro: React.FC<TestingSimulatorIntroProps> = ({
           <View style={[styles.noticeContainer, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)' }]}>
             <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
             <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
-              Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
+              Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app&apos;s main features, not these testing tools.
             </Text>
           </View>
           
           <Text style={[styles.description, { color: theme.textSecondary }]}>
-            In this part, you'll test how FlexBreak's gamification system works by simulating different user scenarios. You'll be able to:
+            In this part, you&apos;ll test how FlexBreak&apos;s gamification system works by simulating different user scenarios. You&apos;ll be able to:
           </Text>
           
           <View style={styles.featureList}>
@@ -419,7 +419,7 @@ const TestingSimulatorIntro: React.FC<TestingSimulatorIntroProps> = ({
           </TouchableOpacity>
           
           <Text style={[styles.note, { color: theme.textSecondary }]}>
-            You'll need to complete at least {minRequiredScenarios} scenarios to proceed to the final feedback step.
+            You&apos;ll need to complete at least {minRequiredScenarios} scenarios to proceed to the final feedback step.
           </Text>
           
           <TouchableOpacity
@@ -485,7 +485,7 @@ const TestingSimulatorIntro: React.FC<TestingSimulatorIntroProps> = ({
         <View style={[styles.noticeContainer, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)', marginBottom: 16 }]}>
           <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
           <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
-            Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
+            Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app&apos;s main features, not these testing tools.
           </Text>
         </View>
         
@@ -497,7 +497,7 @@ const TestingSimulatorIntro: React.FC<TestingSimulatorIntroProps> = ({
               • You may need to RESTART the app (close and reopen) after testing certain scenarios for changes to fully take effect.
             </Text>
             <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-              • If you encounter issues or want to test another scenario, use the "Reset Simulation Data" button (red button in the buttom of the screen or in the simulator) to start fresh. It will not affect your testing progress just reset data for the simulator.
+              • If you encounter issues or want to test another scenario, use the &quot;Reset Simulation Data&quot; button (red button in the buttom of the screen or in the simulator) to start fresh. It will not affect your testing progress just reset data for the simulator.
             </Text>
             <Text style={[styles.infoText, { color: theme.textSecondary }]}>
               • Each scenario is independent - complete any {minRequiredScenarios} that interest you most.

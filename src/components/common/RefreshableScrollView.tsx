@@ -181,7 +181,7 @@ const RefreshableScrollView = forwardRef<ScrollView, RefreshableScrollViewProps>
         {refreshFailed && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>
-              Couldn't refresh data. Pull down to try again.
+              Couldn&apos;t refresh data. Pull down to try again.
             </Text>
           </View>
         )}
@@ -250,3 +250,4 @@ const styles = StyleSheet.create({
 });
 
 export default RefreshableScrollView; 
+RefreshableScrollView.displayName = 'RefreshableScrollView';

@@ -94,7 +94,7 @@ const NonMedicalNotice: React.FC<NonMedicalNoticeProps> = ({
             { color: isDark || isSunset ? theme.textSecondary : '#505050' }
           ]}>
             FlexBreak provides general wellness stretching routines to support your physical wellbeing.
-            This content is not medical advice and isn't intended to diagnose, treat, or cure any condition.
+            This content is not medical advice and isn&apos;t intended to diagnose, treat, or cure any condition.
             Results may vary, and you should consult with a healthcare professional for medical concerns.
           </Text>
           

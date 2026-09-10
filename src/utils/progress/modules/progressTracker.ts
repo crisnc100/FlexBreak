@@ -85,7 +85,7 @@ export const calculateWeeklyActivity = (data: ProgressEntry[]) => {
     // Check if the entry is within the last 7 days
     if (entryDate >= sevenDaysAgo && entryDate <= today) {
       // Calculate days difference from today
-      const daysDiff = Math.floor((today.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = dateUtils.daysBetween(entryDate, today);
       
       entriesInRange++;
       
@@ -156,7 +156,8 @@ export const calculateActiveDays = (data: ProgressEntry[]) => {
   data.forEach(entry => {
     // Convert the entry date to local time for consistency
     const localDateStr = dateUtils.toDateString(entry.date);
-    const entryDate = new Date(localDateStr).setHours(0, 0, 0, 0);
+    const [year, month, day] = localDateStr.split('-').map(Number);
+    const entryDate = new Date(year, month - 1, day).getTime();
     
     if (entryDate >= thirtyDaysAgoTimestamp && entryDate <= today) {
       uniqueDates.add(entryDate);

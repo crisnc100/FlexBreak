@@ -1,3 +1,5 @@
+import { getIsPremium } from '../../services/storageService';
+import { runAIUIWork, getAIDataGeneration, isAIDataCurrent, onAIDataDeleted, trackAIWork } from '../../services/ai/aiDataLifecycle';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -196,7 +198,9 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       
       // Check AI Wellness status
       const checkAIWellnessStatus = async () => {
+        const generation = getAIDataGeneration();
         const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
+        if (!isAIDataCurrent(generation)) return;
         setAiWellnessEnabled(enabled === 'true');
       };
       checkAIWellnessStatus();
@@ -246,14 +250,25 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     }
   }, [showVoiceIntro]);
 
+  useEffect(() => onAIDataDeleted(() => {
+    setMessages([]);
+    setMessage('');
+    setConversationLoaded(false);
+    setIsLoading(false);
+    setIsRecording(false);
+    setCurrentTypewritingId(null);
+    onClose();
+  }), [onClose]);
+
   // Save conversation to AsyncStorage
-  const saveConversation = async (messagesToSave: Message[]) => {
+  const saveConversation = async (messagesToSave: Message[], generation = getAIDataGeneration()) => {
+    if (!isAIDataCurrent(generation)) return;
     try {
       const conversationData = {
         messages: messagesToSave,
         lastUpdated: new Date().toISOString(),
       };
-      await AsyncStorage.setItem('@flexchat_conversation', JSON.stringify(conversationData));
+      await trackAIWork(() => AsyncStorage.setItem('@flexchat_conversation', JSON.stringify(conversationData)));
     } catch (error) {
       console.error('[FlexChatModal] Error saving conversation:', error);
     }
@@ -261,9 +276,10 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
 
   // Load conversation from AsyncStorage
   const loadSavedConversation = async (): Promise<Message[] | null> => {
+    const generation = getAIDataGeneration();
     try {
       const savedData = await AsyncStorage.getItem('@flexchat_conversation');
-      if (!savedData) return null;
+      if (!isAIDataCurrent(generation) || !savedData) return null;
       
       const conversationData = JSON.parse(savedData);
       const lastUpdated = new Date(conversationData.lastUpdated);
@@ -272,7 +288,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       
       // If conversation is too old, return null
       if (hoursSinceLastUpdate > CONVERSATION_EXPIRY_HOURS) {
-        await AsyncStorage.removeItem('@flexchat_conversation');
+        await trackAIWork(() => AsyncStorage.removeItem('@flexchat_conversation'));
         return null;
       }
       
@@ -288,10 +304,12 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
   };
 
   const loadInitialState = async () => {
+    const generation = getAIDataGeneration();
     console.log('[FlexChatModal] Loading initial state...');
     try {
       // Check for saved conversation first
       const savedMessages = await loadSavedConversation();
+      if (!isAIDataCurrent(generation)) return;
       
       if (savedMessages && savedMessages.length > 0) {
         // Resume previous conversation
@@ -319,10 +337,12 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       
       // Check if this is first time seeing voice feature
       const hasSeenVoiceIntro = await AsyncStorage.getItem('@ai_wellness_voice_intro_seen');
+      if (!isAIDataCurrent(generation)) return;
       let voiceIntro = '';
       if (!hasSeenVoiceIntro) {
         voiceIntro = '\n\n🎤 ✨ NEW: Try speaking to me! Tap the glowing microphone button to use your voice instead of typing. Just like having a conversation with a real wellness coach!';
-        await AsyncStorage.setItem('@ai_wellness_voice_intro_seen', 'true');
+        await trackAIWork(() => AsyncStorage.setItem('@ai_wellness_voice_intro_seen', 'true'));
+        if (!isAIDataCurrent(generation)) return;
         setShowVoiceIntro(true);
       }
       
@@ -389,7 +409,8 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     }).start();
   };
 
-  const handleSend = async (text?: string) => {
+  const handleSend = async (text?: string, generation = getAIDataGeneration()) => {
+    if (!isAIDataCurrent(generation)) return;
     const messageText = text || message.trim();
     if (!messageText || isLoading) return;
 
@@ -402,13 +423,15 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     // P0.5: Enforce input clamp with brief notice
     let outboundText = messageText;
     try {
-      const isPremium = (await AsyncStorage.getItem(KEYS.USER.PREMIUM)) === 'true';
+      const isPremium = await getIsPremium();
       const maxLen = isPremium ? AI_CONFIG.limits.premium.maxInputLength : AI_CONFIG.limits.free.maxInputLength;
       if (outboundText.length > maxLen) {
         outboundText = outboundText.slice(0, maxLen);
         Alert.alert('Message trimmed', 'Your message was quite long, so I trimmed it to keep the reply concise.');
       }
-    } catch {}
+    } catch (error) { console.warn('Could not read message length preference:', error); }
+
+    if (!isAIDataCurrent(generation)) return;
 
     // Add user message (possibly trimmed)
     const userMessage: Message = {
@@ -421,7 +444,8 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     setMessages(updatedMessages);
     
     // Save conversation after adding user message
-    await saveConversation(updatedMessages);
+    await saveConversation(updatedMessages, generation);
+    if (!isAIDataCurrent(generation)) return;
 
     // Scroll to bottom
     setTimeout(() => {
@@ -432,6 +456,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
     setIsLoading(true);
     try {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
+      if (!isAIDataCurrent(generation)) return;
       // Pass conversation history to AI service for context
       // Limit to last 10 messages to prevent token overflow
       const recentMessages = messages.slice(-10);
@@ -442,6 +467,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         recentMessages // Pass the recent conversation history
       );
       
+      if (!isAIDataCurrent(generation)) return;
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
@@ -456,7 +482,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       setMessages(updatedMessagesWithAI);
       
       // Save conversation after AI response
-      await saveConversation(updatedMessagesWithAI);
+      await saveConversation(updatedMessagesWithAI, generation);
       
       // Set this message as currently typewriting
       if (ENABLE_TYPEWRITER_EFFECT) {
@@ -468,6 +494,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
+      if (!isAIDataCurrent(generation)) return;
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
@@ -476,22 +503,27 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       };
       const updatedMessagesWithError = [...messages, userMessage, errorMessage];
       setMessages(updatedMessagesWithError);
-      await saveConversation(updatedMessagesWithError);
+      await saveConversation(updatedMessagesWithError, generation);
     } finally {
-      setIsLoading(false);
+      if (isAIDataCurrent(generation)) setIsLoading(false);
     }
   };
 
   const handleVoiceRecord = async () => {
+    const generation = getAIDataGeneration();
+    if (!isAIDataCurrent(generation)) return;
+    try {
     if (isRecording) {
       // Stop recording
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsRecording(false);
       
       const audioUri = await voiceRecordingService.stopRecording();
+      if (!isAIDataCurrent(generation)) return;
       if (audioUri) {
         setIsLoading(true);
         const transcribedText = await voiceRecordingService.transcribeAudio(audioUri);
+        if (!isAIDataCurrent(generation)) return;
         
         if (transcribedText && transcribedText.trim().length > 0) {
           // Check if it's a temporary message
@@ -503,7 +535,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
             );
           } else {
             // Real transcription - send it
-            await handleSend(transcribedText);
+            await handleSend(transcribedText, generation);
           }
         } else {
           // Silent fail - no alert needed, just don't send anything
@@ -515,6 +547,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
       // Start recording
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const started = await voiceRecordingService.startRecording();
+      if (!isAIDataCurrent(generation)) return;
       
       if (started) {
         setIsRecording(true);
@@ -563,6 +596,12 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
         );
       }
     }
+    } catch (error) {
+      if (!isAIDataCurrent(generation)) return;
+      setIsLoading(false);
+      setIsRecording(false);
+      console.warn('Voice recording failed:', error);
+    }
   };
 
   // handleSuggestedAction removed - no longer needed
@@ -586,7 +625,7 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
           ]}
         >
           <TouchableOpacity 
-            style={StyleSheet.absoluteFillObject} 
+            style={StyleSheet.absoluteFill}
             onPress={handleClose}
             activeOpacity={1}
           />
@@ -684,12 +723,13 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                   {/* New conversation button - only show if there's an existing conversation */}
                   {messages.length > 1 && !isCollapsed && (
                     <TouchableOpacity 
-                      onPress={async () => {
+                      onPress={() => runAIUIWork(async generation => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        await AsyncStorage.removeItem('@flexchat_conversation');
+                        await trackAIWork(() => AsyncStorage.removeItem('@flexchat_conversation'));
+                        if (!isAIDataCurrent(generation)) return;
                         setConversationLoaded(false);
                         await loadInitialState();
-                      }} 
+                      })} 
                       style={styles.newChatButton}
                     >
                       <Ionicons name="refresh-outline" size={20} color={isDark ? '#ffffff' : '#1a1a2e'} />
@@ -774,9 +814,12 @@ export const FlexChatModal: React.FC<FlexChatModalProps> = ({ visible, onClose }
                                 </Text>
                                 <TouchableOpacity
                                   onPress={async () => {
+                                    const generation = getAIDataGeneration();
                                     try {
                                       const userId = (await AsyncStorage.getItem('@user_id')) || 'anonymous';
+                                      if (!isAIDataCurrent(generation)) return;
                                       await memoryService.recordRoutineNote(userId, msg.routineParams!);
+                                      if (!isAIDataCurrent(generation)) return;
                                       if ((global as any).navigateToRoutine) {
                                         (global as any).navigateToRoutine(msg.routineParams!);
                                         // Close chat after navigating to routine
@@ -999,7 +1042,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#000000',
   },
   modal: {

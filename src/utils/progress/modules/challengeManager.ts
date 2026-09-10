@@ -11,7 +11,7 @@ import * as streakManager from './streakManager';
 import { calculateStreakWithFlexSaves } from './progressTracker';
 
 // Track recent challenges to avoid repetition
-let recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
+const recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
 
 // Helper to track used challenges to avoid repetition
 const trackUsedChallenge = (challengeId: string, category: string) => {
@@ -198,7 +198,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         }
         break;
         
-      case 'time_of_day':
+      case 'time_of_day': {
         // Get the time range from the challenge data
         const timeRange = challenge.timeRange || { start: 0, end: 24 };
         
@@ -207,8 +207,9 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         
         console.log(`Time of day challenge "${challenge.title}": ${challenge.progress}/${challenge.requirement} routines within time range ${timeRange.start}-${timeRange.end}`);
         break;
+    }
 
-      case 'morning_streak':
+      case 'morning_streak': {
         // Get the time range for morning routines
         const morningTimeRange = challenge.timeRange || { start: 5, end: 10 };
         
@@ -264,6 +265,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         challenge.progress = maxStreak;
         console.log(`Morning streak challenge "${challenge.title}": ${challenge.progress}/${challenge.requirement} consecutive days with morning routines`);
         break;
+    }
         
       case 'daily_minutes':
         // Basic total minutes challenge
@@ -308,7 +310,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         }
         break;
         
-      case 'streak':
+      case 'streak': {
         // Get current streak directly from the streak manager to ensure accuracy
         const streakStatus = await streakManager.getStreakStatus();
         challenge.progress = streakStatus.currentStreak;
@@ -337,6 +339,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
           await streakManager.updateStoredStreak(calculatedStreak);
         }
         break;
+    }
         
       case 'weekly_consistency':
       case 'unique_days':
@@ -367,7 +370,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         }
         break;
         
-      case 'weekend_days':
+      case 'weekend_days': {
         // For weekend warrior challenge - count routines completed on Saturday and Sunday
         const weekendDays = new Set();
         
@@ -387,6 +390,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         challenge.progress = weekendDays.size;
         console.log(`Weekend warrior challenge: ${challenge.progress}/${challenge.requirement} weekend days with routines`);
         break;
+    }
         
       case 'area_variety':
         // Default: Use all unique areas
@@ -436,7 +440,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
         }
         break;
         
-      case 'specific_area':
+      case 'specific_area': {
         // Check for routines targeting a specific area
         const specificArea = challenge.requirementData?.area;
         if (specificArea && stats.routinesByArea) {
@@ -449,6 +453,7 @@ export const updateChallengeProgress = async (userProgress: UserProgress, challe
           }
         }
         break;
+    }
         
       default:
         // For any unhandled challenge types, log a warning
@@ -984,7 +989,7 @@ export const claimChallenge = async (challengeId: string): Promise<{
   
   // Check if XP Boost is active and apply multiplier if it is
   const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
-  let originalXp = xpEarned;
+  const originalXp = xpEarned;
   let xpBoostApplied = false;
   
   if (isActive) {
@@ -1129,7 +1134,7 @@ export const batchUpdateChallenges = async (
  * Update user challenges - combines refresh and batch update
  * This is the main function to call when processing a completed routine
  */
-export const updateUserChallenges = async (userProgress: UserProgress): Promise<Challenge[]> => {
+export const updateUserChallenges = async (userProgress: UserProgress, strict = false): Promise<Challenge[]> => {
   console.log('Updating user challenges after routine completion');
   let completedChallenges: Challenge[] = [];
   
@@ -1202,6 +1207,7 @@ export const updateUserChallenges = async (userProgress: UserProgress): Promise<
     return completedChallenges;
   } catch (error) {
     console.error('Error in updateUserChallenges:', error);
+    if (strict) throw error;
     return [];
   }
 };

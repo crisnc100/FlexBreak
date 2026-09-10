@@ -1,3 +1,7 @@
+import assetlightningReflexes from '../../../assets/images/achievements/lightningReflexes.png';
+import assetgameMaster from '../../../assets/images/achievements/gameMaster.png';
+import assettriviaExpert from '../../../assets/images/achievements/triviaExpert.png';
+import assetperfectScoreBadge from '../../../assets/images/achievements/perfectScoreBadge.png';
 import React, { useState } from 'react';
 import {
   View,
@@ -33,28 +37,28 @@ const MINIGAME_ACHIEVEMENTS = {
     title: 'Lightning Reflexes',
     description: 'Perfect score in Stress Buster!',
     xp: 100,
-    badgeImage: require('../../../assets/images/achievements/lightningReflexes.png'),
+    badgeImage: assetlightningReflexes,
   },
   [MiniGameType.POSTURE_PATROL]: {
     id: 'game_master',
     title: 'Game Master',
     description: 'Completed without losing lives!',
     xp: 150,
-    badgeImage: require('../../../assets/images/achievements/gameMaster.png'),
+    badgeImage: assetgameMaster,
   },
   [MiniGameType.WELLNESS_TRIVIA]: {
     id: 'trivia_expert',
     title: 'Perfect Knowledge',
     description: 'All answers correct!',
     xp: 50,
-    badgeImage: require('../../../assets/images/achievements/triviaExpert.png'),
+    badgeImage: assettriviaExpert,
   },
   [MiniGameType.BALANCE_DROP]: {
     id: 'perfect_balance',
     title: 'Perfect Balance',
     description: 'Flawless balance achieved!',
     xp: 200,
-    badgeImage: require('../../../assets/images/achievements/perfectScoreBadge.png'),
+    badgeImage: assetperfectScoreBadge,
   },
 };
 
@@ -116,7 +120,7 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           isPerfectScore = score >= 17 && xp >= 80; // High score and high XP
           console.log(`[MiniGamesCard] Stress Buster - Score: ${score}, XP: ${xp}, Perfect: ${isPerfectScore}`);
           break;
-        case MiniGameType.POSTURE_PATROL:
+        case MiniGameType.POSTURE_PATROL: {
           // Perfect score if completed with all 3 hearts remaining
           // Since XP calculation can be inconsistent, we'll check score directly
           // In Posture Patrol, score includes hearts remaining bonus (heartsRemaining * 10)
@@ -127,6 +131,7 @@ export const MiniGamesCard: React.FC<MiniGamesCardProps> = ({
           isPerfectScore = likelyHearts >= 3 || xp >= 80; // 3 hearts or PERFECT tier XP
           console.log(`[MiniGamesCard] Posture Patrol - Score: ${score}, XP: ${xp}, Hearts estimate: ${likelyHearts}, Perfect: ${isPerfectScore}`);
           break;
+      }
         case MiniGameType.BALANCE_DROP:
           // Perfect score if completed all rounds with good balance and energy
           // Balance Drop gives high XP for good performance

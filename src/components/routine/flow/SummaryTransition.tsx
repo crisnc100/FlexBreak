@@ -9,10 +9,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Import existing routine stats component to reuse
 import RoutineStats from '../tabs/RoutineStats';
+import { BodyArea, Duration } from '../../../types';
 
 interface SummaryTransitionProps {
-  area: string;
-  duration: string;
+  area: BodyArea;
+  duration: Duration;
   routineLength: number;
   xpEarned?: number;       // Add XP earned prop
   hasXpBoost?: boolean;    // Add XP boost prop
@@ -151,7 +152,7 @@ export const SummaryTransition: React.FC<SummaryTransitionProps> = ({
           Session Summary
         </Text>
         <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-          Here's how you did
+          Here&apos;s how you did
         </Text>
       </Animated.View>
 

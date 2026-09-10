@@ -12,7 +12,6 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import * as Permissions from 'expo-permissions';
 import { Ionicons } from '@expo/vector-icons';
 import { parseUserInput } from '../../utils/smart/parser';
 import { generateRoutineConfig } from '../../utils/smart/configBuilder';
@@ -450,7 +449,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Quick Follow-up</Text>
               <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
-                Let's personalize your routine
+                Let&apos;s personalize your routine
               </Text>
             </View>
             
@@ -458,7 +457,7 @@ export const SmartRoutineGenerator: React.FC<SmartRoutineGeneratorProps> = ({ on
               <View style={styles.questionNumberBadge}>
                 <Text style={styles.questionNumberText}>1</Text>
               </View>
-              <Text style={[styles.label, { color: theme.text }]}>What's your main issue?</Text>
+              <Text style={[styles.label, { color: theme.text }]}>What&apos;s your main issue?</Text>
             </View>
             
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>

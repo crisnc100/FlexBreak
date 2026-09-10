@@ -75,7 +75,7 @@ const XpBreakdown: React.FC<XpBreakdownProps> = ({
 
   // Render a single XP breakdown item
   const renderXpBreakdownItem = (item: XpBreakdownItem, index: number | string) => {
-    let iconName = getIconForXpSource(item.source, item.description);
+    const iconName = getIconForXpSource(item.source, item.description);
     
     // Check if this specific item has XP boost applied
     const itemHasBoost = item.description.includes('XP Boost Applied') || 

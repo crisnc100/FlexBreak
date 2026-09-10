@@ -79,17 +79,6 @@ export const initializeStreak = async (): Promise<void> => {
       flexSavesAvailable = calculatedFlexSaveCount;
     }
     
-    // Force refill flexSaves for certain conditions
-    const forceRefill = flexSavesAvailable === 0 && userProgress.level >= 6;
-    if (forceRefill) {
-      // Attempt direct refill
-      if (userProgress.rewards?.[FLEX_SAVE_REWARD_ID]) {
-        userProgress.rewards[FLEX_SAVE_REWARD_ID].uses = 2; // Set to MAX_FLEX_SAVES
-        await saveUserProgressWithVersionCheck(userProgress, 'streak_init_refill');
-        flexSavesAvailable = 2;
-      }
-    }
-    
     // Calculate streak with flexSaves included
     const calculatedStreak = progressTracker.calculateStreakWithFlexSaves(
       routineDates,
@@ -102,7 +91,7 @@ export const initializeStreak = async (): Promise<void> => {
       currentStreak: calculatedStreak,
       routineDates,
       flexSaveDates,
-      flexSavesAvailable: forceRefill ? 2 : flexSavesAvailable,
+      flexSavesAvailable,
       initialized: true
     };
     
@@ -161,9 +150,9 @@ export const calculateStreakFromHistory = (): number => {
   
   // Count consecutive days backwards from the most recent date
   let streak = 1;
-  let currentDate = new Date(mostRecentDate);
+  const currentDate = new Date(mostRecentDate);
   
-  while (true) {
+  while (allDates.includes(dateUtils.toDateString(currentDate))) {
     // Move to previous day
     currentDate.setDate(currentDate.getDate() - 1);
     const dateStr = dateUtils.toDateString(currentDate);
@@ -543,7 +532,11 @@ export const refillFlexSaves = async (): Promise<boolean> => {
     const currentFlexSaves = userProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.uses || 0;
     
     // Determine if we need to refill
-    const needsRefill = currentFlexSaves < MAX_FLEX_SAVES;
+    const month = dateUtils.todayStringLocal().slice(0, 7);
+    const usedThisMonth = new Set((userProgress.rewards?.[FLEX_SAVE_REWARD_ID]?.appliedDates || [])
+      .map(dateUtils.toDateString).filter(date => date.startsWith(month))).size;
+    const allowance = Math.max(0, MAX_FLEX_SAVES - usedThisMonth);
+    const needsRefill = currentFlexSaves < allowance;
     
     // Already at max or we already refilled this month
     if (!needsRefill) {
@@ -553,7 +546,7 @@ export const refillFlexSaves = async (): Promise<boolean> => {
     // Update cache
     streakCache = {
       ...streakCache,
-      flexSavesAvailable: MAX_FLEX_SAVES
+      flexSavesAvailable: allowance
     };
     
     // Update storage
@@ -561,7 +554,7 @@ export const refillFlexSaves = async (): Promise<boolean> => {
       streakCache.currentStreak,
       streakCache.routineDates,
       streakCache.flexSaveDates,
-      MAX_FLEX_SAVES
+      allowance
     );
     
     return true;

@@ -1,93 +1,9 @@
-# GitHub Actions CI/CD Setup 🚀
+# GitHub automation
 
-## Quick Start
+`workflows/auto-production.yml` runs full reusable CI after every main push, then automatically redeploys all six v2 backend functions when backend paths were touched before changed mobile builds/uploads. Docs-only cumulative changes report a no-op; backend-only changes do not build mobile. Fresh manual dispatch retries the identical operation; Re-run jobs is rejected.
 
-### 1. Add GitHub Secrets
+`workflows/ci.yml` independently checks PRs and staging/develop pushes. Main invokes it once through production. Checks include lint, app/backend typechecking and tests, audits, mobile bundles and real Firestore emulator policies. CI receives no deployment secrets.
 
-Go to your GitHub repository → Settings → Secrets and variables → Actions
+`workflows/deploy-backend.yml` is manual legacy containment only, using a separate queue. No workflow automatically publishes a public store release, changes rules/secrets or deletes remote functions.
 
-Add these secrets:
-```
-EXPO_TOKEN = (your expo access token)
-EAS_PROJECT_ID = (your eas project id)
-SLACK_WEBHOOK_URL = (optional - for notifications)
-```
-
-### 2. Get Your Tokens
-
-```bash
-# Get EXPO_TOKEN
-npx expo login
-npx expo whoami --json
-# Copy the "accessToken" value
-
-# Get EAS_PROJECT_ID
-npx eas project:info
-# Copy the "projectId" value
-```
-
-### 3. Install Dependencies
-
-```bash
-npm install
-```
-
-### 4. Set Up Branches
-
-```bash
-git checkout -b develop
-git push -u origin develop
-
-git checkout -b staging
-git push -u origin staging
-```
-
-## Workflow Summary
-
-| Branch | Trigger | Actions | Output |
-|--------|---------|---------|--------|
-| `develop` | Push | Lint, Type Check, Tests, Build | Development builds |
-| `staging` | Push | All checks + Version bump (patch) | TestFlight & Android preview |
-| `main` | Push | All checks + Security scan + Version bump (minor) | App Store & Play Store |
-
-## Your New Workflow
-
-Instead of running:
-```bash
-npx eas-cli build --platform ios --profile testflight --clear-cache --non-interactive --no-wait
-```
-
-Just:
-```bash
-git push origin staging
-```
-
-Everything happens automatically! 🎉
-
-## Version Management
-
-- **Staging**: Increments patch version (1.0.0 → 1.0.1)
-- **Production**: Increments minor version (1.0.1 → 1.1.0)
-- Build numbers auto-increment on every build
-- Git tags created for production releases
-
-## Monitoring
-
-- Check GitHub Actions tab for build progress
-- Slack notifications (if configured)
-- EAS dashboard for detailed build logs
-
-## Troubleshooting
-
-If builds fail:
-1. Check GitHub Actions logs
-2. Verify secrets are set correctly
-3. Check EAS dashboard for detailed errors
-4. Ensure `eas.json` has correct profiles
-
-## Next Steps
-
-1. ✅ Commit these workflow files
-2. ✅ Add your GitHub secrets
-3. ✅ Push to `develop` to test
-4. ✅ Celebrate automation! 🎉
+Automation is prepared but blocked on account/backend/native/device setup and accurate public privacy disclosure. See the [production runbook](../docs/CI_CD_SETUP_GUIDE.md) and [backend bootstrap/containment](../docs/BACKEND_DEPLOYMENT.md). Protect main; without optional environment reviewers, merging is the deployment approval boundary.

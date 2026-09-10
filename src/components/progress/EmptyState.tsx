@@ -36,7 +36,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
         
         <Text style={[styles.emptyTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>All Routines Hidden</Text>
         <Text style={[styles.emptySubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
-          You've hidden all your routines. You still have progress data and achievements saved.
+          You&apos;ve hidden all your routines. You still have progress data and achievements saved.
         </Text>
         
         <TouchableOpacity 

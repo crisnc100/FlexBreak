@@ -1,3 +1,4 @@
+import { runAIUIWork, isAIDataCurrent } from '../../services/ai/aiDataLifecycle';
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -62,24 +63,32 @@ export const AIWellnessOnboarding: React.FC<AIWellnessOnboardingProps> = ({
   };
 
   const handleNameNext = async () => {
+    return runAIUIWork(async generation => {
     if (userName.trim()) {
       await AsyncStorage.setItem(KEYS.AI_WELLNESS.USER_NAME, userName.trim());
     }
     
+    if (!isAIDataCurrent(generation)) return;
     if (isPremium) {
       setCurrentStep('schedule');
     } else {
       // Free users skip schedule selection
       await enableAIWellness();
     }
+  
+    });
   };
 
   const handleScheduleComplete = async (timePreference: string) => {
+    return runAIUIWork(async () => {
     await AsyncStorage.setItem(KEYS.AI_WELLNESS.TIME_PREFERENCE, timePreference);
     await enableAIWellness();
+  
+    });
   };
 
   const enableAIWellness = async () => {
+    return runAIUIWork(async generation => {
     setCurrentStep('complete');
     
     // Enable AI wellness
@@ -88,13 +97,18 @@ export const AIWellnessOnboarding: React.FC<AIWellnessOnboardingProps> = ({
     
     // Show completion for 2 seconds then close
     setTimeout(() => {
-      onComplete();
+      if (isAIDataCurrent(generation)) onComplete();
     }, 2000);
+  
+    });
   };
 
   const handleDismiss = async () => {
+    return runAIUIWork(async generation => {
     await AsyncStorage.setItem('@ai_wellness_onboarding_dismissed', 'true');
-    onDismiss();
+    if (isAIDataCurrent(generation)) onDismiss();
+  
+    });
   };
 
   const renderStepIndicator = () => {
@@ -134,14 +148,14 @@ export const AIWellnessOnboarding: React.FC<AIWellnessOnboardingProps> = ({
               </Text>
               
               <Text style={[styles.description, { color: theme.textSecondary }]}>
-                I'm here to check in on your wellness and suggest personalized stretches
+                I&apos;m here to check in on your wellness and suggest personalized stretches
               </Text>
               
               <View style={styles.featureList}>
                 <View style={styles.featureItem}>
                   <Ionicons name="chatbubbles-outline" size={20} color={theme.accent} />
                   <Text style={[styles.featureText, { color: theme.text }]}>
-                    Chat about how you're feeling
+                    Chat about how you&apos;re feeling
                   </Text>
                 </View>
                 <View style={styles.featureItem}>
@@ -182,7 +196,7 @@ export const AIWellnessOnboarding: React.FC<AIWellnessOnboardingProps> = ({
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
             <View style={styles.contentContainer}>
               <Text style={[styles.title, { color: theme.text }]}>
-                Let's get started! 🚀
+                Let&apos;s get started! 🚀
               </Text>
               
               <Text style={[styles.description, { color: theme.textSecondary }]}>
@@ -249,11 +263,11 @@ export const AIWellnessOnboarding: React.FC<AIWellnessOnboardingProps> = ({
               </View>
               
               <Text style={[styles.title, { color: theme.text }]}>
-                Perfect! Let's test it out
+                Perfect! Let&apos;s test it out
               </Text>
               
               <Text style={[styles.description, { color: theme.textSecondary }]}>
-                I'll send you a welcome message now.{'\n'}
+                I&apos;ll send you a welcome message now.{'\n'}
                 Look for the notification!
               </Text>
               
@@ -301,7 +315,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modal: {

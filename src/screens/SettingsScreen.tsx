@@ -1,3 +1,4 @@
+import { UpdateNotificationModal } from '../components/UpdateNotificationModal';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Platform, SafeAreaView, StatusBar, Dimensions, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -170,6 +171,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
 
   // Handle clear premium status
   const handleClearPremiumStatus = async () => {
+    if (!__DEV__) return;
     Alert.alert(
       'Clear Premium Status',
       'This will remove your premium status, useful for testing subscription flows. Are you sure?',
@@ -189,6 +191,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation, onClose }) 
 
   // Handle grant premium status
   const handleGrantPremiumStatus = async () => {
+    if (!__DEV__) return;
     Alert.alert(
       'Grant Premium Status',
       'This will enable premium features for testing purposes. Continue?',

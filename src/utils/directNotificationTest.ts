@@ -9,7 +9,8 @@ export async function directNotificationTest() {
   // Temporarily set a permissive handler
   const originalHandler = Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+          shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     }),
@@ -18,9 +19,9 @@ export async function directNotificationTest() {
   try {
     // Test 1: Immediate notification
     console.log('Test 1: Immediate notification...');
-    await Notifications.presentNotificationAsync({
-      title: '📱 Immediate Test',
-      body: 'This should appear right now!',
+    await Notifications.scheduleNotificationAsync({
+      content: { title: '📱 Immediate Test', body: 'This should appear right now!' },
+      trigger: null,
     });
     
     // Test 2: Delayed notification with seconds
@@ -32,6 +33,7 @@ export async function directNotificationTest() {
         sound: true,
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: 5,
       },
     });
@@ -49,6 +51,7 @@ export async function directNotificationTest() {
         sound: true,
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: futureDate,
       },
     });

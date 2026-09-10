@@ -1,3 +1,4 @@
+import assetdefendingFigure2 from '../../../../../assets/images/miniGames/defendingFigure2.png';
 import React from 'react';
 import { View, StyleSheet, Dimensions, Text, Image } from 'react-native';
 import { useTheme } from '../../../../context/ThemeContext';
@@ -86,7 +87,7 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
   
   return (
     <View style={[
-      StyleSheet.absoluteFillObject,
+      StyleSheet.absoluteFill,
       {
         backgroundColor: theme.background,
       }
@@ -165,7 +166,7 @@ export const MazePath: React.FC<MazePathProps> = ({ showGrid = false }) => {
           }
         ]}>
           <Image 
-            source={require('../../../../../assets/images/miniGames/defendingFigure2.png')}
+            source={assetdefendingFigure2}
             style={styles.defenderImage}
             resizeMode="contain"
           />

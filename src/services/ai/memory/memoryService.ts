@@ -1,3 +1,4 @@
+import { trackAIWork } from '../aiDataLifecycle';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoutineParams, BodyArea, Duration, Position } from '../../../types';
 
@@ -78,6 +79,7 @@ class UnifiedMemoryService {
   }
   
   async getMemory(userId: string): Promise<UnifiedUserMemory> {
+    return trackAIWork(async () => {
     try {
       // First try to load improved memory
       const data = await AsyncStorage.getItem(this.getKey(userId));
@@ -122,6 +124,8 @@ class UnifiedMemoryService {
         isPremium: false
       }
     };
+
+    });
   }
   
   /**
@@ -194,6 +198,7 @@ class UnifiedMemoryService {
   }
   
   async saveMemory(userId: string, memory: UnifiedUserMemory): Promise<void> {
+    return trackAIWork(async () => {
     try {
       // Clean up old entries before saving
       memory = this.cleanupMemory(memory);
@@ -201,12 +206,15 @@ class UnifiedMemoryService {
     } catch (error) {
       console.error('Error saving improved memory:', error);
     }
+
+    });
   }
   
   /**
    * Extract and validate wellness information from user input
    */
   async extractAndStore(userId: string, userInput: string, aiResponse: string, language: 'en' | 'es' | 'zh'): Promise<void> {
+    return trackAIWork(async () => {
     const memory = await this.getMemory(userId);
     const input = userInput.toLowerCase();
     const response = aiResponse.toLowerCase();
@@ -239,6 +247,8 @@ class UnifiedMemoryService {
     memory.language = language;
     
     await this.saveMemory(userId, memory);
+
+    });
   }
   
   /**
@@ -320,6 +330,7 @@ class UnifiedMemoryService {
    * Record a short routine note to help with continuity
    */
   async recordRoutineNote(userId: string, rp: RoutineParams): Promise<void> {
+    return trackAIWork(async () => {
     const mem = await this.getMemory(userId);
     const updated: UnifiedUserMemory = {
       ...mem,
@@ -339,6 +350,8 @@ class UnifiedMemoryService {
       }
     };
     await this.saveMemory(userId, updated);
+
+    });
   }
   
   /**
@@ -462,6 +475,7 @@ class UnifiedMemoryService {
    * Add methods from simpleMemory for backward compatibility
    */
   async updateMemory(userId: string, update: Partial<UnifiedUserMemory>): Promise<void> {
+    return trackAIWork(async () => {
     try {
       const current = await this.getMemory(userId);
       const updated = { ...current, ...update };
@@ -481,9 +495,12 @@ class UnifiedMemoryService {
     } catch (error) {
       console.error('Error updating memory:', error);
     }
+
+    });
   }
   
   async addPhysicalIssue(userId: string, issue: string): Promise<void> {
+    return trackAIWork(async () => {
     const memory = await this.getMemory(userId);
     
     // Check if already exists in confidence-based format
@@ -502,9 +519,12 @@ class UnifiedMemoryService {
     }
     
     await this.saveMemory(userId, memory);
+
+    });
   }
   
   async addStressPattern(userId: string, pattern: string): Promise<void> {
+    return trackAIWork(async () => {
     const memory = await this.getMemory(userId);
     
     // Add to simple array for compatibility
@@ -527,9 +547,12 @@ class UnifiedMemoryService {
     }
     
     await this.saveMemory(userId, memory);
+
+    });
   }
   
   async addEffectiveSolution(userId: string, solution: string): Promise<void> {
+    return trackAIWork(async () => {
     const memory = await this.getMemory(userId);
     
     // Check if already exists
@@ -543,14 +566,19 @@ class UnifiedMemoryService {
       });
       await this.saveMemory(userId, memory);
     }
+
+    });
   }
   
   async addGoal(userId: string, goal: string): Promise<void> {
+    return trackAIWork(async () => {
     const memory = await this.getMemory(userId);
     if (!memory.wellness_data.goals.includes(goal)) {
       memory.wellness_data.goals.push(goal);
       await this.updateMemory(userId, { wellness_data: memory.wellness_data });
     }
+
+    });
   }
   
   /**

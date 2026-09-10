@@ -1,3 +1,4 @@
+import { runAIUIWork, isAIDataCurrent } from '../../services/ai/aiDataLifecycle';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, StyleSheet, Animated, ScrollView } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
@@ -64,12 +65,16 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
   };
 
   const handleEnableAI = async () => {
+    return runAIUIWork(async generation => {
     // Enable AI Wellness
     await AsyncStorage.setItem(KEYS.AI_WELLNESS.ENABLED, 'true');
+    if (!isAIDataCurrent(generation)) return;
     setAiEnabled(true);
     setShowEnablePrompt(false);
     
     // Don't schedule notifications yet - wait until setup is complete
+  
+    });
   };
 
   const handleContinue = () => {
@@ -89,20 +94,26 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
   };
 
   const handleTimePreferenceSet = async (timePreference: string) => {
+    return runAIUIWork(async generation => {
     // Now schedule with the welcome notification and new premium settings
     await scheduleAIWellnessV2('upgrade');
-    onComplete();
+    if (isAIDataCurrent(generation)) onComplete();
+  
+    });
   };
 
   const handleSkip = async () => {
+    return runAIUIWork(async generation => {
     if (!aiEnabled) {
       // If they skip without enabling AI, just close
-      onComplete();
+      if (isAIDataCurrent(generation)) onComplete();
       return;
     }
     // User chose to keep random times - schedule with premium upgrade
     await scheduleAIWellnessV2('upgrade');
-    onComplete();
+    if (isAIDataCurrent(generation)) onComplete();
+  
+    });
   };
 
   if (!visible) return null;
@@ -218,7 +229,7 @@ export const AIWellnessPremiumUpgrade: React.FC<AIWellnessPremiumUpgradeProps> =
               <View style={[styles.header, { backgroundColor: theme.accent + '10' }]}>
                 <Text style={styles.celebrationEmoji}>👋</Text>
                 <Text style={[styles.celebrationText, { color: theme.accent }]}>
-                  Let's Get Personal
+                  Let&apos;s Get Personal
                 </Text>
               </View>
 

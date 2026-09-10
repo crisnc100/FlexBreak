@@ -48,7 +48,7 @@ interface GameRendererProps {
   unlockedPads: Set<string>;
   stretchEffects: Array<{
     id: string;
-    type: string;
+    type: React.ComponentProps<typeof StretchEffects>['effects'][number]['type'];
     fromX: number;
     fromY: number;
     toX: number;

@@ -292,20 +292,21 @@ export default function RoutineScreen() {
 
           // ===== SIMPLIFIED LEVEL-UP DETECTION =====
           // Import needed functions to check XP thresholds
-          const { getUserProgress } = require('../services/storageService');
-          const { LEVELS } = require('../utils/progress/constants');
+          const { getUserProgress } = await import('../services/storageService');
+          const { LEVELS } = await import('../utils/progress/constants');
           const userProgress = await getUserProgress();
 
           // Get XP values - handle both regular and testing property names
           const earnedXp = xpBreakdown.reduce((sum, item) => sum + item.amount, 0);
-          const previousXp = userProgress.xp !== undefined
-            ? userProgress.xp - earnedXp
+          const legacyXp = 'xp' in userProgress && typeof userProgress.xp === 'number' ? userProgress.xp : undefined;
+          const previousXp = legacyXp !== undefined
+            ? legacyXp - earnedXp
             : userProgress.totalXP !== undefined
               ? userProgress.totalXP - earnedXp
               : 0;
 
-          const currentXp = userProgress.xp !== undefined
-            ? userProgress.xp
+          const currentXp = legacyXp !== undefined
+            ? legacyXp
             : userProgress.totalXP !== undefined
               ? userProgress.totalXP
               : 0;

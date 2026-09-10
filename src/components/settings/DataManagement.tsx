@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { AIDataManagement } from './ai';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KEYS } from '../../services/storageService';
 
 interface DataManagementProps {
   onResetAllData: () => void;
@@ -13,15 +11,6 @@ interface DataManagementProps {
 const DataManagement: React.FC<DataManagementProps> = ({ onResetAllData }) => {
   const { theme, isDark, isSunset } = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const [aiWellnessEnabled, setAIWellnessEnabled] = useState(false);
-
-  useEffect(() => {
-    const checkAIWellness = async () => {
-      const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true';
-      setAIWellnessEnabled(enabled);
-    };
-    checkAIWellness();
-  }, [expanded]);
 
   return (
     <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
@@ -53,7 +42,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onResetAllData }) => {
               </View>
             </View>
           </TouchableOpacity>
-          {aiWellnessEnabled && <AIDataManagement visible={expanded} />}
+          <AIDataManagement visible={expanded} />
         </View>
       )}
     </View>

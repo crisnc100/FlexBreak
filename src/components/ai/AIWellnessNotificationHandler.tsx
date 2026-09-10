@@ -1,3 +1,4 @@
+import { getAIDataGeneration, isAIDataCurrent, onAIDataDeleted } from '../../services/ai/aiDataLifecycle';
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Modal, ScrollView, Animated, Alert } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
@@ -47,7 +48,16 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
     }
   }, [visible]);
 
+  useEffect(() => onAIDataDeleted(() => {
+    setConversationHistory([]);
+    setMessage('');
+    setIsLoading(false);
+    onClose();
+  }), [onClose]);
+
   const handleSend = async (messageToSend?: string) => {
+    const generation = getAIDataGeneration();
+    if (!isAIDataCurrent(generation)) return;
     const textToSend = messageToSend || message.trim();
     if (!textToSend || isLoading) return;
 
@@ -59,8 +69,10 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
 
     try {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
+      if (!isAIDataCurrent(generation)) return;
       const result = await aiWellnessService.processWellnessCheckIn(textToSend, userId);
       
+      if (!isAIDataCurrent(generation)) return;
       const aiMessage = { type: 'ai' as const, text: result.response };
       setConversationHistory(prev => [...prev, aiMessage]);
       
@@ -68,6 +80,7 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
       if (result.category === 'disabled') {
         // Show settings button or close modal after showing message
         setTimeout(() => {
+          if (!isAIDataCurrent(generation)) return;
           Alert.alert(
             'AI Wellness Coach Disabled',
             'Would you like to enable it in settings?',
@@ -95,10 +108,11 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
       }, 100);
       
     } catch (error) {
+      if (!isAIDataCurrent(generation)) return;
       const errorMessage = { type: 'ai' as const, text: "Oops! Something went wrong. Try again or check your connection." };
       setConversationHistory(prev => [...prev, errorMessage]);
     } finally {
-      setIsLoading(false);
+      if (isAIDataCurrent(generation)) setIsLoading(false);
     }
   };
 
@@ -262,7 +276,7 @@ export const AIWellnessModal: React.FC<AIWellnessModalProps> = ({
 
           {/* Help text */}
           <Text style={[styles.helpText, { color: theme.textSecondary }]}>
-            💡 Pro tip: Use "tap & hold" on notifications for faster replies!
+            💡 Pro tip: Use &quot;tap & hold&quot; on notifications for faster replies!
           </Text>
         </View>
       </KeyboardAvoidingView>

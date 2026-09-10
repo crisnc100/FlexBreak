@@ -310,7 +310,7 @@ const FlexSavePrompt: React.FC<FlexSavePromptProps> = ({ onClose }) => {
       
       const countStr = await AsyncStorage.getItem(PROMPT_COUNT_KEY);
       let promptCount = 0;
-      let countDate = todayStartTime.getTime();
+      const countDate = todayStartTime.getTime();
       
       if (countStr) {
         const countData = JSON.parse(countStr);
@@ -792,7 +792,7 @@ const FlexSavePrompt: React.FC<FlexSavePromptProps> = ({ onClose }) => {
   if (typeof global !== 'undefined') {
     (global as any).forceFlexSavePrompt = forceCheckStreak;
     (global as any).resetStreakPromptRateLimits = resetRateLimiting;
-  };
+  }
   
   return (
     <Modal

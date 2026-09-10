@@ -247,14 +247,18 @@ export const refillFlexSaves = async (): Promise<boolean> => {
     
     // If premium was just gained OR we're in a new month, refill flexSaves
     const isDifferentMonth = lastRefillMonth !== currentMonth || lastRefillYear !== currentYear;
-    const needsRefill = isDifferentMonth && currentFlexSaves < MAX_FLEX_SAVES;
+    const month = dateUtils.todayStringLocal().slice(0, 7);
+    const usedThisMonth = new Set((flexSaveReward?.appliedDates || []).map(dateUtils.toDateString)
+      .filter(date => date.startsWith(month))).size;
+    const allowance = Math.max(0, MAX_FLEX_SAVES - usedThisMonth);
+    const needsRefill = isDifferentMonth && currentFlexSaves < allowance;
     
-    if (needsRefill || currentFlexSaves === 0) {  // Added condition to refill if flexSaves are 0
+    if (needsRefill) {
       console.log(`[FLEXSAVE DEBUG] Refilling flexSaves: ${currentFlexSaves} → ${MAX_FLEX_SAVES} for month ${currentMonth + 1}/${currentYear}`);
       
       // Set value directly in UserProgress first
       if (userProgress.rewards[FLEX_SAVE_REWARD_ID]) {
-        userProgress.rewards[FLEX_SAVE_REWARD_ID].uses = MAX_FLEX_SAVES;
+        userProgress.rewards[FLEX_SAVE_REWARD_ID].uses = allowance;
         userProgress.rewards[FLEX_SAVE_REWARD_ID].lastRefill = today.toISOString();
       } else {
         // Create the reward if it doesn't exist
@@ -266,17 +270,17 @@ export const refillFlexSaves = async (): Promise<boolean> => {
           unlocked: true,
           levelRequired: 6,
           type: "consumable",
-          uses: MAX_FLEX_SAVES,
+          uses: allowance,
           appliedDates: [],
           lastRefill: today.toISOString()
         };
       }
       
       // Save to storage first
-      await storageService.saveUserProgress(userProgress);
+      if (!await storageService.saveUserProgress(userProgress)) return false;
       
       // Then update the cache
-      simpleStreakManager.streakCache.flexSavesAvailable = MAX_FLEX_SAVES;
+      simpleStreakManager.streakCache.flexSavesAvailable = allowance;
       
       // Use simpleStreakManager to refill flexSaves as a backup
       await simpleStreakManager.refillFlexSaves();

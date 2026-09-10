@@ -143,7 +143,15 @@ export interface Statistics {
 }
 
 // Interface for the complete user progress object
+export type CompletionReceipt = { phase: 'complete' } | {
+  routine: import('../../types').ProgressEntry;
+  phase: 'pending' | 'base';
+  xp: number;
+  breakdown: Array<{ source: string; amount: number; description: string }>;
+}
+
 export interface UserProgress {
+  routineCompletions?: Record<string, CompletionReceipt>;
   totalXP: number;
   level: number;
   achievements: Record<string, Achievement>;

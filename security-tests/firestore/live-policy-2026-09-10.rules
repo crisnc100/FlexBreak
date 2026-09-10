@@ -1,0 +1,14 @@
+// Policy transcription of the five live collection grants verified in Firebase
+// console on 2026-09-10 (published 2025-07-18); not a byte-for-byte source export.
+// Archived evidence ONLY. Never deploy this world-readable/writable policy.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /fcm_tokens/{id} { allow read, write: if true; }
+    match /user_reminders/{id} { allow read, write: if true; }
+    match /verifiedEmails/{id} { allow read, write: if true; }
+    match /oneTimeCodes/{id} { allow read, write: if true; }
+    match /premiumUsers/{id} { allow read, write: if true; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

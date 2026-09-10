@@ -1,6 +1,6 @@
 import { Platform, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KEYS } from '../services/storageService';
+import { KEYS, getIsPremium } from '../services/storageService';
 
 // Check if user can access Flex Coach based on subscription and day
 export const canAccessFlexCoach = async (): Promise<{ canAccess: boolean; message?: string }> => {
@@ -15,7 +15,7 @@ export const canAccessFlexCoach = async (): Promise<{ canAccess: boolean; messag
     }
 
     // Check premium status
-    const isPremium = await AsyncStorage.getItem('@user_premium') === 'true';
+    const isPremium = await getIsPremium();
     
     if (isPremium) {
       return { canAccess: true };
@@ -37,11 +37,9 @@ export const canAccessFlexCoach = async (): Promise<{ canAccess: boolean; messag
       };
     }
     
-    // Mark that they've now used it (for first-time users)
-    if (!hasEverUsed) {
-      await AsyncStorage.setItem(hasEverUsedKey, 'true');
-    }
-    
+    // Opening the coach does not consume its welcome interaction. The actual
+    // check-in owns usage accounting.
+
     return { canAccess: true };
   } catch (error) {
     console.error('Error checking Flex Coach access:', error);

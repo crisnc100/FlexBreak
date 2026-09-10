@@ -153,7 +153,7 @@ export const generateRoutine = async (
   console.log(`[DEBUG] Calculated maxStretches=${maxStretches}`);
 
   // Filter logic for Dynamic Flow vs regular areas
-  let filteredStretches = stretches.filter(stretch => {
+  const filteredStretches = stretches.filter(stretch => {
     // Always filter by premium status and demo availability
     const hasPremiumAccess = !stretch.premium || premiumUnlocked;
     const hasDemo = stretch.hasDemo === true;

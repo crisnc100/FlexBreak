@@ -49,7 +49,7 @@ class UpdateService {
    * Get the current app version
    */
   getCurrentVersion(): string {
-    return (Constants as any).expoConfig?.version || Constants.manifest?.version || '1.0.0';
+    return Constants.expoConfig?.version || '1.0.0';
   }
 
   /**

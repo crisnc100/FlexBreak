@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View, Switch, TouchableOpacity } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View, Switch, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { 
@@ -121,7 +121,7 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({ isDark, isSunset }) => {
           
           <ThemedCard 
             style={styles.previewCard}
-            onPress={() => alert('Card pressed!')}
+            onPress={() => Alert.alert('Card pressed!')}
           >
             <ThemedText bold>Touchable Card</ThemedText>
             <ThemedText type="secondary">Press me!</ThemedText>
@@ -165,21 +165,21 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({ isDark, isSunset }) => {
           <View style={styles.buttonRow}>
             <TouchableOpacity 
               style={[styles.button, { backgroundColor: theme.accent }]}
-              onPress={() => alert('Accent button pressed')}
+              onPress={() => Alert.alert('Accent button pressed')}
             >
               <ThemedText style={{ color: 'white' }} bold>Accent</ThemedText>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.button, { backgroundColor: theme.success }]}
-              onPress={() => alert('Success button pressed')}
+              onPress={() => Alert.alert('Success button pressed')}
             >
               <ThemedText style={{ color: 'white' }} bold>Success</ThemedText>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.button, { backgroundColor: theme.error }]}
-              onPress={() => alert('Error button pressed')}
+              onPress={() => Alert.alert('Error button pressed')}
             >
               <ThemedText style={{ color: 'white' }} bold>Error</ThemedText>
             </TouchableOpacity>
@@ -188,14 +188,14 @@ const ThemePreview: React.FC<ThemePreviewProps> = ({ isDark, isSunset }) => {
           <View style={styles.buttonRow}>
             <TouchableOpacity 
               style={[styles.outlineButton, { borderColor: theme.accent }]}
-              onPress={() => alert('Outline button pressed')}
+              onPress={() => Alert.alert('Outline button pressed')}
             >
               <ThemedText style={{ color: theme.accent }} bold>Outline</ThemedText>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.ghostButton]}
-              onPress={() => alert('Ghost button pressed')}
+              onPress={() => Alert.alert('Ghost button pressed')}
             >
               <ThemedText type="accent" bold>Ghost</ThemedText>
             </TouchableOpacity>

@@ -1,7 +1,7 @@
 // Simple weather API test that can run from command line
-const axios = require('axios');
+import axios from 'axios';
 
-// You need to set your API key here or in environment
+// Manual provider diagnostic only. Pass credentials through the environment; never commit them.
 const OPENWEATHER_API_KEY = process.env.OPENWEATHER_MAP_API_KEY || 'YOUR_OPENWEATHER_MAP_API_KEY';
 
 // Test coordinates (New York City)
@@ -13,8 +13,8 @@ async function testWeatherAPI() {
   
   if (OPENWEATHER_API_KEY === 'YOUR_OPENWEATHER_MAP_API_KEY') {
     console.error('❌ Please set your OpenWeatherMap API key!');
-    console.log('\nOption 1: Set in this file');
-    console.log('Option 2: Run with: OPENWEATHER_MAP_API_KEY=your_key node testWeatherAPI.js');
+    console.log('Set OPENWEATHER_MAP_API_KEY in the shell environment before running this diagnostic.');
+    process.exitCode = 1;
     return;
   }
   
@@ -66,7 +66,8 @@ async function testWeatherAPI() {
     }
     
   } catch (error) {
-    console.error('❌ Error fetching weather data:', error.message);
+    process.exitCode = 1;
+    console.error('Weather diagnostic failed:', error.response?.status || error.code || 'unavailable');
     
     if (error.response && error.response.status === 401) {
       console.log('\n⚠️  Invalid API key. Please check your OpenWeatherMap API key.');

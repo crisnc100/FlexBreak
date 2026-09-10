@@ -22,7 +22,7 @@ import * as dateUtils from './modules/utils/dateUtils';
 import * as cacheUtils from './modules/utils/cacheUtils';
 
 // Track recent challenges to avoid repetition
-let recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
+const recentChallenges: Record<string, string[]> = { daily: [], weekly: [] };
 
 
 const isFirstRoutineOfDay = (routine: ProgressEntry, allRoutines: ProgressEntry[]): boolean => {
@@ -34,7 +34,7 @@ const isFirstRoutineOfDay = (routine: ProgressEntry, allRoutines: ProgressEntry[
   });
   
   routinesOnSameDay.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  return routinesOnSameDay.length > 0 && routinesOnSameDay[0].date === routine.date;
+  return routinesOnSameDay.length > 0 && completionIdentity(routinesOnSameDay[0]) === completionIdentity(routine);
 };
 
 const isFirstEverRoutine = async (routine: ProgressEntry, allRoutines: ProgressEntry[]): Promise<boolean> => {
@@ -44,8 +44,6 @@ const isFirstEverRoutine = async (routine: ProgressEntry, allRoutines: ProgressE
     return false;
   }
   
-  userProgress.hasReceivedWelcomeBonus = true;
-  await storageService.saveUserProgress(userProgress);
   
   let isFirst = false;
   
@@ -130,53 +128,101 @@ export const initializeUserProgress = async (): Promise<UserProgress> => {
   return resetProgress;
 };
 
-export const processCompletedRoutine = async (routine: ProgressEntry): Promise<{ 
-  userProgress: UserProgress; 
-  xpBreakdown: any;
+type CompletionResult = {
+  userProgress: UserProgress;
+  xpBreakdown: Array<{ source: string; amount: number; description: string }>;
   completedChallenges: Challenge[];
-}> => {
-  let userProgress = await storageService.getUserProgress();
-  userProgress = normalizeUserProgress(userProgress);
-  await storageService.saveRoutineProgress(routine);
-  
-  cacheUtils.invalidateRoutineCache();
-  const allRoutines = await cacheUtils.getCachedRoutines();
-  
-  updateUserStatistics(userProgress, routine, allRoutines);
-  
-  const { xp: routineXp, breakdown } = await calculateXpRewards(routine, allRoutines, userProgress);
-  userProgress.totalXP += routineXp;
-  
-  // Update streak - first with local calculation
-  handleStreakChanges(userProgress, allRoutines);
-  
-  // Also directly use streakManager to ensure events are triggered
-  if (routine.date) {
-    // Convert the timestamp to a *local-midnight* YYYY-MM-DD so we don't
-    // accidentally advance the date when it's past 8–9 pm local (midnight UTC)
-    const routineDateLocal = dateUtils.toDateString(routine.date);
-    await streakManager.completeRoutine(routineDateLocal);
+};
+const completionIdentity = (routine: ProgressEntry) => `routine:${routine.id || routine.date}`;
+let completionQueue: Promise<unknown> = Promise.resolve();
+const serializeCompletion = <T>(operation: () => Promise<T>): Promise<T> => {
+  const next = completionQueue.then(operation);
+  completionQueue = next.catch(() => undefined);
+  return next;
+};
+const persistCompletion = async (progress: UserProgress) => {
+  if (!await storageService.saveUserProgress(progress)) throw new Error('Could not persist routine rewards');
+};
+
+const finishCompletion = async (routine: ProgressEntry): Promise<CompletionResult> => {
+  let userProgress = normalizeUserProgress(await storageService.getUserProgress(true));
+  const key = completionIdentity(routine);
+  userProgress.routineCompletions ||= {};
+  let receipt = userProgress.routineCompletions[key];
+  if (receipt?.phase === 'complete') return { userProgress, xpBreakdown: [], completedChallenges: [] };
+  if (!receipt) {
+    const history = await storageService.getAllRoutines(true);
+    // History predating receipts was already processed by the old engine.
+    if (history.some(entry => completionIdentity(entry) === key)) {
+      return { userProgress, xpBreakdown: [], completedChallenges: [] };
+    }
+    const plannedHistory = [...history, routine];
+    const award = await calculateXpRewards(routine, plannedHistory, userProgress);
+    // Preserve welcome eligibility until its XP is committed with the base receipt.
+    userProgress = normalizeUserProgress(await storageService.getUserProgress(true));
+    userProgress.routineCompletions ||= {};
+    receipt = { routine, phase: 'pending', xp: award.xp, breakdown: award.breakdown };
+    userProgress.routineCompletions[key] = receipt;
+    await persistCompletion(userProgress);
   }
-  
-  // Update challenges and capture newly completed ones
-  const completedChallenges = await challengeManager.updateUserChallenges(userProgress);
-
-  // Update achievements
-  await achievementManager.updateAchievements(userProgress);
-
+  if (receipt.phase === 'pending') {
+    if (!await storageService.saveRoutineProgress(receipt.routine)) throw new Error('Could not persist completed routine');
+    cacheUtils.invalidateRoutineCache();
+    const allRoutines = await storageService.getAllRoutines(true);
+    updateUserStatistics(userProgress, receipt.routine, allRoutines);
+    userProgress.totalXP += receipt.xp;
+    userProgress.hasReceivedWelcomeBonus = true;
+    receipt.phase = 'base';
+    // Base XP, statistics, welcome flag and receipt share one atomic storage value.
+    await persistCompletion(userProgress);
+  }
+  cacheUtils.invalidateRoutineCache();
+  const allRoutines = await storageService.getAllRoutines(true);
+  await handleStreakChanges(userProgress, allRoutines);
+  await streakManager.completeRoutine(dateUtils.toDateString(receipt.routine.date));
+  const storedAfterStreak = await storageService.getUserProgress(true);
+  userProgress.statistics.bestStreak = Math.max(userProgress.statistics.bestStreak || 0, storedAfterStreak.statistics.bestStreak || 0);
+  const completedChallenges = await challengeManager.updateUserChallenges(userProgress, true);
+  const completedBefore = new Set(Object.values(userProgress.achievements).filter(a => a.completed).map(a => a.id));
+  await achievementManager.updateAchievements(userProgress, false);
+  const newlyCompleted = Object.values(userProgress.achievements).filter(a => a.completed && !completedBefore.has(a.id));
   const { level: newLevel } = calculateLevel(userProgress.totalXP);
   if (newLevel !== userProgress.level) {
     userProgress.level = newLevel;
-    await rewardManager.updateRewards(userProgress);
-    
-    if (userProgress.rewards['flex_saves']?.unlocked) {
-      await flexSaveManager.refillMonthlyFlexSaves();
+    userProgress = await rewardManager.updateRewards(userProgress);
+  }
+  // Intermediate collaborator saves retain phase=base. Their own completion flags
+  // make retry safe if any write succeeds before the final receipt is stored.
+  userProgress.routineCompletions[key] = { phase: 'complete' };
+  await persistCompletion(userProgress);
+  achievementManager.emitAchievementCompletions(newlyCompleted);
+  if (userProgress.rewards['flex_saves']?.unlocked) {
+    await flexSaveManager.refillMonthlyFlexSaves();
+    userProgress = await storageService.getUserProgress(true);
+  }
+  return { userProgress, xpBreakdown: receipt.breakdown, completedChallenges };
+};
+
+const recoverUnfinished = async () => {
+  const progress = await storageService.getUserProgress(true);
+  for (const receipt of Object.values(progress.routineCompletions || {})) {
+    if (receipt.phase !== 'complete') {
+      try { await finishCompletion(receipt.routine); }
+      catch (error) { console.warn('Pending completion remains available for retry:', completionIdentity(receipt.routine), error); }
     }
   }
-
-  await storageService.saveUserProgress(userProgress);
-  return { userProgress, xpBreakdown: breakdown, completedChallenges };
 };
+export const recoverPendingCompletions = (): Promise<void> => serializeCompletion(recoverUnfinished);
+export const processCompletedRoutine = (routine: ProgressEntry): Promise<CompletionResult> => serializeCompletion(async () => {
+  const progress = await storageService.getUserProgress(true);
+  for (const receipt of Object.values(progress.routineCompletions || {})) {
+    if (receipt.phase !== 'complete' && completionIdentity(receipt.routine) !== completionIdentity(routine)) {
+      try { await finishCompletion(receipt.routine); }
+      catch (error) { console.warn('Older completion remains available for retry:', completionIdentity(receipt.routine), error); }
+    }
+  }
+  return finishCompletion(routine);
+});
 
 // Helper function to update user statistics
 const updateUserStatistics = (userProgress: UserProgress, routine: ProgressEntry, allRoutines: ProgressEntry[]): void => {
@@ -205,10 +251,7 @@ const calculateXpRewards = async (
     await isFirstEverRoutine(routine, allRoutines) : false;
   
   // Calculate XP with breakdown
-  const result = await calculateRoutineXp(routine, isFirstOfDay, isFirstEver);
-  
-  // Ensure welcome bonus flag is set
-  userProgress.hasReceivedWelcomeBonus = true;
+  const result = await calculateRoutineXp(routine, isFirstOfDay, isFirstEver, allRoutines);
   
   return result;
 };
@@ -442,14 +485,13 @@ export const claimChallenge = async (challengeId: string): Promise<{
 };
 
 // Calculate XP rewards for completed routines
-const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean, isFirstEver: boolean) => {
+const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean, isFirstEver: boolean, allRoutines: ProgressEntry[]) => {
   let totalXp = 0;
   const breakdown: Array<{ source: string; amount: number; description: string }> = [];
   const { isActive, data } = await xpBoostManager.checkXpBoostStatus();
   const xpMultiplier = isActive ? data.multiplier : 1;
 
-  // Get all routines from today to check if this is the second one
-  const allRoutines = await cacheUtils.getCachedRoutines();
+  // Use the ordered history snapshot, including the planned routine.
   const routineDate = new Date(routine.date);
   const routineDateString = dateUtils.toDateString(routineDate);
   
@@ -458,7 +500,7 @@ const calculateRoutineXp = async (routine: ProgressEntry, isFirstOfDay: boolean,
   });
   
   routinesOnSameDay.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const isSecondOfDay = routinesOnSameDay.length >= 2 && routinesOnSameDay[1].date === routine.date;
+  const isSecondOfDay = routinesOnSameDay.length >= 2 && completionIdentity(routinesOnSameDay[1]) === completionIdentity(routine);
   const isDailyLimitReached = routinesOnSameDay.length > 2 && !isFirstOfDay && !isSecondOfDay;
 
   if (isFirstOfDay) {

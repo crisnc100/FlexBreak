@@ -100,7 +100,7 @@ const TestingAccessForm: React.FC<TestingAccessFormProps> = ({ onAccessGranted }
           </Text>
           
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            You're about to help improve FlexBreak
+            You&apos;re about to help improve FlexBreak
           </Text>
           
           <View style={styles.stepsContainer}>

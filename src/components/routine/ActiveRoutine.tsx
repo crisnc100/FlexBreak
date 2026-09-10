@@ -29,8 +29,8 @@ import { enhanceRoutineWithPremiumInfo } from '../../utils/generators/premiumUti
 import * as soundEffects from '../../utils/soundEffects';
 import * as Haptics from 'expo-haptics';
 import { useRoutineTimer } from '../../hooks/routines/useRoutineTimer';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { Audio } from 'expo-av';
+import { Video, ResizeMode, AVPlaybackStatus } from '../media/NativeVideo';
+import { Audio, Sound } from '../../utils/nativeAudio';
 import StretchFlowView from './StretchFlowView';
 import stretches from '../../data/stretches';
 import * as storageService from '../../services/storageService';
@@ -86,7 +86,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
   const [videoPosition, setVideoPosition] = useState(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<Video>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<Sound | null>(null);
   
   // Track last second where we played a sound to avoid multiple plays
   const lastSecondPlayedRef = useRef<number>(-1);
@@ -502,7 +502,7 @@ const ActiveRoutine: React.FC<ActiveRoutineProps> = ({
             // Validate the custom stretches
             const validCustomStretches = customStretches.map((stretch, index) => {
               // Clone to avoid modifying the original
-              let stretchCopy: any = {...stretch};
+              const stretchCopy: any = {...stretch};
               
               console.log(`Validating stretch ${index}: ID=${stretchCopy.id}, type=${typeof stretchCopy.id}`);
               
@@ -1639,7 +1639,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   countdownContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.85)',

@@ -1,3 +1,4 @@
+import { trackAIWork } from '../aiDataLifecycle';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AI_CONFIG } from '../../../config/aiConfig';
 
@@ -75,6 +76,7 @@ class CostMonitor {
     outputTokens: number,
     isPremium: boolean = false
   ): Promise<void> {
+    return trackAIWork(async () => {
     try {
       const metrics = await this.getMetrics();
       const modelCost = this.MODEL_COSTS[model] || this.MODEL_COSTS['mistralai/mistral-7b-instruct'];
@@ -112,15 +114,20 @@ class CostMonitor {
     } catch (error) {
       console.error('Error tracking cost:', error);
     }
+
+    });
   }
   
   /**
    * Tracks Google Speech API usage
    */
   async trackSpeechUsage(durationSeconds: number): Promise<void> {
+    return trackAIWork(async () => {
     // Google charges $0.006 per 15 seconds
     const cost = Math.ceil(durationSeconds / 15) * 0.006;
     await this.trackUsage('google-speech', 1000, 0); // Use 1000 as proxy for cost calculation
+
+    });
   }
   
   /**

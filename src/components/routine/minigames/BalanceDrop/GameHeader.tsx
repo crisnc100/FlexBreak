@@ -50,12 +50,12 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
     return '#FF6B6B';
   };
 
-  const getEnergyIcon = (): string => {
+  const getEnergyIcon = (): React.ComponentProps<typeof Ionicons>['name'] => {
     if (energyLeft > 75) return 'battery-full';
     if (energyLeft > 50) return 'battery-half';
     if (energyLeft > 25) return 'battery-half';
     if (energyLeft > 10) return 'battery-dead';
-    return 'battery-outline';
+    return 'battery-dead-outline';
   };
 
   const energyPercentage = (energyLeft / MAX_ENERGY) * 100;

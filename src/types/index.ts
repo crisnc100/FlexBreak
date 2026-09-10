@@ -59,6 +59,7 @@ export interface RoutineParams {
 }
 
 export interface ProgressEntry {
+  id?: string; // Stable completion identity; legacy entries use their timestamp.
   date: string;
   area: BodyArea;
   duration: Duration;

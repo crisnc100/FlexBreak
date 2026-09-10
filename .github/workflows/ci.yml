@@ -1,0 +1,67 @@
+name: CI
+on:
+  push:
+    branches: [staging, develop]
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run export:mobile
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - run: deno task --config supabase/deno.json check
+      - run: deno lint --config supabase/deno.json supabase/functions supabase/tests
+      - run: deno task --config supabase/deno.json test
+      - run: deno audit
+        working-directory: supabase
+  firestore-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: security-tests/firestore/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --prefix security-tests/firestore
+      - run: npm audit --prefix security-tests/firestore --audit-level=high
+      - name: Test both staged policies against the real Firestore emulator
+        run: >-
+          npm exec --yes --package=firebase-tools@15.30.0 -- firebase emulators:exec
+          --config firebase.emulators.json --only firestore --project demo-flexbreak-rules
+          'npm --prefix security-tests/firestore test'

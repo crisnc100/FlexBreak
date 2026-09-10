@@ -1,6 +1,7 @@
+import { trackAIWork, onAIDataDeleted, getAIDataGeneration, isAIDataCurrent } from '../aiDataLifecycle';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KEYS } from '../../storageService';
+import { KEYS, getIsPremium } from '../../storageService';
 import { NotificationType, cancelNotificationsByType, scheduleTypedNotification } from '../../../utils/notificationManager';
 // Notification debouncer will be merged into this file
 import { generatePersonalizedNotification, generateDefaultNotification, convertImprovedMemoryToCompat } from './notificationMessages';
@@ -23,6 +24,8 @@ export const cleanupAllAINotifications = async () => {
 };
 
 export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welcome_response' | 'upgrade' | 'preference_change') => {
+  const generation = getAIDataGeneration();
+  return trackAIWork(async () => {
   console.log(`AI Wellness V2: Action = ${action}`);
   
   // Check debouncer to prevent spam
@@ -32,7 +35,7 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
   }
   
   const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-  const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
+  const isPremium = await getIsPremium();
   
   // Only clean up when disabling or before scheduling new ones
   if (action === 'disable' || action === 'enable') {
@@ -44,7 +47,7 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
       console.log('AI Wellness disabled');
       return;
       
-    case 'enable':
+    case 'enable': {
       const hasSeenWelcome = await hasSeenAIWelcome();
       
       if (!hasSeenWelcome) {
@@ -77,15 +80,16 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
       console.log(`Scheduled ${isPremium ? 'daily' : 'weekly'} check-ins`);
       
       // Mark as scheduled to prevent spam
-      markScheduled('ai_wellness_enable');
+      if (isAIDataCurrent(generation)) markScheduled('ai_wellness_enable');
       break;
+      }
       
     case 'welcome_response':
       // Welcome response is now just informational
       console.log('Welcome response received - user engaged with AI wellness');
       break;
       
-    case 'upgrade':
+    case 'upgrade': {
       // Check if we've already sent a premium welcome notification
       const hasSeenPremiumWelcome = await AsyncStorage.getItem(KEYS.AI_WELLNESS.PREMIUM_WELCOME_SENT) === 'true';
       
@@ -127,8 +131,9 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
         console.log('Updated to daily check-ins for premium user');
       }
       break;
+      }
       
-    case 'preference_change':
+    case 'preference_change': {
       // User changed their schedule preference
       console.log('AI Wellness: Handling schedule preference change');
       
@@ -143,10 +148,14 @@ export const scheduleAIWellnessV2 = async (action: 'enable' | 'disable' | 'welco
         console.log(`Rescheduled ${isPremium ? 'daily' : 'weekly'} check-ins with new time preference`);
       }
       break;
+      }
   }
+
+  });
 };
 
 export async function scheduleRegularCheckIns(isPremium: boolean, userId: string) {
+    return trackAIWork(async () => {
   // Limit notifications to next 7 days to avoid hitting iOS 64 notification limit
   const MAX_DAYS_TO_SCHEDULE = 7;
   
@@ -279,7 +288,9 @@ export async function scheduleRegularCheckIns(isPremium: boolean, userId: string
   if (!isPremium) {
     await scheduleUpgradePrompts(userId);
   }
-}
+
+    });
+  }
 
 async function scheduleUpgradePrompts(userId: string) {
   const promptDays = [1, 5];  // Monday and Friday
@@ -426,6 +437,7 @@ function getNextWeekdayTrigger(
  * Prevents notification spam by ensuring scheduling functions aren't called repeatedly
  */
 const lastScheduled = new Map<string, number>();
+onAIDataDeleted(() => lastScheduled.clear());
 const DEBOUNCE_TIME = 60000; // 1 minute minimum between scheduling attempts
 
 export const canScheduleNotifications = (type: string): boolean => {
@@ -441,7 +453,7 @@ export const canScheduleNotifications = (type: string): boolean => {
 };
 
 export const markScheduled = (type: string): void => {
-  lastScheduled.set(type, Date.now());
+  if (isAIDataCurrent(getAIDataGeneration())) lastScheduled.set(type, Date.now());
   console.log(`Marked ${type} as scheduled at ${new Date().toLocaleTimeString()}`);
 };
 

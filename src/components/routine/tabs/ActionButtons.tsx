@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Theme } from '../../../context/ThemeContext';
+import { ThemeColors } from '../../../context/ThemeContext';
 
 type ActionButtonsProps = {
   isPremium: boolean;
   showAnyLevelUp: boolean;
-  theme: Theme;
+  theme: ThemeColors;
   onSaveToFavorites: () => void;
   onSmartPick: () => void;
   onNewRoutine: () => void;

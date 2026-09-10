@@ -1,3 +1,8 @@
+import assetdailyPlayerBadge from '../../../assets/images/achievements/dailyPlayerBadge.png';
+import assetlightningReflexes from '../../../assets/images/achievements/lightningReflexes.png';
+import assetgameMaster from '../../../assets/images/achievements/gameMaster.png';
+import assettriviaExpert from '../../../assets/images/achievements/triviaExpert.png';
+import assetperfectScoreBadge from '../../../assets/images/achievements/perfectScoreBadge.png';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -65,15 +70,15 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
   const getBadgeImage = (achievement: any) => {
     switch (achievement.id) {
       case 'daily_player':
-        return require('../../../assets/images/achievements/dailyPlayerBadge.png');
+        return assetdailyPlayerBadge;
       case 'lightning_reflexes':
-        return require('../../../assets/images/achievements/lightningReflexes.png');
+        return assetlightningReflexes;
       case 'game_master':
-        return require('../../../assets/images/achievements/gameMaster.png');
+        return assetgameMaster;
       case 'trivia_expert':
-        return require('../../../assets/images/achievements/triviaExpert.png');
+        return assettriviaExpert;
       case 'perfect_balance':
-        return require('../../../assets/images/achievements/perfectScoreBadge.png');
+        return assetperfectScoreBadge;
       default:
         return null;
     }

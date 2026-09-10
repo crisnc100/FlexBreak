@@ -1,3 +1,8 @@
+import assetdailyPlayerBadge from '../../../assets/images/achievements/dailyPlayerBadge.png';
+import assetlightningReflexes from '../../../assets/images/achievements/lightningReflexes.png';
+import assetgameMaster from '../../../assets/images/achievements/gameMaster.png';
+import assettriviaExpert from '../../../assets/images/achievements/triviaExpert.png';
+import assetperfectScoreBadge from '../../../assets/images/achievements/perfectScoreBadge.png';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, ScrollView, Modal, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,6 +19,10 @@ import * as storageService from '../../services/storageService';
 import { Achievement } from '../../utils/progress/types';
 import * as haptics from '../../utils/haptics';
 import { MiniGameBadgeDisplay } from '../progress/MiniGameBadgeDisplay';
+
+type DisplayAchievement = Omit<Achievement, 'badgeImage'> & {
+  badgeImage?: string | React.ComponentProps<typeof Image>['source'];
+};
 
 interface LevelProgressCardProps {
   onPress?: () => void;
@@ -37,35 +46,35 @@ const MINIGAME_BADGES = [
     id: 'daily_player',
     title: 'Daily Player',
     description: 'Complete a mini-game after routine for 7 days in a row',
-    badgeImage: require('../../../assets/images/achievements/dailyPlayerBadge.png'),
+    badgeImage: assetdailyPlayerBadge,
     xp: 100,
   },
   {
     id: 'lightning_reflexes',
     title: 'Lightning Reflexes',
     description: 'Get all correct taps in Stress Buster',
-    badgeImage: require('../../../assets/images/achievements/lightningReflexes.png'),
+    badgeImage: assetlightningReflexes,
     xp: 100,
   },
   {
     id: 'game_master',
     title: 'Game Master',
     description: 'Complete Posture Patrol without losing lives',
-    badgeImage: require('../../../assets/images/achievements/gameMaster.png'),
+    badgeImage: assetgameMaster,
     xp: 150,
   },
   {
     id: 'trivia_expert',
     title: 'Trivia Expert',
     description: 'Get all trivia questions correct 3 times in a row',
-    badgeImage: require('../../../assets/images/achievements/triviaExpert.png'),
+    badgeImage: assettriviaExpert,
     xp: 150,
   },
   {
     id: 'perfect_balance',
     title: 'Perfect Balance',
     description: 'Complete Balance Drop with perfect balance and high energy',
-    badgeImage: require('../../../assets/images/achievements/perfectScoreBadge.png'),
+    badgeImage: assetperfectScoreBadge,
     xp: 200,
   }
 ];
@@ -91,7 +100,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
   const [recentAchievements, setRecentAchievements] = useState<Achievement[]>([]);
   const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [isLoadingAchievements, setIsLoadingAchievements] = useState(true);
-  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [selectedAchievement, setSelectedAchievement] = useState<DisplayAchievement | null>(null);
   const [showAchievementModal, setShowAchievementModal] = useState(false);
   
   // Mini-game badge data
@@ -107,7 +116,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
   
   // Move these helper functions before any useEffect to avoid Hook order issues
   // Get badge icon for achievement type
-  const getBadgeIcon = useCallback((achievement: Achievement) => {
+  const getBadgeIcon = useCallback((achievement: DisplayAchievement) => {
     if (!achievement) return 'ribbon-outline';
     
     switch (achievement.type) {
@@ -127,7 +136,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
   }, []);
   
   // Get badge color for achievement type - Using component scope variables
-  const getBadgeColor = useCallback((achievement: Achievement) => {
+  const getBadgeColor = useCallback((achievement: DisplayAchievement) => {
     // If the achievement has a specific color defined, use it
     if (achievement.badgeColor) return achievement.badgeColor;
     
@@ -316,7 +325,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
     };
     
     // Handle achievement completion
-    const handleAchievementCompleted = (achievement: Achievement) => {
+    const handleAchievementCompleted = (achievement: DisplayAchievement) => {
       console.log('LevelProgressCard: Achievement completed event received', achievement.title);
       // Refresh achievements
       loadAchievements();
@@ -431,7 +440,7 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
   };
   
   // Handle achievement badge press
-  const handleBadgePress = (achievement: Achievement) => {
+  const handleBadgePress = (achievement: DisplayAchievement) => {
     // Animate the badge
     Animated.sequence([
       Animated.timing(badgePulseAnim, {
@@ -727,7 +736,10 @@ const LevelProgressCard: React.FC<LevelProgressCardProps> = ({
               <View style={styles.achievementDetail}>
                 {selectedAchievement.badgeImage ? (
                   <Image
-                    source={selectedAchievement.badgeImage}
+                    source={typeof selectedAchievement.badgeImage === 'string'
+                      ? MINIGAME_BADGES.find(badge => badge.id === selectedAchievement.id)?.badgeImage
+                        ?? { uri: selectedAchievement.badgeImage }
+                      : selectedAchievement.badgeImage}
                     style={styles.modalBadgeImage}
                     resizeMode="contain"
                   />

@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(id) {
+      return request.auth != null && request.auth.uid == id;
+    }
+    function tokenShape(d) {
+      return d.keys().hasOnly(['token', 'device', 'createdAt', 'userId', 'anonymous'])
+        && d.keys().hasAll(['token', 'device', 'createdAt'])
+        && d.token is string && d.token.size() > 0 && d.token.size() <= 4096
+        && d.device in ['ios', 'android'] && d.createdAt == request.time;
+    }
+    function reminderShape(d) {
+      return d.keys().hasOnly(['userId', 'token', 'enabled', 'time', 'frequency', 'days', 'message', 'timeZoneOffset', 'isPremium', 'premiumLevel', 'updatedAt'])
+        && d.keys().hasAll(['userId', 'enabled', 'time', 'frequency', 'days', 'message', 'timeZoneOffset', 'isPremium', 'premiumLevel', 'updatedAt'])
+        && d.userId is string && d.userId.size() <= 128
+        && (!('token' in d) || (d.token is string && d.token.size() > 0 && d.token.size() <= 4096))
+        && (!d.enabled || ('token' in d))
+        && d.enabled is bool && d.time is string
+        && d.time.matches('^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$')
+        && d.frequency in ['daily', 'weekdays', 'custom']
+        && d.days is list && d.days.size() <= 7
+        && d.days.hasOnly(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
+        && d.days.toSet().size() == d.days.size()
+        && d.message is string && d.message.size() <= 500
+        && d.timeZoneOffset is number && d.timeZoneOffset >= -840 && d.timeZoneOffset <= 840
+        && d.isPremium is bool && d.premiumLevel is int && d.premiumLevel >= 0 && d.premiumLevel <= 1000
+        && d.updatedAt == request.time;
+    }
+    // Temporary legacy bridge: device IDs are bearer addresses, not identities.
+    // It limits schema and denies enumeration, but cannot stop guessed-ID overwrite.
+    function legacyToken(id, d) {
+      return request.auth == null && id.matches('^device_(ios|android)_[0-9]{10,16}$')
+        && d.get('anonymous', false) == true && !('userId' in d);
+    }
+    function legacyReminder(id, d) {
+      return request.auth == null && id.matches('^device_[0-9]{10,16}_[a-z0-9]{1,16}$')
+        && d.userId == id;
+    }
+    function validCodeId(code) { return code.matches('^FLEX-[A-Z0-9]{8}$'); }
+    function email(value) {
+      return value is string && value.size() >= 3 && value.size() <= 254
+        && value.matches('^[^ @]+@[^ @]+[.][^ @]+$');
+    }
+    function liveCode(d) {
+      // Must be backfilled by an administrator from original expiresAt first.
+      // Rules cannot safely parse the legacy ISO string into a timestamp.
+      return d.expiresAtTimestamp is timestamp && d.expiresAtTimestamp > request.time;
+    }
+    match /fcm_tokens/{id} {
+      allow read, delete: if false;
+      allow create, update: if tokenShape(request.resource.data)
+        && ((owner(id) && request.resource.data.get('userId', '') == id && !('anonymous' in request.resource.data))
+          || legacyToken(id, request.resource.data));
+    }
+    match /user_reminders/{id} {
+      allow read, delete: if false;
+      allow create, update: if reminderShape(request.resource.data)
+        && ((owner(id) && request.resource.data.userId == id) || legacyReminder(id, request.resource.data));
+    }
+    match /oneTimeCodes/{code} {
+      allow list, create, delete: if false;
+      allow get: if validCodeId(code);
+      allow update: if validCodeId(code) && resource.data.code == code
+        && resource.data.used == false && request.resource.data.used == true
+        && liveCode(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt', 'usedAtTimestamp'])
+        && email(request.resource.data.usedBy) && request.resource.data.usedBy == resource.data.email
+        && request.resource.data.usedAt is string && request.resource.data.usedAt.size() <= 35
+        && request.resource.data.usedAtTimestamp == request.time;
+    }
+    match /verifiedEmails/{id} {
+      function backedDiscount(d) {
+        let code = getAfter(/databases/$(database)/documents/oneTimeCodes/$(d.codeUsed)).data;
+        return code.used == true && code.usedBy == id && code.email == id
+          && code.get('type', 'discount') == 'discount' && liveCode(code)
+          && code.usedAtTimestamp >= request.time - duration.value(10, 'm');
+      }
+      allow read, update, delete: if false;
+      allow create: if request.resource.data.keys().hasOnly(['email', 'verifiedAt', 'verificationMethod', 'codeUsed', 'userType'])
+        && request.resource.data.keys().hasAll(['email', 'verifiedAt', 'verificationMethod', 'codeUsed', 'userType'])
+        && email(id) && request.resource.data.email == id
+        && request.resource.data.verificationMethod == 'one_time_code'
+        && request.resource.data.userType == 'office' && request.resource.data.verifiedAt == request.time
+        && request.resource.data.codeUsed is string && validCodeId(request.resource.data.codeUsed)
+        && backedDiscount(request.resource.data);
+    }
+    // Legacy client-calculated free-premium expiry cannot be trusted or bounded
+    // safely. The upgraded backend owns grants; old local-only grants are not trust.
+    match /premiumUsers/{id} { allow read, write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,3 +1,7 @@
+import assetheadspaceHalo1 from '../../../../../assets/images/miniGames/headspaceHalo1.png';
+import assethipHopPlatform from '../../../../../assets/images/miniGames/hipHopPlatform.png';
+import assetchestQuestPad from '../../../../../assets/images/miniGames/chestQuestPad.png';
+import assetarmoryArc from '../../../../../assets/images/miniGames/armoryArc.png';
 import { PadType, PadConfig } from './types';
 
 // Game constants for Posture Patrol Tower Defense
@@ -123,7 +127,7 @@ export const generateRandomWaves = () => {
 };
 
 // Initial wave config (randomized each game)
-export let WAVE_CONFIG = generateRandomWaves();
+export const WAVE_CONFIG = generateRandomWaves();
 
 // Energy system
 export const ENERGY_CONFIG = {
@@ -210,7 +214,7 @@ export const PAD_CONFIG: Record<PadType, PadConfig> = {
     fireRate: 2.0, // Faster targeting
     techNeckBonus: 3, // 3x damage multiplier vs Tech Neck
     description: '3× damage vs Tech Neck! Very short range, rapid fire.',
-    image: require('../../../../../assets/images/miniGames/headspaceHalo1.png')
+    image: assetheadspaceHalo1
   },
   hip_hop_platform: {
     id: 'hip_hop_platform',
@@ -224,7 +228,7 @@ export const PAD_CONFIG: Record<PadType, PadConfig> = {
     splashRadius: 50, // Area damage
     splashDamage: 0.6, // 60% damage to nearby enemies
     description: 'Area damage, medium range. Energy efficient vs groups.',
-    image: require('../../../../../assets/images/miniGames/hipHopPlatform.png')
+    image: assethipHopPlatform
   },
   chest_quest_pad: {
     id: 'chest_quest_pad',
@@ -239,7 +243,7 @@ export const PAD_CONFIG: Record<PadType, PadConfig> = {
     dotDamage: 2, // Damage over time per second
     dotDuration: 3, // Duration in seconds
     description: 'Armor piercing + DoT. Long range anti-tank specialist.',
-    image: require('../../../../../assets/images/miniGames/chestQuestPad.png')
+    image: assetchestQuestPad
   },
   armory_arc: {
     id: 'armory_arc',
@@ -253,7 +257,7 @@ export const PAD_CONFIG: Record<PadType, PadConfig> = {
     piercing: true, // Line piercing
     undodgeable: true, // Can't be dodged
     description: 'Extreme range piercing beam. Can\'t be dodged by Lean Twist.',
-    image: require('../../../../../assets/images/miniGames/armoryArc.png')
+    image: assetarmoryArc
   }
 };
 

@@ -42,7 +42,7 @@ import { disableConsoleLogsInProduction } from './src/utils/disableConsoleLogsIn
 // Import video loader service
 import { videoLoaderService } from './src/services/videoLoaderService';
 // Import AdMob initialization
-import mobileAds from 'react-native-google-mobile-ads';
+import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
 import AdService from './src/services/adService';
 import { UpdateNotificationModal, useUpdateNotification } from './src/components/UpdateNotificationModal';
 import { GlobalAchievementListener } from './src/components/notifications/GlobalAchievementListener';
@@ -75,11 +75,11 @@ if (!firebase.apps.length) {
 }
 
 // Avoid playing intro sound twice
-let introSoundPlayed = false;
+const introSoundPlayed = false;
 
 // AdMob initialization is deferred until after audio is configured
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<Record<string, undefined>, 'tab-navigator'>();
 const Stack = createStackNavigator();
 
 // Define navigation types properly
@@ -366,11 +366,10 @@ const TabNavigator = () => {
   return (
     <>
       <Tab.Navigator
-        // @ts-ignore - id property is available but TypeScript doesn't recognize it
         id="tab-navigator"
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
-            let iconName = 'home';
+            let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'home';
 
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
@@ -384,7 +383,6 @@ const TabNavigator = () => {
               iconName = focused ? 'list' : 'list-outline';
             }
 
-            // @ts-ignore - Handle undefined iconName in extreme case
             return <Ionicons name={iconName} size={size} color={color} />;
           },
           tabBarActiveTintColor: theme.accent,
@@ -401,9 +399,13 @@ const TabNavigator = () => {
           headerTitleStyle: {
             fontWeight: '500',
           },
-          tabBarButton: (props) => (
+          tabBarButton: ({ ref, ...props }) => (
             <Pressable
               {...props}
+              ref={(view) => {
+                if (typeof ref === 'function') ref(view);
+                else if (ref && typeof ref === 'object') Object.assign(ref, { current: view });
+              }}
               onPress={(e) => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 props.onPress(e);
@@ -604,7 +606,7 @@ function MainApp() {
     };
 
     // Expose a global helper to navigate to the Routine tab with params
-    ;(global as any).navigateToRoutine = (params: any) => {
+    (global as any).navigateToRoutine = (params: any) => {
       try {
         if (navigationRef.isReady()) {
           // Navigate to the Routine tab inside MainTabs with params
@@ -712,6 +714,9 @@ function MainApp() {
           return;
         }
 
+        // Progress startup must also run when notifications are unavailable.
+        await initStreakSystem();
+
         // Initialize local notifications system
         await notifications.configureNotifications();
 
@@ -734,47 +739,35 @@ function MainApp() {
         }
         
         if (permissionsGranted) {
-          // Initialize Firebase reminders for premium users
+          // Restore local reminder schedules
           try {
             const firebaseInitialized = await firebaseReminders.initializeFirebaseReminders();
             if (firebaseInitialized) {
-              // Get a real FCM token
-              const token = await firebaseReminders.getFCMToken();
-              
               // Get the current reminder settings
               const settings = await firebaseReminders.getReminderSettings();
               
-              // If enabled, ensure Firebase has the settings
+              // If enabled, refresh the repeating local schedules
               if (settings.enabled) {
                 await firebaseReminders.saveReminderSettings(settings);
               }
               
-              // Start local motivational messages as a fallback for Firebase Cloud Functions
+              // Start local motivational messages
               // Use the production mode (2 messages per day) instead of test mode
               // Add guard to prevent multiple initializations
-              let cleanupMotivationalMessages = () => {};
-              
               if (!isMotivationalMessagesInitialized) {
                 console.log('Initializing motivational messages for the first time');
                 isMotivationalMessagesInitialized = true;
-                cleanupMotivationalMessages = firebaseReminders.startLocalMotivationalMessages(false);
+                firebaseReminders.startLocalMotivationalMessages(false);
               } else {
                 console.log('Skipping motivational messages initialization - already initialized');
               }
               
-              // Return cleanup function
-              return () => {
-                cleanupMotivationalMessages();
-                isMotivationalMessagesInitialized = false; // Reset on cleanup
-              };
             }
           } catch (error) {
             console.error('Error initializing Firebase reminders:', error);
           }
         }
         
-        // Initialize streak system
-        await initStreakSystem();
       } catch (error) {
         console.error('Error during app initialization:', error);
       }
@@ -821,7 +814,7 @@ function MainApp() {
         try {
           await soundEffects.loadSound('click');
           await soundEffects.loadSound('intro');
-        } catch (_) {}
+        } catch (error) { console.warn('Could not prime onboarding sounds:', error); }
 
         // Preload all sound effects for faster playback
         await soundEffects.preloadAllSounds();
@@ -832,7 +825,7 @@ function MainApp() {
           await mobileAds().setRequestConfiguration({
             tagForChildDirectedTreatment: false,
             tagForUnderAgeOfConsent: false,
-            maxAdContentRating: 'G',
+            maxAdContentRating: MaxAdContentRating.G,
           });
           const adapters = await mobileAds().initialize();
           console.log('AdMob initialized successfully (post-audio):', adapters);
@@ -938,8 +931,7 @@ function MainApp() {
         backgroundColor={theme.background} 
       />
       <NavigationContainer theme={navigationTheme} ref={navigationRef}>
-        {/* @ts-ignore - Fixing type error with id property */}
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen name="BobSimulator" component={BobSimulatorScreen} />
         </Stack.Navigator>

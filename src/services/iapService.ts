@@ -1,36 +1,16 @@
-// IAP Service using expo-in-app-purchases
-import * as InAppPurchases from 'expo-in-app-purchases';
+import * as Store from 'expo-iap';
 import { Platform } from 'react-native';
-import * as storageService from './storageService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { callBackend } from './security/backendClient';
 
-// Define product IDs (using proper App Store IDs)
 export const PRODUCTS = {
-  MONTHLY_SUB: Platform.select({
-    ios: 'flexbreak_monthly_4.99',
-    android: 'flexbreak_monthly_4.99',
-    default: 'flexbreak_monthly_4.99',
-  }),
-  YEARLY_SUB: Platform.select({
-    ios: 'flexbreak_yearly_44.99',
-    android: 'flexbreak_yearly_44.99',
-    default: 'flexbreak_yearly_44.99',
-  }),
-  // Discounted products for verified users with codes
-  MONTHLY_VERIFIED: Platform.select({
-    ios: 'flexbreak_monthly_verified',
-    android: 'flexbreak_monthly_verified',
-    default: 'flexbreak_monthly_verified',
-  }),
-  YEARLY_VERIFIED: Platform.select({
-    ios: 'flexbreak_yearly_verified',
-    android: 'flexbreak_yearly_verified',
-    default: 'flexbreak_yearly_verified',
-  }),
-};
+  MONTHLY_SUB: 'flexbreak_monthly_4.99',
+  YEARLY_SUB: 'flexbreak_yearly_44.99',
+  MONTHLY_VERIFIED: 'flexbreak_monthly_verified',
+  YEARLY_VERIFIED: 'flexbreak_yearly_verified',
+} as const;
 
-// Define types for subscription details
 export interface SubscriptionDetails {
+  verificationSource: 'server';
   productId: string;
   purchaseDate: string;
   expiryDate: string;
@@ -39,529 +19,202 @@ export interface SubscriptionDetails {
   platform: 'ios' | 'android';
   purchaseToken: string;
 }
+type UpdateSubscription = (details: SubscriptionDetails) => void | Promise<void>;
+type PurchaseResult = { success: boolean; responseCode?: string; error?: unknown; purchase?: Store.Purchase; subscriptionDetails?: SubscriptionDetails };
+type VerifiedSubscription = Omit<SubscriptionDetails, 'purchaseDate' | 'verificationSource'> & { purchaseDate?: string };
+const knownProduct = (id: string) => Object.values(PRODUCTS).some(product => product === id);
+let initialization: Promise<boolean> | null = null;
+let initialized = false;
+let purchasing = false;
+let connectionGeneration = 0;
+let listeners: { remove(): void }[] = [];
+const persistVerifiedSubscription: UpdateSubscription = async details => {
+  const { saveSubscriptionDetails } = await import('./storageService');
+  if (!await saveSubscriptionDetails(details)) throw new Error('Could not save verified subscription');
+};
+let updater: UpdateSubscription | null = persistVerifiedSubscription;
+let pending: { productId: string; resolve: (result: PurchaseResult) => void; timer: ReturnType<typeof setTimeout> } | null = null;
+const processing = new Map<string, Promise<PurchaseResult>>();
+const completed = new Set<string>();
 
-// Track initialization state
-let isInitialized = false;
-let isInitializing = false;
-let initializationPromise: Promise<boolean> | null = null;
+export const isSubscriptionActive = (details: SubscriptionDetails | null): boolean =>
+  !!details && details.isActive === true && Number.isFinite(Date.parse(details.expiryDate)) && Date.parse(details.expiryDate) > Date.now();
 
-// Initialize IAP module
-export const initializeIAP = async () => {
-  // If already initialized, return immediately
-  if (isInitialized) {
-    console.log('IAP already initialized');
-    return true;
+async function verifyPurchase(purchase: Store.Purchase): Promise<SubscriptionDetails | null> {
+  if (!knownProduct(purchase.productId) || purchase.purchaseState !== 'purchased') return null;
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') throw new Error('Unsupported store platform');
+  if (!purchase.purchaseToken) throw new Error('Store returned no verification token');
+  const verified = await callBackend<VerifiedSubscription>('verify-purchase-v2', {
+    platform: Platform.OS,
+    productId: purchase.productId,
+    purchaseToken: purchase.purchaseToken,
+    transactionId: purchase.id,
+  });
+  if (!verified || !knownProduct(verified.productId) || verified.platform !== Platform.OS ||
+      verified.purchaseToken !== purchase.purchaseToken || typeof verified.autoRenewing !== 'boolean' ||
+      typeof verified.isActive !== 'boolean' || typeof verified.expiryDate !== 'string' ||
+      !Number.isFinite(Date.parse(verified.expiryDate)) ||
+      (verified.purchaseDate !== undefined && (typeof verified.purchaseDate !== 'string' || !Number.isFinite(Date.parse(verified.purchaseDate))))) {
+    throw new Error('Purchase verification returned mismatched entitlement');
   }
+  const details: SubscriptionDetails = {
+    ...verified,
+    verificationSource: 'server',
+    purchaseDate: verified.purchaseDate ?? new Date(purchase.transactionDate).toISOString(),
+  };
+  // An expired/revoked transaction must never refresh premium from its purchase date.
+  return isSubscriptionActive(details) ? details : null;
+}
 
-  // If initialization is in progress, wait for it
-  if (isInitializing && initializationPromise) {
-    console.log('IAP initialization already in progress, waiting...');
-    return initializationPromise;
-  }
-
-  // Start initialization
-  isInitializing = true;
-  
-  initializationPromise = (async () => {
+async function deliverPurchase(purchase: Store.Purchase, update: UpdateSubscription): Promise<PurchaseResult> {
+  const key = `${purchase.productId}:${purchase.id}`;
+  const generation = connectionGeneration;
+  const existing = processing.get(key);
+  if (existing) return existing;
+  const task = (async (): Promise<PurchaseResult> => {
     try {
-      // First disconnect to ensure we don't have an existing connection
-      try {
-        await InAppPurchases.disconnectAsync();
-        console.log('Disconnected existing IAP connection');
-      } catch (disconnectError) {
-        // Ignore any disconnect errors, just continue
-        console.log('No existing IAP connection to disconnect');
+      const subscriptionDetails = await verifyPurchase(purchase);
+      if (!subscriptionDetails) return { success: false, error: 'No active store subscription' };
+      if (generation !== connectionGeneration) throw new Error('Store session changed during verification');
+      await update(subscriptionDetails);
+      // Subscriptions are non-consumable. Acknowledge only after verified entitlement
+      // has been persisted successfully; rejected verification remains recoverable.
+      if (!completed.has(key)) {
+        await Store.finishTransaction({ purchase, isConsumable: false });
+        completed.add(key);
       }
+      return { success: true, purchase, subscriptionDetails };
+    } catch (error) {
+      return { success: false, error };
+    }
+  })();
+  processing.set(key, task);
+  try { return await task; } finally { processing.delete(key); }
+}
 
-      // Now we can safely connect
-      await InAppPurchases.connectAsync();
-      console.log('IAP connection established');
-      isInitialized = true;
-    
-    // Set up purchase listener
-    InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
-      console.log(`Purchase listener triggered: responseCode=${responseCode}, errorCode=${errorCode || 'none'}`);
-      console.log(`Response code meaning: ${InAppPurchases.IAPResponseCode[responseCode] || 'Unknown'}`);
-      
-      if (Array.isArray(results)) {
-        console.log(`Purchase listener results (${results.length}):`, JSON.stringify(results, null, 2));
-      } else {
-        console.log('Purchase listener results: none or invalid');
-      }
-      
-      if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-        if (results && Array.isArray(results)) {
-          results.forEach((purchase, index) => {
-            console.log(`Processing purchase result ${index + 1}/${results.length}`);
+function settle(result: PurchaseResult) {
+  if (!pending) return;
+  const current = pending;
+  pending = null;
+  clearTimeout(current.timer);
+  current.resolve(result);
+}
 
-            if (!isCompletedPurchase(purchase)) {
-              console.log('Purchase not completed yet, skipping persistence until confirmed by store.');
-              return;
-            }
-
-            // Save the successful purchase to AsyncStorage so we can verify it later if direct IAP response fails
-            try {
-              const purchaseKey = `last_purchase_${purchase.productId}`;
-              const purchaseData = JSON.stringify({
-                timestamp: Date.now(),
-                purchase: purchase
-              });
-              AsyncStorage.setItem(purchaseKey, purchaseData)
-                .then(() => console.log(`Stored successful purchase data for ${purchase.productId}`))
-                .catch(e => console.error('Error storing purchase data:', e));
-            } catch (e) {
-              console.error('Error preparing purchase data for storage:', e);
-            }
-
-            // Complete the transaction after handling it
-            if (Platform.OS === 'ios') {
-              console.log(`Finishing transaction for product: ${purchase.productId}`);
-              try {
-                InAppPurchases.finishTransactionAsync(purchase, true);
-                console.log('Transaction finished successfully');
-              } catch (e) {
-                console.error('Error finishing transaction:', e);
-              }
-            }
+export async function initializeIAP(): Promise<boolean> {
+  updater ||= persistVerifiedSubscription;
+  if (initialized) return true;
+  if (initialization) return initialization;
+  initialization = (async () => {
+    try {
+      listeners = [
+        Store.purchaseUpdatedListener(purchase => {
+          // Pending/deferred transactions never grant access. Background updates use
+          // the durable default callback until the provider installs its updater.
+          if (!updater || purchase.purchaseState !== 'purchased' || !knownProduct(purchase.productId)) return;
+          const update = updater;
+          void deliverPurchase(purchase, update).then(result => {
+            if (pending?.productId === purchase.productId) settle(result);
           });
-        }
-      } else {
-        console.error('Purchase event error:', { responseCode, errorCode });
-      }
-    });
-    
+        }),
+        Store.purchaseErrorListener(error => settle({ success: false, error })),
+      ];
+      initialized = await Store.initConnection();
+      if (!initialized) throw new Error('Store connection unavailable');
       return true;
     } catch (error) {
-      console.error('Failed to establish IAP connection:', error);
-      isInitialized = false;
+      listeners.forEach(listener => listener.remove());
+      listeners = [];
+      console.warn('Unable to connect to the store', error);
       return false;
     } finally {
-      isInitializing = false;
+      initialization = null;
     }
   })();
+  return initialization;
+}
 
-  return initializationPromise;
-};
+export async function disconnectIAP(): Promise<void> {
+  settle({ success: false, error: 'Store connection closed' });
+  updater = null;
+  connectionGeneration++;
+  listeners.forEach(listener => listener.remove());
+  listeners = [];
+  initialized = false;
+  initialization = null;
+  await Store.endConnection();
+}
 
-// Disconnect IAP
-export const disconnectIAP = async () => {
+export async function getProducts() {
   try {
-    await InAppPurchases.disconnectAsync();
-    console.log('IAP connection closed');
-    isInitialized = false;
-    isInitializing = false;
-    initializationPromise = null;
+    if (!await initializeIAP()) return [];
+    const products = await Store.fetchProducts({ skus: Object.values(PRODUCTS), type: 'subs' });
+    return (products ?? []).map(product => ({
+      ...product,
+      productId: product.id,
+      price: product.displayPrice,
+      priceAmountMicros: Math.round((product.price ?? 0) * 1_000_000),
+      priceCurrencyCode: product.currency,
+      title: product.title,
+    }));
   } catch (error) {
-    console.error('Failed to disconnect IAP:', error);
+    console.warn('Unable to load subscription products', error);
+    return [];
   }
-};
+}
 
-// Track product fetching state
-let isFetchingProducts = false;
-let productsFetchPromise: Promise<any[]> | null = null;
+export const getProductsForUser = (verificationType?: 'office' | 'student' | null) =>
+  verificationType === 'office' || verificationType === 'student'
+    ? { monthly: PRODUCTS.MONTHLY_VERIFIED, yearly: PRODUCTS.YEARLY_VERIFIED }
+    : { monthly: PRODUCTS.MONTHLY_SUB, yearly: PRODUCTS.YEARLY_SUB };
 
-// Get products info
-export const getProducts = async () => {
-  // If already fetching products, wait for the existing request
-  if (isFetchingProducts && productsFetchPromise) {
-    console.log('Product fetch already in progress, waiting...');
-    return productsFetchPromise;
-  }
-
-  // Start fetching products
-  isFetchingProducts = true;
-  
-  productsFetchPromise = (async () => {
-    try {
-      // Ensure IAP is initialized first
-      if (!isInitialized) {
-        console.log('IAP not initialized, initializing first...');
-        await initializeIAP();
-      }
-
-      const productIDs = Object.values(PRODUCTS);
-      console.log('Requesting products with IDs:', productIDs);
-      
-      // Add a small delay before getProductsAsync to ensure connection is ready
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const { results } = await InAppPurchases.getProductsAsync(productIDs);
-      console.log('IAP products loaded:', results);
-      console.log('IAP product details:', results.map(p => ({
-        productId: p.productId,
-        price: p.price,
-        priceAmountMicros: p.priceAmountMicros,
-        priceCurrencyCode: p.priceCurrencyCode,
-        title: p.title,
-        description: p.description
-      })));
-      return results;
-    } catch (error) {
-      console.error('Failed to get products:', error);
-      return [];
-    } finally {
-      isFetchingProducts = false;
-      // Clear the promise after a delay to allow future fetches
-      setTimeout(() => {
-        productsFetchPromise = null;
-      }, 1000);
-    }
-  })();
-
-  return productsFetchPromise;
-};
-
-// Helper function to get appropriate products based on verification status
-export const getProductsForUser = (verificationType?: 'office' | 'student' | null) => {
-  if (verificationType === 'office' || verificationType === 'student') {
-    // Both students and office workers use the same verified products
-    return {
-      monthly: PRODUCTS.MONTHLY_VERIFIED,
-      yearly: PRODUCTS.YEARLY_VERIFIED,
-    };
-  } else {
-    return {
-      monthly: PRODUCTS.MONTHLY_SUB,
-      yearly: PRODUCTS.YEARLY_SUB,
-    };
-  }
-};
-
-const hasPurchaseEvidence = (purchase: any): boolean => {
-  if (!purchase) return false;
-
-  const evidenceKeys = [
-    'transactionReceipt',
-    'originalTransactionId',
-    'transactionId',
-    'purchaseToken',
-    'orderId'
-  ];
-
-  return evidenceKeys.some((key) => {
-    const value = purchase[key];
-    return typeof value === 'string' && value.length > 0;
-  });
-};
-
-const isCompletedPurchase = (purchase: any): boolean => {
-  if (!purchase) return false;
-
-  const { purchaseState } = purchase;
-
-  const isPurchasedState =
-    purchaseState === undefined ||
-    purchaseState === InAppPurchases.InAppPurchaseState.PURCHASED ||
-    purchaseState === InAppPurchases.InAppPurchaseState.RESTORED;
-
-  if (!isPurchasedState) {
-    return false;
-  }
-
-  return hasPurchaseEvidence(purchase);
-};
-
-// Format purchase data into subscription details
-const formatSubscriptionDetails = (purchase: any): SubscriptionDetails => {
-  const now = new Date();
-  let expiryDate = new Date(now);
-  
-  // For iOS, parse the receipt data to get the real expiration date
-  if (Platform.OS === 'ios' && purchase.originalTransactionId) {
-    // In a real implementation, you would validate the receipt with Apple's server
-    // and get the actual expiration date from the response.
-    // For testing, we'll use a mock expiration date based on the product ID.
-  }
-  
-  // Check if it's a monthly or yearly subscription (including discounted versions)
-  const monthlyProducts = [
-    PRODUCTS.MONTHLY_SUB, 
-    PRODUCTS.MONTHLY_VERIFIED
-  ];
-  const yearlyProducts = [
-    PRODUCTS.YEARLY_SUB, 
-    PRODUCTS.YEARLY_VERIFIED
-  ];
-  
-  if (monthlyProducts.includes(purchase.productId)) {
-    expiryDate.setMonth(expiryDate.getMonth() + 1);
-  } else if (yearlyProducts.includes(purchase.productId)) {
-    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-  }
-  
-  return {
-    productId: purchase.productId,
-    purchaseDate: now.toISOString(),
-    expiryDate: expiryDate.toISOString(),
-    isActive: true,
-    autoRenewing: Platform.OS === 'android' ? purchase.autoRenewingAndroid || false : true,
-    platform: (Platform.OS === 'ios' ? 'ios' : 'android') as 'ios' | 'android',
-    purchaseToken: purchase.transactionId || purchase.originalTransactionId || purchase.purchaseToken || '',
-  };
-};
-
-// Purchase subscription
-export const purchaseSubscription = async (productId: string, updateSubscription: Function) => {
+export async function purchaseSubscription(productId: string, updateSubscription: UpdateSubscription): Promise<PurchaseResult> {
+  if (!knownProduct(productId)) return { success: false, error: 'Unknown subscription product' };
+  if (purchasing) return { success: false, error: 'A purchase is already in progress' };
+  purchasing = true;
   try {
-    console.log(`Initiating purchase for ${productId}`);
-    
-    // Make the purchase
-    let purchaseResponse;
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    // Try multiple times in case of sandbox issues
-    while (retryCount < maxRetries) {
-      try {
-        console.log(`Attempt ${retryCount + 1}/${maxRetries}: Calling purchaseItemAsync...`);
-        purchaseResponse = await InAppPurchases.purchaseItemAsync(productId);
-        console.log('Purchase response received:', JSON.stringify(purchaseResponse, null, 2));
-        
-        if (purchaseResponse) {
-          break; // Got a valid response, exit retry loop
-        }
-        
-        // Wait before retry
-        retryCount++;
-        if (retryCount < maxRetries) {
-          console.log(`No valid response, will retry in 1 second (attempt ${retryCount}/${maxRetries})...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (e) {
-        console.error(`Purchase attempt ${retryCount + 1} error:`, e);
-        retryCount++;
-        
-        if (retryCount < maxRetries) {
-          console.log(`Will retry in 1 second (attempt ${retryCount}/${maxRetries})...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } else {
-          throw e; // Rethrow the last error if all retries failed
-        }
-      }
-    }
-    
-    // Handle case where response might be null
-    if (!purchaseResponse) {
-      console.error(`Purchase failed after ${maxRetries} attempts with no valid response`);
-      
-      // Check if purchase might have succeeded but we didn't get the response
-      // Adding a small delay to allow purchase listener to process any transaction
-      console.log('Waiting 2 seconds before checking for successful transaction...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Try to get purchase history to verify if purchase succeeded
-      try {
-        console.log('Checking purchase history for newly completed transaction...');
-        const historyResponse = await InAppPurchases.getPurchaseHistoryAsync();
-        
-        if (historyResponse.responseCode === InAppPurchases.IAPResponseCode.OK && 
-            historyResponse.results && 
-            historyResponse.results.length > 0) {
-            
-          // Look for a very recent purchase of this product
-          const recentPurchase = historyResponse.results.find(purchase => 
-            purchase.productId === productId && isCompletedPurchase(purchase)
-          );
-          
-          if (recentPurchase) {
-            console.log('Found recent purchase in history:', recentPurchase);
-            
-            // Format subscription details
-            const subscriptionDetails = formatSubscriptionDetails(recentPurchase);
-            
-            // Update subscription details and premium status
-            if (updateSubscription) {
-              await updateSubscription(subscriptionDetails);
-            } else {
-              await storageService.saveSubscriptionDetails(subscriptionDetails);
-              await storageService.saveIsPremium(true);
-            }
-            
-            return { success: true, purchase: recentPurchase, subscriptionDetails, recovered: true };
-          }
-        }
-      } catch (historyError) {
-        console.error('Error checking purchase history:', historyError);
-      }
-      
-      return { success: false, error: 'No result from purchase' };
-    }
-    
-    const { responseCode, results } = purchaseResponse;
-    console.log(`Purchase responseCode: ${responseCode} (${InAppPurchases.IAPResponseCode[responseCode] || 'Unknown'})`);
-    
-    if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-      console.log('Purchase successful:', JSON.stringify(results, null, 2));
-      
-      // Check if results has items
-      if (results && results.length > 0) {
-        const validPurchase = results.find(isCompletedPurchase);
-
-        if (validPurchase) {
-          console.log('Processing confirmed purchase:', JSON.stringify(validPurchase, null, 2));
-
-          // Format subscription details
-          const subscriptionDetails = formatSubscriptionDetails(validPurchase);
-          console.log('Formatted subscription details:', JSON.stringify(subscriptionDetails, null, 2));
-
-          // Update subscription details and premium status
-          if (updateSubscription) {
-            console.log('Calling updateSubscription');
-            await updateSubscription(subscriptionDetails);
-          } else {
-            // Fallback to old method if context function not available
-            console.log('Using fallback storage method for subscription');
-            await storageService.saveSubscriptionDetails(subscriptionDetails);
-            await storageService.saveIsPremium(true);
-          }
-
-          console.log('Purchase processing completed successfully');
-          return { success: true, purchase: validPurchase, subscriptionDetails };
-        }
-
-        console.warn('Purchase response contained no completed transactions. Waiting for confirmation.');
-      } else {
-        console.error('Purchase results array is empty or undefined');
-      }
-    } else {
-      console.error(`Purchase failed with responseCode: ${responseCode} (${InAppPurchases.IAPResponseCode[responseCode] || 'Unknown'})`);
-    }
-    
-    return { success: false, responseCode };
+    if (!await initializeIAP()) throw new Error('Store connection unavailable');
+    const products = await Store.fetchProducts({ skus: [productId], type: 'subs' });
+    const product = products?.find(item => item.id === productId);
+    if (!product) throw new Error('Subscription unavailable in this store');
+    const offers = 'subscriptionOffers' in product ? product.subscriptionOffers : null;
+    const offer = offers?.find(item => !!item.offerTokenAndroid);
+    if (Platform.OS === 'android' && !offer?.offerTokenAndroid) throw new Error('No eligible subscription offer');
+    updater = updateSubscription;
+    const result = new Promise<PurchaseResult>(resolve => {
+      pending = { productId, resolve, timer: setTimeout(() => settle({ success: false, error: 'Store confirmation is pending. Use Restore Purchases after approval.' }), 120_000) };
+    });
+    // requestPurchase is event-based. Never interpret its return value as success,
+    // and never retry a store purchase automatically after an ambiguous response.
+    void Store.requestPurchase({
+      type: 'subs',
+      request: {
+        apple: { sku: productId },
+        google: { skus: [productId], subscriptionOffers: offer?.offerTokenAndroid ? [{ sku: productId, offerToken: offer.offerTokenAndroid }] : [] },
+      },
+    }).catch(error => settle({ success: false, error }));
+    return await result;
   } catch (error) {
-    console.error('Unexpected error during purchase:', error);
     return { success: false, error };
+  } finally {
+    purchasing = false;
   }
-};
+}
 
-// Restore purchases
-export const restorePurchases = async (updateSubscription: Function) => {
+export async function restorePurchases(updateSubscription: UpdateSubscription) {
   try {
-    console.log('Restoring purchases...');
-    
-    // First check if we have a recent successful purchase stored in AsyncStorage
-    try {
-      const productIDs = Object.values(PRODUCTS);
-      for (const productId of productIDs) {
-        const purchaseKey = `last_purchase_${productId}`;
-        const storedPurchaseData = await AsyncStorage.getItem(purchaseKey);
-        
-        if (storedPurchaseData) {
-          const parsedData = JSON.parse(storedPurchaseData);
-          const timestamp = parsedData.timestamp || 0;
-          const purchase = parsedData.purchase;
-          
-          // Only consider purchases in the last 5 minutes
-          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-          
-          if (timestamp > fiveMinutesAgo && purchase) {
-            if (!isCompletedPurchase(purchase)) {
-              console.log('Stored recent purchase is not completed yet. Skipping persistence.');
-              await AsyncStorage.removeItem(purchaseKey);
-              continue;
-            }
-            console.log(`Found recent purchase for ${productId} from ${new Date(timestamp).toISOString()}`);
-            
-            // Format subscription details
-            const subscriptionDetails = formatSubscriptionDetails(purchase);
-            
-            // Update subscription details and premium status
-            if (updateSubscription) {
-              await updateSubscription(subscriptionDetails);
-            } else {
-              // Fallback to old method if context function not available
-              await storageService.saveSubscriptionDetails(subscriptionDetails);
-              await storageService.saveIsPremium(true);
-            }
-            
-            // Clean up the stored purchase
-            await AsyncStorage.removeItem(purchaseKey);
-            
-            return { success: true, hasPurchases: true, subscriptionDetails, fromRecent: true };
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Error checking for recent purchases:', e);
+    updater = updateSubscription;
+    if (!await initializeIAP()) throw new Error('Store connection unavailable');
+    const purchases = await Store.getAvailablePurchases();
+    let verificationError: unknown;
+    for (const purchase of purchases.filter(item => knownProduct(item.productId) && item.purchaseState === 'purchased')
+      .sort((a, b) => b.transactionDate - a.transactionDate)) {
+      const result = await deliverPurchase(purchase, updateSubscription);
+      if (result.success) return { ...result, hasPurchases: true };
+      if (result.error !== 'No active store subscription') verificationError = result.error;
     }
-    
-    // Fetch purchase history
-    let historyResponse;
-    try {
-      historyResponse = await InAppPurchases.getPurchaseHistoryAsync();
-    } catch (e) {
-      console.error('Restore error:', e);
-      return { success: false, error: e };
-    }
-    
-    // Handle case where response might be null
-    if (!historyResponse) {
-      return { success: false, error: 'No result from restore purchases' };
-    }
-    
-    const { responseCode, results } = historyResponse;
-    
-    if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-      console.log('Restored purchases:', results);
-      
-      // Ensure results exists and has items
-      if (!results || results.length === 0) {
-        return { success: true, hasPurchases: false };
-      }
-      
-      // Check if any valid subscription exists
-      const validSubscriptions = results.filter(purchase => 
-        Object.values(PRODUCTS).includes(purchase.productId) && isCompletedPurchase(purchase)
-      );
-      
-      if (validSubscriptions.length > 0) {
-        // Get the most recent subscription
-        const latestPurchase = validSubscriptions.reduce((latest, current) => {
-          // Safe check for purchaseTime or purchaseDate or transactionDate
-          const getTimestamp = (purchase: any) => {
-            return purchase.purchaseTime || 
-                   (purchase.purchaseDate ? new Date(purchase.purchaseDate).getTime() : 0) ||
-                   (purchase.transactionDate ? new Date(purchase.transactionDate).getTime() : 0) ||
-                   0;
-          };
-          
-          const latestTime = getTimestamp(latest);
-          const currentTime = getTimestamp(current);
-          
-          return currentTime > latestTime ? current : latest;
-        }, validSubscriptions[0]);
-        
-        // Format subscription details
-        const subscriptionDetails = formatSubscriptionDetails(latestPurchase);
-        
-        // Update subscription details and premium status
-        if (updateSubscription) {
-          await updateSubscription(subscriptionDetails);
-        } else {
-          // Fallback to old method if context function not available
-          await storageService.saveSubscriptionDetails(subscriptionDetails);
-          await storageService.saveIsPremium(true);
-        }
-        
-        return { success: true, hasPurchases: true, subscriptionDetails };
-      }
-      
-      return { success: true, hasPurchases: false };
-    }
-    
-    return { success: false, responseCode };
+    if (verificationError) return { success: false, hasPurchases: false, error: verificationError };
+    return { success: true, hasPurchases: false };
   } catch (error) {
-    console.error('Error restoring purchases:', error);
-    return { success: false, error };
+    return { success: false, hasPurchases: false, error };
   }
-};
-
-// Check if a subscription is still valid
-export const isSubscriptionActive = (subscriptionDetails: SubscriptionDetails | null): boolean => {
-  if (!subscriptionDetails) return false;
-  
-  const now = new Date();
-  const expiryDate = new Date(subscriptionDetails.expiryDate);
-  
-  return expiryDate > now && subscriptionDetails.isActive;
-};
+}

@@ -13,10 +13,12 @@
 export * from './types';
 // Re-export selectively to avoid duplications
 import { 
+  recoverPendingCompletions,
   processCompletedRoutine,
   initializeUserProgress
 } from './gameEngine';
 export {
+  recoverPendingCompletions,
   processCompletedRoutine,
   initializeUserProgress
 };
@@ -25,6 +27,7 @@ export * from './modules/challengeManager';
 
 // Import and re-export from storageService for accessing user data
 import * as storageService from '../../services/storageService';
+import { LEVELS } from './constants';
 
 // Create stub implementations for backward compatibility
 // These are temporary and will be removed after all components are migrated
@@ -34,7 +37,6 @@ export const xp = {
   getLevelData: (level: number) => {
     console.warn('Deprecated: Use useGamification().gamificationSummary instead');
     // Import LEVELS from constants
-    const { LEVELS } = require('./constants');
     // Find the appropriate level data or use a default
     if (level <= LEVELS.length) {
       return { 

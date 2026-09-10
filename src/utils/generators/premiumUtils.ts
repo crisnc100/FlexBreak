@@ -142,7 +142,7 @@ export const enhanceRoutineWithPremiumInfo = async (
       // For premium stretches, add VIP badge
       if (copy.premium) {
         // Create a default badge color
-        let vipBadgeColor = '#FFD700'; // Default gold
+        const vipBadgeColor = '#FFD700'; // Default gold
         
         return {
           ...copy,
@@ -183,7 +183,7 @@ export const getPremiumStretchesPreview = async (count: number = 15): Promise<(S
     }
     
     // Ensure we have a reasonable number of stretches - make duplicates if needed
-    let enhancedStretches = premiumStretches.map((stretch, index) => {
+    const enhancedStretches = premiumStretches.map((stretch, index) => {
       // Log what we're working with
       console.log(`Processing stretch ${index}: ID=${stretch.id}, Name=${stretch.name}`);
       console.log(`Image type: ${typeof stretch.image}`);

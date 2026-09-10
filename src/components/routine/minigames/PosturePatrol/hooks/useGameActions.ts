@@ -111,7 +111,7 @@ export const useGameActions = (
 
     setGameState(prev => {
       // Batch all game state updates for performance
-      let batchedUpdates: Partial<GameState> = {};
+      const batchedUpdates: Partial<GameState> = {};
       
       // Update all monster positions for smooth movement
       const updatedMonsters = prev.monsters.map(monster => {
@@ -123,7 +123,7 @@ export const useGameActions = (
       });
       
       // Skip boss minion spawning for performance
-      let newMonsters = updatedMonsters;
+      const newMonsters = updatedMonsters;
 
       // Check for monsters reaching defender
       const monstersReachingDefender = newMonsters.filter(hasMonsterReachedDefender);
@@ -163,41 +163,6 @@ export const useGameActions = (
       };
     });
   }, [addDamageNumber, gameAreaCacheRef]);
-
-  // Handle pad firing logic (back to checking all pads)
-  const handlePadFiring = useCallback((gameState: GameState, monsters: Monster[], now: number) => {
-    const { offsetX, offsetY } = gameAreaCacheRef.current;
-    
-    gameState.placedPads.forEach(pad => {
-      if (canPadFire(pad, now)) {
-        const targets = findMonstersInRange(pad, monsters);
-        if (targets.length > 0) {
-          const target = targets[0];
-          pad.lastFired = now;
-
-          const slot = BUILD_SLOTS.find(s => s.id === pad.slotId);
-          if (slot) {
-            const fromPos = gridToPixel(slot.gridX, slot.gridY);
-            const toPos = gridToPixel(target.position.x, target.position.y);
-            
-            // Create stretch effect animation
-            const effectId = `effect_${Date.now()}_${Math.random()}`;
-            const newEffect = {
-              id: effectId,
-              type: pad.padType,
-              fromX: offsetX + fromPos.x,
-              fromY: offsetY + fromPos.y,
-              toX: offsetX + toPos.x,
-              toY: offsetY + toPos.y,
-              onComplete: () => handlePadHit(effectId, pad, target, offsetX + toPos.x, offsetY + toPos.y),
-            };
-            
-            setStretchEffects((prev: any) => [...prev, newEffect]);
-          }
-        }
-      }
-    });
-  }, [gameAreaCacheRef, handlePadHit]);
 
   // Handle pad hit logic (with stretch effects)
   const handlePadHit = useCallback((effectId: string, pad: PlacedPad, target: Monster, x: number, y: number) => {
@@ -280,6 +245,41 @@ export const useGameActions = (
       }));
     }
   }, [setStretchEffects, setDamageNumbers, setGameState, setGameStats]);
+
+  // Handle pad firing logic (back to checking all pads)
+  const handlePadFiring = useCallback((gameState: GameState, monsters: Monster[], now: number) => {
+    const { offsetX, offsetY } = gameAreaCacheRef.current;
+    
+    gameState.placedPads.forEach(pad => {
+      if (canPadFire(pad, now)) {
+        const targets = findMonstersInRange(pad, monsters);
+        if (targets.length > 0) {
+          const target = targets[0];
+          pad.lastFired = now;
+
+          const slot = BUILD_SLOTS.find(s => s.id === pad.slotId);
+          if (slot) {
+            const fromPos = gridToPixel(slot.gridX, slot.gridY);
+            const toPos = gridToPixel(target.position.x, target.position.y);
+            
+            // Create stretch effect animation
+            const effectId = `effect_${Date.now()}_${Math.random()}`;
+            const newEffect = {
+              id: effectId,
+              type: pad.padType,
+              fromX: offsetX + fromPos.x,
+              fromY: offsetY + fromPos.y,
+              toX: offsetX + toPos.x,
+              toY: offsetY + toPos.y,
+              onComplete: () => handlePadHit(effectId, pad, target, offsetX + toPos.x, offsetY + toPos.y),
+            };
+            
+            setStretchEffects((prev: any) => [...prev, newEffect]);
+          }
+        }
+      }
+    });
+  }, [gameAreaCacheRef, handlePadHit]);
 
   // End the game with enhanced results
   const endGame = useCallback(() => {

@@ -1,3 +1,4 @@
+import { trackAIWork } from '../aiDataLifecycle';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserContext, buildUserContext, categorizeInput, detectLanguage } from '../contextBuilder';
 
@@ -79,6 +80,7 @@ export class ConversationManager {
   private sessions: Map<string, ConversationSession> = new Map();
   
   async getOrCreateSession(userId: string): Promise<ConversationSession> {
+    return trackAIWork(async () => {
     const existingSession = this.sessions.get(userId);
     const now = Date.now();
     
@@ -105,6 +107,8 @@ export class ConversationManager {
     await this.loadSessionFromStorage(userId, session);
     
     return session;
+
+    });
   }
   
   async addMessage(
@@ -113,6 +117,7 @@ export class ConversationManager {
     content: string,
     suggestionGiven?: string
   ): Promise<ConversationMessage> {
+    return trackAIWork(async () => {
     const session = await this.getOrCreateSession(userId);
     
     const message: ConversationMessage = {
@@ -158,6 +163,8 @@ export class ConversationManager {
     await this.saveSessionToStorage(session);
     
     return message;
+
+    });
   }
   
   private analyzeSentiment(content: string, language: 'en' | 'es' | 'zh'): 'positive' | 'negative' | 'neutral' {
@@ -276,6 +283,10 @@ export class ConversationManager {
     }
   }
   
+  clearAllSessions(): void {
+    this.sessions.clear();
+  }
+
   async clearSession(userId: string): Promise<void> {
     this.sessions.delete(userId);
     const key = `@ai_conversation_session_${userId}`;

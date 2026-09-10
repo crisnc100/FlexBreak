@@ -38,7 +38,7 @@ export const initializeAchievements = (userProgress: UserProgress): void => {
  * @param userProgress The user progress object containing achievements and statistics
  * @returns The number of achievements that were updated
  */
-export const updateAchievements = async (userProgress: UserProgress): Promise<number> => {
+export const updateAchievements = async (userProgress: UserProgress, notify = true): Promise<number> => {
   let updatedCount = 0;
   const newlyCompletedAchievements: Achievement[] = [];
   
@@ -63,7 +63,7 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
       case 'routine_count': 
         achievement.progress = stats.totalRoutines || 0; 
         break;
-      case 'streak': 
+      case 'streak': { 
         // Get streak from streak manager for consistency
         const streakStatus = await streakManager.getStreakStatus();
         achievement.progress = streakStatus.currentStreak;
@@ -88,6 +88,7 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
           await streakManager.updateStoredStreak(calculatedStreak);
         }
         break;
+    }
       case 'area_variety': 
         achievement.progress = stats.uniqueAreas?.length || 0; 
         break;
@@ -141,7 +142,16 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
     }
   }
   
-  // Emit events for newly completed achievements
+  if (notify) emitAchievementCompletions(newlyCompletedAchievements);
+
+  if (updatedCount > 0) {
+    console.log(`Updated ${updatedCount} achievements`);
+  }
+  
+  return updatedCount;
+};
+
+export const emitAchievementCompletions = (newlyCompletedAchievements: Achievement[]): void => {
   if (newlyCompletedAchievements.length > 0) {
     // Send them one at a time to avoid overwhelming the UI
     setTimeout(() => {
@@ -155,11 +165,6 @@ export const updateAchievements = async (userProgress: UserProgress): Promise<nu
     }, 1000); // Wait 1 second after routine completion
   }
   
-  if (updatedCount > 0) {
-    console.log(`Updated ${updatedCount} achievements`);
-  }
-  
-  return updatedCount;
 };
 
 /**
@@ -340,7 +345,7 @@ export const updateMiniGameAchievements = async (
       case 'balance_drop':
         achievementId = 'perfect_balance';
         break;
-      case 'trivia':
+      case 'trivia': {
         // Handle trivia streak
         const triviaAchievement = userProgress.achievements['trivia_expert'];
         if (triviaAchievement && !triviaAchievement.completed) {
@@ -361,6 +366,7 @@ export const updateMiniGameAchievements = async (
           }
         }
         break;
+    }
     }
     
     // Handle single perfect game achievements

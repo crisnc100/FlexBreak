@@ -13,6 +13,7 @@ import { usePremium } from '../../context/PremiumContext';
 import { playCompletionSound, playLevelUpSound } from '../../utils/soundEffects';
 import { getData, setData, KEYS } from '../../services/storageService';
 import ActionButtons from './tabs/ActionButtons';
+import { BodyArea, Duration } from '../../types';
 
 // Import new micro-interaction components
 import { CompletionCelebration } from './flow/CompletionCelebration';
@@ -23,8 +24,8 @@ import { MiniGamePopup } from './MiniGamePopup';
 
 interface RoutineCompletionFlowProps {
   // Existing props from CompletedRoutine
-  area: string;
-  duration: string;
+  area: BodyArea;
+  duration: Duration;
   isPremium: boolean;
   xpEarned?: number;
   xpBreakdown?: any[];

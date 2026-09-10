@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as storageService from '../services/storageService';
 import { configureAINotifications, setupAINotificationHandlers } from '../services/notifications/aiNotificationHandler';
@@ -60,14 +60,16 @@ export async function configureNotifications(): Promise<void> {
       // 4. Weather-based motivational messages (NEW)
       if (isWeather) {
         return {
-          shouldShowAlert: true,   // Show weather messages even if app is open
+          shouldShowBanner: true,
+          shouldShowList: true,   // Show weather messages even if app is open
           shouldPlaySound: false,  // Keep gentle in-app
           shouldSetBadge: false,
         };
       }
       if (isWelcome || isGoodbye || isAIResponse || isAICheckIn) {
         return {
-          shouldShowAlert: true,   // Show these immediately
+          shouldShowBanner: true,
+          shouldShowList: true,   // Show these immediately
           shouldPlaySound: true,   // Play sound for these
           shouldSetBadge: false,
         };
@@ -76,7 +78,8 @@ export async function configureNotifications(): Promise<void> {
       // SUPPRESS ALL OTHER NOTIFICATIONS WHILE APP IS IN FOREGROUND
       // This prevents spam from scheduled check-ins and upgrade prompts
       return {
-        shouldShowAlert: false,  // Don't show scheduled notifications while app is active
+        shouldShowBanner: false,
+          shouldShowList: false,  // Don't show scheduled notifications while app is active
         shouldPlaySound: false,  // No sounds while in app
         shouldSetBadge: false,
       };
@@ -135,7 +138,7 @@ export const requestNotificationsPermissions = async (): Promise<boolean> => {
  * Shows a smart prompt to users when they first enable notifications
  */
 export const requestWeatherNotificationsPermission = async (): Promise<void> => {
-  const { Alert } = require('react-native');
+
   const { checkLocationPermission, requestLocationPermission, setWeatherNotificationsEnabled } = await import('../services/locationService');
   
   try {

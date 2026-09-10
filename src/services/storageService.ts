@@ -152,75 +152,98 @@ export const getAllKeys = async (): Promise<readonly string[]> => {
  * @param isPremium Whether user has premium access
  * @returns Success boolean
  */
-export const saveIsPremium = async (isPremium: boolean): Promise<boolean> => {
-  return setData(KEYS.USER.PREMIUM, isPremium);
+export type StoredSubscriptionDetails = {
+  productId: string;
+  purchaseDate: string;
+  expiryDate?: string;
+  isActive: boolean;
+  autoRenewing?: boolean;
+  platform: 'ios' | 'android';
+  purchaseToken?: string;
+  verificationSource?: 'server';
 };
-
-/**
- * Get premium status, including testing premium if available
- * @returns Premium status boolean
- */
-export const getIsPremium = async (): Promise<boolean> => {
-  try {
-    // FORCE CHECK ALL POSSIBLE PREMIUM KEYS DIRECTLY
-    const directKeys = [
-      KEYS.USER.PREMIUM,
-      KEYS.USER.TESTING_PREMIUM,
-      '@flexbreak:testing_premium_access',
-      '@user_premium',
-      '@premium',
-      '@isPremium',
-      '@premium_access',
-      'premium_status',
-      'isPremium',
-      'premium_access',
-      'premiumAccess',
-      'premium_unlocked',
-      'premium_user'
-    ];
-    
-    // First check normal premium status
-    const isPremium = await getData<boolean>(KEYS.USER.PREMIUM, false);
-    
-    // Then check testing premium status (direct access, not through getData)
-    const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
-    const testingPremiumAccess = await AsyncStorage.getItem('@flexbreak:testing_premium_access');
-    
-    // Check for free premium code status
-    const freePremiumStatus = await AsyncStorage.getItem('@flexbreak:premium_status');
-    const premiumExpiryDate = await AsyncStorage.getItem('@flexbreak:premium_expiry_date');
-    
-    // Check if free premium is still valid
-    let hasValidFreePremium = false;
-    if (freePremiumStatus === 'true' && premiumExpiryDate) {
-      const expiryDate = new Date(premiumExpiryDate);
-      const now = new Date();
-      hasValidFreePremium = now < expiryDate;
-      
-      if (!hasValidFreePremium) {
-        // Free premium expired, clean up
-        await AsyncStorage.multiRemove([
-          '@flexbreak:premium_status',
-          '@flexbreak:premium_type',
-          '@flexbreak:premium_email',
-          '@flexbreak:premium_start_date',
-          '@flexbreak:premium_expiry_date'
-        ]);
-      }
-    }
-    
-    // User has premium if ANY premium flag is true
-    const hasPremium = 
-      isPremium || 
-      testingPremium === 'true' || 
-      testingPremiumAccess === 'true' ||
-      hasValidFreePremium;
-    
-    return hasPremium;
-  } catch (error) {
-    return false;
+export type EntitlementRecord = {
+  version: 1;
+  paid?: { source: 'paid' | 'legacy-paid'; active: boolean; details?: StoredSubscriptionDetails };
+  promo?: { source: 'promo'; expiryDate: string };
+  dev?: boolean;
+};
+const ENTITLEMENT_KEY = '@flexbreak:entitlements:v1';
+const isFuture = (date?: string) => !!date && Number.isFinite(Date.parse(date)) && Date.parse(date) > Date.now();
+const developmentBuild = () => typeof __DEV__ !== 'undefined' && __DEV__;
+let entitlementQueue: Promise<unknown> = Promise.resolve();
+const serializeEntitlement = <T>(operation: () => Promise<T>): Promise<T> => {
+  const next = entitlementQueue.then(operation);
+  entitlementQueue = next.catch(() => undefined);
+  return next;
+};
+const readEntitlement = async (): Promise<EntitlementRecord> => {
+  const stored = await AsyncStorage.getItem(ENTITLEMENT_KEY);
+  if (stored !== null) {
+    const record = JSON.parse(stored) as EntitlementRecord;
+    if (!record || record.version !== 1) throw new Error('Invalid entitlement record');
+    return record;
   }
+  const [paidFlag, promoFlag, promoType, promoExpiry, subscription, devFlag] = await Promise.all([
+    AsyncStorage.getItem(KEYS.USER.PREMIUM),
+    AsyncStorage.getItem('@flexbreak:premium_status'),
+    AsyncStorage.getItem('@flexbreak:premium_type'),
+    AsyncStorage.getItem('@flexbreak:premium_expiry_date'),
+    AsyncStorage.getItem(KEYS.USER.SUBSCRIPTION_DETAILS),
+    AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM),
+  ]);
+  const oldSubscription: StoredSubscriptionDetails | undefined = subscription ? JSON.parse(subscription) : undefined;
+  const promoEvidence = promoFlag !== null || promoType !== null || promoExpiry !== null;
+  const record: EntitlementRecord = { version: 1 };
+  // Old release synthesized subscription expiry from "now". It is not a verified
+  // expiry; preserve real legacy-paid access until a definitive store answer.
+  if (paidFlag === 'true' && (!promoEvidence || !!oldSubscription?.productId)) {
+    record.paid = { source: oldSubscription?.verificationSource === 'server' ? 'paid' : 'legacy-paid', active: true, details: oldSubscription };
+  }
+  // Keep expired promo provenance, too: its old paid boolean must never migrate
+  // into a perpetual legacy subscription on a later launch.
+  if (promoFlag === 'true' && promoExpiry) record.promo = { source: 'promo', expiryDate: promoExpiry };
+  if (developmentBuild() && devFlag === 'true') record.dev = true;
+  await AsyncStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(record));
+  return record;
 };
+export const getEntitlementSnapshot = () => serializeEntitlement(async () => {
+  const record = await readEntitlement();
+  const details = record.paid?.details;
+  const paid = record.paid?.active === true && (record.paid.source === 'legacy-paid' ||
+    (record.paid.source === 'paid' && details?.verificationSource === 'server' && details.isActive === true && isFuture(details.expiryDate)));
+  const promo = record.promo?.source === 'promo' && isFuture(record.promo.expiryDate);
+  const expiries = [paid && record.paid?.source === 'paid' ? details?.expiryDate : undefined, promo ? record.promo?.expiryDate : undefined]
+    .filter((date): date is string => !!date).sort((a, b) => Date.parse(a) - Date.parse(b));
+  return {
+    isPremium: !!(paid || promo || (developmentBuild() && record.dev)),
+    source: paid ? record.paid?.source : promo ? 'promo' as const : developmentBuild() && record.dev ? 'dev' as const : null,
+    nextExpiry: expiries[0] || null,
+    subscriptionDetails: details || null,
+  };
+});
+export const getIsPremium = async (): Promise<boolean> => (await getEntitlementSnapshot()).isPremium;
+
+// Compatibility entry point: production access is derived, never granted by a boolean.
+export const saveIsPremium = (isPremium: boolean): Promise<boolean> => serializeEntitlement(async () => {
+  if (!developmentBuild()) return false;
+  const record = await readEntitlement();
+  record.dev = isPremium;
+  await AsyncStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(record));
+  return true;
+});
+export const savePromoEntitlement = (expiryDate: string): Promise<void> => serializeEntitlement(async () => {
+  if (!isFuture(expiryDate)) throw new Error('Invalid or expired promo entitlement');
+  const record = await readEntitlement();
+  record.promo = { source: 'promo', expiryDate };
+  await AsyncStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(record));
+});
+// Only a successful store reconciliation may call this; network failures never do.
+export const clearVerifiedPaidEntitlement = (): Promise<void> => serializeEntitlement(async () => {
+  const record = await readEntitlement();
+  record.paid = { source: 'paid', active: false, details: record.paid?.details };
+  await AsyncStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(record));
+});
 
 // ========== PROGRESS METHODS ==========
 
@@ -228,23 +251,26 @@ export const getIsPremium = async (): Promise<boolean> => {
  * Get user progress data
  * @returns User progress object
  */
-export const getUserProgress = async (): Promise<UserProgress> => {
+export const getUserProgress = async (strict = false): Promise<UserProgress> => {
   try {
-    const progress = await getData<UserProgress>(
-      KEYS.PROGRESS.USER_PROGRESS, 
-      { ...INITIAL_USER_PROGRESS }
-    );
+    const progress = strict
+      ? JSON.parse(await AsyncStorage.getItem(KEYS.PROGRESS.USER_PROGRESS) || JSON.stringify(INITIAL_USER_PROGRESS))
+      : await getData<UserProgress>(KEYS.PROGRESS.USER_PROGRESS, { ...INITIAL_USER_PROGRESS });
     
+    if (strict && (!progress || Array.isArray(progress) || !Number.isFinite(progress.totalXP))) {
+      throw new Error('Invalid saved user progress');
+    }
     // Migrate progress if needed
     const migratedProgress = migrateUserProgress(progress);
     
     // If migration was performed, save the updated progress
-    if (migratedProgress !== progress) {
+    if (!strict && migratedProgress !== progress) {
       await saveUserProgress(migratedProgress);
     }
     
     return migratedProgress;
   } catch (error) {
+    if (strict) throw error;
     return { ...INITIAL_USER_PROGRESS };
   }
 };
@@ -371,11 +397,14 @@ export const getRecentRoutines = async (): Promise<ProgressEntry[]> => {
  * Get all routines (including hidden)
  * @returns Array of all routines
  */
-export const getAllRoutines = async (): Promise<ProgressEntry[]> => {
+export const getAllRoutines = async (strict = false): Promise<ProgressEntry[]> => {
   try {
     logTimezone('getAllRoutines', `Current date/time: ${new Date().toISOString()}`);
     
-    const allRoutines = await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
+    const allRoutines: ProgressEntry[] = strict
+      ? JSON.parse(await AsyncStorage.getItem(KEYS.PROGRESS.PROGRESS_ENTRIES) || '[]')
+      : await getData<ProgressEntry[]>(KEYS.PROGRESS.PROGRESS_ENTRIES, []);
+    if (!Array.isArray(allRoutines)) throw new Error('Invalid routine history');
     logTimezone('getAllRoutines', `Found ${allRoutines.length} total routines`);
     
     if (allRoutines.length > 0) {
@@ -396,6 +425,7 @@ export const getAllRoutines = async (): Promise<ProgressEntry[]> => {
     
     return allRoutines;
   } catch (error) {
+    if (strict) throw error;
     logTimezone('getAllRoutines', `Error: ${error}`);
     return [];
   }
@@ -406,39 +436,32 @@ export const getAllRoutines = async (): Promise<ProgressEntry[]> => {
  * @param entry Progress entry to save
  * @returns Success boolean
  */
-export const saveRoutineProgress = async (entry: ProgressEntry): Promise<boolean> => {
-  try {
-    logTimezone('saveRoutineProgress', `Current date/time: ${new Date().toISOString()}`);
-    logTimezone('saveRoutineProgress', `Entry date: ${entry.date}`);
-    
-    // Parse and log entry date for debugging
-    const entryDate = new Date(entry.date);
-    logTimezone('saveRoutineProgress', `Entry date parsed: ${entryDate.toISOString()}`);
-    logTimezone('saveRoutineProgress', `Entry local components: Y=${entryDate.getFullYear()} M=${entryDate.getMonth()+1} D=${entryDate.getDate()}`);
-    
-    // Get existing routines
-    const existingRoutines = await getRecentRoutines();
-    
-    // Add to beginning of array
-    const updatedRoutines = [entry, ...existingRoutines];
-    
-    // Limit to 20 most recent routines to prevent excessive growth
-    const limitedRoutines = updatedRoutines.slice(0, 20);
-    
-    // Save to storage for recent routines
-    const saveRecentResult = await setData(KEYS.PROGRESS.PROGRESS_HISTORY, limitedRoutines);
-    
-    // Also save to progress key for statistics
-    const allRoutines = await getAllRoutines();
-    allRoutines.push(entry);
-    const saveAllResult = await setData(KEYS.PROGRESS.PROGRESS_ENTRIES, allRoutines);
-    
-    streakEvents.emit(STREAK_UPDATED_EVENT);    
-    return saveRecentResult && saveAllResult;
-  } catch (error) {
-    logTimezone('saveRoutineProgress', `Error: ${error}`);
-    return false;
-  }
+// Same queue also protects direct callers from read/modify/write races.
+let routineWriteQueue: Promise<unknown> = Promise.resolve();
+export const saveRoutineProgress = (entry: ProgressEntry): Promise<boolean> => {
+  const operation = routineWriteQueue.then(async () => {
+    try {
+      const recent: ProgressEntry[] = JSON.parse(await AsyncStorage.getItem(KEYS.PROGRESS.PROGRESS_HISTORY) || '[]');
+      const all = await getAllRoutines(true);
+      if (!Array.isArray(recent)) throw new Error('Invalid recent routine history');
+      const identity = (routine: ProgressEntry) => routine.id || routine.date;
+      const contains = (items: ProgressEntry[]) => items.some(item => identity(item) === identity(entry));
+      // Each key is independently idempotent: retry repairs a partially written pair.
+      if (!contains(recent)) {
+        await AsyncStorage.setItem(KEYS.PROGRESS.PROGRESS_HISTORY, JSON.stringify([entry, ...recent].slice(0, 20)));
+      }
+      if (!contains(all)) {
+        await AsyncStorage.setItem(KEYS.PROGRESS.PROGRESS_ENTRIES, JSON.stringify([...all, entry]));
+      }
+      streakEvents.emit(STREAK_UPDATED_EVENT);
+      return true;
+    } catch (error) {
+      logTimezone('saveRoutineProgress', `Error: ${error}`);
+      return false;
+    }
+  });
+  routineWriteQueue = operation.catch(() => undefined);
+  return operation;
 };
 
 /**
@@ -850,8 +873,10 @@ export const exportUserProgress = (progress: UserProgress): void => {
       doc.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
+      console.error('Could not export progress data:', error);
     }
   } else {
+    // File export is only implemented on web.
   }
 };
 
@@ -1035,11 +1060,13 @@ export const clearAllData = async (resetTestingData: boolean = false): Promise<b
  * This ensures the user can still access testing features
  */
 export const restoreTestingAccess = async (): Promise<void> => {
+  if (!developmentBuild()) return;
   try {
     // Set minimum testing keys to ensure access
     await AsyncStorage.setItem('@flexbreak:testing_access', 'true');
     await AsyncStorage.setItem('@flexbreak:testing_phase', '1');
   } catch (error) {
+    console.warn('Could not restore testing access:', error);
   }
 };
 
@@ -1152,6 +1179,7 @@ export const clearRoutines = async (): Promise<boolean> => {
  * @returns Success boolean
  */
 export const resetSimulationData = async (): Promise<boolean> => {
+  if (!developmentBuild()) return false;
   try {
     // First, backup premium and testing status
     const testingPremium = await AsyncStorage.getItem(KEYS.USER.TESTING_PREMIUM);
@@ -1314,7 +1342,7 @@ export const resetSimulationData = async (): Promise<boolean> => {
       const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
       const aiNotificationIds = scheduledNotifications
         .filter(notif => 
-          notif.content.data?.type?.includes('ai_wellness') ||
+          (typeof notif.content.data?.type === 'string' && notif.content.data.type.includes('ai_wellness')) ||
           notif.identifier.includes('ai_wellness')
         )
         .map(notif => notif.identifier);
@@ -1341,6 +1369,8 @@ export const resetSimulationData = async (): Promise<boolean> => {
  * @returns Whether the premium status was successfully cleared
  */
 export const clearAllPremiumStatus = async (): Promise<boolean> => {
+  if (!developmentBuild()) return false;
+  await AsyncStorage.removeItem(ENTITLEMENT_KEY);
   // Define all possible premium-related keys that might exist
   const premiumKeys = [
     KEYS.USER.PREMIUM,
@@ -1406,47 +1436,30 @@ export const clearAllPremiumStatus = async (): Promise<boolean> => {
  * @param details Subscription details object
  * @returns Success boolean
  */
-export const saveSubscriptionDetails = async (details: {
-  productId: string;
-  purchaseDate: string;
-  expiryDate?: string;
-  isActive: boolean;
-  autoRenewing?: boolean;
-  platform: 'ios' | 'android';
-  purchaseToken?: string;
-}): Promise<boolean> => {
-  try {
-    return await setData(KEYS.USER.SUBSCRIPTION_DETAILS, details);
-  } catch (error) {
-    return false;
+export const saveSubscriptionDetails = (details: StoredSubscriptionDetails): Promise<boolean> => serializeEntitlement(async () => {
+  if (details.verificationSource !== 'server' || !details.productId || !details.purchaseToken ||
+      !['ios', 'android'].includes(details.platform) || typeof details.isActive !== 'boolean' ||
+      !Number.isFinite(Date.parse(details.purchaseDate)) || !details.expiryDate ||
+      !Number.isFinite(Date.parse(details.expiryDate)) || (details.isActive && !isFuture(details.expiryDate))) {
+    throw new Error('Subscription must have a verified store status and expiry');
   }
-};
-
-/**
- * Get current subscription details
- * @returns Subscription details or null if not found
- */
-export const getSubscriptionDetails = async (): Promise<any | null> => {
-  try {
-    return await getData(KEYS.USER.SUBSCRIPTION_DETAILS, null);
-  } catch (error) {
-    return null;
+  const record = await readEntitlement();
+  if (!details.isActive && record.paid?.active && record.paid.details?.productId && record.paid.details.productId !== details.productId) {
+    throw new Error('Inactive subscription does not match the active subscription');
   }
-};
+  record.paid = { source: 'paid', active: details.isActive, details };
+  // This record is the authority. Do not acknowledge a purchase if it fails.
+  await AsyncStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(record));
+  await AsyncStorage.setItem(KEYS.USER.SUBSCRIPTION_DETAILS, JSON.stringify(details));
+  return true;
+});
+export const getSubscriptionDetails = async (): Promise<StoredSubscriptionDetails | null> =>
+  (await getEntitlementSnapshot()).subscriptionDetails;
 
-/**
- * Clear subscription details (used when subscription is canceled)
- * @returns Success boolean
- */
+// Local cancellation does not end paid-through access. Actual expiry/revocation
+// arrives via verified store reconciliation, not this legacy boolean API.
 export const clearSubscriptionDetails = async (): Promise<boolean> => {
-  try {
-    // Clear subscription details
-    await removeData(KEYS.USER.SUBSCRIPTION_DETAILS);
-    // Also update premium status
-    await saveIsPremium(false);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}; 
-
+  if (!developmentBuild()) return false;
+  await clearVerifiedPaidEntitlement();
+  return true;
+};

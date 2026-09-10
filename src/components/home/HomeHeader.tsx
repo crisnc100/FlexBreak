@@ -1,3 +1,4 @@
+import assetpotentialLogo2 from '../../../assets/images/potentialLogo2.png';
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Animated, TouchableWithoutFeedback, Platform, Easing } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
@@ -383,7 +384,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             ]}
           >
             <Image 
-              source={require('../../../assets/images/potentialLogo2.png')} 
+              source={assetpotentialLogo2} 
               style={styles.logoImage}
             />
             

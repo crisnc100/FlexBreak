@@ -1,0 +1,22 @@
+{
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "strict": true,
+    "lib": [
+      "deno.ns",
+      "dom",
+      "esnext"
+    ]
+  },
+  "imports": {
+    "jose": "npm:jose@6.2.12",
+    "firebase-admin/app": "npm:firebase-admin@14.3.0/app",
+    "firebase-admin/firestore": "npm:firebase-admin@14.3.0/firestore",
+    "apple-store": "npm:@apple/app-store-server-library@3.1.0",
+    "node-fetch": "npm:node-fetch@2.7.0"
+  },
+  "tasks": {
+    "check": "deno check functions/*/index.ts tests/*.test.ts",
+    "test": "deno test --allow-env --allow-read tests/"
+  }
+}

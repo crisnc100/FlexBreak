@@ -152,9 +152,9 @@ const TestingModal: React.FC<TestingModalProps> = ({ visible, onClose }) => {
       return false;
     };
 
-    BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
     return () => {
-      BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
+      backSubscription.remove();
     };
   }, [visible, phase]);
 

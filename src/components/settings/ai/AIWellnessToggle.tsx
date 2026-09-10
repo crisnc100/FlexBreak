@@ -1,3 +1,4 @@
+import { runAIUIWork, isAIDataCurrent, AIDataDeletionError } from '../../../services/ai/aiDataLifecycle';
 import React from 'react';
 import { View, Text, Switch, StyleSheet } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
@@ -60,6 +61,7 @@ const sendGoodbyeNotification = async () => {
         },
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: 1 // Send almost immediately
       }
     });
@@ -106,6 +108,8 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
   const handleToggle = async (value: boolean) => {
     if (isToggling) return; // Prevent rapid toggling
     
+    return runAIUIWork(async generation => {
+    if (!isAIDataCurrent(generation)) return;
     // Premium upgrade check removed for MVP simplification
     
     setIsToggling(true);
@@ -113,10 +117,12 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
     try {
       // Check for toggle spam (optional - only for fun notification)
       const isSpamming = await checkToggleSpam();
+      if (!isAIDataCurrent(generation)) return;
       
       // Update AsyncStorage first
       await AsyncStorage.setItem(KEYS.AI_WELLNESS.ENABLED, value.toString());
       
+      if (!isAIDataCurrent(generation)) return;
       // Then update parent state
       onToggle(value);
       
@@ -129,12 +135,14 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
               body: "I'm getting dizzy! Pick a side - I'm either here to help or taking a nap! 😵",
               data: { type: 'ai_wellness_spam' },
             },
-            trigger: { seconds: 1 }
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1 }
           });
         }
         
+        if (!isAIDataCurrent(generation)) return;
         // Use the new cleaner scheduler
         await scheduleAIWellnessV2('enable');
+        if (!isAIDataCurrent(generation)) return;
         Toast.show(
           `AI Wellness Coach enabled! ${isPremium ? 'Daily check-ins scheduled.' : 'Check-ins scheduled for Wednesday.'}`, 
           {
@@ -145,9 +153,11 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
       } else {
         // Use the new cleaner scheduler to disable
         await scheduleAIWellnessV2('disable');
+        if (!isAIDataCurrent(generation)) return;
         
         // Send a funny goodbye notification
         await sendGoodbyeNotification();
+        if (!isAIDataCurrent(generation)) return;
         
         Toast.show('AI Wellness Coach disabled', {
           duration: 2000,
@@ -155,12 +165,14 @@ export const AIWellnessToggle: React.FC<AIWellnessToggleProps> = ({ enabled, onT
         });
       }
     } catch (error) {
+      if (error instanceof AIDataDeletionError) throw error;
       console.error('Error toggling AI Wellness:', error);
       // Reset state on error
-      onToggle(enabled);
+      if (isAIDataCurrent(generation)) onToggle(enabled);
     } finally {
       setTimeout(() => setIsToggling(false), 1000); // Re-enable after 1 second
     }
+    });
   };
 
   return (

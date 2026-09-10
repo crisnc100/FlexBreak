@@ -1,3 +1,8 @@
+import assetdailyPlayerBadge from '../../../assets/images/achievements/dailyPlayerBadge.png';
+import assetlightningReflexes from '../../../assets/images/achievements/lightningReflexes.png';
+import assetgameMaster from '../../../assets/images/achievements/gameMaster.png';
+import assettriviaExpert from '../../../assets/images/achievements/triviaExpert.png';
+import assetperfectScoreBadge from '../../../assets/images/achievements/perfectScoreBadge.png';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, RefreshControl, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -271,7 +276,7 @@ const ACHIEVEMENTS = [
     category: 'intermediate',
     backendCategory: 'minigames',
     type: 'minigame_streak',
-    badgeImage: require('../../../assets/images/achievements/dailyPlayerBadge.png')
+    badgeImage: assetdailyPlayerBadge
   },
   {
     id: 'lightning_reflexes',
@@ -283,7 +288,7 @@ const ACHIEVEMENTS = [
     category: 'intermediate',
     backendCategory: 'minigames',
     type: 'stress_buster_perfect',
-    badgeImage: require('../../../assets/images/achievements/lightningReflexes.png')
+    badgeImage: assetlightningReflexes
   },
   {
     id: 'game_master',
@@ -295,7 +300,7 @@ const ACHIEVEMENTS = [
     category: 'advanced',
     backendCategory: 'minigames',
     type: 'posture_patrol_perfect',
-    badgeImage: require('../../../assets/images/achievements/gameMaster.png')
+    badgeImage: assetgameMaster
   },
   {
     id: 'trivia_expert',
@@ -307,7 +312,7 @@ const ACHIEVEMENTS = [
     category: 'advanced',
     backendCategory: 'minigames',
     type: 'trivia_streak',
-    badgeImage: require('../../../assets/images/achievements/triviaExpert.png')
+    badgeImage: assettriviaExpert
   },
   {
     id: 'perfect_balance',
@@ -319,7 +324,7 @@ const ACHIEVEMENTS = [
     category: 'elite',
     backendCategory: 'minigames',
     type: 'balance_drop_perfect',
-    badgeImage: require('../../../assets/images/achievements/perfectScoreBadge.png')
+    badgeImage: assetperfectScoreBadge
   }
 ];
 

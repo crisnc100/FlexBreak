@@ -26,7 +26,7 @@ export const UpdateNotificationModal: React.FC<UpdateNotificationModalProps> = (
   onClose,
   updateInfo,
 }) => {
-  const { colors } = useTheme();
+  const { theme: colors } = useTheme();
   const [isUpdating, setIsUpdating] = useState(false);
   const [canDismiss, setCanDismiss] = useState(true);
 
@@ -92,14 +92,14 @@ export const UpdateNotificationModal: React.FC<UpdateNotificationModalProps> = (
       onRequestClose={canDismiss ? handleDismiss : undefined}
     >
       <View style={styles.overlay}>
-        <View style={[styles.container, { backgroundColor: colors.card }]}>
+        <View style={[styles.container, { backgroundColor: colors.cardBackground }]}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.iconContainer}>
               <Ionicons 
                 name="cloud-download" 
                 size={48} 
-                color={colors.primary} 
+                color={colors.accent} 
               />
               {updateInfo.isMandatory && (
                 <View style={styles.mandatoryBadge}>
@@ -116,14 +116,14 @@ export const UpdateNotificationModal: React.FC<UpdateNotificationModalProps> = (
               Version {updateInfo.latestVersion} is now available
             </Text>
             <Text style={[styles.currentVersion, { color: colors.textSecondary }]}>
-              You're on version {updateInfo.currentVersion}
+              You&apos;re on version {updateInfo.currentVersion}
             </Text>
           </View>
 
           {/* Release Notes */}
           <ScrollView style={styles.releaseNotesContainer} showsVerticalScrollIndicator={false}>
             <Text style={[styles.releaseNotesTitle, { color: colors.text }]}>
-              What's New:
+              What&apos;s New:
             </Text>
             <Text style={[styles.releaseNotes, { color: colors.textSecondary }]}>
               {formatReleaseNotes(updateInfo.releaseNotes)}
@@ -133,7 +133,7 @@ export const UpdateNotificationModal: React.FC<UpdateNotificationModalProps> = (
           {/* Actions */}
           <View style={styles.actions}>
             <TouchableOpacity
-              style={[styles.updateButton, { backgroundColor: colors.primary }]}
+              style={[styles.updateButton, { backgroundColor: colors.accent }]}
               onPress={handleUpdate}
               disabled={isUpdating}
             >

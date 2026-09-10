@@ -238,7 +238,7 @@ const RoutineDashboard: React.FC<RoutineDashboardProps> = ({
             />
             <Text style={[styles.emptyTitle, { color: isDark || isSunset ? theme.text : '#333' }]}>No Recent Routines</Text>
             <Text style={[styles.emptySubtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
-              You've hidden all your recent routines. Start a new one or try a suggestion below.
+              You&apos;ve hidden all your recent routines. Start a new one or try a suggestion below.
             </Text>
           </View>
           

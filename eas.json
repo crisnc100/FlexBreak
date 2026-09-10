@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
+    "version": "24.0.0",
     "appVersionSource": "remote"
   },
   "build": {
@@ -11,16 +11,19 @@
         "simulator": false,
         "resourceClass": "m-medium",
         "buildConfiguration": "Debug"
-      }
+      },
+      "node": "22.23.2"
     },
     "preview": {
+      "extends": "production",
       "distribution": "internal",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
       },
       "ios": {
-        "simulator": true
+        "simulator": false,
+        "buildConfiguration": "Release"
       }
     },
     "internal": {
@@ -28,7 +31,8 @@
         "buildType": "apk",
         "resourceClass": "medium",
         "autoIncrement": true
-      }
+      },
+      "node": "22.23.2"
     },
     "production": {
       "autoIncrement": true,
@@ -43,7 +47,10 @@
       "env": {
         "EXPO_PUBLIC_ENABLE_PROGUARD": "true",
         "EXPO_PUBLIC_ENABLE_HERMES": "true"
-      }
+      },
+      "distribution": "store",
+      "environment": "production",
+      "node": "22.23.2"
     },
     "testflight": {
       "extends": "production",
@@ -56,26 +63,14 @@
       "ios": {
         "buildConfiguration": "Release",
         "resourceClass": "m-medium"
-      }
+      },
+      "node": "22.23.2"
     }
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "crisnc100@gmail.com",
-        "ascAppId": "6738905173",
-        "appleTeamId": "K9X8R2S6CD"
-      },
       "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
         "track": "internal"
-      }
-    },
-    "testflight": {
-      "ios": {
-        "appleId": "crisnc100@gmail.com",
-        "ascAppId": "6728844881",
-        "appleTeamId": "7LHNAAUJQ6"
       }
     }
   }

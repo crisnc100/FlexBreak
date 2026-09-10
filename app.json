@@ -13,21 +13,18 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.cristianortega.flexbreak",
       "buildNumber": "12",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "FlexBreak uses your location to verify office worker eligibility when requested.",
         "NSMicrophoneUsageDescription": "FlexBreak needs access to your microphone for voice responses to the AI Wellness Coach.",
-        "NSUserActivityTypes": ["OpenFlexCoachIntent"],
+        "NSUserActivityTypes": [
+          "OpenFlexCoachIntent"
+        ],
         "NSSiriUsageDescription": "Use Siri to quickly open your AI Flex Coach for wellness check-ins."
-      },
-      "splash": {
-        "xib": "./ios/FlexBreak/SplashScreen.storyboard"
       }
     },
     "android": {
       "package": "com.cristianortega.flexbreak",
-      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -38,9 +35,7 @@
         "ACCESS_COARSE_LOCATION",
         "RECORD_AUDIO"
       ],
-      "versionCode": 4,
-      "enableProguardInReleaseBuilds": true,
-      "enableShrinkResourcesInReleaseBuilds": true
+      "versionCode": 4
     },
     "web": {},
     "plugins": [
@@ -49,17 +44,47 @@
         {
           "icon": "./assets/images/potentialLogo2.png",
           "color": "#ffffff",
-          "sounds": ["./assets/sounds/AInotification1.mp3"]
+          "sounds": [
+            "./assets/sounds/ai_notification_1.mp3"
+          ]
         }
       ],
-      "./plugins/withSiriShortcuts",
+      "./plugins/withSiriShortcuts.mjs",
       [
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3940256099942544~3347511713",
           "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "FlexBreak needs access to your microphone for voice responses to the AI Wellness Coach.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      "expo-iap",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/potentialLogo2.png",
+          "imageWidth": 100,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "./plugins/withReleaseSigningGuard.mjs"
     ],
     "extra": {
       "eas": {
@@ -67,12 +92,6 @@
       }
     },
     "owner": "crisnc100",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/e2f2f0ca-229d-4469-9de8-9f69b7f7a724"
-    },
     "scheme": "flexbreak-app",
     "jsEngine": "hermes"
   }

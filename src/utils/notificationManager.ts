@@ -182,7 +182,7 @@ export async function scheduleTypedNotification(
   // Use custom sound for AI wellness notifications
   let sound = content.sound;
   if (type === NotificationType.AI_WELLNESS || type === NotificationType.UPGRADE_PROMPT) {
-    sound = 'AInotification1.mp3';
+    sound = 'ai_notification_1.mp3';
   }
   
   // Ensure the notification has the correct type in data

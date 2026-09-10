@@ -114,7 +114,7 @@ export const AIWellnessWidgetPreview: React.FC = () => {
           </View>
           <View style={styles.siriContent}>
             <Text style={[styles.siriCommand, { color: theme.text }]}>
-              "Hey Siri, start my FlexBreak wellness check"
+              &quot;Hey Siri, start my FlexBreak wellness check&quot;
             </Text>
             <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
               Opens FlexBreak AI Coach directly
@@ -123,10 +123,10 @@ export const AIWellnessWidgetPreview: React.FC = () => {
             <View style={styles.divider} />
             
             <Text style={[styles.siriCommand, { color: theme.text }]}>
-              "Hey Siri, my back hurts"
+              &quot;Hey Siri, my back hurts&quot;
             </Text>
             <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
-              FlexBreak: "I'll guide you through a 2-minute back relief routine"
+              FlexBreak: &quot;I&apos;ll guide you through a 2-minute back relief routine&quot;
             </Text>
           </View>
         </View>
@@ -146,7 +146,7 @@ export const AIWellnessWidgetPreview: React.FC = () => {
           </View>
           <View style={styles.siriContent}>
             <Text style={[styles.siriCommand, { color: theme.text }]}>
-              "OK Google, open FlexBreak wellness coach"
+              &quot;OK Google, open FlexBreak wellness coach&quot;
             </Text>
             <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
               Launches AI Coach with voice input ready
@@ -155,10 +155,10 @@ export const AIWellnessWidgetPreview: React.FC = () => {
             <View style={styles.divider} />
             
             <Text style={[styles.siriCommand, { color: theme.text }]}>
-              "OK Google, I need a stress relief exercise"
+              &quot;OK Google, I need a stress relief exercise&quot;
             </Text>
             <Text style={[styles.siriResponse, { color: theme.textSecondary }]}>
-              FlexBreak: "Starting 3-minute breathing exercise..."
+              FlexBreak: &quot;Starting 3-minute breathing exercise...&quot;
             </Text>
           </View>
         </View>

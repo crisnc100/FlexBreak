@@ -1,3 +1,5 @@
+import assettechNeck from '../../../../../assets/images/miniGames/techNeck.png';
+import assetheadspaceHalo1 from '../../../../../assets/images/miniGames/headspaceHalo1.png';
 import React from 'react';
 import {
   View,
@@ -61,7 +63,7 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({
       {/* Simple Monster Preview */}
       <View style={styles.monsterPreview}>
         <Image 
-          source={require('../../../../../assets/images/miniGames/techNeck.png')}
+          source={assettechNeck}
           style={styles.mainMonster}
           resizeMode="contain"
         />
@@ -70,7 +72,7 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({
         </View>
         <View style={styles.stretchPadPreview}>
           <Image 
-            source={require('../../../../../assets/images/miniGames/headspaceHalo1.png')}
+            source={assetheadspaceHalo1}
             style={styles.stretchPadImage}
             resizeMode="contain"
           />
@@ -94,7 +96,7 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({
         <View style={styles.instruction}>
           <Ionicons name="heart" size={30} color="#FF6B6B" />
           <Text style={[styles.instructionText, { color: theme.text }]}>
-            Don't lose all hearts!
+            Don&apos;t lose all hearts!
           </Text>
         </View>
       </View>

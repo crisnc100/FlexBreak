@@ -232,7 +232,7 @@ export default function FavoritesScreen() {
             styles.emptyText,
             { color: isDark || isSunset ? theme.textSecondary : '#666' }
           ]}>
-            No favorite routines yet. When you complete a routine, tap "Save to Favorites" to save it here!
+            No favorite routines yet. When you complete a routine, tap &quot;Save to Favorites&quot; to save it here!
           </Text>
         </View>
       ) : (

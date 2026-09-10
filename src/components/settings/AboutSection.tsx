@@ -206,14 +206,14 @@ const AboutSection: React.FC<AboutSectionProps> = ({
               How do I start a stretching routine?
             </ThemedText>
             <ThemedText style={styles.helpAnswer}>
-              From the home screen, tap on "Start Stretching" or select a specific routine from the routines tab. Follow the on-screen instructions for each stretch.
+              From the home screen, tap on &quot;Start Stretching&quot; or select a specific routine from the routines tab. Follow the on-screen instructions for each stretch.
             </ThemedText>
             
             <ThemedText style={styles.helpQuestion} bold>
               Can I create custom routines?
             </ThemedText>
             <ThemedText style={styles.helpAnswer}>
-              Yes! Go to the Routines tab and tap "Create New" to build your own custom routine with stretches of your choice.
+              Yes! Go to the Routines tab and tap &quot;Create New&quot; to build your own custom routine with stretches of your choice.
             </ThemedText>
             
             <ThemedText style={styles.helpQuestion} bold>
@@ -234,7 +234,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({
               How do I set up stretch reminders?
             </ThemedText>
             <ThemedText style={styles.helpAnswer}>
-              Go to the Reminders tab and tap "Add Reminder". Choose your preferred time and frequency, and ensure notifications are enabled for the app in your device settings.
+              Go to the Reminders tab and tap &quot;Add Reminder&quot;. Choose your preferred time and frequency, and ensure notifications are enabled for the app in your device settings.
             </ThemedText>
             
             <View style={styles.helpDivider} />

@@ -41,7 +41,7 @@ const tips: Tip[] = [
     id: 10,
     text: "Want a pro‑level tip? Use a lacrosse ball to roll out tight spots (like your glutes or upper back) against a wall. It’s self‑massage that digs deep into pain points."
   },
-  // ——— NEW TIPS ———
+  // ——— NEW TIPS ———
   {
     id: 11,
     text: "Hydration hack: Dehydrated muscles feel tighter. Sip water throughout the day and you’ll notice your stretches feel smoother and more ‘elastic.’"

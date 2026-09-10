@@ -30,12 +30,10 @@ config.watchFolders = [
   path.resolve(__dirname, 'assets'),
 ];
 
-config.resolver.blockList = [
-  /node_modules\/firebase-admin\/.*/,
-  /functions\/.*/,  // Exclude entire functions directory
-  /functions\/node_modules\/.*/,  // Explicitly exclude functions node_modules
-  /\.bin\/.*/,  // Exclude all .bin directories
-];
+// Anchor project-only backend exclusions; a generic /functions/ expression also
+// hides semver/functions, which Reanimated needs during bundling.
+const escapedRoot = __dirname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+config.resolver.blockList = [new RegExp(`${escapedRoot}/(?:functions|supabase)/`)];
 
 // Clear cache on each run in development
 if (process.env.NODE_ENV !== 'production') {

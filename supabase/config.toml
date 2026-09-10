@@ -1,0 +1,32 @@
+project_id = "tkudukjujfztyiqijvjn"
+
+[functions.ai-chat-v2]
+verify_jwt = false
+
+[functions.transcribe-audio-v2]
+verify_jwt = false
+
+[functions.verify-email-v2]
+verify_jwt = false
+
+[functions.redeem-code-v2]
+verify_jwt = false
+
+[functions.verify-purchase-v2]
+verify_jwt = false
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.ai-chat-firebase]
+verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false
+
+[functions.verify-email]
+verify_jwt = false
+
+[functions.weather-v2]
+verify_jwt = false
+
