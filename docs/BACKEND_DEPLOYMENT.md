@@ -1,6 +1,6 @@
 # Automatic backend deployment and legacy containment
 
-Function deployment remains pending. Credential setup and live probe results are tracked in [activation progress](../builds/audit-release/activation-progress.md). After one-time setup and readiness qualification, merging to main runs `auto-production.yml`, full CI, cumulative planning and required preflight. If backend paths were touched since the checkpoint, it redeploys all six named v2 functions to **tkudukjujfztyiqijvjn** before any iOS mobile operations. The first release is Apple-only; Android account setup and uploads are deferred. Backend-only changes do not build mobile. Runtime health is never inferred from a successful deployment command.
+The initial v2 bootstrap is deployed; runtime and release qualification remain separate. Credential setup and live probe results are tracked in [activation progress](../builds/audit-release/activation-progress.md). After one-time setup and readiness qualification, merging to main runs `auto-production.yml`, full CI, cumulative planning and required preflight. If backend paths were touched since the checkpoint, it redeploys all six named v2 functions to **tkudukjujfztyiqijvjn** before any iOS mobile operations. The first release is Apple-only; Android account setup and uploads are deferred. Backend-only changes do not build mobile. Runtime health is never inferred from a successful deployment command.
 
 ## One-time preparation and engineering bootstrap
 
@@ -9,7 +9,7 @@ Function deployment remains pending. Credential setup and live probe results are
 3. Follow [server configuration](../supabase/README.md#server-configuration-and-least-privilege): enable Firebase anonymous auth for `flexbreak-28ad0`, provision scoped Firebase service-account JSON/base64, OpenRouter/Groq, OpenWeather, Google Speech, ZeroBounce, Apple server API key/issuer/key ID/app ID. The Google Play verification service account and Play-specific setup are deferred until an Android release; Google Speech remains a shared voice-service dependency. Set provider billing caps. Configure sandbox flags only for approved testing. Use the owner's authenticated Supabase secret-management channel; never put values in source, app environment, inputs or logs. The workflow does not set/rotate secrets.
 4. Complete staging/physical-device and store verification before opening mobile readiness. Because these tests need v2 deployed, an owner-authorized **one-time engineering bootstrap** is available below, just as native qualification uses separately authorized builds. This is not a permanent alternate workflow or readiness override. Select a reviewed SHA, run the complete CI bar, verify the fixed project/secrets, and obtain authorization for these remote commands before running them.
 
-Prepared bootstrap commands using Supabase CLI **2.117.0** (not executed during this audit):
+Bootstrap commands using Supabase CLI **2.117.0** (executed once on September 10, 2026 from reviewed merged source; see activation progress):
 
 ```sh
 supabase --version

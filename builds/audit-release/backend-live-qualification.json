@@ -1,0 +1,317 @@
+{
+  "checkedAt": "2026-09-10T15:38:42.046Z",
+  "project": "tkudukjujfztyiqijvjn",
+  "checks": [
+    {
+      "route": "ai-chat-v2",
+      "label": "CORS",
+      "status": 204,
+      "result": "PASS"
+    },
+    {
+      "route": "ai-chat-v2",
+      "label": "method denial",
+      "status": 405,
+      "code": "METHOD_NOT_ALLOWED",
+      "result": "PASS"
+    },
+    {
+      "route": "ai-chat-v2",
+      "label": "missing token",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "result": "PASS"
+    },
+    {
+      "route": "ai-chat-v2",
+      "label": "invalid token",
+      "status": 401,
+      "code": "INVALID_TOKEN",
+      "result": "PASS"
+    },
+    {
+      "route": "transcribe-audio-v2",
+      "label": "CORS",
+      "status": 204,
+      "result": "PASS"
+    },
+    {
+      "route": "transcribe-audio-v2",
+      "label": "method denial",
+      "status": 405,
+      "code": "METHOD_NOT_ALLOWED",
+      "result": "PASS"
+    },
+    {
+      "route": "transcribe-audio-v2",
+      "label": "missing token",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "result": "PASS"
+    },
+    {
+      "route": "transcribe-audio-v2",
+      "label": "invalid token",
+      "status": 401,
+      "code": "INVALID_TOKEN",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-email-v2",
+      "label": "CORS",
+      "status": 204,
+      "result": "PASS"
+    },
+    {
+      "route": "verify-email-v2",
+      "label": "method denial",
+      "status": 405,
+      "code": "METHOD_NOT_ALLOWED",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-email-v2",
+      "label": "missing token",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-email-v2",
+      "label": "invalid token",
+      "status": 401,
+      "code": "INVALID_TOKEN",
+      "result": "PASS"
+    },
+    {
+      "route": "redeem-code-v2",
+      "label": "CORS",
+      "status": 204,
+      "result": "PASS"
+    },
+    {
+      "route": "redeem-code-v2",
+      "label": "method denial",
+      "status": 405,
+      "code": "METHOD_NOT_ALLOWED",
+      "result": "PASS"
+    },
+    {
+      "route": "redeem-code-v2",
+      "label": "missing token",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "result": "PASS"
+    },
+    {
+      "route": "redeem-code-v2",
+      "label": "invalid token",
+      "status": 401,
+      "code": "INVALID_TOKEN",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-purchase-v2",
+      "label": "CORS",
+      "status": 204,
+      "result": "PASS"
+    },
+    {
+      "route": "verify-purchase-v2",
+      "label": "method denial",
+      "status": 405,
+      "code": "METHOD_NOT_ALLOWED",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-purchase-v2",
+      "label": "missing token",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-purchase-v2",
+      "label": "invalid token",
+      "status": 401,
+      "code": "INVALID_TOKEN",
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "CORS",
+      "status": 204,
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "method denial",
+      "status": 405,
+      "code": "METHOD_NOT_ALLOWED",
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "missing token",
+      "status": 401,
+      "code": "AUTH_REQUIRED",
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "invalid token",
+      "status": 401,
+      "code": "INVALID_TOKEN",
+      "result": "PASS"
+    },
+    {
+      "route": "ai-chat-v2",
+      "label": "authenticated malformed JSON",
+      "status": 400,
+      "code": "INVALID_JSON",
+      "result": "PASS"
+    },
+    {
+      "route": "ai-chat-v2",
+      "label": "authenticated invalid object",
+      "status": 400,
+      "code": "INVALID_OBJECT",
+      "result": "PASS"
+    },
+    {
+      "route": "transcribe-audio-v2",
+      "label": "authenticated malformed JSON",
+      "status": 400,
+      "code": "INVALID_JSON",
+      "result": "PASS"
+    },
+    {
+      "route": "transcribe-audio-v2",
+      "label": "authenticated invalid object",
+      "status": 400,
+      "code": "INVALID_OBJECT",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-email-v2",
+      "label": "authenticated malformed JSON",
+      "status": 400,
+      "code": "INVALID_JSON",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-email-v2",
+      "label": "authenticated invalid object",
+      "status": 400,
+      "code": "INVALID_OBJECT",
+      "result": "PASS"
+    },
+    {
+      "route": "redeem-code-v2",
+      "label": "authenticated malformed JSON",
+      "status": 400,
+      "code": "INVALID_JSON",
+      "result": "PASS"
+    },
+    {
+      "route": "redeem-code-v2",
+      "label": "authenticated invalid object",
+      "status": 400,
+      "code": "INVALID_OBJECT",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-purchase-v2",
+      "label": "authenticated malformed JSON",
+      "status": 400,
+      "code": "INVALID_JSON",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-purchase-v2",
+      "label": "authenticated invalid object",
+      "status": 400,
+      "code": "INVALID_OBJECT",
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "authenticated malformed JSON",
+      "status": 400,
+      "code": "INVALID_JSON",
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "authenticated invalid object",
+      "status": 400,
+      "code": "INVALID_OBJECT",
+      "result": "PASS"
+    },
+    {
+      "route": "ai-chat-v2",
+      "label": "own-user database and input validation",
+      "status": 400,
+      "code": "INVALID_MESSAGES",
+      "result": "PASS"
+    },
+    {
+      "route": "transcribe-audio-v2",
+      "label": "own-user database and input validation",
+      "status": 400,
+      "code": "INVALID_AUDIO",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-email-v2",
+      "label": "own-user database and input validation",
+      "status": 200,
+      "result": "PASS"
+    },
+    {
+      "route": "redeem-code-v2",
+      "label": "own-user database and input validation",
+      "status": 400,
+      "code": "INVALID_CODE",
+      "result": "PASS"
+    },
+    {
+      "route": "verify-purchase-v2",
+      "label": "own-user database and input validation",
+      "status": 400,
+      "code": "SIGNED_STOREKIT_PROOF_REQUIRED",
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "own-user database and input validation",
+      "status": 400,
+      "code": "INVALID_WEATHER_LOCATION",
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "OpenWeather current",
+      "status": 200,
+      "result": "PASS"
+    },
+    {
+      "route": "weather-v2",
+      "label": "OpenWeather forecast",
+      "status": 200,
+      "result": "PASS"
+    }
+  ],
+  "cleanup": {
+    "dedicatedRecordsDeleted": 3,
+    "sharedBudgetsUntouched": true,
+    "dedicatedAuthUserDeleted": true
+  },
+  "result": "PASS",
+  "sourceSha": "6a52dfee13fcf40c431a313339a32ea37d982f45",
+  "limitations": [
+    "No real chat, speech, successful work-email, redemption or signed StoreKit transaction was exercised.",
+    "Device persistence, quotas under contention, deletion UX, privacy publication and legacy containment remain unqualified.",
+    "Aggregate project/weather budgets were not reset; isolated own-user records and Auth account were cleaned up."
+  ]
+}
