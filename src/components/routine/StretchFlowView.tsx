@@ -108,7 +108,6 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   const currentStretchId = stretch.id;
   const mediaKey = JSON.stringify([currentStretchId, stretchObj?.image]);
   const currentMediaKey = useRef<string | null>(mediaKey);
-  currentMediaKey.current = mediaKey;
   const videoSource = loadedVideo?.key === mediaKey ? loadedVideo.source : null;
 
   useEffect(() => {
@@ -116,7 +115,8 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     return () => { currentMediaKey.current = null; };
   }, [mediaKey]);
 
-  // Load video source when stretch changes
+  // Load only when media identity changes. Equivalent stretch objects share a
+  // request; this effect captures the stretch belonging to its committed key.
   useEffect(() => {
     let active = true;
     const setVideoSource = (source: NonNullable<typeof loadedVideo>['source']) => {
@@ -177,7 +177,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
 
     loadVideoSource();
     return () => { active = false; };
-  }, [currentStretchId, stretchObj, mediaKey]);
+  }, [mediaKey]);
   
   // Effect to handle stretch changes
   useEffect(() => {

@@ -4,9 +4,9 @@ Updated September 10, 2026. Cris requested this handoff while Apple release acti
 
 ## Latest device follow-up — September 10, 2026
 
-This section supersedes the older activation snapshot below. Current worktree is unchanged; branch is `build/ios-preview`, HEAD `823219bb31b99ff3d9ad292b1efbd8ac7b4978ce`. PRs #6 and #7 were merged by Cris. Signing was renewed through September 2027. Preview39 (`149e027d-bee9-46eb-a67a-6a56051092e4`) is installed on his phone. One-click iPhone preview workflow is merged. Production remains blocked by readiness preflight; quality/backend/rules CI passed on the post-merge run.
+This section supersedes the older activation snapshot below. Current worktree is unchanged; branch is `build/ios-preview`. Release fixes are committed as `4665a53`; buffering spinner fixes are committed as `7a9e63b`. Additional approved media-loading safeguards and this status correction are included in the follow-up commit. Use `git log -1 --oneline` for the current HEAD rather than the older snapshot below. PRs #6 and #7 were merged by Cris. Signing was renewed through September 2027. Preview39 (`149e027d-bee9-46eb-a67a-6a56051092e4`) is installed on his phone. One-click iPhone preview workflow is merged. Production remains blocked by readiness preflight; quality/backend/rules CI passed on the post-merge run.
 
-Uncommitted fixes now in this worktree: native blue splash without square logo, cold first-video loading/error isolation, accessible coach catalog selected before transitions, real iOS AdMob app ID, flattened native voice recording settings, and shorter ordinary coach replies. See `builds/qualification-followup/plan.md` and review artifacts there. All155 tests pass; type-check and lint pass (lint has existing warnings). Native device checks still required on a new preview. No readiness gate was overridden.
+Committed release fixes in this worktree: native blue splash without square logo, cold first-video loading/error isolation, accessible coach catalog selected before transitions, real iOS AdMob app ID, flattened native voice recording settings, and shorter ordinary coach replies. See `builds/qualification-followup/plan.md` and review artifacts there. The initial release fixes passed155 tests and the spinner follow-up passed157; see the latest validation record for subsequent checks. Type-check and lint pass (lint has existing warnings). Native device checks still required on a new preview. No readiness gate was overridden.
 
 Cris confirmed voice shows Recording Failed immediately, before transcription. Native recorder constructor was receiving nested iOS settings, leaving Android extension/default fields at the constructor boundary; corrected and regression-tested against installed Expo normalization. Actual recording/transcription remains unverified. The first timed stretch blankness has a reproduced cold-source component defect, but exact device timing is untraced.
 
@@ -14,13 +14,13 @@ Typed sleep/concentration chat produced one authenticated backend requests recor
 
 AdMob owner dashboard confirms real app ID in current app.json, but shows Requires review/Limited ad serving because App Store listing lacks a developer website. Existing privacy site is `https://flexbreak-privacy-app.netlify.app/`; its public text is outdated. No website or App Store setting was published/changed. Correct app-ads.txt is in repo; accurate policy draft in `docs/PRIVACY_POLICY_DRAFT.md` still needs concrete owner publication approval.
 
-Independent reviews and both mobile exports passed. Next: obtain explicit commit authorization per Cris doctrine, commit and create one new preview for device checks. Do not merge or declare production ready.
+Cris authorized committing the release fixes and both rounds of reported review corrections. Initial independent reviews and both mobile exports passed; committed review reports and follow-up evidence are recorded under `reviews/` and `builds/qualification-followup/`. Next: create one new preview after validation of the final corrections, then check it on the phone. Do not merge or declare production ready.
 
 ## Goal
 
 Complete the security/redundancy/test audit and fixes for the live FlexBreak app while preserving its specific core features, then make production backend deployment and Apple/TestFlight uploads automatic after a protected-main merge. The original audit PR was merged by Cris. Activation and qualification remain unfinished. **Cris explicitly deferred Google Play: focus on Apple; do not create a Play account, enable its API, provision Play credentials or upload Android builds.** Preserve Android code and CI coverage.
 
-## Current State
+## Archived activation snapshot — superseded by latest follow-up above
 
 - **Work only here:** `/Users/cortega/Documents/Projects/personal/FlexBreak/.worktrees/flexbreak-audit-release`.
 - Trunk `/Users/cortega/Documents/Projects/personal/FlexBreak` is parked on main; do not edit there. This is one continuing goal/worktree.
@@ -34,7 +34,7 @@ Complete the security/redundancy/test audit and fixes for the live FlexBreak app
 - **44 live checks passed**: CORS/method handling, missing/malformed-token denial, valid anonymous Firebase auth reaching malformed-body validation on all six routes, own-user database/input validation, and real OpenWeather current/forecast. No real chat, speech, successful work-email, redemption or StoreKit transaction was exercised. Three dedicated-user records and the temporary Auth account were deleted; aggregate budgets were deliberately not reset.
 - The immediate Apple blocker: EAS's distribution certificate and App Store/ad hoc provisioning profiles expired **April 24, 2026**. A fresh Apple login is required to renew them.
 
-## Files in Flight
+## Archived files in flight at the original handoff
 
 These changes were not committed/pushed when the handoff began; preserve them:
 

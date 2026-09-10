@@ -79,7 +79,18 @@ function harness(initialStretch = videoStretch('first'), { deferAnimations = fal
       startTimer() {}, currentStretch: stretch, isPlaying: false });
   };
   const flushEffects = () => { const queued = pendingEffects; pendingEffects = []; queued.forEach(effect => effect()); };
-  return { render, flushEffects, requests, animations, writesAfterUnmount: () => writesAfterUnmount,
+  const discardRender = next => {
+    // A discarded React render does not commit effects/state, but useRef objects
+    // remain shared with the committed tree. Preserve that distinction here.
+    const committedSlots = slots.slice();
+    const committedStretch = stretch;
+    const committedEffects = pendingEffects.slice();
+    render(next);
+    slots.splice(0, slots.length, ...committedSlots);
+    stretch = committedStretch;
+    pendingEffects = committedEffects;
+  };
+  return { render, discardRender, flushEffects, requests, animations, writesAfterUnmount: () => writesAfterUnmount,
     unmount() { slots.forEach(slot => slot?.cleanup?.()); mounted = false; } };
 }
 
@@ -105,6 +116,21 @@ test('cold timed video stays visibly loading until its source resolves, never mo
   assert.equal(video.props.source.uri, h.requests[0].uri);
   assert.equal(video.props.shouldPlay, true);
   assert.equal(video.props.isLooping, true);
+});
+
+test('equivalent recreated stretch objects do not restart an in-flight video request', async () => {
+  const h = harness(); h.render(); h.flushEffects();
+  h.render(videoStretch('first')); h.flushEffects();
+  assert.equal(h.requests.length, 1);
+  h.requests[0].resolve({ uri: h.requests[0].uri, isLocal: false }); await setImmediate();
+  assert.equal(find(h.render(), 'Video').props.source.uri, h.requests[0].uri);
+});
+
+test('discarded render cannot discard a source result for the committed stretch', async () => {
+  const h = harness(); h.render(); h.flushEffects();
+  h.discardRender(videoStretch('never-committed'));
+  h.requests[0].resolve({ uri: h.requests[0].uri, isLocal: false }); await setImmediate();
+  assert.equal(find(h.render(), 'Video')?.props.source.uri, h.requests[0].uri);
 });
 
 test('resolved video keeps a visible spinner while native playback buffers', async () => {
