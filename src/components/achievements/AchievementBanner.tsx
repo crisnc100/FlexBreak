@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   shineOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'white',
   },
 });

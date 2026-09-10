@@ -1,3 +1,4 @@
+import { onAIDataDeleted, getAIDataGeneration, isAIDataCurrent } from '../../../services/ai/aiDataLifecycle';
 import React, { useState, useEffect } from 'react';
 import { View, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,11 +14,14 @@ export const AIWellnessSettings: React.FC = () => {
 
   // Load AI Wellness setting on mount
   useEffect(() => {
+    const generation = getAIDataGeneration();
+    const unsubscribe = onAIDataDeleted(() => setAIWellnessEnabled(false));
     const loadAIWellnessSetting = async () => {
       const enabled = await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED);
-      setAIWellnessEnabled(enabled === 'true');
+      if (isAIDataCurrent(generation)) setAIWellnessEnabled(enabled === 'true');
     };
-    loadAIWellnessSetting();
+    void loadAIWellnessSetting().catch(error => console.warn('Could not load AI settings:', error));
+    return unsubscribe;
   }, []);
 
   // Handle toggle from child component

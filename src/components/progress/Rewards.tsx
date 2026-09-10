@@ -83,7 +83,7 @@ const Rewards: React.FC<RewardsProps> = ({ userLevel, isPremium, onUpgradeToPrem
         const otherRewards = allRewards.filter(reward => reward.id !== 'dark_theme');
         
         // Create the final rewards list with dark theme first (if exists)
-        let finalRewards = [...otherRewards];
+        const finalRewards = [...otherRewards];
         if (darkThemeReward) {
           finalRewards.unshift(darkThemeReward);
         }

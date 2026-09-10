@@ -1,8 +1,3 @@
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/auth';
-import 'firebase/compat/firestore';
-import 'firebase/compat/app-check';
-import { functions } from '../config/firebase';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationType, cancelNotificationsByType } from './notificationManager';
@@ -22,7 +17,6 @@ export {
   setReminderMessage
 } from '../services/reminderService';
 
-export { getFCMToken, clearStoredToken } from '../services/fcmTokenService';
 export { scheduleAdvancedReminders } from '../services/notificationScheduler';
 export type { ReminderSettings, ReminderFrequency } from '../types/reminders';
 
@@ -95,68 +89,6 @@ export async function sendImmediateLocalNotification(): Promise<boolean> {
 }
 
 /**
- * Set up Firebase message handlers
- * This should be called during app initialization
- */
-export function setupMessageHandlers(): (() => void) {
-  console.log('Setting up Firebase message handlers');
-  
-  try {
-    // First check if Firebase messaging is available
-    if (!firebase.messaging || typeof firebase.messaging !== 'function') {
-      console.log('Firebase messaging is not available in this build - using Expo notifications only');
-      return () => {}; // Return empty cleanup function
-    }
-    
-    // Try to get the messaging instance
-    let messagingInstance;
-    try {
-      messagingInstance = firebase.messaging();
-    } catch (messagingError) {
-      console.log('Could not initialize Firebase messaging:', messagingError);
-      return () => {};
-    }
-    
-    if (!messagingInstance || !messagingInstance.onMessage) {
-      console.log('Firebase messaging instance or onMessage not available');
-      return () => {};
-    }
-    
-    // Listen for foreground messages 
-    const unsubscribe = messagingInstance.onMessage(async (message) => {
-      console.log('Foreground Firebase message received:', message);
-      
-      // For foreground messages, we need to manually display a notification
-      try {
-        const notification = message.notification;
-        if (notification) {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: notification.title || 'FlexBreak',
-              body: notification.body || '',
-              data: message.data || {},
-            },
-            trigger: null, // Show immediately
-          });
-          console.log('Displayed foreground Firebase message as notification');
-        }
-      } catch (displayError) {
-        console.error('Error displaying foreground message:', displayError);
-      }
-    });
-    
-    console.log('Firebase message handlers set up successfully');
-    
-    // Return cleanup function
-    return unsubscribe;
-  } catch (error) {
-    console.error('Error setting up Firebase message handlers:', error);
-    // Return empty cleanup function
-    return () => {};
-  }
-}
-
-/**
  * Get a summary of all scheduled notifications
  * Used by the diagnostics screen
  */
@@ -184,10 +116,10 @@ export async function getScheduledNotificationsSummary(): Promise<NotificationSu
       
       // Add to details
       details.push({
-        type: type || 'unknown',
+        type: typeof type === 'string' ? type : 'unknown',
         title: title,
         scheduledFor: notification.trigger && 'date' in notification.trigger 
-          ? notification.trigger.date 
+          ? new Date(notification.trigger.date) 
           : null
       });
     });
@@ -259,7 +191,7 @@ export function startLocalMotivationalMessages(testMode: boolean = false): (() =
   console.log(`Starting local motivational messages timer (${testMode ? 'TEST MODE - every 5 minutes' : 'PRODUCTION MODE - 2 per day'})`);
 
   // Cancel only existing motivational messages, not all notifications
-  cancelNotificationsByType([NotificationType.MOTIVATIONAL, NotificationType.PREMIUM_REMINDER]).then(() => {
+  cancelNotificationsByType([NotificationType.MOTIVATIONAL]).then(() => {
     console.log('Cleared existing motivational messages');
   }).catch(error => {
     console.error('Error clearing motivational messages:', error);
@@ -279,7 +211,7 @@ export function startLocalMotivationalMessages(testMode: boolean = false): (() =
     console.log('Stopping local motivational messages');
     
     // Clean up only motivational messages
-    cancelNotificationsByType([NotificationType.MOTIVATIONAL, NotificationType.PREMIUM_REMINDER])
+    cancelNotificationsByType([NotificationType.MOTIVATIONAL])
       .then(() => console.log('Motivational messages cancelled'))
       .catch(error => console.error('Error cancelling motivational messages:', error));
   };

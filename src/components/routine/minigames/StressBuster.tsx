@@ -1,3 +1,5 @@
+import tiredWorker1 from '../../../../assets/images/tiredWorker1.png';
+import goodWorker1 from '../../../../assets/images/goodWorker1.png';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -54,7 +56,7 @@ export const StressBuster: React.FC<StressBusterProps> = ({
   
   // Game refs - safer game area with margins to prevent off-screen spawning
   const gameArea = useRef({ width: width - 60, height: height * 0.6 }); // More margin, smaller height
-  const workerSpawnTimer = useRef<NodeJS.Timeout>();
+  const workerSpawnTimer = useRef<NodeJS.Timeout>(undefined);
   const workerId = useRef(0);
   
   // Preload images on mount
@@ -67,8 +69,8 @@ export const StressBuster: React.FC<StressBusterProps> = ({
       console.log('🎮 Starting image preload...');
       
       // React Native compatible approach - just prefetch
-      const goodWorkerUri = Image.resolveAssetSource(require('../../../../assets/images/goodWorker1.png')).uri;
-      const tiredWorkerUri = Image.resolveAssetSource(require('../../../../assets/images/tiredWorker1.png')).uri;
+      const goodWorkerUri = Image.resolveAssetSource(goodWorker1).uri;
+      const tiredWorkerUri = Image.resolveAssetSource(tiredWorker1).uri;
       
       // Prefetch both images with timeout
       await Promise.race([
@@ -430,7 +432,7 @@ export const StressBuster: React.FC<StressBusterProps> = ({
                     height: 120,
                   }]}>
                     <Image 
-                      source={require('../../../../assets/images/goodWorker1.png')}
+                      source={goodWorker1}
                       style={[styles.exampleImage, { width: 100, height: 100 }]}
                       resizeMode="contain"
                     />
@@ -448,7 +450,7 @@ export const StressBuster: React.FC<StressBusterProps> = ({
                     height: 120,
                   }]}>
                     <Image 
-                      source={require('../../../../assets/images/tiredWorker1.png')}
+                      source={tiredWorker1}
                       style={[styles.exampleImage, { width: 100, height: 100 }]}
                       resizeMode="contain"
                     />
@@ -618,13 +620,13 @@ export const StressBuster: React.FC<StressBusterProps> = ({
             >
               {worker.hasGoodPosture ? (
                 <Image 
-                  source={require('../../../../assets/images/goodWorker1.png')}
+                  source={goodWorker1}
                   style={styles.workerImage}
                   resizeMode="contain"
                 />
               ) : (
                 <Image 
-                  source={require('../../../../assets/images/tiredWorker1.png')}
+                  source={tiredWorker1}
                   style={styles.workerImage}
                   resizeMode="contain"
                 />
@@ -659,7 +661,7 @@ export const StressBuster: React.FC<StressBusterProps> = ({
               Exit Game?
             </Text>
             <Text style={[styles.alertMessage, { color: theme.textSecondary }]}>
-              You'll lose your current progress and miss out on bonus XP.
+              You&apos;ll lose your current progress and miss out on bonus XP.
             </Text>
             <View style={styles.alertButtons}>
               <TouchableOpacity 

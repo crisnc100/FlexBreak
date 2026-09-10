@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PremiumContext } from './PremiumContext';
 import * as storageService from '../services/storageService';
@@ -333,7 +333,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Only show alert on error
       setTimeout(() => {
         try {
-          const alert = global.Alert || require('react-native').Alert;
+          const alert = global.Alert || Alert;
           if (alert && alert.alert) {
             alert.alert(
               'Theme Error',

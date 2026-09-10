@@ -120,7 +120,7 @@ const RoutineList: React.FC<RoutineListProps> = ({
             styles.emptyText,
             { color: theme.textSecondary }
           ]}>
-            You haven't created any custom routines yet.
+            You haven&apos;t created any custom routines yet.
           </Text>
           <Text style={[
             styles.emptySubtext,

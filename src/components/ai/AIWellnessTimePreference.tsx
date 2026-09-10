@@ -71,7 +71,7 @@ export const AIWellnessTimePreference: React.FC<AIWellnessTimePreferenceProps> =
         When should I check in with you? ⏰
       </Text>
       <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-        As a premium member, you'll get daily check-ins!
+        As a premium member, you&apos;ll get daily check-ins!
       </Text>
 
       <View style={styles.optionsContainer}>

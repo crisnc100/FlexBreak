@@ -1,3 +1,4 @@
+import { getIsPremium } from '../storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CONTEXT_TEMPLATE } from './core/promptManager';
 import { buildAppContextForAI, buildUserProgressContext } from './config/appContext';
@@ -51,7 +52,7 @@ export const buildUserContext = async (userInput: string, userId?: string): Prom
       }
       
       // Check if premium
-      const isPremium = await AsyncStorage.getItem('@user_premium') === 'true';
+      const isPremium = await getIsPremium();
       context.isPremium = isPremium;
       
       // Check if this is first interaction (greeting words in multiple languages)

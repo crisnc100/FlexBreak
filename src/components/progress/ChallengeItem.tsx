@@ -202,9 +202,10 @@ const ChallengeItem: React.FC<ChallengeItemProps> = ({ challenge, onClaimSuccess
         return `${challenge.progress}/${challenge.requirement} unique days`;
       case 'area_variety':
         return `${challenge.progress}/${challenge.requirement} unique areas`;
-      case 'specific_area':
+      case 'specific_area': {
         const area = challenge.requirementData?.area || challenge.areaTarget || 'specified area';
         return `${challenge.progress}/${challenge.requirement} routines in ${area}`;
+      }
       default:
         return `${challenge.progress}/${challenge.requirement}`;
     }

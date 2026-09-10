@@ -130,12 +130,6 @@ export const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
   },
-  balanceIndicator: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 4,
-  },
   balanceText: {
     fontSize: 12,
     fontWeight: '600',
@@ -472,10 +466,6 @@ export const styles = StyleSheet.create({
   statLabel: {
     fontSize: 16,
   },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
   continueButton: {
     paddingHorizontal: 40,
     paddingVertical: 16,
@@ -780,9 +770,6 @@ export const styles = StyleSheet.create({
   },
 
   // Life Stats with Bars
-  lifeStatsGrid: {
-    paddingTop: 10,
-  },
   statItemWithBar: {
     marginBottom: 10,
   },

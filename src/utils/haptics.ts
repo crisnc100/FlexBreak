@@ -13,11 +13,9 @@ export function success() {
     
     // Fallback to any available method
     if (typeof Haptics.notificationAsync === 'function') {
-      // @ts-ignore - Some versions use enum, others use string
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType?.Success || 'success');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else if (typeof Haptics.impactAsync === 'function') {
-      // @ts-ignore - Handle different parameter formats
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Medium || 'medium');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else if (typeof Haptics.selectionAsync === 'function') {
       Haptics.selectionAsync();
     }
@@ -36,11 +34,9 @@ export function error() {
     
     // Fallback to any available method
     if (typeof Haptics.notificationAsync === 'function') {
-      // @ts-ignore - Some versions use enum, others use string
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType?.Error || 'error');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } else if (typeof Haptics.impactAsync === 'function') {
-      // @ts-ignore - Handle different parameter formats
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Heavy || 'heavy');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     } else if (typeof Haptics.selectionAsync === 'function') {
       Haptics.selectionAsync();
     }
@@ -59,11 +55,9 @@ export function warning() {
     
     // Fallback to any available method
     if (typeof Haptics.notificationAsync === 'function') {
-      // @ts-ignore - Some versions use enum, others use string
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType?.Warning || 'warning');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } else if (typeof Haptics.impactAsync === 'function') {
-      // @ts-ignore - Handle different parameter formats
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Medium || 'medium');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else if (typeof Haptics.selectionAsync === 'function') {
       Haptics.selectionAsync();
     }
@@ -82,8 +76,7 @@ export function light() {
     
     // Fallback to any available method
     if (typeof Haptics.impactAsync === 'function') {
-      // @ts-ignore - Handle different parameter formats
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Light || 'light');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else if (typeof Haptics.selectionAsync === 'function') {
       Haptics.selectionAsync();
     }
@@ -102,8 +95,7 @@ export function medium() {
     
     // Fallback to any available method
     if (typeof Haptics.impactAsync === 'function') {
-      // @ts-ignore - Handle different parameter formats
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Medium || 'medium');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else if (typeof Haptics.selectionAsync === 'function') {
       Haptics.selectionAsync();
     }
@@ -122,8 +114,7 @@ export function heavy() {
     
     // Fallback to any available method
     if (typeof Haptics.impactAsync === 'function') {
-      // @ts-ignore - Handle different parameter formats
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Heavy || 'heavy');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     } else if (typeof Haptics.selectionAsync === 'function') {
       Haptics.selectionAsync();
     }
@@ -144,8 +135,7 @@ export function selection() {
     if (typeof Haptics.selectionAsync === 'function') {
       Haptics.selectionAsync();
     } else if (typeof Haptics.impactAsync === 'function') {
-      // @ts-ignore - Handle different parameter formats
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Light || 'light');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   } catch (error) {
     // Silence haptics errors - they're not critical for app function

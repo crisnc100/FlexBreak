@@ -371,7 +371,7 @@ export const WellnessTrueFalse: React.FC<WellnessTrueFalseProps> = ({
               Exit Game?
             </Text>
             <Text style={[styles.alertMessage, { color: theme.textSecondary }]}>
-              You'll lose your current progress and miss out on bonus XP.
+              You&apos;ll lose your current progress and miss out on bonus XP.
             </Text>
             <View style={styles.alertButtons}>
               <TouchableOpacity 

@@ -1,4 +1,25 @@
-import { Audio } from 'expo-av';
+import mediaAsset0 from '../../assets/sounds/routineCompletion.mp3';
+import mediaAsset1 from '../../assets/sounds/levelUP.mp3';
+import mediaAsset2 from '../../assets/sounds/normalClick.mp3';
+import mediaAsset3 from '../../assets/sounds/normalClick.mp3';
+import mediaAsset4 from '../../assets/sounds/flexSave_xboost.mp3';
+import mediaAsset5 from '../../assets/sounds/flexSave_xboost.mp3';
+import mediaAsset6 from '../../assets/sounds/intro2.mp3';
+import mediaAsset7 from '../../assets/sounds/unlockedPremium.mp3';
+import mediaAsset8 from '../../assets/sounds/redeemingChallenge.mp3';
+import mediaAsset9 from '../../assets/sounds/timerTheme2.mp3';
+import mediaAsset10 from '../../assets/sounds/timerTheme1.mp3';
+import mediaAsset11 from '../../assets/sounds/transition1.mp3';
+import mediaAsset12 from '../../assets/sounds/transition2.mp3';
+import mediaAsset13 from '../../assets/sounds/unlockedPremium.mp3';
+import mediaAsset14 from '../../assets/sounds/correctTheme.mp3';
+import mediaAsset15 from '../../assets/sounds/incorrectTheme.mp3';
+import mediaAsset16 from '../../assets/sounds/bossRound.mp3';
+import mediaAsset17 from '../../assets/sounds/monstersDestroyed.mp3';
+import mediaAsset18 from '../../assets/sounds/padPlacement.mp3';
+import mediaAsset19 from '../../assets/sounds/roundComplete.mp3';
+import mediaAsset20 from '../../assets/sounds/ai_notification_1.mp3';
+import { Audio, Sound, InterruptionModeIOS, InterruptionModeAndroid } from './nativeAudio';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -9,7 +30,7 @@ type SoundEffect = 'complete' | 'levelUp' | 'click' | 'timerTick' | 'flexSave' |
 'roundComplete' | 'AInotification1';
 
 // Define the cache to store loaded sounds
-const soundCache: Record<SoundEffect, Audio.Sound | null> = {
+const soundCache: Record<SoundEffect, Sound | null> = {
   complete: null,
   levelUp: null,
   click: null,
@@ -102,27 +123,27 @@ let isAudioSessionInitialized = false;
 
 // Map sound types to their URIs
 const soundUris: Record<SoundEffect, any> = {
-  complete: require('../../assets/sounds/routineCompletion.mp3'),
-  levelUp: require('../../assets/sounds/levelUP.mp3'),
-  click: require('../../assets/sounds/normalClick.mp3'),
-  timerTick: require('../../assets/sounds/normalClick.mp3'),
-  flexSave: require('../../assets/sounds/flexSave_xboost.mp3'),
-  xpBoost: require('../../assets/sounds/flexSave_xboost.mp3'),
-  intro: require('../../assets/sounds/intro2.mp3'),
-  premiumUnlocked: require('../../assets/sounds/unlockedPremium.mp3'),
-  redeemingChallenge: require('../../assets/sounds/redeemingChallenge.mp3'),
-  timerTheme2: require('../../assets/sounds/timerTheme2.mp3'),
-  timerTheme1: require('../../assets/sounds/timerTheme1.mp3'),
-  transition1: require('../../assets/sounds/transition1.mp3'),
-  transition2: require('../../assets/sounds/transition2.mp3'),
-  halfway: require('../../assets/sounds/unlockedPremium.mp3'),
-  correct: require('../../assets/sounds/correctTheme.mp3'),
-  incorrect: require('../../assets/sounds/incorrectTheme.mp3'),
-  bossRound: require('../../assets/sounds/bossRound.mp3'),
-  monstersDestroyed: require('../../assets/sounds/monstersDestroyed.mp3'),
-  padPlacement: require('../../assets/sounds/padPlacement.mp3'),
-  roundComplete: require('../../assets/sounds/roundComplete.mp3'),
-  AInotification1: require('../../assets/sounds/AInotification1.mp3'),
+  complete: mediaAsset0,
+  levelUp: mediaAsset1,
+  click: mediaAsset2,
+  timerTick: mediaAsset3,
+  flexSave: mediaAsset4,
+  xpBoost: mediaAsset5,
+  intro: mediaAsset6,
+  premiumUnlocked: mediaAsset7,
+  redeemingChallenge: mediaAsset8,
+  timerTheme2: mediaAsset9,
+  timerTheme1: mediaAsset10,
+  transition1: mediaAsset11,
+  transition2: mediaAsset12,
+  halfway: mediaAsset13,
+  correct: mediaAsset14,
+  incorrect: mediaAsset15,
+  bossRound: mediaAsset16,
+  monstersDestroyed: mediaAsset17,
+  padPlacement: mediaAsset18,
+  roundComplete: mediaAsset19,
+  AInotification1: mediaAsset20,
 };
 
 /**
@@ -148,9 +169,9 @@ export const initSoundSystem = async (): Promise<void> => {
           allowsRecordingIOS: false,
           staysActiveInBackground: false,
           // Use enum syntax compatible with expo-av@15
-          interruptionModeIOS: Audio.InterruptionModeIOS.DoNotMix,
+          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
           // Android
-          interruptionModeAndroid: Audio.InterruptionModeAndroid.DoNotMix,
+          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
           shouldDuckAndroid: true,
         });
         
@@ -376,8 +397,8 @@ export const playSound = async (soundName: SoundEffect, volume = 1.0): Promise<v
           playsInSilentModeIOS: true,
           allowsRecordingIOS: false,
           staysActiveInBackground: false,
-          interruptionModeIOS: Audio.InterruptionModeIOS.DoNotMix,
-          interruptionModeAndroid: Audio.InterruptionModeAndroid.DoNotMix,
+          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
           shouldDuckAndroid: true,
         });
         isAudioSessionInitialized = true;

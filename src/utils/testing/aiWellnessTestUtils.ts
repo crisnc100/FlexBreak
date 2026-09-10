@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { KEYS } from '../../services/storageService';
+import { KEYS, getIsPremium, saveIsPremium } from '../../services/storageService';
 import { scheduleAIWellnessV2, debugAIWellnessNotifications } from '../../services/ai/scheduling/notificationScheduler';
 import memoryService from '../../services/ai/memory/memoryService';
 
@@ -25,7 +25,7 @@ export const AIWellnessTestUtils = {
     // Cancel all notifications
     const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
     const aiNotifications = allNotifications.filter(n => 
-      n.content.data?.type?.includes('ai_wellness')
+      (typeof n.content.data?.type === 'string' && n.content.data.type.includes('ai_wellness'))
     );
     
     for (const notification of aiNotifications) {
@@ -48,29 +48,22 @@ export const AIWellnessTestUtils = {
       case 'returning':
         // User with some history
         await AsyncStorage.setItem(KEYS.AI_WELLNESS.USER_NAME, 'TestUser');
-        await memoryService.addConversationInsight(userId, {
-          category: 'back_pain',
-          solution: 'cat-cow stretch',
-          effectiveness: 'helped',
-          timeOfDay: 'afternoon'
-        });
+        await memoryService.addPhysicalIssue(userId, 'back_pain');
+        await memoryService.addEffectiveSolution(userId, 'cat-cow stretch');
         break;
         
       case 'premium':
+        if (!__DEV__) return;
         // Premium user with preferences
-        await AsyncStorage.setItem(KEYS.USER.PREMIUM, 'true');
+        await saveIsPremium(true);
         await AsyncStorage.setItem(KEYS.AI_WELLNESS.TIME_PREFERENCE, 'morning');
         break;
         
       case 'heavy_user':
         // User with lots of history
         for (let i = 0; i < 20; i++) {
-          await memoryService.addConversationInsight(userId, {
-            category: ['back_pain', 'stress', 'fatigue'][i % 3],
-            solution: ['stretches', 'breathing', 'walk'][i % 3],
-            effectiveness: 'helped',
-            timeOfDay: 'afternoon'
-          });
+          await memoryService.addPhysicalIssue(userId, ['back_pain', 'stress', 'fatigue'][i % 3]);
+          await memoryService.addEffectiveSolution(userId, ['stretches', 'breathing', 'walk'][i % 3]);
         }
         break;
     }
@@ -99,6 +92,7 @@ export const AIWellnessTestUtils = {
         categoryIdentifier: 'AI_WELLNESS_SIMPLE' as any,
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: 30
       }
     });
@@ -115,7 +109,7 @@ export const AIWellnessTestUtils = {
       enabled: await AsyncStorage.getItem(KEYS.AI_WELLNESS.ENABLED) === 'true',
       userName: await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME),
       hasSeenWelcome: await AsyncStorage.getItem(KEYS.AI_WELLNESS.HAS_SEEN_WELCOME) === 'true',
-      isPremium: await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true',
+      isPremium: await getIsPremium(),
       timePreference: await AsyncStorage.getItem(KEYS.AI_WELLNESS.TIME_PREFERENCE),
       memory: await memoryService.getMemory(userId),
       scheduledNotifications: await debugAIWellnessNotifications()
@@ -146,17 +140,18 @@ export const AIWellnessTestUtils = {
   
   // Simulate premium upgrade
   async simulatePremiumUpgrade() {
+    if (!__DEV__) return;
     // First ensure user was free
     await AsyncStorage.setItem('@last_premium_status', 'false');
     // Then set to premium
-    await AsyncStorage.setItem(KEYS.USER.PREMIUM, 'true');
+    await saveIsPremium(true);
     console.log('✅ Simulated premium upgrade - reload app to see upgrade modal');
   }
 };
 
 // Export for use in React Native Debugger console
 if (__DEV__) {
-  (global as any).AITest = AIWellnessTestUtils;
+  Object.assign(globalThis, { AITest: AIWellnessTestUtils });
   console.log('🧪 AI Wellness Test Utils available as: AITest');
   console.log('   - AITest.resetToFreshState()');
   console.log('   - AITest.simulateUserState("new" | "returning" | "premium" | "heavy_user")');

@@ -208,7 +208,7 @@ const RoutinePicker: React.FC<RoutinePickerProps> = ({
             styles.optionLabel,
             { color: theme.text }
           ]}>
-            What's tight?
+            What&apos;s tight?
           </Text>
           <TouchableOpacity
             onPress={onAreaPress}

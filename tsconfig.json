@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["ES2020", "ES2023"],
+    "lib": [
+      "ES2020",
+      "ES2023"
+    ],
     "module": "ES2020",
     "jsx": "react-native",
     "esModuleInterop": true,
@@ -9,13 +12,19 @@
     "resolveJsonModule": true,
     "allowJs": true,
     "skipLibCheck": true,
-    "moduleResolution": "node",
-    "downlevelIteration": true,
+    "moduleResolution": "bundler",
     "strict": false,
-    "baseUrl": ".",
     "paths": {
-      "*": ["*", "src/*"]
-    }
+      "*": [
+        "./*",
+        "./src/*"
+      ]
+    },
+    "types": [
+      "node",
+      "react",
+      "react-native"
+    ]
   },
   "extends": "expo/tsconfig.base",
   "include": [
@@ -27,6 +36,8 @@
   "exclude": [
     "node_modules",
     "babel.config.js",
-    "metro.config.js"
+    "metro.config.js",
+    "supabase/**",
+    "security-tests/**"
   ]
 }

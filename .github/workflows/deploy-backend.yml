@@ -1,0 +1,41 @@
+name: Deploy legacy containment only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: flexbreak-legacy-containment
+  cancel-in-progress: false
+jobs:
+  trusted-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: test "$DEPLOY_REF" = refs/heads/main
+  quality:
+    needs: trusted-source
+    uses: ./.github/workflows/ci.yml
+  deploy:
+    needs: quality
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+      - name: Validate manifest and deploy four legacy handlers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BACKEND_SELECTION: legacy-containment
+        run: node scripts/deploy-backend.mjs

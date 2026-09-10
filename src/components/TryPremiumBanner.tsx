@@ -102,7 +102,7 @@ export const TryPremiumBanner: React.FC<TryPremiumBannerProps> = ({
         subText: 'Unlock custom routines, advanced analytics & more',
         ctaText: 'Start free trial',
         icon: 'trophy' as const,
-        gradient: ['#10b981', '#059669', '#047857'] // Success green
+        gradient: ['#10b981', '#059669', '#047857'] as const // Success green
       };
     }
     
@@ -112,7 +112,7 @@ export const TryPremiumBanner: React.FC<TryPremiumBannerProps> = ({
       subText: 'Custom routines, smart reminders & analytics',
       ctaText: 'Start free trial',
       icon: 'star' as const,
-      gradient: ['#22c55e', '#16a34a', '#166534'] // Green
+      gradient: ['#22c55e', '#16a34a', '#166534'] as const // Green
     };
   };
 

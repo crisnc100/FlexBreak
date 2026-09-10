@@ -279,10 +279,11 @@ class AdService {
       }
     }
 
-    return new Promise(async (resolve) => {
+    const { AdEventType, RewardedAdEventType } = await import('react-native-google-mobile-ads');
+
+    return new Promise((resolve) => {
       let isResolved = false;
       let cleanupTimeoutId: NodeJS.Timeout | null = null;
-      const { AdEventType, RewardedAdEventType } = await import('react-native-google-mobile-ads');
       
       // Helper to safely resolve only once and cleanup
       const safeResolve = (value: boolean) => {

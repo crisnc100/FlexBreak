@@ -324,7 +324,7 @@ const TestingChecklistPart1: React.FC<TestingChecklistPart1Props> = ({ onComplet
               <View style={styles.helpItem}>
                 <Ionicons name="arrow-forward-circle-outline" size={20} color={theme.accent} style={styles.helpItemIcon} />
                 <Text style={[styles.helpItemText, { color: theme.textSecondary }]}>
-                  Once all tasks are completed, click "Continue to Part 2"
+                  Once all tasks are completed, click &quot;Continue to Part 2&quot;
                 </Text>
               </View>
             </View>
@@ -334,7 +334,7 @@ const TestingChecklistPart1: React.FC<TestingChecklistPart1Props> = ({ onComplet
         <View style={[styles.noticeContainer, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)', marginBottom: 16 }]}>
           <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
           <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
-            Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
+            Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app&apos;s main features, not these testing tools.
           </Text>
         </View>
         

@@ -84,6 +84,8 @@ export function useGamification() {
     setIsLoading(true);
     setChallengesLoading(true);
     try {
+      try { await gamificationManager.recoverPendingCompletions(); }
+      catch (error) { console.warn('Completion recovery unavailable; loading saved progress:', error); }
       // Get user progress and ensure achievements are initialized
       const userProgress = await storageService.getUserProgress();
       achievementManager.initializeAchievements(userProgress);

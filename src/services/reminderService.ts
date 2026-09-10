@@ -1,64 +1,41 @@
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { getNotificationType, NotificationType } from '../utils/notificationManager';
 import * as storageService from './storageService';
-import { getFCMToken } from './fcmTokenService';
 import { scheduleAdvancedReminders } from './notificationScheduler';
 import { ReminderSettings, ReminderFrequency } from '../types/reminders';
 import { STORAGE_KEYS, DEFAULTS } from '../constants/reminderDefaults';
 
 /**
- * Save reminder settings to Firestore through Cloud Function
- * This ensures reminders work even when the app is closed
+ * Save reminder settings and install repeating notifications on this device.
+ * The OS delivers them while the app is closed; no push token is required.
  */
 export async function saveReminderSettings(settings: ReminderSettings): Promise<boolean> {
   try {
-    // First save locally
-    await saveLocalReminderSettings(settings);
-    
-    // Only send to Firebase if enabled
-    if (settings.enabled) {
-      try {
-        // Get the FCM token
-        const token = await getFCMToken();
-        if (!token) {
-          console.error('Cannot save reminder settings: No FCM token available');
-          return true; // Still return true as we saved locally
-        }
-        
-        // Get user's premium status
-        const isPremium = await storageService.getIsPremium();
-        const userProgress = await storageService.getUserProgress();
-        const premiumLevel = isPremium ? (userProgress.level || 1) : 0;
-        
-        // Get the device's timezone offset in minutes
-        const timeZoneOffset = new Date().getTimezoneOffset();
-        
-        // Save to Firebase
-        await saveToFirebase(settings, token, isPremium, premiumLevel, timeZoneOffset);
-        
-        // If we just enabled reminders, schedule them
-        if (settings.enabled) {
-          try {
-            // Schedule local reminders based on premium level
-            await scheduleAdvancedReminders(settings, premiumLevel);
-          } catch (scheduleError) {
-            console.error('Error scheduling advanced reminders:', scheduleError);
-          }
-        }
-        
-        return true;
-      } catch (firebaseError) {
-        console.error('Error saving to Firebase, but local settings saved:', firebaseError);
-        // Schedule a local notification as fallback
-        if (settings.enabled) {
-          await scheduleLocalReminderFallback(settings);
-        }
+    // Cancellation is strict here: a failed OS call must not report disabled.
+    const pending = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of pending) {
+      if ([NotificationType.REMINDER, NotificationType.PREMIUM_REMINDER].includes(getNotificationType(notification))) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
       }
     }
-    
-    // Since we saved locally, return success
+    // Persist disabled while installing so a failed schedule cannot silently
+    // re-enable itself on the next launch. Cancellation failures keep old settings.
+    await saveLocalReminderSettings({ ...settings, enabled: false });
+    let isPremium = false;
+    let premiumLevel = 0;
+    try {
+      isPremium = await storageService.getIsPremium();
+      const progress = await storageService.getUserProgress();
+      premiumLevel = isPremium ? (progress.level || 1) : 0;
+    } catch (error) {
+      console.error('Premium reminder options unavailable; scheduling the primary reminder:', error);
+    }
+    if (settings.enabled) {
+      const scheduled = await scheduleAdvancedReminders(settings, premiumLevel);
+      if (scheduled.length === 0) throw new Error('No local reminders were scheduled');
+      await AsyncStorage.setItem(STORAGE_KEYS.REMINDER_ENABLED, 'true');
+    }
     return true;
   } catch (error) {
     console.error('Error saving reminder settings:', error);
@@ -77,67 +54,6 @@ async function saveLocalReminderSettings(settings: ReminderSettings): Promise<vo
     AsyncStorage.setItem(STORAGE_KEYS.REMINDER_DAYS, JSON.stringify(settings.days)),
     AsyncStorage.setItem(STORAGE_KEYS.REMINDER_MESSAGE, settings.message || DEFAULTS.REMINDER_MESSAGE)
   ]);
-}
-
-/**
- * Save reminder settings to Firebase
- */
-async function saveToFirebase(
-  settings: ReminderSettings,
-  token: string,
-  isPremium: boolean,
-  premiumLevel: number,
-  timeZoneOffset: number
-): Promise<void> {
-  try {
-    // For anonymous users, generate a device-specific ID
-    let userId = await AsyncStorage.getItem('@flexbreak:device_id');
-    if (!userId) {
-      // Generate a unique device ID
-      userId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      await AsyncStorage.setItem('@flexbreak:device_id', userId);
-    }
-    
-    // Save directly to Firestore
-    await firebase.firestore().collection('user_reminders')
-      .doc(userId)
-      .set({
-        userId,
-        token,
-        enabled: settings.enabled,
-        time: settings.time,
-        frequency: settings.frequency,
-        days: settings.days,
-        message: settings.message,
-        timeZoneOffset,
-        isPremium,
-        premiumLevel,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-  } catch (error) {
-    console.error('Error saving to Firestore:', error);
-    throw error;
-  }
-}
-
-/**
- * Schedule a local reminder as fallback when Firebase fails
- */
-async function scheduleLocalReminderFallback(settings: ReminderSettings): Promise<void> {
-  try {
-    // Show an immediate notification informing the user that local reminders will be used
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'FlexBreak Reminders Set Locally',
-        body: `Your reminders have been set up locally. You'll receive notifications at ${settings.time}. Note: Local reminders require the app to be opened at least once a day.`,
-        data: { type: 'reminder_setup' },
-      },
-      trigger: null, // null trigger for immediate notification
-    });
-  } catch (error) {
-    console.error('Error sending local reminder notification:', error);
-    throw error;
-  }
 }
 
 /**
@@ -166,7 +82,7 @@ export async function getReminderSettings(): Promise<ReminderSettings> {
       enabled: false,
       time: DEFAULTS.REMINDER_TIME,
       frequency: DEFAULTS.REMINDER_FREQUENCY,
-      days: DEFAULTS.REMINDER_DAYS,
+      days: [...DEFAULTS.REMINDER_DAYS],
       message: DEFAULTS.REMINDER_MESSAGE
     };
   }

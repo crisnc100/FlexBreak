@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { StretchEffects } from '../StretchEffects';
 import { Monster, GameState, PlacedPad } from '../types';
 import { 
   WAVE_CONFIG,
@@ -82,7 +83,7 @@ export const useGameLogic = (
   // Stretch effects state
   const [stretchEffects, setStretchEffects] = useState<Array<{
     id: string;
-    type: string;
+    type: React.ComponentProps<typeof StretchEffects>['effects'][number]['type'];
     fromX: number;
     fromY: number;
     toX: number;
@@ -133,10 +134,10 @@ export const useGameLogic = (
   });
 
   // Refs for timers and state
-  const gameTimerRef = useRef<NodeJS.Timeout>();
-  const spawnTimerRef = useRef<NodeJS.Timeout>();
-  const energyTimerRef = useRef<NodeJS.Timeout>();
-  const gameLoopRef = useRef<NodeJS.Timeout>();
+  const gameTimerRef = useRef<NodeJS.Timeout>(undefined);
+  const spawnTimerRef = useRef<NodeJS.Timeout>(undefined);
+  const energyTimerRef = useRef<NodeJS.Timeout>(undefined);
+  const gameLoopRef = useRef<NodeJS.Timeout>(undefined);
   const gameStateRef = useRef(gameState);
   const gamePausedRef = useRef(gamePaused);
   const showWaveAnnouncementRef = useRef(showWaveAnnouncement);

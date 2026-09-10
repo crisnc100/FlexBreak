@@ -82,6 +82,17 @@ interface SimulationResult {
   daysSimulated?: number;
 }
 
+
+const createSimulationDate = (originalDate: DateConstructor, timestamp: number): DateConstructor =>
+  new Proxy(originalDate, {
+    construct(target, args) {
+      return Reflect.construct(target, args.length === 0 ? [timestamp] : args);
+    },
+    get(target, property, receiver) {
+      return property === 'now' ? () => timestamp : Reflect.get(target, property, receiver);
+    },
+  });
+
 const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any }) => {
   const { theme, isDark } = useTheme();
   
@@ -373,39 +384,11 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
     const targetTime = targetDate.getTime();
       logWithTimestamp(`Target time: ${targetTime}`);
     
-      // @ts-ignore - hack for simulation
       global.OriginalDate = originalDate;
       logWithTimestamp('Original Date stored in global.OriginalDate');
     
       // Override the Date constructor
-      // @ts-ignore - hack for simulation
-    global.Date = class extends originalDate {
-        constructor() {
-          if (arguments.length === 0) {
-          super(targetTime);
-            // Only log occasionally to avoid flooding
-            if (Math.random() < 0.01) {
-              logWithTimestamp(`New Date() created (sampled log): ${super.toString()}`);
-            }
-        } else {
-            // @ts-ignore - we need to pass through arguments
-            super(...arguments);
-          }
-        }
-      };
-      
-      // Copy all properties and methods from the original Date
-      Object.getOwnPropertyNames(originalDate).forEach(prop => {
-        // @ts-ignore - hack for simulation
-        if (prop !== 'prototype' && prop !== 'length' && prop !== 'name') {
-          // @ts-ignore - hack for simulation
-          global.Date[prop] = originalDate[prop];
-        }
-      });
-
-      // Copy now method explicitly
-      // @ts-ignore - hack for simulation
-      global.Date.now = () => targetTime;
+      global.Date = createSimulationDate(originalDate, targetTime);
       
       // Set the current date for the component
       setCurrentDate(new Date(targetTime));
@@ -423,11 +406,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       
       // Try to restore original date in case of error
       try {
-        // @ts-ignore - hack for simulation
         if (global.OriginalDate) {
-          // @ts-ignore - hack for simulation
           global.Date = global.OriginalDate;
-          // @ts-ignore - hack for simulation
           global.OriginalDate = undefined;
           logWithTimestamp('Restored original Date after patching error');
         }
@@ -443,11 +423,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
   const restoreOriginalDate = () => {
     logWithTimestamp('Attempting to restore original Date');
     try {
-      // @ts-ignore - hack for simulation
       if (global.OriginalDate) {
-        // @ts-ignore - hack for simulation
         global.Date = global.OriginalDate;
-        // @ts-ignore - hack for simulation
         global.OriginalDate = undefined;
         logWithTimestamp('Original Date successfully restored');
         
@@ -735,8 +712,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       let finalXp = 0;
       let finalPercentToNextLevel = 0;
       let finalStreak = 0;
-      let completedChallenges: Array<{title: string, xp: number}> = [];
-      let achievements: Array<{title: string}> = [];
+      const completedChallenges: Array<{title: string, xp: number}> = [];
+      const achievements: Array<{title: string}> = [];
       
       // Simulate each day
       for (let i = 0; i < daysToSimulate; i++) {
@@ -754,23 +731,9 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         try {
           const originalDate = Date;
           
-          // @ts-ignore
           global.OriginalDate = originalDate;
           
-          // @ts-ignore
-          global.Date = class extends originalDate {
-            constructor() {
-              if (arguments.length === 0) {
-                super(currentDate.getTime());
-              } else {
-                // @ts-ignore
-                super(...arguments);
-              }
-            }
-          };
-          
-          // @ts-ignore
-          global.Date.now = () => currentDate.getTime();
+          global.Date = createSimulationDate(originalDate, currentDate.getTime());
           
         } catch (error) {
           logWithTimestamp(`Error patching date: ${error}`);
@@ -807,11 +770,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         } finally {
           // Restore date after each day to prevent memory leaks
           try {
-            // @ts-ignore
             if (global.OriginalDate) {
-              // @ts-ignore
               global.Date = global.OriginalDate;
-              // @ts-ignore
               global.OriginalDate = undefined;
             }
           } catch (dateRestoreError) {
@@ -987,8 +947,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       let finalXp = 0;
       let finalPercentToNextLevel = 0;
       let finalStreak = 0;
-      let completedChallenges: Array<{title: string, xp: number}> = [];
-      let achievements: Array<{title: string}> = [];
+      const completedChallenges: Array<{title: string, xp: number}> = [];
+      const achievements: Array<{title: string}> = [];
       
       // Simulate each day
       for (let i = 0; i < daysToSimulate; i++) {
@@ -1152,7 +1112,7 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
       addLog(`Reset data for streak flexSave test ${testId}`);
       
       // Set XP to 1800 to reach Level 6 (when streak flexSave unlocks)
-      let progress = await storageService.getUserProgress();
+      const progress = await storageService.getUserProgress();
       progress.totalXP = 1800;
       progress.level = 6; // Ensure level is set correctly
       await storageService.saveUserProgress(progress);
@@ -1358,8 +1318,8 @@ const BobSimulatorScreen = ({ navigation, route }: { navigation: any, route: any
         return false;
       };
 
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      const backSubscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => backSubscription.remove();
     }, [fromTesting])
   );
   

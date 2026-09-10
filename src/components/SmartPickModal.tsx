@@ -128,7 +128,7 @@ export default function SmartPickModal({
               <TouchableOpacity 
                 style={styles.startButton} 
                 onPress={() => {
-                  onStartRecommendation && onStartRecommendation(recommendation);
+                  onStartRecommendation?.(recommendation);
                   onClose();
                 }}
               >

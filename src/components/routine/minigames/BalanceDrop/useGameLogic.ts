@@ -74,7 +74,7 @@ export const useGameLogic = (
   });
   
   // Combo tracking
-  const [lastPlacedTypes, setLastPlacedTypes] = useState<('work' | 'life')[]>([]);
+  const [lastPlacedTypes, setLastPlacedTypes] = useState<('work' | 'life' | 'neutral')[]>([]);
   const [currentCombo, setCurrentCombo] = useState<ComboInfo | null>(null);
   
   // Refs
@@ -169,7 +169,7 @@ export const useGameLogic = (
     setEnergyLeft(startingEnergy);
     
     // Apply scenario stat modifiers if present
-    let lifeStats = { ...stats.lifeStats };
+    const lifeStats = { ...stats.lifeStats };
     if (round.scenario?.statModifiers) {
       Object.entries(round.scenario.statModifiers).forEach(([stat, value]) => {
         lifeStats[stat as keyof LifeStats] = value;
@@ -327,8 +327,8 @@ export const useGameLogic = (
     const itemSize = ITEM_BASE_SIZE + (itemData.weight - 1) * 15;
     
     // Simple spawn positions - items fall from top
-    let startX = Math.random() * (width - itemSize - 40) + 20;
-    let startY = -itemSize;
+    const startX = Math.random() * (width - itemSize - 40) + 20;
+    const startY = -itemSize;
     
     const position = new Animated.ValueXY({ x: startX, y: startY });
     
@@ -680,7 +680,7 @@ export const useGameLogic = (
     }
     
     // Apply immediate effects
-    let effectMessages: string[] = [];
+    const effectMessages: string[] = [];
     let effectsToApply: StatEffect[] = [];
     
     // Determine which effects to apply based on item type

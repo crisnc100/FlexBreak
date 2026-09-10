@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stretch } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { getPremiumStretchesPreview } from '../../utils/generators/premiumUtils';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode } from '../media/NativeVideo';
 
 interface PremiumStretchesPreviewProps {
   onClose?: () => void;

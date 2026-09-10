@@ -99,7 +99,7 @@ const ThemeUnlockNotification: React.FC<ThemeUnlockNotificationProps> = ({
           Sunset Theme
         </Text>
         <Text style={[styles.description, { color: theme.textSecondary }]}>
-          You've earned 6 badges and unlocked the beautiful sunset theme! Go to Settings to select and use it.
+          You&apos;ve earned 6 badges and unlocked the beautiful sunset theme! Go to Settings to select and use it.
         </Text>
       </View>
       

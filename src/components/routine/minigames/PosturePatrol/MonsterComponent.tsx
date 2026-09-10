@@ -1,3 +1,8 @@
+import assettechNeck from '../../../../../assets/images/miniGames/techNeck.png';
+import assetdeskHunch2 from '../../../../../assets/images/miniGames/deskHunch2.png';
+import assetslouchSlump from '../../../../../assets/images/miniGames/slouchSlump.png';
+import assetleanTwist from '../../../../../assets/images/miniGames/leanTwist.png';
+import assetdeskHunch1 from '../../../../../assets/images/miniGames/deskHunch1.png';
 import React from 'react';
 import {
   View,
@@ -18,11 +23,11 @@ interface MonsterComponentProps {
 
 const getFigureImage = (type: MonsterType) => {
   const images = {
-    tech_neck: require('../../../../../assets/images/miniGames/techNeck.png'),
-    desk_hunch: require('../../../../../assets/images/miniGames/deskHunch2.png'),
-    slouch_slump: require('../../../../../assets/images/miniGames/slouchSlump.png'),
-    lean_twist: require('../../../../../assets/images/miniGames/leanTwist.png'),
-    boss_posture: require('../../../../../assets/images/miniGames/deskHunch1.png'),
+    tech_neck: assettechNeck,
+    desk_hunch: assetdeskHunch2,
+    slouch_slump: assetslouchSlump,
+    lean_twist: assetleanTwist,
+    boss_posture: assetdeskHunch1,
   };
   return images[type];
 };
@@ -100,3 +105,4 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
+MonsterComponent.displayName = 'MonsterComponent';

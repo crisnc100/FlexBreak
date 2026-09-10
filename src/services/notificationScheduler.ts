@@ -26,104 +26,39 @@ export async function scheduleAdvancedReminders(
   settings: ReminderSettings,
   premiumLevel: number = 0
 ): Promise<string[]> {
+  const created: string[] = [];
   try {
-    const scheduledNotificationIds: string[] = [];
-    
-    // IMPORTANT: Always cancel all existing reminder notifications first
-    // This ensures notifications are cancelled when reminders are disabled
+    const [hours, minutes] = settings.time.split(':').map(Number);
+    if (!/^\d{2}:\d{2}$/.test(settings.time) || hours > 23 || minutes > 59) throw new Error('Invalid reminder time');
+    const days = settings.frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6]
+      : settings.frequency === 'weekdays' ? [1, 2, 3, 4, 5]
+      : settings.frequency === 'custom' ? [...new Set(settings.days.map(dayStringToNumber))] : [];
+    if (settings.enabled && (!days.length || days.some(day => day < 0))) throw new Error('Invalid reminder days');
     await cancelNotificationsByType([NotificationType.REMINDER, NotificationType.PREMIUM_REMINDER]);
-    
-    // Only schedule new notifications if reminders are enabled
-    if (!settings.enabled) {
-      return scheduledNotificationIds;
-    }
-    
-    // Parse the primary reminder time
-    const [hours, minutes] = settings.time.split(':').map(num => parseInt(num, 10));
-    
-    // Get days based on frequency
-    let selectedDays: number[] = [];
-    
-    switch (settings.frequency) {
-      case 'daily':
-        // All days (0 = Sunday, 6 = Saturday in JavaScript Date)
-        selectedDays = [0, 1, 2, 3, 4, 5, 6];
-        break;
-      case 'weekdays':
-        // Monday to Friday
-        selectedDays = [1, 2, 3, 4, 5];
-        break;
-      case 'custom':
-        // Convert string day IDs to day numbers
-        selectedDays = settings.days
-          .map(day => dayStringToNumber(day))
-          .filter(day => day !== -1);
-        break;
-    }
-    
-    // Schedule for each selected day
-    for (const dayOfWeek of selectedDays) {
-      // Calculate next occurrence
-      const nextDate = getNextDayOfWeek(dayOfWeek, hours, minutes);
-      const secondsTillReminder = Math.max(1, Math.floor((nextDate.getTime() - new Date().getTime()) / 1000));
-      
-      // Create the notification with proper type
-      const notificationId = await scheduleTypedNotification(
-        {
-          title: 'FlexBreak Reminder',
-          body: settings.message || 'Time for your daily stretch!',
-          data: { 
-            type: 'scheduled_reminder', 
-            dayOfWeek,
-            scheduledFor: nextDate.toISOString()
-          },
+    if (!settings.enabled) return created;
+
+    for (const day of days) {
+      for (const offset of premiumLevel >= 3 ? [0, 2] : [0]) {
+        const hour = (hours + offset) % 24;
+        const dayOfWeek = (day + Math.floor((hours + offset) / 24)) % 7;
+        const premium = offset > 0;
+        created.push(await scheduleTypedNotification({
+          title: premium ? 'FlexBreak Premium Reminder' : 'FlexBreak Reminder',
+          body: settings.message || (premium ? 'Time for another stretch break!' : 'Time for your daily stretch!'),
+          data: { dayOfWeek, scheduledFor: getNextDayOfWeek(dayOfWeek, hour, minutes).toISOString() },
           sound: true,
-        },
-        { 
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: secondsTillReminder,
-        },
-        NotificationType.REMINDER
-      );
-      
-      scheduledNotificationIds.push(notificationId);
-    }
-    
-    // For premium level 3+, add additional reminders if configured
-    if (premiumLevel >= 3) {
-      // Add an additional reminder 2 hours after the main one for premium users
-      for (const dayOfWeek of selectedDays) {
-        // Calculate next occurrence with +2 hours offset
-        const nextDate = getNextDayOfWeek(dayOfWeek, hours + 2, minutes);
-        const secondsTillReminder = Math.max(1, Math.floor((nextDate.getTime() - new Date().getTime()) / 1000));
-        
-        // Only schedule if it's more than 1 hour from the first reminder
-        if (secondsTillReminder > 3600) {
-          const notificationId = await scheduleTypedNotification(
-            {
-              title: 'FlexBreak Premium Reminder',
-              body: settings.message || 'Time for another stretch break!',
-              data: { 
-                type: 'premium_reminder', 
-                dayOfWeek,
-                scheduledFor: nextDate.toISOString()
-              },
-              sound: true,
-            },
-            { 
-              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-              seconds: secondsTillReminder,
-            },
-            NotificationType.PREMIUM_REMINDER
-          );
-          
-          scheduledNotificationIds.push(notificationId);
-        }
+        }, {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: dayOfWeek + 1,
+          hour,
+          minute: minutes,
+        }, premium ? NotificationType.PREMIUM_REMINDER : NotificationType.REMINDER));
       }
     }
-    
-    return scheduledNotificationIds;
+    return created;
   } catch (error) {
+    // Avoid reporting success for a partially installed schedule.
+    await Promise.allSettled(created.map(id => Notifications.cancelScheduledNotificationAsync(id)));
     console.error('Error scheduling advanced reminders:', error);
     return [];
   }

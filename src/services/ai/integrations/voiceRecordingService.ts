@@ -1,16 +1,17 @@
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { trackAIWork, getAIDataGeneration, isAIDataCurrent } from '../aiDataLifecycle';
+import { AudioModule, setAudioModeAsync, type AudioRecorder, type RecordingOptions } from 'expo-audio';
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import secureGoogleSpeechService from './secureGoogleSpeechService';
 import { rateLimiter } from '../utils/reliabilityService';
 
 class VoiceRecordingService {
-  private recording: Audio.Recording | null = null;
+  private recording: AudioRecorder | null = null;
   private recordingUri: string | null = null;
 
   async requestPermissions(): Promise<boolean> {
     try {
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await AudioModule.requestRecordingPermissionsAsync();
       return status === 'granted';
     } catch (error) {
       console.error('Error requesting audio permissions:', error);
@@ -19,6 +20,8 @@ class VoiceRecordingService {
   }
 
   async startRecording(): Promise<boolean> {
+    const generation = getAIDataGeneration();
+    return trackAIWork(async () => {
     try {
       // Stop any existing recording first
       if (this.recording) {
@@ -33,35 +36,32 @@ class VoiceRecordingService {
       }
 
       // Configure audio mode with minimal required settings
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false, // Ensure we're not trying to record in background
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        shouldPlayInBackground: false, // Ensure we're not trying to record in background
+        interruptionMode: 'duckOthers',
+        shouldRouteThroughEarpiece: false,
       });
 
       // Wait longer for audio mode to be properly set on iOS
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Create and start recording with optimized settings for speech
-      const recordingOptions = {
+      const recordingOptions: RecordingOptions = {
+        extension: '.amr', sampleRate: 16000, numberOfChannels: 1, bitRate: 23850,
         isMeteringEnabled: true,
         android: {
-          extension: '.m4a',
-          outputFormat: 2, // MPEG_4
-          audioEncoder: 3, // AAC
+          extension: '.amr',
+          outputFormat: 'amrwb',
+          audioEncoder: 'amr_wb',
           sampleRate: 16000, // Optimal for speech recognition
-          numberOfChannels: 1, // Mono is sufficient for voice
-          bitRate: 128000,
         },
         ios: {
-          extension: '.caf',
+          extension: '.wav',
           outputFormat: 'lpcm',
           audioQuality: 32,
           sampleRate: 16000,
-          numberOfChannels: 1,
-          bitRate: 16000,
           linearPCMBitDepth: 16,
           linearPCMIsBigEndian: false,
           linearPCMIsFloat: false,
@@ -73,19 +73,34 @@ class VoiceRecordingService {
       };
       
       console.log('Creating recording with options:', recordingOptions);
-      const { recording } = await Audio.Recording.createAsync(recordingOptions);
+      const recording = new AudioModule.AudioRecorder(recordingOptions);
+      this.recording = recording;
+      await recording.prepareToRecordAsync();
+      if (!isAIDataCurrent(generation)) {
+        const uri = recording.uri;
+        recording.release();
+        if (this.recording === recording) this.recording = null;
+        if (uri) {
+          this.recordingUri = uri;
+          await FileSystem.deleteAsync(uri, { idempotent: true });
+          if (this.recordingUri === uri) this.recordingUri = null;
+        }
+        return false;
+      }
+      recording.record();
       
       this.recording = recording;
       console.log('Recording created and started successfully');
       return true;
     } catch (error) {
       console.error('Failed to start recording:', error);
+      this.recording?.release();
       this.recording = null;
       
       // Reset audio mode on error
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
+        await setAudioModeAsync({
+          allowsRecording: false,
         });
       } catch (resetError) {
         console.error('Failed to reset audio mode:', resetError);
@@ -93,9 +108,15 @@ class VoiceRecordingService {
       
       return false;
     }
+
+    });
   }
 
   async stopRecording(): Promise<string | null> {
+    return trackAIWork(() => this.stopRecordingInternal());
+  }
+
+  private async stopRecordingInternal(): Promise<string | null> {
     try {
       if (!this.recording) {
         console.log('No recording in progress');
@@ -105,28 +126,31 @@ class VoiceRecordingService {
       console.log('Stopping recording...');
       
       // Get URI before stopping (in case stopAndUnloadAsync clears it)
-      const uri = this.recording.getURI();
+      const uri = this.recording.uri;
+      if (uri) this.recordingUri = uri;
       
-      await this.recording.stopAndUnloadAsync();
+      await this.recording.stop();
       
       // Reset audio mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
+      await setAudioModeAsync({
+        allowsRecording: false,
       });
 
       this.recordingUri = uri;
+      this.recording?.release();
       this.recording = null;
 
       console.log('Recording stopped and stored at', uri);
       return uri;
     } catch (error) {
       console.error('Failed to stop recording:', error);
+      this.recording?.release();
       this.recording = null;
       
       // Try to reset audio mode even on error
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
+        await setAudioModeAsync({
+          allowsRecording: false,
         });
       } catch (resetError) {
         console.error('Failed to reset audio mode after error:', resetError);
@@ -137,6 +161,7 @@ class VoiceRecordingService {
   }
 
   async transcribeAudio(audioUri: string): Promise<string | null> {
+    return trackAIWork(async () => {
     try {
       console.log('Transcribing audio from:', audioUri);
       
@@ -173,7 +198,7 @@ class VoiceRecordingService {
           }
           
           if (result && result.text && result.text.trim().length > 0) {
-            console.log('Got transcription:', result.text);
+            console.log('Voice transcription received');
             console.log('Detected language from Google:', result.detectedLanguage);
             
             // Store the detected language from Google for context building
@@ -211,7 +236,12 @@ class VoiceRecordingService {
     } catch (error) {
       console.error('Failed to transcribe audio:', error);
       return null;
+    } finally {
+      await FileSystem.deleteAsync(audioUri, { idempotent: true });
+      if (this.recordingUri === audioUri) this.recordingUri = null;
     }
+
+    });
   }
 
   isRecording(): boolean {
@@ -219,15 +249,9 @@ class VoiceRecordingService {
   }
 
   async cancelRecording(): Promise<void> {
-    if (this.recording) {
-      try {
-        await this.recording.stopAndUnloadAsync();
-        this.recording = null;
-        this.recordingUri = null;
-      } catch (error) {
-        console.error('Error canceling recording:', error);
-      }
-    }
+    const uri = this.recording ? (await this.stopRecordingInternal()) || this.recordingUri : this.recordingUri;
+    if (uri) await FileSystem.deleteAsync(uri, { idempotent: true });
+    this.recordingUri = null;
   }
 }
 

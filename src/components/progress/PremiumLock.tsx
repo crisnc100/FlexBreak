@@ -66,7 +66,7 @@ const PremiumLock: React.FC<PremiumLockProps> = ({
       <Ionicons name="trophy" size={80} color="#FFD700" style={styles.trophyIcon} />
       <Text style={styles.premiumTitle}>Unlock Your Full Potential!</Text>
       <Text style={styles.premiumSubtitle}>
-        You've earned {formattedXP} XP so far. Upgrade to Premium to track your progress and unlock exclusive features!
+        You&apos;ve earned {formattedXP} XP so far. Upgrade to Premium to track your progress and unlock exclusive features!
       </Text>
       
       <View style={styles.premiumFeatures}>

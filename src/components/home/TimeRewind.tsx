@@ -30,7 +30,7 @@ const TIME_ICONS = [
   'replay',
   'calendar-clock',
   'timer-sand'  // hourglass
-];
+] as const;
 
 // Screen dimensions for vortex effect
 const { width, height } = Dimensions.get('window');

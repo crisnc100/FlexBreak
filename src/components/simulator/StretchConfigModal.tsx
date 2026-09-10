@@ -62,7 +62,7 @@ const StretchConfigModal = ({
   );
   
   // Helper function to get random item from array
-  const getRandomItem = <T extends unknown>(array: T[]): T => {
+  const getRandomItem = <T,>(array: T[]): T => {
     return array[Math.floor(Math.random() * array.length)];
   };
   

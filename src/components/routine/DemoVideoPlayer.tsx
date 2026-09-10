@@ -12,8 +12,8 @@ import {
   Modal,
   StatusBar
 } from 'react-native';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { Audio } from 'expo-av';
+import { Video, ResizeMode, AVPlaybackStatus } from '../media/NativeVideo';
+import { Audio, Sound } from '../../utils/nativeAudio';
 import { Ionicons } from '@expo/vector-icons';
 import * as soundEffects from '../../utils/soundEffects';
 import NetInfo from '@react-native-community/netinfo';
@@ -91,7 +91,7 @@ const DemoVideoPlayer: React.FC<DemoVideoPlayerProps> = ({
   
   // Refs
   const videoRef = useRef<Video>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<Sound | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -1549,11 +1549,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   fullscreenOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'transparent',
   },
   fullscreenControls: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   exitFullscreenButton: {

@@ -216,7 +216,7 @@ export const InAppAINotification: React.FC<InAppAINotificationProps> = ({
           <TextInput
             style={{
               flex: 1,
-              backgroundColor: theme.surface,
+              backgroundColor: theme.cardBackground,
               borderRadius: 20,
               paddingHorizontal: 16,
               paddingVertical: 8,

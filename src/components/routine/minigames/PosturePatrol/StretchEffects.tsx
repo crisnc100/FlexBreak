@@ -22,7 +22,7 @@ export const StretchEffects: React.FC<StretchEffectsProps> = ({ effects }) => {
   const { theme } = useTheme();
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {effects.map(effect => (
         <StretchEffectAnimation
           key={effect.id}

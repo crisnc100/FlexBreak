@@ -159,7 +159,7 @@ export function useFeatureAccess() {
     if (!isPremium) return false;
     
     switch (featureId) {
-      case 'dark_theme':
+      case 'dark_theme': {
         // Dark theme is accessible if:
         // 1. The reward is specifically unlocked in the rewards system
         // 2. OR the user has reached level 2 or higher
@@ -168,6 +168,7 @@ export function useFeatureAccess() {
         
         console.log(`Dark theme access check - Has reward: ${hasDarkThemeReward}, Meets level req: ${hasRequiredLevel}`);
         return hasDarkThemeReward || hasRequiredLevel;
+      }
         
       case 'custom_reminders':
         return features.customReminders || meetsLevelRequirement('custom_reminders');

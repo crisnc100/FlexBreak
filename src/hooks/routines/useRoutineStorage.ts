@@ -119,7 +119,6 @@ export function useRoutineStorage(): UseRoutineStorageReturn {
           .filter(Boolean)
           .sort();
         
-      } else {
       }
     } catch (error) {
       console.error('[HOOK ERROR] Error saving routine progress:', error);

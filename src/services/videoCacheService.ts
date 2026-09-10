@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Video cache configuration
 const VIDEO_CACHE_DIR = `${FileSystem.documentDirectory}videoCache/`;
@@ -181,7 +181,7 @@ export class VideoCacheService {
       // Clean up partial download
       try {
         await FileSystem.deleteAsync(localPath, { idempotent: true });
-      } catch {}
+      } catch (cleanupError) { console.warn('Could not remove partial video download:', cleanupError); }
       throw error;
     }
   }

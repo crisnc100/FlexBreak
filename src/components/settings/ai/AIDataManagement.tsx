@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
-import aiWellnessService from '../../../services/ai/core/aiWellnessService';
+import Clipboard from '@react-native-clipboard/clipboard';
+import { exportLocalAIData } from '../../../services/ai/localAIData';
+import { getAIDataGeneration, isAIDataCurrent, onAIDataDeleted } from '../../../services/ai/aiDataLifecycle';
+import { deleteLocalAIData } from '../../../services/ai/deleteAIData';
 import memoryService from '../../../services/ai/memory/memoryService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { KEYS } from '../../../services/storageService';
 
 interface AIDataManagementProps {
   visible: boolean;
@@ -21,10 +23,14 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
     loadDataStats();
   }, [visible]);
 
+  useEffect(() => onAIDataDeleted(() => setDataStats({ interactions: 0, lastCheckIn: 'Never' })), []);
+
   const loadDataStats = async () => {
+    const generation = getAIDataGeneration();
     try {
       const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
       const memory = await memoryService.getMemory(userId);
+      if (!isAIDataCurrent(generation)) return;
       setDataStats({
         interactions: memory.usage.totalInteractions,
         lastCheckIn: memory.usage.lastCheckIn ? new Date(memory.usage.lastCheckIn).toLocaleDateString() : 'Never'
@@ -39,58 +45,23 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
   const handleExportData = async () => {
     try {
       setIsExporting(true);
-      const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-      
-      // Get wellness memory data
-      const memory = await memoryService.getMemoryWithCompatibility(userId);
-      const insights = await memoryService.getRecentInsights(userId, 50);
-      const userName = await AsyncStorage.getItem(KEYS.AI_WELLNESS.USER_NAME);
-      
-      const exportData = {
-        exportDate: new Date().toISOString(),
-        userData: {
-          name: userName || 'Not provided',
-          totalInteractions: memory.usage?.totalInteractions || 0,
-          weeklyCount: memory.usage?.weeklyCount || 0,
-          lastCheckIn: memory.usage?.lastCheckIn ? new Date(memory.usage.lastCheckIn).toISOString() : null,
-          language: memory.language || 'en',
-          isPremium: memory.usage?.isPremium || false
-        },
-        wellnessData: {
-          physicalIssues: memory.wellness_data?.physical_issues || [],
-          effectiveSolutions: memory.wellness_data?.effective_solutions || [],
-          patterns: memory.wellness_data?.patterns || [],
-          goals: memory.wellness_data?.goals || []
-        },
-        preferences: memory.preferences || {},
-        recentInteractions: insights.map(i => ({
-          date: i.timestamp ? new Date(i.timestamp).toISOString() : new Date().toISOString(),
-          type: i.type || 'unknown',
-          content: i.content || '',
-          context: i.context || '',
-          confidence: i.confidence || 0
-        }))
-      };
-      
+      const generation = getAIDataGeneration();
+      const exportData = await exportLocalAIData();
+      if (!isAIDataCurrent(generation)) return;
+
       // Convert to JSON string with pretty printing
       const jsonData = JSON.stringify(exportData, null, 2);
       
       // Show preview in alert (in production, save to file or share)
       Alert.alert(
         'Your AI Wellness Data',
-        `Data ready for export:\n\n` +
-        `• Name: ${exportData.userData.name}\n` +
-        `• Total check-ins: ${exportData.userData.totalInteractions}\n` +
-        `• Weekly interactions: ${exportData.userData.weeklyCount}\n` +
-        `• Physical issues tracked: ${exportData.wellnessData.physicalIssues.length}\n` +
-        `• Effective solutions: ${exportData.wellnessData.effectiveSolutions.length}\n` +
-        `• Data spans: ${insights.length} insights`,
+        `Ready to copy ${Object.keys(exportData.records).length} local AI records, including conversations, memory and settings.`,
         [
           {
             text: 'Copy to Clipboard',
             onPress: () => {
-              // In production, use Clipboard API
-              console.log('Data copied:', jsonData);
+              if (!isAIDataCurrent(generation)) return;
+              Clipboard.setString(jsonData);
               Alert.alert('Success', 'Data copied to clipboard');
             }
           },
@@ -108,7 +79,7 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
   const handleDeleteData = async () => {
     Alert.alert(
       'Delete AI Wellness Data',
-      'This will permanently delete all your AI Wellness conversations and data. This action cannot be undone.',
+      'Delete AI conversations, wellness memory and settings from this device, and cancel AI notifications? Shared diagnostic error counts are retained. This does not delete records already processed by cloud providers.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -117,40 +88,15 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
           onPress: async () => {
             try {
               setIsDeleting(true);
-              const userId = await AsyncStorage.getItem('@user_id') || 'anonymous';
-              
-              // Clear all wellness memory
-              await memoryService.clearMemory(userId);
-              
-              // Clear AI wellness settings
-              await AsyncStorage.multiRemove([
-                KEYS.AI_WELLNESS.ENABLED,
-                KEYS.AI_WELLNESS.HAS_SEEN_WELCOME,
-                KEYS.AI_WELLNESS.USER_NAME,
-                KEYS.AI_WELLNESS.LAST_CHECKIN,
-                KEYS.AI_WELLNESS.WEEKLY_USAGE,
-                KEYS.AI_WELLNESS.INTRO_MESSAGES_COUNT,
-                KEYS.AI_WELLNESS.FIRST_ENABLE_DONE,
-                KEYS.AI_WELLNESS.TIME_PREFERENCE,
-                KEYS.AI_WELLNESS.PREMIUM_WELCOME_SENT,
-                '@ai_wellness_last_response',
-                '@ai_wellness_show_modal',
-                '@ai_wellness_voice_mode',
-                '@ai_wellness_detected_language',
-                '@show_flexchat_on_open'
-              ]);
-              
-              // Clear conversation history from AsyncStorage
-              await AsyncStorage.removeItem(`@ai_wellness_conversation_${userId}`);
-              
+              await deleteLocalAIData();
+
               Alert.alert(
                 'Data Deleted',
-                'All your AI Wellness data has been permanently deleted.',
+                'AI conversations, wellness memory and settings were deleted from this device. AI notifications were cancelled and the coach was turned off. Shared diagnostic error counts remain.',
                 [{ text: 'OK' }]
               );
               
-              // Reload stats
-              await loadDataStats();
+              setDataStats({ interactions: 0, lastCheckIn: 'Never' });
             } catch (error) {
               Alert.alert('Deletion Failed', 'Unable to delete your data. Please try again.');
             } finally {
@@ -165,16 +111,9 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
   const handleViewPolicy = () => {
     Alert.alert(
       'AI Wellness Data Policy',
-      'What we store:\n' +
-      '• Your first name (if provided)\n' +
-      '• Anonymized wellness patterns\n' +
-      '• Effective solutions that helped you\n' +
-      '• Time patterns (no exact timestamps)\n\n' +
-      'What we DON\'T store:\n' +
-      '• Full conversation transcripts\n' +
-      '• Personal health information\n' +
-      '• Location or device data\n\n' +
-      'Your data is stored locally on your device and can be deleted anytime.',
+      'On this device: your conversations, wellness notes, preferences and usage timestamps.\n\n' +
+      'When you use the coach, messages and relevant context are sent through our backend to AI providers. Voice input is sent for speech transcription. Email verification sends the email address to the verification service.\n\n' +
+      'You can copy your local AI data or delete it here. Local deletion does not remove data already processed by providers. Avoid sharing information you do not want processed remotely.',
       [
         {
           text: 'Your Rights',
@@ -182,10 +121,10 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
             Alert.alert(
               'Your Data Rights',
               '✓ Access: Export your data anytime\n' +
-              '✓ Delete: Remove all data permanently\n' +
+              '✓ Delete: Remove AI data from this device\n' +
               '✓ Control: Enable/disable AI wellness\n' +
-              '✓ Privacy: No data leaves your device\n\n' +
-              'We only store patterns to improve your experience, never full conversations.',
+              '✓ Privacy: Review how AI data is processed\n\n' +
+              'Conversations are stored locally. AI and speech requests also use remote providers; local deletion does not delete provider records.',
               [{ text: 'OK' }]
             );
           }
@@ -214,7 +153,7 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
             Export My Data
           </Text>
           <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
-            Download all your AI Wellness data
+            Copy all AI Wellness data on this device
           </Text>
         </View>
         {isExporting ? (
@@ -235,7 +174,7 @@ export const AIDataManagement: React.FC<AIDataManagementProps> = ({ visible }) =
             Delete My Data
           </Text>
           <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
-            Permanently remove all AI data
+            Remove AI data from this device
           </Text>
         </View>
         {isDeleting ? (

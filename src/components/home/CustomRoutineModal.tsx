@@ -260,7 +260,7 @@ const CustomRoutineModal: React.FC<CustomRoutineModalProps> = ({
     console.log('Starting custom routine:', routine.name, 'with', 
                 routine.customStretches?.length || 0, 'stretches');
     
-    let params: RoutineParams = {
+    const params: RoutineParams = {
       area: routine.area,
       duration: routine.duration,
       position: 'All' // Default level

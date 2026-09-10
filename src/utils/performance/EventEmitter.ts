@@ -13,7 +13,7 @@ export class EventEmitter {
    * @param listener Function to call when event is emitted
    * @returns Unsubscribe function
    */
-  on(event: string, listener: Listener): Function {
+  on(event: string, listener: Listener): () => void {
     if (!this.events[event]) {
       this.events[event] = [];
     }

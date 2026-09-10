@@ -46,14 +46,8 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   const meetsLevelRequirement = userLevel >= requiredLevel;
   const canUseFlexSave = meetsLevelRequirement && isPremiumUser;
   
-  // Add error handling for the streak hook
-  let liveStreak = 0;
-  try {
-    liveStreak = useStreak({ forceRefresh: false }) || 0;
-  } catch (error) {
-    console.error('Error using streak hook:', error);
-    liveStreak = currentStreak; // Fall back to the prop value
-  }
+  // The hook handles storage failures while retaining its last known streak.
+  const liveStreak = useStreak({ forceRefresh: false }) || 0;
 
   const [validatedStreak, setValidatedStreak] = useState(liveStreak);
   
@@ -77,7 +71,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
 
   // Validate streak and listen for streak updates
   useEffect(() => {
-    let cancelled = false;
+    const cancelled = false;
   
     /** ask the manager if the current streak is broken */
     const checkBroken = async () => {

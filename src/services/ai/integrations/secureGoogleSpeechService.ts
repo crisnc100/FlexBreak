@@ -1,6 +1,5 @@
-import firebase from 'firebase/compat/app';
-import { EDGE_FUNCTIONS, SUPABASE_ANON_KEY } from '../../../config/supabase';
-import * as FileSystem from 'expo-file-system';
+import { callBackend } from '../../security/backendClient';
+import * as FileSystem from 'expo-file-system/legacy';
 
 class SecureGoogleSpeechService {
   async transcribeAudio(audioUri: string, languageCode?: string): Promise<{ text: string; detectedLanguage?: string } | null> {
@@ -14,37 +13,17 @@ class SecureGoogleSpeechService {
       });
       console.log('Audio file read, base64 length:', audioBase64.length);
 
-      // Determine audio format based on file extension
-      const isIOS = audioUri.includes('.caf');
-      const encoding = isIOS ? 'LINEAR16' : 'WEBM_OPUS';
-      const sampleRate = isIOS ? 16000 : 48000; // Use 16000 for better accuracy like original
-      
-      console.log('Audio format detected:', { encoding, sampleRate, isIOS });
-
-      // Call Supabase Edge Function
-      const currentUser = firebase.auth().currentUser;
-      const response = await fetch(EDGE_FUNCTIONS.SPEECH_TRANSCRIPTION, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          audioBase64,
-          languageCode,
-          encoding,
-          sampleRate,
-          userId: currentUser?.uid || 'anonymous'
-        })
+      // Match the native recorder: WAV PCM16 on iOS; AMR-WB on Android.
+      // Do not label AAC or CAF data as WebM/Opus or raw PCM.
+      const extension = audioUri.split('?')[0].split('.').pop()?.toLowerCase();
+      const encoding = extension === 'wav' ? 'LINEAR16' : extension === 'amr' ? 'AMR_WB' : null;
+      if (!encoding) throw new Error('Unsupported recording format');
+      const result = await callBackend<{ text: string; detectedLanguage?: string }>('transcribe-audio-v2', {
+        audioContent: audioBase64,
+        languageCode,
+        encoding,
+        sampleRateHertz: 16000,
       });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        console.error('Transcription failed:', result.error);
-        return null;
-      }
 
       console.log('Transcription successful');
       return {

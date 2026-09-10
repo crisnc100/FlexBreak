@@ -1,6 +1,6 @@
-import openRouterService from '../integrations/openRouterService';
+import { getIsPremium } from '../../storageService';
+import { trackAIWork } from '../aiDataLifecycle';
 import secureAIService from '../integrations/secureAIService';
-import groqService from '../integrations/groqService';
 import { buildUserContext, categorizeInput } from '../contextBuilder';
 import { WELLNESS_COACH_PROMPT, FALLBACK_RESPONSES } from './promptManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -69,7 +69,7 @@ export class AIWellnessServiceV2 {
     if (!hasBullets) {
       // Split into sentences by common punctuation (supports CJK)
       const sentences = text
-        .split(/(?<=[\.!?。！？])\s+/)
+        .split(/(?<=[.!?。！？])\s+/)
         .map(s => s.trim())
         .filter(Boolean);
 
@@ -94,7 +94,7 @@ export class AIWellnessServiceV2 {
     // Soft word clamp (~220 max, ideal 160–220)
     const words = text.split(/\s+/);
     if (words.length > 220) {
-      text = words.slice(0, 220).join(' ').replace(/[,:;\-]+$/, '') + '…';
+      text = words.slice(0, 220).join(' ').replace(/[,:;-]+$/, '') + '…';
     }
     return text.trim();
   }
@@ -160,7 +160,7 @@ export class AIWellnessServiceV2 {
     const singleLimit = 28; // ~28 words per step
     const limited = pruned.map(s => {
       const words = s.split(/\s+/);
-      return words.length > singleLimit ? words.slice(0, singleLimit).join(' ').replace(/[,:;\-]+$/, '') + '…' : s;
+      return words.length > singleLimit ? words.slice(0, singleLimit).join(' ').replace(/[,:;-]+$/, '') + '…' : s;
     });
 
     // Rebuild as numbered list
@@ -179,7 +179,7 @@ export class AIWellnessServiceV2 {
     const all = `${body}\n\n${finalLine}`.trim();
     const words = all.split(/\s+/);
     if (words.length > 130) {
-      return words.slice(0, 130).join(' ').replace(/[,:;\-]+$/, '') + '…';
+      return words.slice(0, 130).join(' ').replace(/[,:;-]+$/, '') + '…';
     }
     return all;
   }
@@ -196,10 +196,10 @@ export class AIWellnessServiceV2 {
       const transitionDuration = await getTransitionDuration();
 
       const config = generateRoutineConfig(parsed, issue, duration, transitionDuration);
-      let routineItems = selectStretches(config, allStretches);
+      const routineItems = selectStretches(config, allStretches);
 
       const hasPremiumAccess = await rewardManager.isRewardUnlocked('premium_stretches');
-      let filtered = routineItems.filter(item => {
+      const filtered = routineItems.filter(item => {
         if ('isTransition' in item) return true;
         const s = item as Stretch;
         return !s.premium || hasPremiumAccess;
@@ -218,8 +218,8 @@ export class AIWellnessServiceV2 {
       if (!custom || countNonTransition(custom) < 3) {
         // Relax position filter
         const relaxedConfig = { ...config, position: 'All' as Position, isDeskFriendly: false };
-        let relaxedItems = selectStretches(relaxedConfig, allStretches);
-        let relaxedFiltered = relaxedItems.filter(item => {
+        const relaxedItems = selectStretches(relaxedConfig, allStretches);
+        const relaxedFiltered = relaxedItems.filter(item => {
           if ('isTransition' in item) return true;
           const s = item as Stretch;
           return !s.premium || hasPremiumAccess;
@@ -258,7 +258,16 @@ export class AIWellnessServiceV2 {
     }
   }
   
-  async processWellnessCheckIn(
+  processWellnessCheckIn(
+    userInput: string,
+    userId?: string,
+    isNotification = false,
+    conversationHistory?: Array<{ type: 'user' | 'ai'; message: string; timestamp: Date }>
+  ): Promise<WellnessResponse> {
+    return trackAIWork(() => this.processWellnessCheckInInternal(userInput, userId, isNotification, conversationHistory));
+  }
+
+  private async processWellnessCheckInInternal(
     userInput: string,
     userId?: string,
     isNotification: boolean = false,
@@ -276,7 +285,7 @@ export class AIWellnessServiceV2 {
       }
       
       // Check cost limits
-      const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
+      const isPremium = await getIsPremium();
       const canUseCost = await costMonitor.canMakeRequest(isPremium);
       if (!canUseCost) {
         return {
@@ -473,7 +482,7 @@ export class AIWellnessServiceV2 {
               lastCheckIn: Date.now(),
               totalInteractions: currentMemory.usage.totalInteractions + 1,
               weeklyCount: currentMemory.usage.weeklyCount + 1,
-              isPremium: await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true'
+              isPremium: await getIsPremium()
             }
           });
         }
@@ -490,95 +499,17 @@ export class AIWellnessServiceV2 {
       let aiResponse: string;
       
       try {
-        // Convert to messages format for chat API
-        const messages = [
-          { role: 'system' as const, content: enhancedPrompt },
-          { role: 'user' as const, content: userInput }
-        ];
-        
-        // Use secure or direct service based on configuration
-        const aiService = AI_CONFIG.useSecureMode ? secureAIService : openRouterService;
-        
-        // Use chatWithRetry which includes built-in retry logic
-        aiResponse = await aiService.chatWithRetry(
-          messages,
-          {
-            model: modelConfig.model,
-            maxTokens: modelConfig.maxTokens,
-            temperature: 0.7
-          }
-        );
+        // The server owns provider selection, fallback and continuation under one
+        // quota reservation. Replaying the request here would charge it again.
+        aiResponse = await secureAIService.chat([
+          { role: 'system', content: enhancedPrompt },
+          { role: 'user', content: userInput }
+        ], { maxTokens: modelConfig.maxTokens, temperature: 0.7 });
       } catch (apiError) {
-        console.error('API call failed after retries:', apiError);
-        
-        // Check if we should try free model as fallback
-        if (!isPremium && modelConfig.model !== AI_CONFIG.models.free) {
-          console.log('Attempting free model fallback');
-          
-          try {
-            const freeModelConfig = { 
-              ...modelConfig, 
-              model: AI_CONFIG.models.free 
-            };
-            
-            // Recreate messages for fallback call
-            const fallbackMessages = [
-              { role: 'system' as const, content: enhancedPrompt },
-              { role: 'user' as const, content: userInput }
-            ];
-            
-            // Use the same service (secure or direct) for fallback
-            const aiService = AI_CONFIG.useSecureMode ? secureAIService : openRouterService;
-            
-            aiResponse = await aiService.chatWithRetry(
-              fallbackMessages,
-              {
-                model: freeModelConfig.model,
-                maxTokens: freeModelConfig.maxTokens,
-                temperature: 0.7
-              }
-            );
-          } catch (freeModelError) {
-            console.error('Free model failed, trying Groq fallback');
-            try {
-              // Try Groq as intermediate fallback
-              aiResponse = await groqService.chatWithRetry(
-                fallbackMessages,
-                {
-                  model: AI_CONFIG.groq.defaultModel,
-                  maxTokens: freeModelConfig.maxTokens,
-                  temperature: 0.7
-                }
-              );
-            } catch (groqError) {
-              console.error('Groq also failed, using static fallback');
-              aiResponse = await this.getFallbackResponse(userInput, userId);
-            }
-          }
-        } else {
-          // For premium users, try Groq before static fallback
-          console.log('Trying Groq fallback for premium user');
-          try {
-            const fallbackMessages = [
-              { role: 'system' as const, content: enhancedPrompt },
-              { role: 'user' as const, content: userInput }
-            ];
-            
-            aiResponse = await groqService.chatWithRetry(
-              fallbackMessages,
-              {
-                model: AI_CONFIG.groq.defaultModel,
-                maxTokens: modelConfig.maxTokens,
-                temperature: 0.7
-              }
-            );
-          } catch (groqError) {
-            console.error('Groq fallback failed for premium user, using static fallback');
-            aiResponse = await this.getFallbackResponse(userInput, userId);
-          }
-        }
+        console.error('AI request unavailable; using local guidance:', apiError);
+        aiResponse = await this.getFallbackResponse(userInput, userId);
       }
-      
+
       // Validate response
       if (!aiResponse || aiResponse.trim().length < 10) {
         console.error('AI response empty, using fallback');
@@ -635,13 +566,13 @@ export class AIWellnessServiceV2 {
             lastCheckIn: Date.now(),
             totalInteractions: currentMemory.usage.totalInteractions + 1,
             weeklyCount: currentMemory.usage.weeklyCount + 1,
-            isPremium: await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true'
+            isPremium: await getIsPremium()
           }
         });
       }
       
       // No routineParams in text/clarify modes
-      let routineParams: RoutineParams | undefined = undefined;
+      const routineParams: RoutineParams | undefined = undefined;
 
       return {
         response: safeResponse,
@@ -751,7 +682,7 @@ export class AIWellnessServiceV2 {
       };
     }
     
-    const isPremium = await AsyncStorage.getItem(KEYS.USER.PREMIUM) === 'true';
+    const isPremium = await getIsPremium();
     
     // Check day of week for free users (but allow first welcome interaction)
     if (!isPremium) {

@@ -728,7 +728,7 @@ const FlexSaveCard: React.FC<FlexSaveCardProps> = ({
         ) : (
           <>
             <Text style={[styles.subtitle, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
-              Missing a day won't break your streak! Your FlexSaves reset at the beginning of each month.
+              Missing a day won&apos;t break your streak! Your FlexSaves reset at the beginning of each month.
             </Text>
             
             {currentStreak >= 1 && !isStreakBroken && (
@@ -777,7 +777,7 @@ const FlexSaveCard: React.FC<FlexSaveCardProps> = ({
               <View style={styles.warningContainer}>
                 <Ionicons name="alert-circle-outline" size={18} color={isDark || isSunset ? '#FF5722' : '#FF5722'} style={{ marginRight: 6 }} />
                 <Text style={[styles.warningText, { color: isDark || isSunset ? '#FF5722' : '#FF5722' }]}>
-                  Streak broken: It's been more than 2 days since your last activity. Your streak will reset when you next complete a routine.
+                  Streak broken: It&apos;s been more than 2 days since your last activity. Your streak will reset when you next complete a routine.
                 </Text>
               </View>
             )}
@@ -786,7 +786,7 @@ const FlexSaveCard: React.FC<FlexSaveCardProps> = ({
             
             {!canSaveStreak && !isStreakBroken && !hasTodayActivity && currentStreak > 0 && (
               <Text style={[styles.explainerText, { color: isDark || isSunset ? theme.textSecondary : '#666' }]}>
-                Flex saves apply when you've missed a day of activity.
+                Flex saves apply when you&apos;ve missed a day of activity.
               </Text>
             )}
           </>

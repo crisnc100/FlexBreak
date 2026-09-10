@@ -132,7 +132,7 @@ ${bugs}
         <View style={[styles.noticeContainer, { backgroundColor: isDark ? 'rgba(255, 193, 7, 0.15)' : 'rgba(255, 193, 7, 0.1)', marginTop: 16 }]}>
           <Ionicons name="alert-circle-outline" size={22} color="#FFC107" style={styles.noticeIcon} />
           <Text style={[styles.noticeText, { color: isDark ? '#FFC107' : '#856404' }]}>
-            Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app's main features, not these testing tools.
+            Note: These testing screens will be removed from the app at launch. Please focus your feedback on the app&apos;s main features, not these testing tools.
           </Text>
         </View>
       </View>

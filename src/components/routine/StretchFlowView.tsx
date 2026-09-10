@@ -22,7 +22,7 @@ import { videoLoaderService } from '../../services/videoLoaderService';
 import * as Haptics from 'expo-haptics';
 import { Stretch, RestPeriod, TransitionPeriod } from '../../types';
 import { NavigationButtons } from './utils';
-import { Video, ResizeMode as VideoResizeMode } from 'expo-av';
+import { Video, ResizeMode as VideoResizeMode } from '../media/NativeVideo';
 import Svg, { Circle, G } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import CircularTimer from './CircularTimer';
@@ -1162,7 +1162,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
                   <Text style={[styles.transitionButtonText, {
                     fontSize: 14
                   }]}>
-                    I'm Ready
+                    I&apos;m Ready
                   </Text>
                   <Ionicons name="chevron-forward" size={18} color="#FFF" />
                 </TouchableOpacity>

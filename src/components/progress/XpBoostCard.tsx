@@ -21,14 +21,19 @@ const mockRewardManager = {
   }
 };
 
-// Try to import the actual rewardManager, use mock as fallback
-let rewardManager: typeof mockRewardManager;
-try {
-  rewardManager = require('../../utils/progress/modules/rewardManager');
-} catch (e) {
-  console.warn('Could not import rewardManager, using mock instead', e);
-  rewardManager = mockRewardManager;
-}
+// Keep a local fallback if loading the reward module fails.
+const rewardManager = {
+  isRewardUnlocked: async (rewardId: string): Promise<boolean> => {
+    let manager: typeof mockRewardManager;
+    try {
+      manager = await import('../../utils/progress/modules/rewardManager');
+    } catch (error) {
+      console.warn('Could not import rewardManager, using mock instead', error);
+      manager = mockRewardManager;
+    }
+    return manager.isRewardUnlocked(rewardId);
+  },
+};
 
 interface XpBoostCardProps {
   onActivate?: () => void;

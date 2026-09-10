@@ -99,3 +99,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+BuildSlotComponent.displayName = 'BuildSlotComponent';

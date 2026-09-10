@@ -18,7 +18,7 @@ export const AIDebugButton: React.FC<AIDebugButtonProps> = ({ visible }) => {
     
     // Group notifications by type
     const aiNotifs = allScheduled.filter(n => 
-      n.content.data?.type?.includes('ai_wellness') ||
+      (typeof n.content.data?.type === 'string' && n.content.data.type.includes('ai_wellness')) ||
       n.content.title?.includes('AI') ||
       n.content.title?.includes('wellness')
     );

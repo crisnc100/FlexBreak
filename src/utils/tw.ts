@@ -88,9 +88,7 @@ const styles = StyleSheet.create({
 export const tw = (styleString: string) => {
   const classNames = styleString.split(' ');
   return classNames.reduce((acc, className) => {
-    // @ts-ignore - We know these styles exist
     if (styles[className]) {
-      // @ts-ignore
       return { ...acc, ...styles[className] };
     }
     return acc;

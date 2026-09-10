@@ -734,3 +734,4 @@ const styles = StyleSheet.create({
 });
 
 export default ChallengesTab; 
+ChallengesTab.displayName = 'ChallengesTab';

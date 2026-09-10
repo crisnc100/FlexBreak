@@ -32,22 +32,17 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [isFullyMounted, setIsFullyMounted] = useState(false);
   
-  // Show notification for challenges and mini-games
-  // Skip rendering for other sources (routines use their own flow)
-  if (source !== 'challenge' && source !== 'mini-game') {
-    console.log(`LevelUpNotification: Skipping notification for source '${source}'`);
-    
-    // Immediately dismiss without rendering
-    setTimeout(() => {
-      onDismiss();
-    }, 100);
-    
-    // Return null instead of rendering the component
-    return null;
-  }
-  
+  const supportedSource = source === 'challenge' || source === 'mini-game';
+
+  useEffect(() => {
+    if (supportedSource) return;
+    const timer = setTimeout(onDismiss, 100);
+    return () => clearTimeout(timer);
+  }, [supportedSource, onDismiss]);
+
   // Detailed console logging for debugging
   useEffect(() => {
+    if (!supportedSource) return;
     console.log(`Rendering LevelUpNotification: ${oldLevel} → ${newLevel}`);
     console.log(`Source: ${source}, Challenge: ${challengeTitle || 'None'}`);
     
@@ -55,18 +50,23 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
     
     // First mark as fully mounted (layout complete)
     // This ensures all styles are properly applied before animation
-    setTimeout(() => {
+    let visibleTimer: ReturnType<typeof setTimeout>;
+    const mountedTimer = setTimeout(() => {
       setIsFullyMounted(true);
       
       // Then after a tiny delay, trigger animation
-      setTimeout(() => {
+      visibleTimer = setTimeout(() => {
         setIsVisible(true);
       }, 100);
     }, 100);
-  }, []);
+    return () => {
+      clearTimeout(mountedTimer);
+      clearTimeout(visibleTimer);
+    };
+  }, [supportedSource]);
 
   useEffect(() => {
-    if (isVisible && isFullyMounted) {
+    if (supportedSource && isVisible && isFullyMounted) {
       // Animate in only after we're fully ready
       Animated.timing(animation, {
         toValue: 1,
@@ -89,7 +89,9 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isVisible, isFullyMounted]);
+  }, [isVisible, isFullyMounted, supportedSource]);
+
+  if (!supportedSource) return null;
   
   // Get source description
   const getSourceText = () => {
@@ -161,7 +163,7 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
               </View>
             </View>
             <Text style={styles.description}>
-              You've reached level {newLevel} {getSourceText()}
+              You&apos;ve reached level {newLevel} {getSourceText()}
             </Text>
           </View>
         </View>
@@ -215,7 +217,7 @@ const LevelUpNotification: React.FC<LevelUpNotificationProps> = ({
             </View>
           </View>
           <Text style={styles.description}>
-            You've reached level {newLevel} {getSourceText()}
+            You&apos;ve reached level {newLevel} {getSourceText()}
           </Text>
         </View>
       </View>

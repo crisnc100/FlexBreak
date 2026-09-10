@@ -249,3 +249,23 @@ firebase-debug.log
 *.xd
 *.pdf
 !assets/**/*.pdf
+
+# Secrets: EAS uses this file instead of .gitignore.
+**/*service-account*.json
+**/*serviceAccount*.json
+**/*credentials*.json
+**/secrets/
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+.artifacts/
+builds/
+.worktrees/
+.worktrees.conf
+.worktree-port
+.claude/
+.cursor/

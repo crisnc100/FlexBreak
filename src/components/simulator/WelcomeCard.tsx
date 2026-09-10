@@ -53,7 +53,7 @@ const WelcomeCard: React.FC = () => {
             <Text style={styles.stepNumberText}>4</Text>
           </View>
           <Text style={[styles.stepText, { color: theme.text }]}>
-            Once you're done, close out the app and reopen it to see the results.
+            Once you&apos;re done, close out the app and reopen it to see the results.
           </Text>
         </View>
       </View>

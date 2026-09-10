@@ -1,6 +1,13 @@
-import axios from 'axios';
+import { callBackend } from './security/backendClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { OPENWEATHER_MAP_API_KEY } from '../config/weather.config';
+
+interface CurrentWeatherResponse {
+  main: { temp: number; feels_like: number; humidity: number };
+  weather: { main: string; description: string }[];
+  wind: { speed: number };
+  sys: { sunrise: number; sunset: number };
+  dt: number;
+}
 
 // Weather data interface
 export interface WeatherData {
@@ -53,39 +60,8 @@ export async function getWeatherData(lat: number, lon: number): Promise<WeatherD
       }
     }
     
-    // Fetch fresh weather data
-    console.log(`Fetching fresh weather data for ${lat}, ${lon}`);
-    
-    // Quick location check - these coordinates should be in North Carolina
-    if (lat > 35 && lat < 37 && lon > -79 && lon < -78) {
-      console.log('Location verified: North Carolina area');
-    } else {
-      console.log('Warning: Location may be incorrect');
-    }
-    
-    // Get API key from config
-    const apiKey = OPENWEATHER_MAP_API_KEY;
-    
-    if (!apiKey || apiKey === 'YOUR_OPENWEATHER_MAP_API_KEY') {
-      console.error('OpenWeatherMap API key not configured');
-      return null;
-    }
-    
-    const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/weather`,
-      {
-        params: {
-          lat,
-          lon,
-          appid: apiKey,
-          units: 'imperial' // For Fahrenheit
-        },
-        timeout: 5000 // 5 second timeout
-      }
-    );
-    
-    const data = response.data;
-    
+    const data = await callBackend<CurrentWeatherResponse>('weather-v2', { lat, lon, kind: 'current' });
+
     // Parse weather data
     const weatherData: WeatherData = {
       temp: Math.round(data.main.temp),
@@ -248,33 +224,8 @@ export async function getWeatherForecast(lat: number, lon: number): Promise<Weat
       }
     }
     
-    // Fetch fresh forecast data
-    console.log(`Fetching fresh weather forecast for ${lat}, ${lon}`);
-    
-    const apiKey = OPENWEATHER_MAP_API_KEY;
-    
-    if (!apiKey || apiKey === 'YOUR_OPENWEATHER_MAP_API_KEY') {
-      console.error('OpenWeatherMap API key not configured');
-      return null;
-    }
-    
-    // Using 5-day forecast API (free tier)
-    const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/forecast`,
-      {
-        params: {
-          lat,
-          lon,
-          appid: apiKey,
-          units: 'imperial', // For Fahrenheit
-          cnt: 40 // Get all 40 data points (5 days * 8 three-hour periods)
-        },
-        timeout: 10000 // 10 second timeout
-      }
-    );
-    
-    const data = response.data;
-    
+    const data = await callBackend<{ list: CurrentWeatherResponse[] }>('weather-v2', { lat, lon, kind: 'forecast' });
+
     // Group forecasts by day and get the max temp for each day
     const dailyForecasts = new Map<string, any>();
     
