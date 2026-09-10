@@ -1,0 +1,18 @@
+{
+  "project": "flexbreak-28ad0",
+  "appId": "1:1008736824952:ios:f061ee871cb11dbda1478d",
+  "checkedAt": "2026-09-10T14:46:55.635Z",
+  "checks": {
+    "anonymousSignup": "PASS",
+    "tokenProjectAndProvider": "PASS",
+    "refreshPreservesIdentity": "PASS",
+    "deleteOnlyCreatedTestAccount": "PASS"
+  },
+  "limitations": "Firebase JS SDK sign-in and token refresh only. Physical-device persistence after restart is still unverified.",
+  "previousConfiguration": {
+    "signupHTTPStatus": 400,
+    "signupError": "API_KEY_INVALID",
+    "appId": "1:1033066069126:ios:2b3ecbc0c5ef94df14c06e",
+    "messagingSenderId": "1033066069126"
+  }
+}

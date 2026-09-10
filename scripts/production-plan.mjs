@@ -113,7 +113,7 @@ export async function main() {
   });
   const plan = classifyPaths(collectTouchedPaths(checkpoint, env.GITHUB_SHA));
   appendFileSync(env.GITHUB_OUTPUT, `backend=${plan.backend}\nmobile=${plan.mobile}\n`);
-  appendFileSync(env.GITHUB_STEP_SUMMARY, `Checkpoint ${checkpoint}; source ${env.GITHUB_SHA}; planned: ${plan.backend ? 'v2 backend ' : ''}${plan.mobile ? 'iOS + Android internal uploads' : ''}${!plan.backend && !plan.mobile ? 'none' : ''}.\n`);
+  appendFileSync(env.GITHUB_STEP_SUMMARY, `Checkpoint ${checkpoint}; source ${env.GITHUB_SHA}; planned: ${plan.backend ? 'v2 backend ' : ''}${plan.mobile ? 'iOS upload for TestFlight processing' : ''}${!plan.backend && !plan.mobile ? 'none' : ''}.\n`);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch(error => { console.error(error.message); process.exitCode = 1; });
