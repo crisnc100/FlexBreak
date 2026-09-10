@@ -183,19 +183,15 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
   useEffect(() => {
     // Reset image error state when stretch changes
     setImageLoadError(null);
+    setIsImageLoading(true);
+    setHasDemoBeenWatched(false);
     
     // Fade out current image
     Animated.timing(imageOpacity, {
       toValue: 0,
       duration: 150,
       useNativeDriver: true
-    }).start(() => {
-      // Start loading new image
-      setIsImageLoading(true);
-      
-      // Reset hasDemoBeenWatched when stretch changes
-      setHasDemoBeenWatched(false);
-    });
+    }).start();
   }, [currentStretchId, mediaKey]);
   
   // Determine if this stretch has tips
@@ -492,58 +488,60 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
     
     if (shouldRenderVideo && videoSource) {
       return (
-        <Animated.View style={[styles.imageWrapper, { opacity: imageOpacity }]}>
-          <Video 
-            key={mediaKey}
-            source={videoSource}
-            style={styles.stretchImage}
-            resizeMode={VideoResizeMode.CONTAIN}
-            shouldPlay={true}
-            isLooping={true}
-            isMuted={true}
-            useNativeControls={false}
-            onLoadStart={() => {
-              setIsImageLoading(true);
-            }}
-            onReadyForDisplay={() => {
-              console.log(`Video ready for display: ${stretchObj.name}`);
-              setIsImageLoading(false);
-              // Fade in the video when loaded
-              Animated.timing(imageOpacity, {
-                toValue: 1,
-                duration: 250,
-                useNativeDriver: true
-              }).start();
-            }}
-            onLoad={() => {
-              console.log(`Successfully loaded video for ${stretchObj.name}`);
-              setIsImageLoading(false);
-              // Fade in the video when loaded
-              Animated.timing(imageOpacity, {
-                toValue: 1,
-                duration: 250,
-                useNativeDriver: true
-              }).start();
-            }}
-            onError={(error) => {
-              if (currentMediaKey.current !== mediaKey) return;
-              console.warn(`Failed to load video for stretch: ${stretchObj.name}`, error);
-              setImageLoadError(mediaKey);
-              setIsImageLoading(false);
-            }}
-            onPlaybackStatusUpdate={(status) => {
-              // Also mark as loaded when playback starts
-              if (status.isLoaded && status.isPlaying && isImageLoading) {
-                console.log(`Video is now playing for ${stretchObj.name}`);
+        <View style={styles.imageWrapper}>
+          <Animated.View style={[styles.imageWrapper, { opacity: imageOpacity }]}>
+            <Video
+              key={mediaKey}
+              source={videoSource}
+              style={styles.stretchImage}
+              resizeMode={VideoResizeMode.CONTAIN}
+              shouldPlay={true}
+              isLooping={true}
+              isMuted={true}
+              useNativeControls={false}
+              onLoadStart={() => {
+                setIsImageLoading(true);
+              }}
+              onReadyForDisplay={() => {
+                console.log(`Video ready for display: ${stretchObj.name}`);
                 setIsImageLoading(false);
+                // Fade in the video when loaded
                 Animated.timing(imageOpacity, {
                   toValue: 1,
                   duration: 250,
                   useNativeDriver: true
                 }).start();
-              }
-            }}
-          />
+              }}
+              onLoad={() => {
+                console.log(`Successfully loaded video for ${stretchObj.name}`);
+                setIsImageLoading(false);
+                // Fade in the video when loaded
+                Animated.timing(imageOpacity, {
+                  toValue: 1,
+                  duration: 250,
+                  useNativeDriver: true
+                }).start();
+              }}
+              onError={(error) => {
+                if (currentMediaKey.current !== mediaKey) return;
+                console.warn(`Failed to load video for stretch: ${stretchObj.name}`, error);
+                setImageLoadError(mediaKey);
+                setIsImageLoading(false);
+              }}
+              onPlaybackStatusUpdate={(status) => {
+                // Also mark as loaded when playback starts
+                if (status.isLoaded && status.isPlaying && isImageLoading) {
+                  console.log(`Video is now playing for ${stretchObj.name}`);
+                  setIsImageLoading(false);
+                  Animated.timing(imageOpacity, {
+                    toValue: 1,
+                    duration: 250,
+                    useNativeDriver: true
+                  }).start();
+                }
+              }}
+            />
+          </Animated.View>
           {isImageLoading && (
             <View style={styles.imageLoadingContainer}>
               <ActivityIndicator size="large" color={isDark || isSunset ? theme.accent : '#4CAF50'} />
@@ -552,7 +550,7 @@ export const StretchFlowView: React.FC<StretchFlowViewProps> = ({
               </Text>
             </View>
           )}
-        </Animated.View>
+        </View>
       );
     }
     

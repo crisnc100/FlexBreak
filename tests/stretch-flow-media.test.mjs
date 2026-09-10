@@ -11,13 +11,14 @@ const find = (tree, type) => nodes(tree).find(node => node.type === type);
 
 // Execute the real component with persistent hook state; mock only native surfaces
 // and the asynchronous loader. Effects retain dependency and cleanup semantics.
-function harness(initialStretch = videoStretch('first')) {
+function harness(initialStretch = videoStretch('first'), { deferAnimations = false } = {}) {
   const slots = [];
   let cursor = 0;
   let pendingEffects = [];
   let mounted = true;
   let writesAfterUnmount = 0;
   const requests = [];
+  const animations = [];
   const changed = (before, after) => !before || after.some((value, index) => value !== before[index]);
   const react = {
     useState(initial) {
@@ -45,7 +46,11 @@ function harness(initialStretch = videoStretch('first')) {
   };
   class Value { constructor(value) { this.value = value; } setValue(value) { this.value = value; } }
   const Animated = { Value, View: 'Animated.View', createAnimatedComponent: component => component,
-    timing: (value, options) => ({ start(callback) { value.value = options.toValue; callback?.({ finished: true }); } }) };
+    timing: (value, options) => ({ start(callback) {
+      const complete = () => { value.value = options.toValue; callback?.({ finished: true }); };
+      if (deferAnimations) animations.push(complete);
+      else complete();
+    } }) };
   const native = Object.fromEntries(['View', 'Text', 'Image', 'TouchableOpacity', 'ScrollView', 'FlatList', 'ActivityIndicator'].map(name => [name, name]));
   const jsx = (type, props) => ({ type, props });
   const load = createLoader({ mocks: {
@@ -74,7 +79,7 @@ function harness(initialStretch = videoStretch('first')) {
       startTimer() {}, currentStretch: stretch, isPlaying: false });
   };
   const flushEffects = () => { const queued = pendingEffects; pendingEffects = []; queued.forEach(effect => effect()); };
-  return { render, flushEffects, requests, writesAfterUnmount: () => writesAfterUnmount,
+  return { render, flushEffects, requests, animations, writesAfterUnmount: () => writesAfterUnmount,
     unmount() { slots.forEach(slot => slot?.cleanup?.()); mounted = false; } };
 }
 
@@ -100,6 +105,30 @@ test('cold timed video stays visibly loading until its source resolves, never mo
   assert.equal(video.props.source.uri, h.requests[0].uri);
   assert.equal(video.props.shouldPlay, true);
   assert.equal(video.props.isLooping, true);
+});
+
+test('resolved video keeps a visible spinner while native playback buffers', async () => {
+  const h = harness(); h.render(); h.flushEffects();
+  h.requests[0].resolve({ uri: h.requests[0].uri, isLocal: false }); await setImmediate();
+  const tree = h.render();
+  const video = find(tree, 'Video');
+  const loading = find(tree, 'ActivityIndicator');
+  assert.ok(video); assert.ok(loading);
+  assert.ok(!nodes(tree).some(node => node.type === 'Animated.View'
+    && node.props.style.some(style => style?.opacity?.value === 0)
+    && nodes(node).includes(loading)));
+  video.props.onReadyForDisplay();
+  assert.equal(find(h.render(), 'ActivityIndicator'), undefined);
+});
+
+test('late fade-out completion cannot restart the spinner after a fast video load', async () => {
+  const h = harness(videoStretch('fast'), { deferAnimations: true });
+  h.render(); h.flushEffects();
+  h.requests[0].resolve({ uri: h.requests[0].uri, isLocal: false }); await setImmediate();
+  find(h.render(), 'Video').props.onLoad();
+  assert.equal(find(h.render(), 'ActivityIndicator'), undefined);
+  h.animations.shift()();
+  assert.equal(find(h.render(), 'ActivityIndicator'), undefined);
 });
 
 test('source changes hide the previous video immediately and ignore out-of-order loader results', async () => {
