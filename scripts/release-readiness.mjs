@@ -32,13 +32,9 @@ export const serviceReadiness = {
     status: 'blocked', evidence: null,
     reason: 'Deploy and verify the authenticated v2 endpoints in the intended environment, including identity enforcement, quotas, deletion, transcription and weather-v2 with its server-only OPENWEATHER_API_KEY.',
   },
-  storeVerification: {
-    status: 'blocked', evidence: null,
-    reason: 'Configure server-side Apple/Google verification credentials and prove sandbox purchase, restore, expiry and cancellation against the intended backend.',
-  },
   productionAccounts: {
     status: 'blocked', evidence: null,
-    reason: 'Verify the Apple team, replace AdMob sample app IDs with account-verified production IDs, and verify the retained JavaScript Firebase project 28ad0 against the production account. Unused native Firebase configuration was removed with cloud push registration.',
+    reason: 'Replace AdMob sample app IDs with account-verified production IDs, and verify the retained JavaScript Firebase project 28ad0 against the production account. Unused native Firebase configuration was removed with cloud push registration.',
   },
   privacyDisclosure: {
     status: 'blocked', evidence: null,
@@ -46,11 +42,43 @@ export const serviceReadiness = {
   },
 };
 
-export function assertReleaseReady(platform, nativeRecords = readiness, serviceRecords = serviceReadiness) {
+// Required keys come from the checked-in policy, never from caller-provided evidence.
+export const platformServiceReadiness = {
+  ios: {
+    storeVerification: {
+      status: 'blocked', evidence: null,
+      reason: 'Configure server-side Apple verification credentials and prove sandbox purchase, restore, expiry and cancellation against the intended backend.',
+    },
+    storeAccount: {
+      status: 'blocked', evidence: null,
+      reason: 'Verify the Apple team and intended App Store Connect account/app and signing identity.',
+    },
+  },
+  android: {
+    storeVerification: {
+      status: 'blocked', evidence: null,
+      reason: 'Deferred Android release: configure server-side Google verification credentials and prove Play test purchase, restore, expiry and cancellation against the intended backend.',
+    },
+    storeAccount: {
+      status: 'blocked', evidence: null,
+      reason: 'Deferred Android release: verify the Google Play account/app and signing identity and grant the submission service account access to the intended app.',
+    },
+  },
+};
+
+export function assertReleaseReady(platform, nativeRecords = readiness, serviceRecords = serviceReadiness, platformRecords = platformServiceReadiness) {
   for (const key of Object.keys(serviceReadiness)) {
     const record = serviceRecords[key];
     if (record?.status !== 'ready' || typeof record.evidence !== 'string' || !record.evidence.trim()) {
       throw new Error(`Service release blocked (${key}): ${record?.reason ?? 'missing reviewed integration evidence'} See docs/CI_CD_SETUP_GUIDE.md.`);
+    }
+  }
+  const required = platformServiceReadiness[platform];
+  if (!required) throw new Error(`Unknown release platform: ${platform}`);
+  for (const key of Object.keys(required)) {
+    const record = platformRecords[platform]?.[key];
+    if (record?.status !== 'ready' || typeof record.evidence !== 'string' || !record.evidence.trim()) {
+      throw new Error(`Platform service release blocked (${platform}/${key}): ${record?.reason ?? 'missing reviewed integration evidence'} See docs/CI_CD_SETUP_GUIDE.md.`);
     }
   }
   assertNativeReady(platform, nativeRecords);

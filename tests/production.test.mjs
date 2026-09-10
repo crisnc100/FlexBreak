@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { bootstrap, repository, workflowPath, validateProductionSource, selectCheckpoint, classifyPaths } from '../scripts/production-plan.mjs';
+import { assertReleaseReady, serviceReadiness, platformServiceReadiness } from '../scripts/release-readiness.mjs';
 import { preflightProduction, runMobile } from '../scripts/production-preflight.mjs';
 const tip = 'a'.repeat(40), previous = 'b'.repeat(40);
 const env = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main', GITHUB_REPOSITORY: repository, GITHUB_RUN_ATTEMPT: '1', GITHUB_SHA: tip, HAS_EXPO_TOKEN: 'true', HAS_SUPABASE_TOKEN: 'true', ASC_APP_ID: '6743581671', APPLE_TEAM_ID: 'ABCDEFGHIJ' };
@@ -47,15 +48,15 @@ test('cumulative path classification handles documentation, backend, mobile, unk
   assert.deepEqual(classifyPaths(['supabase/functions/weather-v2/index.ts', 'supabase/functions/ai-chat/index.ts']), { backend: true, mobile: false });
   assert.deepEqual(classifyPaths(['src/deleted.ts', 'scripts/check-android-signing.mjs']), { backend: false, mobile: true });
   assert.deepEqual(classifyPaths(['supabase/old.ts', 'src/moved.ts']), { backend: true, mobile: true });
-  for (const path of ['.github/workflows/ci.yml', '.github/ISSUE_TEMPLATE/tool.js', 'unknown.conf', 'scripts/production-plan.mjs']) assert.deepEqual(classifyPaths([path]), { backend: true, mobile: true });
+  for (const path of ['.github/workflows/ci.yml', '.github/ISSUE_TEMPLATE/tool.js', 'unknown.conf', 'scripts/production-plan.mjs', 'scripts/release-platforms.mjs']) assert.deepEqual(classifyPaths([path]), { backend: true, mobile: true });
   for (const path of ['../bad', '/absolute', 'bad\npath']) assert.throws(() => classifyPaths([path]));
 });
 
 const config = { backend: readFileSync(new URL('../supabase/config.toml', import.meta.url), 'utf8'), app: JSON.parse(readFileSync(new URL('../app.json', import.meta.url))), eas: JSON.parse(readFileSync(new URL('../eas.json', import.meta.url))), supabaseVersion: '2.117.0', easVersion: '24.0.0' };
-test('combined preflight checks both platforms before callers can deploy; no-op needs no credentials', () => {
+test('combined preflight checks iOS before callers can deploy; no-op needs no credentials', () => {
   const calls = [];
-  assert.throws(() => { preflightProduction({ backend: true, mobile: true }, env, config, platform => { calls.push(platform); if (platform === 'android') throw new Error('blocked device'); }); calls.push('deploy'); }, /blocked device/);
-  assert.deepEqual(calls, ['ios', 'android']);
+  assert.throws(() => { preflightProduction({ backend: true, mobile: true }, env, config, platform => { calls.push(platform); if (platform === 'ios') throw new Error('blocked device'); }); calls.push('deploy'); }, /blocked device/);
+  assert.deepEqual(calls, ['ios']);
   assert.throws(() => preflightProduction({ backend: true, mobile: true }, env, config), /release blocked/);
   for (const change of [{ HAS_EXPO_TOKEN: 'false' }, { HAS_SUPABASE_TOKEN: 'false' }, { APPLE_TEAM_ID: '' }, { ASC_APP_ID: '' }]) assert.throws(() => preflightProduction({ backend: true, mobile: true }, { ...env, ...change }, config, () => {}));
   assert.throws(() => preflightProduction({ backend: true, mobile: true }, env, { ...config, easVersion: 'old' }, () => {}));
@@ -63,10 +64,10 @@ test('combined preflight checks both platforms before callers can deploy; no-op 
   assert.doesNotThrow(() => preflightProduction({ backend: false, mobile: false }, {}, {}));
 });
 
-test('mobile sequencing awaits iOS before Android and stops on failure', async () => {
+test('mobile execution awaits only iOS and propagates failure', async () => {
   const calls = [];
   await runMobile(async platform => { calls.push(platform); });
-  assert.deepEqual(calls, ['ios', 'android']);
+  assert.deepEqual(calls, ['ios']);
   calls.length = 0;
   await assert.rejects(runMobile(async platform => { calls.push(platform); throw new Error('upload failed'); }), /upload failed/);
   assert.deepEqual(calls, ['ios']);
@@ -75,6 +76,13 @@ test('mobile sequencing awaits iOS before Android and stops on failure', async (
 test('actual workflow preflights before backend/mobile and isolates deployment tokens', async () => {
   const { default: yaml } = await import('js-yaml');
   const workflow = yaml.load(readFileSync(new URL('../.github/workflows/auto-production.yml', import.meta.url), 'utf8'));
+  assert.equal(workflow.on.workflow_dispatch?.inputs, undefined);
+  assert.ok(Object.hasOwn(workflow.on, 'workflow_dispatch'));
+  for (const entry of Object.values(workflow.jobs)) {
+    assert.equal(entry.env?.RELEASE_PLATFORM, undefined);
+    for (const step of entry.steps ?? []) assert.equal(step.env?.RELEASE_PLATFORM, undefined);
+  }
+  assert.equal(workflow.env?.RELEASE_PLATFORM, undefined);
   const job = workflow.jobs.production;
   assert.equal(job.if, undefined, 'no-op production job must not be skipped');
   const commands = job.steps.filter(step => step.run);
@@ -89,4 +97,22 @@ test('actual workflow preflights before backend/mobile and isolates deployment t
   assert.equal(workflow.jobs.quality.secrets, undefined);
   const legacy = yaml.load(readFileSync(new URL('../.github/workflows/deploy-backend.yml', import.meta.url), 'utf8'));
   assert.notEqual(legacy.concurrency.group, workflow.concurrency.group);
+});
+
+
+test('iOS preflight needs no Google credentials or Android evidence and ignores platform env overrides', () => {
+  const ready = { status: 'ready', evidence: 'Reviewed iOS integration and device results' };
+  const services = Object.fromEntries(Object.keys(serviceReadiness).map(key => [key, ready]));
+  const platformRecords = { ios: Object.fromEntries(Object.keys(platformServiceReadiness.ios).map(key => [key, ready])) };
+  const calls = [];
+  preflightProduction({ backend: true, mobile: true }, { ...env, RELEASE_PLATFORM: 'android', RELEASE_PLATFORMS: 'ios,android' }, config, platform => {
+    calls.push(platform);
+    assertReleaseReady(platform, { ios: ready }, services, platformRecords);
+  });
+  assert.deepEqual(calls, ['ios']);
+  for (const key of Object.keys(serviceReadiness)) {
+    const missing = { ...services };
+    delete missing[key];
+    assert.throws(() => preflightProduction({ backend: true, mobile: true }, env, config, platform => assertReleaseReady(platform, { ios: ready }, missing, platformRecords)), /Service release blocked/);
+  }
 });

@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { assertCurrentMainSync } from './production-plan.mjs';
+import { assertReleasePlatform } from './release-platforms.mjs';
 import { assertReleaseReady } from './release-readiness.mjs';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -65,11 +66,12 @@ function eas(args, capture = false) {
   return result.stdout;
 }
 
-export function main() {
+export function main(checkReady = assertReleaseReady) {
   const env = process.env;
   const app = JSON.parse(readFileSync('app.json', 'utf8'));
   const inputs = validateInputs(env, app);
-  assertReleaseReady(inputs.platform);
+  assertReleasePlatform(inputs.platform);
+  checkReady(inputs.platform);
   const json = eas(['build', '--platform', inputs.platform, '--profile', 'production', '--wait', '--json', '--non-interactive'], true);
   const buildId = validateBuildResult(json, inputs);
   appendFileSync(env.GITHUB_STEP_SUMMARY, `Built ${inputs.platform} from ${inputs.sourceSha}. EAS build ID: ${buildId}.\n`);

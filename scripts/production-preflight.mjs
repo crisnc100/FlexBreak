@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateInputs } from './release.mjs';
 import { deploymentPlan, cliVersion } from './deploy-backend.mjs';
+import { releasePlatforms } from './release-platforms.mjs';
 import { assertReleaseReady } from './release-readiness.mjs';
 
 export function preflightProduction(plan, env, config, checkReady = assertReleaseReady) {
@@ -15,15 +16,14 @@ export function preflightProduction(plan, env, config, checkReady = assertReleas
   if (plan.mobile) {
     if (env.HAS_EXPO_TOKEN !== 'true') throw new Error('Expo deployment token missing.');
     if (config.easVersion !== '24.0.0' || config.eas.cli?.version !== '24.0.0' || config.eas.build?.production?.distribution !== 'store' || config.eas.build.production.environment !== 'production') throw new Error('Unexpected EAS production configuration/version.');
-    for (const platform of ['ios', 'android']) {
+    for (const platform of releasePlatforms) {
       validateInputs({ ...env, RELEASE_PLATFORM: platform, RELEASE_ACTION: 'build-and-submit', EXPO_TOKEN: 'presence-checked' }, config.app);
       checkReady(platform);
     }
   }
 }
 export async function runMobile(run) {
-  await run('ios');
-  await run('android');
+  for (const platform of releasePlatforms) await run(platform);
 }
 function main() {
   const plan = { backend: process.env.PLAN_BACKEND === 'true', mobile: process.env.PLAN_MOBILE === 'true' };
