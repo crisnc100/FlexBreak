@@ -34,8 +34,8 @@ export class Sound {
   private subscription?: { remove(): void };
   private removed = false;
   private constructor(private player: AudioPlayer) {}
-  static async createAsync(source: AudioSource, initial: { shouldPlay?: boolean; volume?: number; isLooping?: boolean } = {}, callback?: ((status: PlaybackStatus) => void) | null) {
-    const player = createAudioPlayer(source, { updateInterval: 250 });
+  static async createAsync(source: AudioSource, initial: { shouldPlay?: boolean; volume?: number; isLooping?: boolean; keepAudioSessionActive?: boolean } = {}, callback?: ((status: PlaybackStatus) => void) | null) {
+    const player = createAudioPlayer(source, { updateInterval: 250, keepAudioSessionActive: initial.keepAudioSessionActive ?? false });
     const sound = new Sound(player);
     try {
       await new Promise<void>((resolve, reject) => {

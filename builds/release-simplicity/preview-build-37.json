@@ -1,0 +1,15 @@
+{
+  "id": "3d58b13a-525f-4994-9927-993257a3bca5",
+  "status": "FINISHED",
+  "platform": "IOS",
+  "buildProfile": "preview",
+  "distribution": "INTERNAL",
+  "appBuildVersion": "37",
+  "gitCommitHash": "e35ccb9ba88387497a7ba8ee8de085ed7f18d8d9",
+  "isForIosSimulator": false,
+  "buildPage": "https://expo.dev/accounts/crisnc100/projects/flexbreak/builds/3d58b13a-525f-4994-9927-993257a3bca5",
+  "limitations": [
+    "Build completion only; device installation and behavior remain unverified.",
+    "StoreKit and production readiness remain unqualified."
+  ]
+}

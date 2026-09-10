@@ -33,7 +33,7 @@ export function validateBuildResult(json, { platform, projectId, sourceSha }) {
   if (!build || !uuid.test(build.id ?? '')) throw new Error('Invalid build ID.');
   if (build.status !== 'FINISHED') throw new Error('EAS build did not finish successfully.');
   if (build.platform !== platform.toUpperCase()) throw new Error('Build platform mismatch.');
-  if (build.project?.id !== projectId) throw new Error('Build project mismatch.');
+  if (build.app?.id !== projectId) throw new Error('Build project mismatch.');
   if (build.gitCommitHash !== sourceSha) throw new Error('Build source SHA mismatch.');
   if (build.buildProfile !== 'production' || build.distribution !== 'STORE' || build.isForIosSimulator === true) {
     throw new Error('Build is not a production store binary.');
