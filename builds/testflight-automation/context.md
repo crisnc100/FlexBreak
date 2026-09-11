@@ -1,0 +1,11 @@
+# Verified context — September 11, 2026
+- Worktree release/ios-qualification at main 642eb5b6ee19bb42e9a02b25c596732ae82c78d8.
+- GitHub run 34527948754 failed at serviceReadiness.anonymousAuth, not at code CI.
+- Baseline npm test: 159 passed, zero failed.
+- Store41 submission log confirms successful Apple upload; source archive and signing evidence live under ignored .artifacts/qualification.
+- GitHub repository EXPO_TOKEN exists; cannot read/test its value locally. Production environment ASC_APP_ID=6743581671 and APPLE_TEAM_ID=7LHNAAUJQ6 match verified archive/account. Supabase token also present but not needed by proposed workflow.
+- Separate workflow required: production-plan.selectCheckpoint interprets successful auto-production runs as fully deployed history. Qualification-only success cannot safely share that history.
+- Existing manual ad-hoc preview helper provides orchestration/testing style; release.mjs exports production/store validator and submission-config constructor.
+- Policy publication is done, but store privacy labels and billing/identity qualification remain incomplete. No readiness record can truthfully be marked fully ready from this change.
+- Expo official docs https://docs.expo.dev/submit/ios/ and https://docs.expo.dev/submit/testflight/ confirm upload enters Apple processing/TestFlight, not public App Review. Internal distribution can require existing tester-group/compliance setup.
+- Installed EAS CLI24 source verified: build/commands/submit.js:131–135 calls waitToCompleteAsync then exitWithNonZeroCodeIfSomeSubmissionsDidntFinish; build/submit/submit.js exits1 for any non-FINISHED submission. Captured submit exit status is therefore a meaningful upload outcome, not merely scheduling success.

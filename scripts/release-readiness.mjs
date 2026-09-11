@@ -21,7 +21,9 @@ export function assertNativeReady(platform, records = readiness) {
   }
 }
 
-// These dependencies are required by the new client even in TestFlight/internal testing.
+// These dependencies must be qualified before the normal release pipeline opens.
+// The separate owner-authorized TestFlight qualification workflow gathers that evidence;
+// it does not make the dependencies ready or change these release gates.
 // Evidence must identify the tested environment, source/build and result in a reviewed report.
 export const serviceReadiness = {
   anonymousAuth: {

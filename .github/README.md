@@ -7,3 +7,5 @@
 `workflows/deploy-backend.yml` is manual legacy containment only, using a separate queue. No workflow automatically publishes a public store release, changes rules/secrets or deletes remote functions.
 
 Automation is prepared but blocked on account/backend/native/device setup and accurate public privacy disclosure. See the [production runbook](../docs/CI_CD_SETUP_GUIDE.md) and [backend bootstrap/containment](../docs/BACKEND_DEPLOYMENT.md). Protect main; without optional environment reviewers, merging is the deployment approval boundary.
+
+`workflows/iphone-testflight.yml` provides **Build and upload to TestFlight → Run workflow** on main for owner-authorized qualification. It runs full CI, then builds and uploads a verified production iOS artifact. It never deploys the backend or advances production checkpoints. The existing automatic production preflight remains blocked until all release evidence is complete. See the [short deployment steps](../docs/RELEASING.md).
