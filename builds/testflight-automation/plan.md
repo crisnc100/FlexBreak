@@ -1,0 +1,16 @@
+# Frame
+One GitHub Actions Run workflow on main runs full CI, builds a production iOS binary, validates it and uploads that exact build to App Store Connect for TestFlight qualification. No terminal work for the operator. Existing public release gates remain blocked truthfully.
+
+# Context
+Current production run 34527948754 passed CI but failed service readiness anonymousAuth. Build41 successfully uploaded using separately authorized qualification path. Production policy currently combines public readiness and TestFlight qualification. User explicitly authorizes an easy automated TestFlight path. Implement a separate manual qualification workflow; do not make qualification successes production checkpoints. Production environment variables contain Apple IDs; secrets contain the Supabase token; inspect repository EXPO_TOKEN presence. No sandbox setting changes.
+
+# Plan / bar
+1. New manually dispatched main-only TestFlight workflow reuses ci.yml, production environment and shared non-cancelling release concurrency. No automatic public release, backend mutation, or changes to existing gates/checkpoint history.
+2. New helper validates fresh dispatch/current main before each remote mutation, expected repo/project/app/team and pinned production EAS configuration, and token presence before build.
+3. Build production iOS with pinned local CLI, wait, require exact project/source/store/finished metadata with existing validator; submit only validated ID. Restore eas.json on success/failure.
+4. Summaries provide sanitized build link, TestFlight link and actionable failure stage. Never emit secrets, signed URLs or untrusted remote output. Build/submit nonzero/error must fail; no false success. Note Apple processing remains asynchronous and existing tester setup is separate.
+5. Meaningful injected-run tests exercise happy path, build failure/malformed or wrong metadata, stale main before submission, submission failure, config restoration, wrong branch/event/repository/retry and missing configuration. Existing test suite and lint/type-check remain passing. Read-only cross-family Grade.
+6. Docs distinguish TestFlight qualification from existing blocked production workflow; no claims gates fixed or public launch ready. No commit, PR, or GitHub workflow run until requested/merged by Cris.
+
+# Bounce resolutions
+Fable 5.1 read-only plan review completed (is_error=false, modelUsage verified). Implement a separate preview-style entry point, reusing only pure release validators/config construction, never release.main or a readiness override. Capture both CLI streams, use a 340-minute subprocess timeout within the 360-minute job, and inject env/run/checkMain/summary/config IO. Use production profile explicitly. A wrong-branch guard job fails before CI. Tests assert no backend mutation/secret and original gates remain blocking. Safe verified build links may require two-phase metadata validation; otherwise report only the known dashboard. Config restoration uses temp files in tests. Apple IDs come from vars. Existing production workflow/history remain unchanged. Docs explain its continuing red preflight, shared queue cancellation limits, Apple processing and first-run token risk. Store41 upload is now confirmed successful, superseding review's stale concern about that submission; GitHub EXPO_TOKEN itself remains unverified.
