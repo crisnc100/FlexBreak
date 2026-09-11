@@ -77,7 +77,7 @@ test('actual workflow preflights before backend/mobile and isolates deployment t
   const { default: yaml } = await import('js-yaml');
   const workflow = yaml.load(readFileSync(new URL('../.github/workflows/auto-production.yml', import.meta.url), 'utf8'));
   assert.equal(workflow.on.workflow_dispatch?.inputs, undefined);
-  assert.ok(Object.hasOwn(workflow.on, 'workflow_dispatch'));
+  assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch'], 'unfinished production must never trigger on push');
   for (const entry of Object.values(workflow.jobs)) {
     assert.equal(entry.env?.RELEASE_PLATFORM, undefined);
     for (const step of entry.steps ?? []) assert.equal(step.env?.RELEASE_PLATFORM, undefined);

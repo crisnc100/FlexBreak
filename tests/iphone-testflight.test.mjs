@@ -60,9 +60,20 @@ test('fresh checks bracket a production build and exact-ID submission with confi
   assert.match(result.summaries[0], /No App Review submission/);
 });
 
+test('main push performs the same guarded exact-artifact upload as manual dispatch', async () => {
+  const manual = await exercise();
+  const pushed = await exercise({ inputs: { env: { ...env, GITHUB_EVENT_NAME: 'push' } } });
+  assert.equal(pushed.error, undefined);
+  assert.deepEqual(pushed.events, manual.events);
+  assert.deepEqual(pushed.summaries, manual.summaries);
+  const wrongBranch = await exercise({ inputs: { env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/staging' } } });
+  assert.ok(wrongBranch.error);
+  assert.deepEqual(wrongBranch.events, []);
+});
+
 test('configuration rejection happens before any remote operation', async () => {
   for (const change of [
-    { GITHUB_ACTIONS: 'false' }, { GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/staging' },
+    { GITHUB_ACTIONS: 'false' }, { GITHUB_EVENT_NAME: 'pull_request' }, { GITHUB_REF: 'refs/heads/staging' },
     { GITHUB_RUN_ATTEMPT: '2' }, { GITHUB_REPOSITORY: 'other/FlexBreak' }, { GITHUB_SHA: 'bad' },
     { EXPO_TOKEN: '' }, { ASC_APP_ID: '' }, { ASC_APP_ID: '1234567' }, { APPLE_TEAM_ID: 'AAAAAAAAAA' },
   ]) {
@@ -141,7 +152,9 @@ test('workflow runs explicit guard and full CI before an isolated TestFlight upl
   const text = readFileSync('.github/workflows/iphone-testflight.yml', 'utf8');
   const workflow = yaml.load(text);
   const production = yaml.load(readFileSync('.github/workflows/auto-production.yml', 'utf8'));
-  assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
+  assert.deepEqual(Object.keys(workflow.on).sort(), ['push', 'workflow_dispatch']);
+  assert.deepEqual(workflow.on.push, { branches: ['main'] });
+  assert.deepEqual(Object.keys(production.on), ['workflow_dispatch']);
   assert.deepEqual(workflow.concurrency, production.concurrency);
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.equal(workflow.jobs.dispatch.if, undefined);

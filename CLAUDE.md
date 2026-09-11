@@ -13,6 +13,6 @@ FlexBreak helps desk workers take stretching breaks. The mobile app combines gui
 
 Follow [AGENTS.md](AGENTS.md), including its standing permission to commit validated requested work and open a PR. Cris alone merges. Use Node 22, `npm ci`, then `npm start`; native integrations need a development/native build. `npm run verify` runs app lint, type-check, tests and mobile exports. CI also checks the Deno backend and Firestore emulator policies.
 
-For deployment, use [the short release guide](docs/RELEASING.md). The manual TestFlight workflow automates CI, a production iOS build and exact-artifact upload. Apple processing and public release are separate. iOS is the current release focus; Android store release is deferred. Do not infer readiness from old handoffs—check current gates and evidence.
+For deployment, use [the short release guide](docs/RELEASING.md). The TestFlight workflow runs after main pushes (or fresh manual dispatch) and automates CI, a production iOS build and exact-artifact upload. Production/backend deployment is manual-only and still gated. Apple processing and public release are separate. iOS is the current release focus; Android store release is deferred. Do not infer readiness from old handoffs—check current gates and evidence.
 
 See [README.md](README.md) for the repository map and [backend deployment](docs/BACKEND_DEPLOYMENT.md) for server operations. Keep this file an overview, not a session log.
