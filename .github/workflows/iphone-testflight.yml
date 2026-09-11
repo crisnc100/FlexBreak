@@ -1,5 +1,7 @@
 name: Build and upload to TestFlight
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,7 +12,7 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Require a fresh dispatch on main
+      - name: Require current main and a first attempt
         run: |
           if [ "$GITHUB_REF" != refs/heads/main ] || [ "$GITHUB_RUN_ATTEMPT" != 1 ] || [ "$GITHUB_REPOSITORY" != crisnc100/FlexBreak ]; then
             echo 'Use a fresh Run workflow on main in crisnc100/FlexBreak; do not use Re-run jobs.' >> "$GITHUB_STEP_SUMMARY"

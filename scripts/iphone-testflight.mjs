@@ -11,8 +11,8 @@ const testflight = 'https://appstoreconnect.apple.com/apps/6743581671/testflight
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function testflightInputs(env, app, config, cliVersion) {
-  if (env.GITHUB_ACTIONS !== 'true' || env.GITHUB_EVENT_NAME !== 'workflow_dispatch' || env.GITHUB_REF !== 'refs/heads/main' || env.GITHUB_RUN_ATTEMPT !== '1' || env.GITHUB_REPOSITORY !== 'crisnc100/FlexBreak' || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '')) {
-    throw new Error('Use a fresh Run workflow on this repository’s main branch.');
+  if (env.GITHUB_ACTIONS !== 'true' || !['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME) || env.GITHUB_REF !== 'refs/heads/main' || env.GITHUB_RUN_ATTEMPT !== '1' || env.GITHUB_REPOSITORY !== 'crisnc100/FlexBreak' || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '')) {
+    throw new Error('Requires a main push or fresh Run workflow in this repository.');
   }
   if (!env.EXPO_TOKEN?.trim() || env.ASC_APP_ID !== '6743581671' || env.APPLE_TEAM_ID !== '7LHNAAUJQ6') throw new Error('Missing or incorrect production account configuration.');
   if (app?.expo?.owner !== project.owner || app?.expo?.slug !== project.slug || app?.expo?.extra?.eas?.projectId !== project.projectId || app?.expo?.ios?.bundleIdentifier !== 'com.cristianortega.flexbreak') throw new Error('Unexpected app configuration.');
@@ -42,7 +42,7 @@ export async function main({
   summary = text => appendFileSync(env.GITHUB_STEP_SUMMARY, text),
 } = {}) {
   let buildUrl;
-  let stage = 'configuration (fresh main dispatch, app, production accounts and pinned CLI)';
+  let stage = 'configuration (main push or fresh dispatch, app, production accounts and pinned CLI)';
   try {
     const original = configIO.read();
     const config = JSON.parse(original);

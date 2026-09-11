@@ -1,7 +1,5 @@
-name: Automatic production deployment
+name: Production deployment (manual)
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

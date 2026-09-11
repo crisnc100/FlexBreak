@@ -51,9 +51,9 @@ npm run verify
 
 ## Test and ship
 
-For iPhone testing: **GitHub Actions → Build and upload to TestFlight → Run workflow → main**. The workflow runs CI, builds the exact main revision and uploads it to Apple. Wait for Apple processing, then use the existing TestFlight tester setup.
+Merging to **main** automatically runs **Build and upload to TestFlight**. For retries: **GitHub Actions → Build and upload to TestFlight → Run workflow → main**. The workflow runs CI, builds the exact main revision and uploads it to Apple. Wait for Apple processing, then use the existing TestFlight tester setup.
 
-The existing automatic production workflow remains gated on release qualification. TestFlight upload does not submit the app for public App Review. Android store release is currently deferred.
+**Production deployment (manual)** is dispatch-only and remains gated on release qualification. Backend changes are not deployed by TestFlight. TestFlight upload does not submit the app for public App Review. Android store release is currently deferred.
 
 - [Short deployment steps](docs/RELEASING.md)
 - [CI, signing and release qualification](docs/CI_CD_SETUP_GUIDE.md)
